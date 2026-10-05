@@ -15,6 +15,10 @@
 
 [docs/feature-spec.md](docs/feature-spec.md). 원본은 노션 CORE의 '기능 명세 통합본'이다.
 
+## 기술 가이드
+
+[docs/tech-guide.md](docs/tech-guide.md). 기술 스택, 담당별 구현 방법과 주의점, 담당자끼리 맞춰야 할 연결 지점.
+
 ## 작업 방식
 
 팀 작업 규칙(브랜치, 커밋, PR, 리뷰·머지 흐름)은 [CLAUDE.md](CLAUDE.md)에 있다. 모든 팀원의 Claude가 세션을 시작할 때 이 파일을 읽는다.
