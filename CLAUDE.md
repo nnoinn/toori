@@ -6,12 +6,14 @@
 
 | 이름 | GitHub | 담당 | 맡는 것 | 주 작업 폴더 (예정) |
 | --- | --- | --- | --- | --- |
-| Donghoon Hyun (현동훈) | nnoinn | 통합·QA | 기반 세팅, DB 스키마·인증·권한 설계와 변경 승인, 공통 UI 컴포넌트, CLAUDE.md, 자동 검사·PR 규칙, 테스트, PR 리뷰와 main 머지, 리팩토링, 다른 팀원 작업 서포팅 | `src/components/ui/`, `tests/`, `.github/`, `docs/`, `CLAUDE.md` |
-| Chanhyeong Jeong (정찬형) | chosanai | 고객(수요자) | 홈·내 주변 매물, 목록·지도 탐색, 매물 상세, 예약·결제 화면, 내 예약, 로그인 화면, 지도 API | `src/app/(customer)/` |
-| Minsuk Jung (정민석) | alstjr62 | 업주(공급자) | 업주 가입·매장 등록, 매물 3탭 등록·수정·마감, 예약 현황 캘린더, 매장 설정(신규 고객 전용 등), 업주용 대시보드 | `src/app/(owner)/` |
-| Kyumin Kang (강규민) | poiuyst282-ui | 공통·부가 | DB 스키마·인증·권한 구현(설계·변경 승인은 현동훈), 결제·환불 엔진, 알림, 업체 프로필, 정산·통계 대시보드(플랫폼 운영자용) | `prisma/`, `src/server/`, `src/app/api/`, `src/app/(admin)/` |
+| Donghoon Hyun (현동훈) | nnoinn | 통합·QA | 기반 세팅, DB 스키마·인증·권한 설계와 변경 승인, 공통 UI 컴포넌트, CLAUDE.md, 자동 검사·PR 규칙, 테스트, PR 리뷰와 main 머지, 리팩토링, 다른 팀원 작업 서포팅 | `src/components/ui/`, `src/lib/`, 루트 설정 파일(`package.json`, `src/app/layout.tsx` 등), `public/`, `tests/`, `.github/`, `docs/`, `CLAUDE.md` |
+| Chanhyeong Jeong (정찬형) | chosanai | 고객(수요자) | 홈·내 주변 매물, 목록·지도 탐색, 매물 상세, 예약·결제 화면, 내 예약, 로그인 화면, 지도 API | `src/app/(customer)/`, `src/features/map/` |
+| Minsuk Jung (정민석) | alstjr62 | 업주(공급자) | 업주 가입·매장 등록, 매물 3탭 등록·수정·마감, 예약 현황 캘린더, 매장 설정(신규 고객 전용 등), 업주용 대시보드 | `src/app/owner/` |
+| Kyumin Kang (강규민) | poiuyst282-ui | 공통·부가 | DB 스키마·인증·권한 구현(설계·변경 승인은 현동훈), 결제·환불 엔진, 알림, 업체 프로필, 정산·통계 대시보드(플랫폼 운영자용) | `src/server/`, `src/app/api/`, `src/app/admin/`, DB 스키마 폴더(DB 도구를 정하면 확정) |
 
 세션을 시작하면 `gh api user --jq .login`으로 지금 사용자가 누구인지 확인하고, 위 표의 담당에 맞게 돕는다. 폴더 경로는 프로젝트 뼈대를 만들면서 확정한다.
+
+화면 주소: 고객 화면은 `src/app/(customer)/` 아래에 두어 기본 주소(`/`, `/slots/...`, `/reservations/...`)를 쓴다. 괄호 폴더는 주소에 나타나지 않으므로, 업주 화면은 `src/app/owner/`(`/owner/...`), 운영자 화면은 `src/app/admin/`(`/admin/...`) 아래에만 만든다.
 
 ## 작업 흐름 (가장 중요한 규칙)
 
@@ -56,6 +58,7 @@ nnoinn이 아닌 팀원과 작업할 때:
 사람도 읽는 규칙이다. Claude도 지키되, 최종 책임은 사람에게 있다.
 
 - 담당 영역 밖 파일은 고치지 않는다. 필요하면 멈추고, 담당자에게 보낼 GitHub Issue 내용을 정리해 사용자에게 보여준다
+- 한 화면에서만 쓰는 서버 코드(데이터 조회·저장)는 그 화면 폴더 안에 두고 담당자가 직접 만든다. 여러 영역이 같이 쓰는 로직(결제, 환불, 정산, 알림, 정책 계산, 권한)만 `src/server/`에 두고 강규민이 만든다
 - DB 구조(스키마 파일)와 인증·권한은 현동훈(nnoinn)이 설계·변경 승인하고, 강규민이 구현한다. 다른 팀원은 DB 구조를 직접 바꾸지 않고 nnoinn에게 `schema` 라벨 Issue로 요청한다
 - 새 UI를 만들기 전에 `src/components/ui/`에 쓸 수 있는 컴포넌트가 있는지 먼저 확인한다
 - 환불 구간, 최소 할인율 같은 정책 숫자는 화면 코드에 직접 쓰지 않고 정책 파일에서 가져다 쓴다
