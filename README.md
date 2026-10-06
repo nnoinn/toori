@@ -11,6 +11,10 @@
 | 정민석 | [alstjr62](https://github.com/alstjr62) | 업주(공급자) | 업주 가입·매장 등록, 매물 3탭 등록·수정·마감, 예약 현황 캘린더, 매장 설정(신규 고객 전용 등), 업주용 대시보드 |
 | 강규민 | [poiuyst282-ui](https://github.com/poiuyst282-ui) | 공통·부가 | DB 스키마·인증·권한 구현(설계·변경 승인은 현동훈), 결제·환불 엔진, 알림, 업체 프로필, 정산·통계 대시보드(플랫폼 운영자용) |
 
+## 처음 왔다면
+
+[docs/onboarding.md](docs/onboarding.md): 세팅, Git, Claude Code 사용법, 매일 작업 흐름, 막혔을 때. 코드 규칙은 [docs/conventions.md](docs/conventions.md).
+
 ## 기능 명세
 
 [docs/feature-spec.md](docs/feature-spec.md). 원본은 노션 CORE의 '기능 명세 통합본'이다.
