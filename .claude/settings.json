@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/session-start.mjs",
+            "timeout": 60,
+            "statusMessage": "팀 브리핑 준비 중 (main 최신화)"
+          }
+        ]
+      }
+    ]
+  }
+}
