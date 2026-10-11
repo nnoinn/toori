@@ -1,0 +1,34 @@
+name: CI
+
+# PR을 올리거나 고칠 때마다 자동 검사를 돌린다. 통과해야 main에 머지할 수 있다.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: 코드 모양 검사
+        run: npm run format:check
+      - name: 린트
+        run: npm run lint
+      - name: 타입 검사
+        run: npm run typecheck
+      - name: 테스트
+        run: npm test
+      - name: 빌드
+        run: npm run build

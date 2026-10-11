@@ -1,0 +1,11 @@
+# 문서와 자동 생성 파일은 Prettier가 건드리지 않는다
+*.md
+docs/
+scripts/
+.claude/
+.github/
+node_modules/
+.next/
+package-lock.json
+src/db/migrations/
+next-env.d.ts

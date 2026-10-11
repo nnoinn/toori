@@ -72,7 +72,7 @@ winget install --id GitHub.cli -e
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-설치 확인: `git --version`, `node -v`, `gh --version` 세 개가 버전을 출력하면 된다. 설치 후 **Claude 앱을 완전히 종료했다가 다시 켠다**(Windows는 작업 표시줄 트레이 아이콘에서 종료, Mac은 `Cmd`+`Q`).
+설치 확인: `git --version`, `node -v`, `gh --version` 세 개가 버전을 출력하면 된다. **Node는 24 버전**(`v24.`로 시작)이어야 한다. 22보다 낮으면 위 방법으로 LTS를 다시 설치한다. 설치 후 **Claude 앱을 완전히 종료했다가 다시 켠다**(Windows는 작업 표시줄 트레이 아이콘에서 종료, Mac은 `Cmd`+`Q`).
 
 ### 2-2. GitHub 로그인 연결
 
@@ -104,6 +104,22 @@ gh로 내 GitHub 계정을 확인해서 git 전역 설정의 이름은 "영문 �
 온보딩 점검해줘. git·node·gh 버전, gh 로그인 계정, git 작성자 이름·이메일,
 jupjup 레포 연결 상태, .env.local이 있는지(값은 출력하지 말고)를 표로 보여줘.
 ```
+
+### 2-7. 처음 실행해 보기
+
+Claude에게 "처음 실행해줘"라고 하면 아래를 대신 해 준다.
+
+1. `npm install`: 필요한 패키지를 받는다(몇 분 걸린다)
+2. `npm run dev`: 개발 서버를 켠다
+3. 브라우저에서 `http://localhost:3000`(고객 홈), `/owner`(업주), `/admin`(운영자)이 열리면 성공이다
+
+자주 쓰는 명령은 Claude가 알아서 실행한다. 직접 알 필요는 없지만 이름만 알아 두면 좋다.
+
+| 명령 | 하는 일 |
+| --- | --- |
+| `npm run dev` | 개발 서버 켜기 (코드를 고치면 바로 반영) |
+| `npm run lint` · `npm run typecheck` · `npm test` · `npm run build` | 자동 검사. PR을 올리면 GitHub에서도 똑같이 돈다 |
+| `npm run format` | 코드 모양을 팀 규칙대로 정리 |
 
 ---
 

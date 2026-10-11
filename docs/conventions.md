@@ -46,8 +46,10 @@ Claude는 코드를 만들거나 고칠 때 이 문서를 따른다. 1장은 정
 
 ### 품질
 
-- PR을 올리기 전에 자동 검사(린트, 타입 검사, 테스트)를 통과시킨다. 명령어는 프로젝트 뼈대에서 정한다
-- 정책·돈·시간 계산 함수는 테스트를 같이 만든다
+- PR을 올리기 전에 자동 검사를 통과시킨다: `npm run format` → `npm run lint` → `npm run typecheck` → `npm test` → `npm run build`. 같은 검사가 PR마다 GitHub Actions(`.github/workflows/ci.yml`)에서도 돌고, 통과해야 머지된다
+- 정책·돈·시간 계산 함수는 테스트를 같이 만든다. 테스트 파일은 코드 옆에 `이름.test.ts`로 둔다(예: `src/lib/time.test.ts`)
+- 시간 계산은 `src/lib/time.ts`, 서버 함수 결과는 `src/lib/result.ts`의 `ok()`·`fail()`, 클래스 합치기는 `src/lib/utils.ts`의 `cn()`을 쓴다
+- 코드 모양(따옴표, 줄바꿈, Tailwind 클래스 순서)은 Prettier가 정한다. 손으로 맞추지 않는다
 - 화면은 직접 열어서 확인한다. 고객 화면은 폰 크기(폭 375px), 업주 화면은 PC와 폰 크기 둘 다, 운영자 화면은 PC 크기로 확인한다
 - 새 npm 패키지는 설치 전에 사용자에게 묻는다
 

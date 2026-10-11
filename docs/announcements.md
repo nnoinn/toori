@@ -13,6 +13,13 @@ nnoinn이 팀원에게 알릴 내용을 PR과 함께 이 파일에 추가한다.
 
 ---
 
+## 2026-10-11 · 전원 (프로젝트 뼈대)
+- 프로젝트 뼈대가 올라왔다: Next.js 16.4, TypeScript, Tailwind 4·shadcn/ui, Supabase·Drizzle·zod, Vitest, ESLint·Prettier, GitHub Actions 자동 검사. 고객 홈, `/owner`, `/admin`은 "준비 중" 화면만 있다
+- **Next.js 16.4는 Claude가 배운 내용과 다를 수 있다.** CLAUDE.md가 `AGENTS.md`를 불러와서, Claude는 코드를 쓰기 전에 `node_modules/next/dist/docs/`의 문서를 먼저 읽는다. Cache Components가 켜져 있어서 쿠키·세션을 읽는 화면은 `<Suspense>` 안에 둬야 한다(tech-guide 1)
+- 공통으로 쓸 패키지는 뼈대에 다 들어 있다. `package.json`은 현동훈 담당이니 새 패키지가 필요하면 먼저 묻는다
+- PR을 올리면 GitHub에서 코드 모양·린트·타입·테스트·빌드 검사가 자동으로 돈다. 통과해야 머지된다
+- 할 일: 10/23 개발을 시작할 때 Node 24를 확인하고(`node -v`), Claude에게 "처음 실행해줘"라고 한다(`npm install` → `npm run dev`). `.env.local`은 10/22에 단톡방으로 받는다
+
 ## 2026-10-11 · 전원 (계정·쿠폰 결정, 명세 동기화)
 - **계정 방식이 바뀌었다(앞의 Issue 답보다 이 공지가 우선):** 로그인 화면에서 고객/업주를 토글로 고르고, 같은 이메일로 고객 계정과 업주 계정을 따로 만들 수 있다. 두 계정의 정보·예약·정산은 완전히 따로이고, 업주 계정으로는 예약·결제를 할 수 없다. 로그인 정보는 하나, 계정은 둘인 구조다(CLAUDE.md 핵심 비즈니스 규칙)
 - 업주 계정을 만들 때 사업자 정보와 정산 계좌를 필수로 입력한다
