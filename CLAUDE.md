@@ -67,6 +67,7 @@ nnoinn과 작업할 때: 팀원에게 영향을 주는 변경(규칙, 문서, �
 | `docs/onboarding.md` | 팀원이 세팅, Git, Claude Code 사용법, 작업 흐름, 오류 해결을 물을 때. 이 문서를 기준으로 답한다 |
 | `docs/conventions.md` | 코드를 만들거나 고치기 전에. 이름 규칙, 화면·서버 코드 방식, 완료의 기준, 회의에서 정할 항목 |
 | `docs/feature-spec.md` | 기능 ID로 작업할 때 |
+| `docs/schema-v1.md` | DB 테이블·컬럼·상태 값을 쓰거나 바꿀 때. 바꾸려면 `schema` Issue로 요청한다 |
 | `docs/tech-guide.md` | 새 기능을 시작할 때(공통 원칙, 담당 섹션, 연결 지점), 환경변수·외부 서비스 문제를 다룰 때 |
 
 새 기능을 시작할 때:
