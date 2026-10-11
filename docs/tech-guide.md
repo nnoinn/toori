@@ -128,7 +128,23 @@
 ### 3-4. 현동훈 — 기반·스키마·품질
 
 - **Week 0:** 프로젝트 뼈대, 스키마 v1과 시드 데이터, 인증·권한 설계, 공통 UI, 정책 파일 틀, 공용 시간 함수(UTC ↔ 한국 시간), 자동 검사, Vercel 연결, 줄바꿈·Node 버전 통일. 뼈대에 `src/proxy.ts`(강규민이 채움)와 PWA manifest·`public/sw.js`(푸시 부분은 강규민) 자리, `next.config`의 Supabase Storage 이미지 주소 허용을 넣는다
-- **공통 UI:** 매물 카드, 남은 시간 타이머, 상태 배지(환불 불가, 신규 고객 전용, 임박, 다른 고객이 결제 중), 가격 표시, 레이아웃(고객: 폰, 하단 메뉴 홈/내 예약/내 정보 · 업주: PC와 폰, 메뉴 대시보드/매물 등록/매장 설정/정산 · 운영자: PC)
+- **공통 UI v1 (`src/components/ui/`, 미리보기 `/dev/ui`):** 아래 표. 운영 배포에서는 `/dev/ui`가 404다
+
+  | 컴포넌트 | 쓰는 법 | 메모 |
+  | --- | --- | --- |
+  | `SlotCard` | `shopName, menuName, startAt, serverNow, listPrice, salePrice, discountRate, badges?, imageUrl?, distanceText?, href?` | 매물 카드(C-202). 금액·배지는 서버가 계산한 값을 넘긴다 |
+  | `SlotBadge`, `SlotBadges` | `kind`: `nonRefundable`(환불 불가) / `imminent`(임박) / `newCustomerOnly`(신규 고객 전용) / `onHold`(다른 고객이 결제 중) | 어떤 배지를 붙일지는 서버가 정책 설정값으로 판단한다 |
+  | `Price` | `listPrice, salePrice, discountRate, size?` | "30% 23,500원 ~~33,500원~~" |
+  | `Countdown` | `targetAt, serverNow, variant?: 'remaining' \| 'clock', onExpire?` | 남은 시간(C-203)과 10분 홀딩 타이머(C-404). 서버 시각 기준 |
+  | `EmptyState`, `ErrorState`, `LoadingCards` | `title, description?, action?` | 목록·상세의 세 상태 |
+  | `CustomerBottomNav` | 고객 레이아웃에 들어 있음 | 홈 `/`, 내 예약 `/reservations`, 내 정보 `/me` |
+  | `OwnerNav` | 업주 레이아웃에 들어 있음. `canCreateSlot` | 대시보드 `/owner`, 매물 등록 `/owner/slots/new`(승인 전 잠금), 매장 설정 `/owner/settings`, 정산 `/owner/settlements`. PC는 왼쪽 메뉴, 폰은 메뉴 버튼 |
+  | `AdminNav` | 운영자 레이아웃에 들어 있음 | 입점 승인, 회원, 매물·예약, 이의제기, 정산 |
+  | shadcn 기본 부품 | `Button`, `Badge`, `Card`, `Sheet`, `Skeleton` | 더 필요하면 현동훈에게 알리고 추가 |
+
+  - **`serverNow` 만드는 법:** 서버 컴포넌트에서 `await getRequestNow()`(`src/lib/request-time.ts`)로 받고, 그 컴포넌트는 `<Suspense>` 안에 둔다(Cache Components 규칙). 예시는 `src/app/dev/ui/page.tsx`
+  - **형식 함수:** `formatWon`, `formatRemaining`, `formatClock`(`src/lib/format.ts`), `formatKst`(`src/lib/time.ts`)
+  - 메뉴 주소는 각 화면 담당자가 정하면서 바꿀 수 있다(바꾸면 nav 파일 한 곳만 고친다)
 - **시드 데이터:** #18·#22의 조합을 안산시 실제 좌표로 만들고, 시작 시각은 시드를 넣는 시각 기준 상대값으로 둔다. 간편 로그인만 있으므로 시드 계정으로 들어가는 개발 환경 전용 로그인을 만든다
 - **스키마 v1 설계:** [schema-v1.md](schema-v1.md). 아래 항목을 반영했다.
 - **스키마 설계 때 반영할 것:** 매물 상태 6개(노쇼는 매물을 '완료'로 두고 예약 쪽에 기록), 결제 잠금 필드, 시간 겹침 제약(S-209), 재등록 매물과 원래 매물의 연결, 신규 고객 판별 근거 데이터, 주문·결제·환불 이력, 정산, 알림 기록, 웹 푸시 구독 정보
@@ -147,7 +163,7 @@
 | 1 | DB 스키마, 매물 상태 6개 | 현동훈(설계)·강규민(구현) | 전원 | 테이블, 필드, 상태 이름 | Week 0 |
 | 2 | 로그인 사용자·역할 확인 함수 | 강규민 | 전원 | 반환 형태, 권한이 없을 때 동작 | Week 0 |
 | 3 | 시드 데이터 | 현동훈 | 정찬형, 정민석 | 가짜 샵·메뉴·매물·계정 | Week 0 |
-| 4 | 공통 UI (매물 카드, 타이머, 배지) | 현동훈 | 정찬형, 정민석 | 컴포넌트 이름과 받는 값 | Week 0~1 |
+| 4 | 공통 UI (매물 카드, 타이머, 배지, 메뉴) | 현동훈 | 정찬형, 정민석 | 컴포넌트 이름과 받는 값 (3-4 표, v1 완료) | Week 0~1 |
 | 5 | 정책 설정값 | 강규민 | 전원 | 이름과 단위(시간, %, 원) | 1단계 |
 | 6 | 주소→좌표 변환 (X-501) | 정찬형 | 정민석 (S-103) | 주소 → 위도·경도·구, 실패 시 동작 | 정민석 매장 등록 전 |
 | 7 | 신규 고객 판별 (X-104) | 강규민 | 정찬형 (C-306), 결제 재검증 | 입력(사용자, 샵) → 참/거짓 | 1단계 |

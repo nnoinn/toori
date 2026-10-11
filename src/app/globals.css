@@ -31,6 +31,9 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-sale: var(--sale);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -76,6 +79,10 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  /* 할인율 강조(text-sale)와 임박 강조(bg-warning/text-warning-foreground). 브랜드 색이 정해지면 함께 바꾼다 */
+  --sale: oklch(0.6 0.22 25);
+  --warning: oklch(0.85 0.16 80);
+  --warning-foreground: oklch(0.42 0.1 60);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -101,6 +108,9 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* 한글이 단어 중간에서 줄바꿈되지 않게 한다. 긴 영문·주소는 넘치지 않게 끊는다 */
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
   html {
     @apply font-sans;

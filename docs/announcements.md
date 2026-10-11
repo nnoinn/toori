@@ -13,6 +13,13 @@ nnoinn이 팀원에게 알릴 내용을 PR과 함께 이 파일에 추가한다.
 
 ---
 
+## 2026-10-11 · 전원 (공통 UI v1)
+- 공통 UI v1이 올라왔다: 매물 카드(`SlotCard`), 배지(`SlotBadge`), 가격(`Price`), 남은 시간·10분 홀딩 타이머(`Countdown`), 로딩·빈 화면·오류(`LoadingCards`, `EmptyState`, `ErrorState`), 고객 하단 메뉴, 업주·운영자 메뉴(PC는 왼쪽, 폰은 메뉴 버튼)
+- 개발 서버를 켜고 `http://localhost:3000/dev/ui`에서 모양을 볼 수 있다. 쓰는 법은 `docs/tech-guide.md` 3-4 표
+- 남은 시간처럼 "지금"이 필요한 화면은 서버에서 `getRequestNow()`로 시각을 받아 `<Suspense>` 안에서 쓴다(conventions)
+- 색은 브랜드 색이 정해지면 바뀐다. 화면 코드에 색 코드를 직접 쓰지 말고 `text-sale`, `bg-warning` 같은 이름을 쓴다
+- 할 일: 없음
+
 ## 2026-10-11 · 전원 (프로젝트 뼈대)
 - 프로젝트 뼈대가 올라왔다: Next.js 16.4, TypeScript, Tailwind 4·shadcn/ui, Supabase·Drizzle·zod, Vitest, ESLint·Prettier, GitHub Actions 자동 검사. 고객 홈, `/owner`, `/admin`은 "준비 중" 화면만 있다
 - **Next.js 16.4는 Claude가 배운 내용과 다를 수 있다.** CLAUDE.md가 `AGENTS.md`를 불러와서, Claude는 코드를 쓰기 전에 `node_modules/next/dist/docs/`의 문서를 먼저 읽는다. Cache Components가 켜져 있어서 쿠키·세션을 읽는 화면은 `<Suspense>` 안에 둬야 한다(tech-guide 1)
