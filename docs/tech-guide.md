@@ -12,21 +12,22 @@
 
 | 영역 | 선택 | 상태 | 메모 |
 | --- | --- | --- | --- |
-| 언어 | TypeScript (strict) | 제안 | 타입이 AI의 실수를 잡아준다 |
-| 프레임워크 | Next.js (App Router) | 확정 | 화면과 서버 코드를 한 프로젝트에서 |
+| 언어 | TypeScript 5 (strict) | 확정 | 타입이 AI의 실수를 잡아준다 |
+| 프레임워크 | Next.js 16.4 (App Router, Turbopack) + React 19 | 확정 | 화면과 서버 코드를 한 프로젝트에서. **Cache Components가 켜져 있다**: 데이터 읽기는 기본으로 요청 때마다 하고, 캐시는 `use cache`로 고른다. 쿠키·세션을 읽는 화면은 `<Suspense>` 안에 둔다. 화면 접근 보호는 `src/proxy.ts`(예전 이름 middleware). 이 버전은 학습 내용과 다를 수 있으니 `node_modules/next/dist/docs/`를 먼저 읽는다(특히 `01-app/02-guides/authentication-with-cache-components.md`) |
+| 실행 환경 | Node 24 (`.nvmrc`), npm | 확정 | 22 이상이면 실행된다 |
 | 배포 | Vercel | 확정 | 무료(Hobby)는 비상업용이고 예약 작업이 하루 1회(±59분)로 제한된다. 상용 출시 때 Pro로 전환 |
 | DB | Supabase Postgres (서울 리전) + PostGIS | 확정 | PostGIS로 "반경 N km" 검색 |
 | DB 도구 | Drizzle ORM + drizzle-kit(마이그레이션) | 확정 | Supabase DB에 접속해서 쓰는 코드용 도구이며 Supabase를 대체하지 않는다. PostGIS 위치 타입을 다루기 쉽다. Vercel에서는 Supabase의 트랜잭션 풀러 주소로 접속하고 prepared statement를 끈다(`prepare: false`) |
 | 로그인 | Supabase Auth 간편 로그인: 카카오·구글·네이버 (토스 제외) | 확정 (C-101, S-101) | 줍줍 전용 아이디·비밀번호는 만들지 않는다. 카카오·구글은 Supabase 기본 지원이라 먼저 만들고, 네이버는 Supabase 커스텀 OAuth로 그다음에 만든다(응답 형식 맞추기와 네이버 검수 필요). 토스 로그인은 토스 앱 안의 미니앱(앱인토스) 전용이라 쓰지 않는다 |
-| 이미지 저장 | Supabase Storage | 제안 | 샵·스타일 이미지 |
+| 이미지 저장 | Supabase Storage | 확정 | 샵·스타일 이미지. `next.config.ts`에서 `*.supabase.co`의 공개 버킷 이미지를 `next/image`로 쓸 수 있게 해 두었다 |
 | 결제 | 포트원 V2 (첫 결제사 채널: 토스페이먼츠) | 확정 (X-201) | 우리 코드는 포트원 방식으로만 짜고, 실제 결제사는 포트원 콘솔의 채널로 바꿀 수 있다. 개발은 테스트 채널로 |
 | 지도 | 카카오맵 JS SDK + 카카오 로컬 API | 확정 (X-503) | 카카오 로그인과 같은 카카오 개발자 앱에서 관리한다 |
 | 알림 | 웹 푸시(PWA) → 앱 푸시(앱 단계) | 확정 | 가장 중요한 건 푸시다. 카카오 알림톡은 사업자 등록 후 구현하고, 문자는 지금은 만들지 않는다(추후 논의) |
 | PWA | Next.js manifest + 서비스 워커 | 확정 (웹 퍼스트) | iOS 웹 푸시는 홈 화면에 추가한 경우에만 된다 |
-| UI | Tailwind CSS + shadcn/ui | 제안 | 공통 컴포넌트는 `src/components/ui/` |
-| 입력 검증 | zod | 제안 | 서버에서 모든 입력을 검증 |
-| 테스트 | Vitest(계산·정책), Playwright(화면 흐름) | 제안 | |
-| 자동 검사 | ESLint(또는 Biome), 타입 검사, GitHub Actions | 제안 | PR마다 실행 |
+| UI | Tailwind CSS 4 + shadcn/ui(Radix, nova 스타일) + lucide 아이콘 | 확정 | 공통 컴포넌트는 `src/components/ui/`. 부품 추가는 `npx shadcn@4.21.4 add 이름`(현동훈에게 먼저 알린다). 색·글꼴은 `src/app/globals.css`의 이름만 쓴다. 라이트 모드만 |
+| 입력 검증 | zod 4 | 확정 | 서버에서 모든 입력을 검증 |
+| 테스트 | Vitest 5(계산·정책), Playwright(화면 흐름) | Vitest 확정, Playwright 나중 | Vitest는 코드 옆 `*.test.ts`. Playwright는 시연 시나리오 테스트 때 넣는다 |
+| 자동 검사 | ESLint, Prettier, 타입 검사, GitHub Actions | 확정 | PR마다 `.github/workflows/ci.yml`이 코드 모양·린트·타입·테스트·빌드를 검사한다 |
 | 운영 | Sentry(에러), PostHog(사용자 분석) | 나중 | |
 
 ---

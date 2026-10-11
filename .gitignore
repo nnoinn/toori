@@ -1,5 +1,11 @@
 # dependencies
 node_modules/
+/.pnp
+.pnp.*
+.yarn/*
+
+# misc
+*.pem
 
 # Next.js / build
 .next/

@@ -1,0 +1,11 @@
+# Windows와 Mac이 섞여 있어서 줄바꿈을 LF로 통일한다
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary

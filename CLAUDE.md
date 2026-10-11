@@ -2,16 +2,20 @@
 
 예약 취소·빈 시간을 할인 판매하는 B2B2C 마켓. 팀 멈반죽. PWA 웹을 먼저 만들고, 완성되면 앱 UI로도 구현한다.
 
+이 프로젝트는 Next.js 16.4다. 학습한 내용과 API가 다를 수 있으므로, Next.js 코드를 쓰기 전에 아래 AGENTS.md 지시대로 `node_modules/next/dist/docs/`의 해당 문서를 먼저 읽는다.
+
+@AGENTS.md
+
 ## 팀
 
-| 이름 | GitHub | 담당 | 맡는 것 | 주 작업 폴더 (예정) |
+| 이름 | GitHub | 담당 | 맡는 것 | 주 작업 폴더 |
 | --- | --- | --- | --- | --- |
 | Donghoon Hyun (현동훈) | nnoinn | 통합·QA | 기반 세팅, DB 스키마·인증·권한 설계와 변경 승인, 공통 UI 컴포넌트, CLAUDE.md, 자동 검사·PR 규칙, 테스트, PR 리뷰와 main 머지, 리팩토링, 다른 팀원 작업 서포팅 | `src/components/ui/`, `src/lib/`, 루트 설정 파일(`package.json`, `src/app/layout.tsx` 등), `public/`, `tests/`, `.github/`, `docs/`, `CLAUDE.md` |
 | Chanhyeong Jeong (정찬형) | chosanai | 고객(수요자) | 홈·내 주변 매물, 목록·지도 탐색, 매물 상세와 업주 프로필 보기, 예약·결제 화면(쿠폰 적용 포함), 내 예약, 로그인 화면, 푸시 권한·관심 동네 화면, 지도 API | `src/app/(customer)/`, `src/features/map/` |
 | Minsuk Jung (정민석) | alstjr62 | 업주(공급자) | 업주 가입·입점 신청, 업주 프로필(샵 정보·이미지·서비스 설명)·메뉴·정산 계좌 설정, 매물 3탭 등록·수정·마감, 업주 귀책 취소 화면, 업주용 대시보드, 예약 현황 캘린더, 매물 상태 계산 | `src/app/owner/`, `src/features/slot-status/` |
 | Kyumin Kang (강규민) | poiuyst282-ui | 공통·부가 | DB 스키마·인증·권한 구현(설계·변경 승인은 현동훈), 결제·환불 엔진, 쿠폰 발급·검증, 업주 귀책 취소 처리(환불·쿠폰·패널티), 알림, 정산·통계 대시보드(플랫폼 운영자용) | `src/server/`, `src/app/api/`, `src/app/admin/`, `src/db/`(Drizzle 스키마·마이그레이션), `src/proxy.ts`와 `public/sw.js`의 푸시 부분(뼈대에서 자리를 만든다) |
 
-세션을 시작하면 `gh api user --jq .login`으로 지금 사용자가 누구인지 확인하고, 위 표의 담당에 맞게 돕는다. 폴더 경로는 프로젝트 뼈대를 만들면서 확정한다.
+세션을 시작하면 `gh api user --jq .login`으로 지금 사용자가 누구인지 확인하고, 위 표의 담당에 맞게 돕는다. 폴더는 프로젝트 뼈대에서 위 표대로 만들어 두었다. 루트 설정 파일(`package.json`, `next.config.ts`, `tsconfig.json`, `eslint.config.mjs`, `.github/` 등)은 현동훈 담당이다.
 
 화면 주소: 고객 화면은 `src/app/(customer)/` 아래에 두어 기본 주소(`/`, `/slots/...`, `/reservations/...`)를 쓴다. 괄호 폴더는 주소에 나타나지 않으므로, 업주 화면은 `src/app/owner/`(`/owner/...`), 운영자 화면은 `src/app/admin/`(`/admin/...`) 아래에만 만든다.
 
@@ -21,6 +25,7 @@
 
 - 사용자의 첫 메시지에 답하기 전에 브리핑을 3~6줄로 먼저 알린다. 브리핑 안의 우선순위를 따른다
 - 브리핑에 "바뀐 규칙·문서"가 있으면 그 파일을 바로 다시 읽고 따른다
+- 바뀐 파일에 `package.json`이 있거나 `node_modules`가 없으면 `npm install`을 실행한다
 - 브리핑이 보이지 않으면(훅 실패) `node scripts/session-start.mjs --print`를 실행해서 같은 일을 한다
 - 사용자가 "작업 시작", "새 작업", 다음 기능 ID를 말하면 같은 명령을 다시 실행해서 최신 상태에서 시작한다. 한 세션을 오래 써도 이렇게 최신화된다
 
@@ -71,7 +76,7 @@ nnoinn과 작업할 때: 팀원에게 영향을 주는 변경(규칙, 문서, �
 4. 명세에 없거나 서로 모순되는 부분, **[결정 필요]** 항목은 임의로 정하지 않고 사용자에게 묻는다
 
 PR을 올리기 전에:
-1. `docs/conventions.md`의 "완료의 기준"을 하나씩 확인한다
+1. `npm run format`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`를 실행해 모두 통과시킨다(GitHub에서도 같은 검사가 돌고, 통과해야 머지된다). 그다음 `docs/conventions.md`의 "완료의 기준"을 하나씩 확인한다
 2. 무엇을 바꿨는지 사용자에게 쉬운 말로 설명하고, 사용자가 이해했는지 확인한다
 3. PR 템플릿을 채우고, 화면이 바뀌었으면 스크린샷을 첨부하라고 안내한다
 
