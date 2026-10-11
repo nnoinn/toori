@@ -24,7 +24,7 @@
 | 지도 | 카카오맵 JS SDK + 카카오 로컬 API | 확정 (X-503) | 카카오 로그인과 같은 카카오 개발자 앱에서 관리한다 |
 | 알림 | 웹 푸시(PWA) → 앱 푸시(앱 단계) | 확정 | 가장 중요한 건 푸시다. 카카오 알림톡은 사업자 등록 후 구현하고, 문자는 지금은 만들지 않는다(추후 논의) |
 | PWA | Next.js manifest + 서비스 워커 | 확정 (웹 퍼스트) | iOS 웹 푸시는 홈 화면에 추가한 경우에만 된다 |
-| UI | Tailwind CSS 4 + shadcn/ui(Radix, nova 스타일) + lucide 아이콘 | 확정 | 공통 컴포넌트는 `src/components/ui/`. 부품 추가는 `npx shadcn@4.21.4 add 이름`(현동훈에게 먼저 알린다). 색·글꼴은 `src/app/globals.css`의 이름만 쓴다. 라이트 모드만 |
+| UI | Tailwind CSS 4 + shadcn/ui(Radix, nova 스타일) + lucide 아이콘 | 확정 | 공통 컴포넌트는 `src/components/ui/`. 부품 추가는 `npx shadcn@4.21.4 add 이름`(누구나 추가할 수 있고, PR에 적는다). 색·글꼴은 `src/app/globals.css`의 이름만 쓴다. 라이트 모드만 |
 | 입력 검증 | zod 4 | 확정 | 서버에서 모든 입력을 검증 |
 | 테스트 | Vitest 5(계산·정책), Playwright(화면 흐름) | Vitest 확정, Playwright 나중 | Vitest는 코드 옆 `*.test.ts`. Playwright는 시연 시나리오 테스트 때 넣는다 |
 | 자동 검사 | ESLint, Prettier, 타입 검사, GitHub Actions | 확정 | PR마다 `.github/workflows/ci.yml`이 코드 모양·린트·타입·테스트·빌드를 검사한다 |
@@ -140,7 +140,9 @@
   | `CustomerBottomNav` | 고객 레이아웃에 들어 있음 | 홈 `/`, 내 예약 `/reservations`, 내 정보 `/me` |
   | `OwnerNav` | 업주 레이아웃에 들어 있음. `canCreateSlot` | 대시보드 `/owner`, 매물 등록 `/owner/slots/new`(승인 전 잠금), 매장 설정 `/owner/settings`, 정산 `/owner/settlements`. PC는 왼쪽 메뉴, 폰은 메뉴 버튼 |
   | `AdminNav` | 운영자 레이아웃에 들어 있음 | 입점 승인, 회원, 매물·예약, 이의제기, 정산 |
-  | shadcn 기본 부품 | `Button`, `Badge`, `Card`, `Sheet`, `Skeleton` | 더 필요하면 현동훈에게 알리고 추가 |
+  | shadcn 기본 부품 | `Button`, `Badge`, `Card`, `Sheet`, `Skeleton` | 더 필요하면 추가해도 된다 |
+
+  - **v1은 출발점이다.** 팀원이 화면을 만들면서 모양·크기(PC·폰)·받는 값을 고치거나 새 부품을 추가할 수 있다. 기존 사용법은 깨지 않게 하고 PR에 "공통 UI 변경"을 적는다. 브랜드 색이 정해지면 색도 바뀐다
 
   - **`serverNow` 만드는 법:** 서버 컴포넌트에서 `await getRequestNow()`(`src/lib/request-time.ts`)로 받고, 그 컴포넌트는 `<Suspense>` 안에 둔다(Cache Components 규칙). 예시는 `src/app/dev/ui/page.tsx`
   - **형식 함수:** `formatWon`, `formatRemaining`, `formatClock`(`src/lib/format.ts`), `formatKst`(`src/lib/time.ts`)

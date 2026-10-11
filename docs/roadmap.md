@@ -34,7 +34,7 @@
 | ✅ | 뼈대 PR(#29): Next.js 16.4, TypeScript, Tailwind 4·shadcn/ui, 린트·Prettier·타입 검사·Vitest, GitHub Actions, 줄바꿈·Node 24 | 현동훈 |
 | ✅ | 뼈대 안의 자리: `src/proxy.ts`, PWA manifest·`public/sw.js`, `next.config` 이미지 주소, 공용 시간 함수(`src/lib/time.ts`), 결과 형태(`src/lib/result.ts`), 정책 파일 틀, `src/lib/site.ts`(서비스 이름) | 현동훈 |
 | ✅ | CI(`check`)를 main 보호 규칙의 필수 검사로 추가 | 현동훈 |
-| ⏳ | 공통 UI v1·레이아웃 (연결 #4, 미리보기 `/dev/ui`, 검토 대기) | 현동훈 |
+| ✅ | 공통 UI v1·레이아웃 (#32, 연결 #4, 미리보기 `/dev/ui`). 이후 팀원 작업을 보며 계속 조정 | 현동훈 |
 | ⏳ | 스키마 v1 설계 `docs/schema-v1.md` (#14·#18·#22 반영, 검토 대기) | 현동훈 |
 | 🔒 | 시드 데이터와 개발용 시드 계정 로그인 (연결 #3, 강규민 W1 스키마 구현 뒤) | 현동훈 |
 | ⬜ | Vercel 연결, 미리보기 보호 끄기, 폰 확인용 고정 주소를 카카오 도메인·Supabase 복귀 주소에 등록 | 현동훈 |
