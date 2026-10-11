@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | `CLAUDE.md` | Claude가 매 세션 자동으로 읽는 팀 규칙 | 자동 |
 | `docs/announcements.md` | 팀 공지 (현동훈이 작성) | 세션을 시작하면 Claude가 새 공지를 알려준다 |
+| `docs/roadmap.md` | 지금 어느 단계인지, 누가 다음에 무엇을 하는지 | "다음에 뭐 해?", "지금 뭐 기다려?"라고 물을 때 |
 | `docs/onboarding.md` | 이 문서. 세팅, Git, Claude Code 사용법, 작업 흐름, 문제 해결 | 처음, 막혔을 때 |
 | `docs/conventions.md` | 코드 작성 규칙과 팀 합의 사항 | 코드를 짤 때 |
 | `docs/feature-spec.md` | 기능 명세 (C-202 같은 ID) | 기능을 만들 때 |
