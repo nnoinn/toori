@@ -403,9 +403,9 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | total_fee_amount | integer | 플랫폼 수수료 + VAT + 결제 수수료 합 |
 | penalty_deducted | integer | 이번에 뗀 패널티 |
 | payout_amount | integer | 최종 지급액 |
-| status | text | `pending`(지급 대기) / `paid`(지급 완료) |
+| status | text | `pending`(지급 전) / `requested`(PG에 지급 요청) / `paid`(지급 완료) / `failed`(지급 실패, 재요청 필요) |
 | paid_at | timestamptz, null | |
-| paid_by | uuid, null → profiles | 수기 지급한 관리자 |
+| payout_ref | text, null | PG 지급대행 요청 번호(결과 확인·재요청용). 투리는 직접 송금하지 않는다(10/12) |
 | memo | text, null | |
 | created_at | timestamptz | |
 
@@ -525,3 +525,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | --- | --- |
 | 2026-10-11 | 계정 모드는 로그인 토큰(Hook) 대신 httpOnly 쿠키 + 서버 DB 확인으로 한다(#13 Q4 변경) |
 | 2026-10-12 | 원장님 정산·수수료는 판매가(쿠폰 전) 기준. `settlement_items`의 PG 수수료 칸을 `payment_fee`(원장님에게 받는 결제 수수료, 판매가 기준)와 `pg_fee_actual`(실제 PG 비용)로 나누고, 쿠폰 보전액 칸 대신 `coupon_amount`(투리 부담 쿠폰)를 둔다 |
+| 2026-10-12 | 투리는 돈을 직접 보내지 않는다(PG 지급대행). `settlements`의 `paid_by`(수기 지급한 관리자)를 `payout_ref`(지급대행 요청 번호)로 바꾸고 상태에 `requested`·`failed`를 더한다 |

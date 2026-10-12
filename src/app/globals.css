@@ -5,7 +5,7 @@
 /*
  * 색과 글꼴은 이 파일의 이름(테마 토큰)으로만 쓴다. 화면 코드에 색 코드(#xxxxxx)를 직접 쓰지 않는다.
  * 라이트 모드만 지원한다(다크 모드 스타일은 만들지 않는다).
- * 브랜드 색·글꼴이 정해지면 아래 :root 값만 바꾼다(현동훈 담당).
+ * 브랜드 색·글꼴(10/12 회의)은 아래 :root 값에만 있다. 바꿀 때는 여기만 고친다(현동훈 담당).
  */
 
 /* shadcn/ui 부품 안의 dark: 클래스가 폰의 다크 모드 설정으로 켜지지 않게, .dark 클래스가 있을 때만 동작하게 한다(.dark는 쓰지 않는다) */
@@ -58,26 +58,26 @@
 }
 
 :root {
-  /* 글꼴: 브랜드 글꼴이 정해지기 전까지 기기 기본 한글 글꼴 */
+  /* 글꼴: Pretendard(src/app/layout.tsx에서 불러온다). 못 불러오면 기기 기본 한글 글꼴 */
   --font-sans:
-    -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕',
-    system-ui, sans-serif;
+    'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
+    'Malgun Gothic', '맑은 고딕', system-ui, sans-serif;
 
-  /* 색: 브랜드 색이 정해지기 전까지 shadcn/ui 기본(무채색) */
-  --background: oklch(1 0 0);
+  /* 색: 브랜드 색(10/12 회의). 배경 #F3F4F6, 1st #10B981, 2nd #34D399, 3rd #D1FAE5. 카드·메뉴는 흰색으로 배경과 구분한다 */
+  --background: #f3f4f6;
   --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
+  --card: #ffffff;
   --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
+  --popover: #ffffff;
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
+  --primary: #10b981;
+  --primary-foreground: #ffffff;
+  --secondary: #34d399;
+  --secondary-foreground: #064e3b;
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --accent: #d1fae5;
+  --accent-foreground: #064e3b;
   --destructive: oklch(0.577 0.245 27.325);
   /* 할인율 강조(text-sale)와 임박 강조(bg-warning/text-warning-foreground). 브랜드 색이 정해지면 함께 바꾼다 */
   --sale: oklch(0.6 0.22 25);
@@ -85,21 +85,21 @@
   --warning-foreground: oklch(0.42 0.1 60);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: #10b981;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
+  --sidebar: #ffffff;
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-primary: #10b981;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #d1fae5;
+  --sidebar-accent-foreground: #064e3b;
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-ring: #10b981;
 }
 
 @layer base {
