@@ -345,7 +345,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 - 고객이 직접 취소하면 쓴 쿠폰은 그대로 "사용됨"으로 둔다(돌려주지 않음)
 - 원장님 귀책 취소면 `used_order_id`, `used_at`을 비워서 다시 쓸 수 있게 돌려주고, 보상 쿠폰을 새로 발급한다
 
-### owner_penalties — 원장님 패널티
+### owner_penalties — 원장님 귀책 취소 패널티
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
