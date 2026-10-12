@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: '원장님' };
 
-// 업주 대시보드(S-401). 정민석이 만든다.
+// 원장님 대시보드(S-401). 정민석이 만든다.
 export default function OwnerHomePage() {
   return (
     <main className="flex flex-1 flex-col gap-2 p-6">

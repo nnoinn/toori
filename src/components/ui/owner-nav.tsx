@@ -9,7 +9,7 @@ type OwnerNavProps = {
   canCreateSlot?: boolean;
 };
 
-// 업주 메뉴(대시보드 / 매물 등록 / 매장 설정 / 정산). 주소는 정민석이 화면을 만들면서 바꿀 수 있다(바꾸면 여기만 고친다).
+// 원장님 메뉴(대시보드 / 매물 등록 / 매장 설정 / 정산). 주소는 정민석이 화면을 만들면서 바꿀 수 있다(바꾸면 여기만 고친다).
 export function OwnerNav({ canCreateSlot = true }: OwnerNavProps) {
   return (
     <SideNav
