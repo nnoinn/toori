@@ -143,7 +143,7 @@ erDiagram
 | business_registration_number | text | 사업자등록번호(숫자 10자리) |
 | opened_on | date | 개업일자 |
 | business_doc_path | text | 사업자등록증 사진 위치(비공개 버킷 `business-docs`) |
-| mail_order_report_number | text, null | 통신판매업 신고번호(신고한 원장님만). 통신판매중개자로서 결제 전에 판매자 정보를 보여줄 때 쓴다 |
+| mail_order_report_number | text, null | 통신판매업 신고번호. **선택 입력이고 받지 않아도 된다.** 직전 연도 통신판매 50회 미만이거나 간이과세자면 신고가 면제라 없는 원장님이 많다. 있으면 결제 전 판매자 정보에 같이 보여준다 |
 | status | text | 입점 상태: `pending`(승인 대기) / `approved`(승인) / `rejected`(반려) |
 | rejection_reason | text, null | 반려 사유. 원장님에게 보여준다 |
 | applied_at | timestamptz | 입점 신청(다시 신청 포함) 시각 |
@@ -166,9 +166,11 @@ erDiagram
 | account_last4 | text | 원장님 화면 표시용 뒷자리 |
 | account_holder | text | 예금주 |
 | pg_seller_id | text, null | 토스페이먼츠 지급대행에 등록한 셀러 번호 |
-| pg_seller_status | text | `not_registered`(등록 전) / `requested`(심사 중) / `approved`(지급 가능) / `rejected`(반려). `approved`일 때만 지급을 요청한다 |
+| pg_seller_status | text | `not_registered`(등록 전) / `requested`(원장님 본인인증 대기 등 확인 중) / `approved`(지급 가능) / `rejected`(정보 오류, 수정 필요). `approved`일 때만 지급을 요청한다 |
 | pg_seller_checked_at | timestamptz, null | 셀러 상태를 마지막으로 확인한 시각 |
 | updated_at | timestamptz | |
+
+셀러 등록은 투리가 API로 한다. 원장님이 따로 할 일은 토스페이먼츠 문자로 오는 휴대폰 본인인증 한 번뿐이다. 최근 7일 지급액이 1천만 원 이상이 되면 토스가 서류 확인(KYC)을 요청할 수 있다.
 
 민감 정보라 샵 정보와 테이블을 나눈다. 전체 계좌번호는 운영자 화면에서만 복호화해 보여준다. 로그에 남기지 않는다.
 
