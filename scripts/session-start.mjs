@@ -33,8 +33,10 @@ function briefing() {
   const sections = [];
   const notes = [];
   const commonDir = git('rev-parse', '--git-common-dir').out;
-  const stateFile = path.resolve(cwd, commonDir, 'jupjup-last-seen');
-  const lastSeen = existsSync(stateFile) ? readFileSync(stateFile, 'utf8').trim() : '';
+  const stateFile = path.resolve(cwd, commonDir, 'toori-last-seen');
+  const oldStateFile = path.resolve(cwd, commonDir, 'jupjup-last-seen'); // 10/12 이름 변경 전 기록
+  const seenFile = existsSync(stateFile) ? stateFile : oldStateFile;
+  const lastSeen = existsSync(seenFile) ? readFileSync(seenFile, 'utf8').trim() : '';
 
   if (!run('git', ['fetch', 'origin', '--prune', '--quiet'], 25000).ok) {
     notes.push('GitHub에서 최신 정보를 받지 못했다(인터넷 또는 gh 로그인 확인 필요). 아래는 마지막으로 받은 정보 기준이다.');

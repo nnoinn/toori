@@ -79,7 +79,7 @@ function NavLinks({
   );
 }
 
-/** 업주·운영자 화면 메뉴. PC는 왼쪽 고정 메뉴, 폰은 위쪽 막대의 메뉴 버튼으로 연다 */
+/** 원장님·운영자 화면 메뉴. PC는 왼쪽 고정 메뉴, 폰은 위쪽 막대의 메뉴 버튼으로 연다 */
 export function SideNav({ title, items, rootHref }: SideNavProps) {
   const [open, setOpen] = useState(false);
 

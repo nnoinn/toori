@@ -24,7 +24,7 @@ DB 구조 설계안이다. 설계와 변경 승인은 현동훈, 구현(Drizzle 
 ```mermaid
 erDiagram
   profiles ||--o| customers : "고객 계정"
-  profiles ||--o| owners : "업주 계정"
+  profiles ||--o| owners : "원장님 계정"
   owners ||--|| shops : "MVP는 1:1"
   shops ||--|| payout_accounts : "정산 계좌"
   shops ||--o{ shop_images : ""
@@ -47,7 +47,7 @@ erDiagram
 
 ## 1. 계정
 
-로그인 정보(Supabase `auth.users`)는 사람마다 하나다. 그 아래 **고객 계정(`customers`)과 업주 계정(`owners`)을 따로** 만든다. 같은 이메일로 둘 다 가질 수 있고, 두 계정의 정보·예약·정산은 완전히 따로다.
+로그인 정보(Supabase `auth.users`)는 사람마다 하나다. 그 아래 **고객 계정(`customers`)과 원장님 계정(`owners`)을 따로** 만든다. 같은 이메일로 둘 다 가질 수 있고, 두 계정의 정보·예약·정산은 완전히 따로다.
 
 ### profiles — 로그인한 사람 (auth.users와 1:1)
 
@@ -70,18 +70,18 @@ erDiagram
 | withdrawn_at | timestamptz, null | 탈퇴 시각(C-106, P1) |
 | created_at | timestamptz | |
 
-### owners — 업주 계정
+### owners — 원장님 계정
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | id | uuid PK | |
-| user_id | uuid, unique → profiles | 한 사람당 업주 계정 하나 |
+| user_id | uuid, unique → profiles | 한 사람당 원장님 계정 하나 |
 | name | text | 원장님 이름(표시용) |
-| phone | text | 업주 연락처 |
+| phone | text | 원장님 연락처 |
 | withdrawn_at | timestamptz, null | |
 | created_at | timestamptz | |
 
-업주 계정은 가입 흐름(S-101)에서 사업자 정보·정산 계좌와 **한 번에** 만든다. `owners` + `shops` + `payout_accounts`를 한 트랜잭션으로 저장한다.
+원장님 계정은 가입 흐름(S-101)에서 사업자 정보·정산 계좌와 **한 번에** 만든다. `owners` + `shops` + `payout_accounts`를 한 트랜잭션으로 저장한다.
 
 ### terms_agreements — 약관 동의 기록
 
@@ -96,28 +96,28 @@ erDiagram
 
 ### 지금 어느 계정으로 들어왔는지 (계정 모드)
 
-- 로그인 화면의 고객/업주 토글 값을 서버가 **httpOnly 쿠키**(`account_mode`: `customer` / `owner`)로 저장한다. 계정 전환도 이 쿠키를 바꾼다.
-- `src/proxy.ts`는 Supabase 로그인 세션과 이 쿠키만 보고 1차로 막는다. 업주 모드가 아니면 `/owner`를 막고, 로그인하지 않았으면 `/admin`을 막는다.
+- 로그인 화면의 고객/원장님 토글 값을 서버가 **httpOnly 쿠키**(`account_mode`: `customer` / `owner`)로 저장한다. 계정 전환도 이 쿠키를 바꾼다.
+- `src/proxy.ts`는 Supabase 로그인 세션과 이 쿠키만 보고 1차로 막는다. 원장님 모드가 아니면 `/owner`를 막고, 로그인하지 않았으면 `/admin`을 막는다.
 - 서버 함수는 한 번 더 확인한다. 권한 함수가 DB를 보고 판단하므로, 쿠키를 바꿔도 없는 계정의 권한은 생기지 않는다.
   - `requireCustomer()`: 고객 모드이고 `customers` 행이 있어야 한다. 예약·결제는 이것만 통과한다
-  - `requireOwner()`: 업주 모드이고 `owners` 행이 있어야 한다. `requireShopOwner(shopId)`는 그 샵의 주인인지까지 본다
+  - `requireOwner()`: 원장님 모드이고 `owners` 행이 있어야 한다. `requireShopOwner(shopId)`는 그 샵의 주인인지까지 본다
   - `requireAdmin()`: `profiles.is_admin`이 true여야 한다
 - **#13 Q4 변경(10/11 결정):** 계정이 둘로 나뉘면서 로그인 토큰에 역할을 넣는 방식(Custom Access Token Hook)이 복잡해졌다. 토큰은 토글 값을 알 수 없고, 계정을 바꿀 때마다 토큰을 다시 받아야 한다. 그래서 Hook은 쓰지 않고 위 방식으로 한다. Supabase 대시보드에서 Hook을 켤 일(#12 K4)도 없어졌다
 - 알아 둘 점
-  - 모드는 기기(브라우저)마다 따로 기억된다. 폰에서 업주로 바꿔도 PC는 그대로다
+  - 모드는 기기(브라우저)마다 따로 기억된다. 폰에서 원장님으로 바꿔도 PC는 그대로다
   - 쿠키가 지워지면 고객 모드로 돌아가고, 다시 고르면 된다
-  - proxy는 쿠키만 보므로, 업주 화면의 레이아웃과 서버 함수에서도 `requireOwner()`로 다시 확인해야 한다
+  - proxy는 쿠키만 보므로, 원장님 화면의 레이아웃과 서버 함수에서도 `requireOwner()`로 다시 확인해야 한다
 
 ---
 
 ## 2. 샵
 
-### shops — 샵(업주 프로필)
+### shops — 샵(원장님 프로필)
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | id | uuid PK | |
-| owner_id | uuid, unique → owners | MVP는 업주 하나에 샵 하나. 여러 샵이 필요해지면 unique를 푼다 |
+| owner_id | uuid, unique → owners | MVP는 원장님 하나에 샵 하나. 여러 샵이 필요해지면 unique를 푼다 |
 | name | text | 샵 이름 |
 | category | text | 업종: `hair`(미용실) / `nail_lash`(네일·속눈썹) |
 | phone | text | 샵 전화번호 |
@@ -129,7 +129,7 @@ erDiagram
 | sigungu_code | text | 지역 필터·동네 선택·관심 지역 기준(X-502) |
 | location | PostGIS 점(WGS84, SRID 4326) | 지도·거리 검색. **GIST 인덱스** |
 | business_hours | jsonb | 요일별 여는·닫는 시각과 쉬는 날. 형식은 zod로 검사 |
-| description | text, null | 업주 프로필의 서비스 설명 |
+| description | text, null | 원장님 프로필의 서비스 설명 |
 | instagram_url | text, null | |
 | naver_place_url | text, null | |
 | business_name | text | 상호(사업자등록증 기준) |
@@ -138,7 +138,7 @@ erDiagram
 | opened_on | date | 개업일자 |
 | business_doc_path | text | 사업자등록증 사진 위치(비공개 버킷 `business-docs`) |
 | status | text | 입점 상태: `pending`(승인 대기) / `approved`(승인) / `rejected`(반려) |
-| rejection_reason | text, null | 반려 사유. 업주에게 보여준다 |
+| rejection_reason | text, null | 반려 사유. 원장님에게 보여준다 |
 | applied_at | timestamptz | 입점 신청(다시 신청 포함) 시각 |
 | reviewed_at | timestamptz, null | |
 | reviewed_by | uuid, null → profiles | 처리한 관리자 |
@@ -154,7 +154,7 @@ erDiagram
 | shop_id | uuid, unique → shops | |
 | bank_code | text | 은행 코드 |
 | account_number_encrypted | text | 계좌번호 암호문. 서버에서 암호화(키는 서버 환경변수) |
-| account_last4 | text | 업주 화면 표시용 뒷자리 |
+| account_last4 | text | 원장님 화면 표시용 뒷자리 |
 | account_holder | text | 예금주 |
 | updated_at | timestamptz | |
 
@@ -179,8 +179,8 @@ erDiagram
 | id | uuid PK | |
 | shop_id | uuid → shops | |
 | service_type | text | 업종별 고정 목록(아래) 중 하나 |
-| name | text | 서비스 이름(업주 자유) |
-| description | text, null | 상세 설명(업주 자유) |
+| name | text | 서비스 이름(원장님 자유) |
+| description | text, null | 상세 설명(원장님 자유) |
 | list_price | integer | 정가(원) |
 | duration_minutes | integer | 소요 시간(분) |
 | sort_order | integer | |
@@ -219,7 +219,7 @@ erDiagram
 | status | text | 저장된 상태(아래) |
 | hold_customer_id | uuid, null → customers | 10분 홀딩한 고객 |
 | hold_expires_at | timestamptz, null | 홀딩 만료 시각 |
-| closed_at | timestamptz, null | 업주가 직접 마감한 시각 |
+| closed_at | timestamptz, null | 원장님이 직접 마감한 시각 |
 | close_reason | text, null | `other_channel`(다른 곳 예약) / `mistake`(잘못 올림) / `other`(기타) |
 | relisted_from_slot_id | uuid, null → slots | 재등록(S-408)으로 만든 매물이면 원래 매물 |
 | created_by | uuid → profiles | 등록한 사람 |
@@ -232,8 +232,8 @@ erDiagram
 | `scheduled` | 등록(게시 시각 전) | 예약대기. `publish_at`이 지났으면 **게시중**으로 계산 |
 | `published` | 등록(바로 게시) | 게시중. `start_at`이 지났으면 **마감**으로 계산 |
 | `reserved` | 결제 확정 | 예약됨. 시작이 지나도 방문·노쇼 처리 전까지 예약됨 |
-| `closed` | 업주 직접 마감 | 마감 |
-| `cancelled` | 예약 취소(고객·업주 귀책·자동) | 취소 |
+| `closed` | 원장님 직접 마감 | 마감 |
+| `cancelled` | 예약 취소(고객·원장님 귀책·자동) | 취소 |
 | `completed` | 방문·노쇼 처리 | 완료(노쇼 여부는 예약에 기록) |
 
 **홀딩.** "저장 상태가 게시중으로 계산되고, 홀딩이 없거나 `hold_expires_at`이 지난 경우에만" 홀딩을 거는 업데이트 한 번으로 처리한다(동시에 눌러도 한 명만 성공). 한 고객이 동시에 1개만 홀딩하도록 서버에서 확인한다. 만료된 홀딩은 시각 비교로 무시한다.
@@ -289,9 +289,9 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | visit_recorded_at | timestamptz, null | 서비스 시작 이후에만 기록 가능 |
 | visit_recorded_by | uuid, null → profiles | |
 | cancelled_at | timestamptz, null | |
-| cancel_actor | text, null | `customer`(고객 취소) / `owner_fault`(업주 귀책) / `system`(자동) / `admin`(운영자) |
+| cancel_actor | text, null | `customer`(고객 취소) / `owner_fault`(원장님 귀책) / `system`(자동) / `admin`(운영자) |
 | cancel_reason | text, null | |
-| hours_before_start_at_cancel | numeric, null | 취소할 때 시작까지 남은 시간. 업주 귀책 취소 제재 기준을 정할 데이터 |
+| hours_before_start_at_cancel | numeric, null | 취소할 때 시작까지 남은 시간. 원장님 귀책 취소 제재 기준을 정할 데이터 |
 | created_at | timestamptz | |
 
 신규 고객 판별(X-104): 고객이 그 샵 매물에 `confirmed` 또는 `completed` 예약이 있으면 "이력 있음"이다. 취소된 예약(위약금만 낸 건 포함)은 이력이 아니다.
@@ -336,16 +336,16 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | customer_id | uuid → customers | |
 | amount | integer | 예: 3,000원(정책 설정값) |
 | reason | text | `owner_fault_compensation` / `promotion` / `invite` |
-| source_reservation_id | uuid, null → reservations | 업주 귀책 보상일 때 원인 예약 |
+| source_reservation_id | uuid, null → reservations | 원장님 귀책 보상일 때 원인 예약 |
 | issued_at | timestamptz | |
 | expires_at | timestamptz | 발급 + 90일(정책 설정값) |
 | used_order_id | uuid, null → orders | 쓴 주문 |
 | used_at | timestamptz, null | |
 
 - 고객이 직접 취소하면 쓴 쿠폰은 그대로 "사용됨"으로 둔다(돌려주지 않음)
-- 업주 귀책 취소면 `used_order_id`, `used_at`을 비워서 다시 쓸 수 있게 돌려주고, 보상 쿠폰을 새로 발급한다
+- 원장님 귀책 취소면 `used_order_id`, `used_at`을 비워서 다시 쓸 수 있게 돌려주고, 보상 쿠폰을 새로 발급한다
 
-### owner_penalties — 업주 패널티
+### owner_penalties — 원장님 패널티
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
@@ -383,11 +383,11 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | fee_rate | integer | 적용한 수수료율(당시 값, %) |
 | fee_amount | integer | 플랫폼 수수료(원 미만 버림) |
 | fee_vat | integer | 수수료 VAT |
-| payment_fee_rate | numeric | 업주에게 받는 결제 수수료율(당시 값, 판매가의 N%) |
-| payment_fee | integer | 업주에게 받는 결제 수수료 = base_amount × payment_fee_rate |
-| payout_amount | integer | 이 거래로 업주가 받을 금액 = base_amount − fee_amount − fee_vat − payment_fee |
-| pg_fee_actual | integer | 실제 PG 수수료(실제 결제액 기준). 줍줍 손익 계산용, 업주 정산에는 쓰지 않는다 |
-| coupon_amount | integer, 기본 0 | 줍줍이 부담한 쿠폰 금액. 줍줍 손익 계산용 |
+| payment_fee_rate | numeric | 원장님에게 받는 결제 수수료율(당시 값, 판매가의 N%) |
+| payment_fee | integer | 원장님에게 받는 결제 수수료 = base_amount × payment_fee_rate |
+| payout_amount | integer | 이 거래로 원장님이 받을 금액 = base_amount − fee_amount − fee_vat − payment_fee |
+| pg_fee_actual | integer | 실제 PG 수수료(실제 결제액 기준). 투리 손익 계산용, 원장님 정산에는 쓰지 않는다 |
+| coupon_amount | integer, 기본 0 | 투리가 부담한 쿠폰 금액. 투리 손익 계산용 |
 | settlement_id | uuid, null → settlements | 어느 정산에 들어갔는지. 비어 있으면 정산 전 |
 | created_at | timestamptz | |
 
@@ -500,7 +500,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 테이블 | 인덱스·제약 | 왜 |
 | --- | --- | --- |
 | shops | GIST(location), (status), (sigungu_code) | 지도·거리 검색, 승인된 샵만, 지역 필터 |
-| slots | (status, start_at), (shop_id, start_at), 시간 겹침 EXCLUDE | 목록 조회, 업주 대시보드, S-209 |
+| slots | (status, start_at), (shop_id, start_at), 시간 겹침 EXCLUDE | 목록 조회, 원장님 대시보드, S-209 |
 | slots | check: discount_rate 10~50, end_at > start_at | |
 | reservations | unique(code), unique(slot_id), (customer_id), (status) | 예약번호, 매물당 하나, 내 예약 |
 | orders | unique(payment_id), (customer_id), (status) | 결제 검증, 복구 |
@@ -524,4 +524,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 날짜 | 결정 |
 | --- | --- |
 | 2026-10-11 | 계정 모드는 로그인 토큰(Hook) 대신 httpOnly 쿠키 + 서버 DB 확인으로 한다(#13 Q4 변경) |
-| 2026-10-12 | 업주 정산·수수료는 판매가(쿠폰 전) 기준. `settlement_items`의 PG 수수료 칸을 `payment_fee`(업주에게 받는 결제 수수료, 판매가 기준)와 `pg_fee_actual`(실제 PG 비용)로 나누고, 쿠폰 보전액 칸 대신 `coupon_amount`(줍줍 부담 쿠폰)를 둔다 |
+| 2026-10-12 | 원장님 정산·수수료는 판매가(쿠폰 전) 기준. `settlement_items`의 PG 수수료 칸을 `payment_fee`(원장님에게 받는 결제 수수료, 판매가 기준)와 `pg_fee_actual`(실제 PG 비용)로 나누고, 쿠폰 보전액 칸 대신 `coupon_amount`(투리 부담 쿠폰)를 둔다 |
