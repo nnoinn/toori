@@ -384,8 +384,9 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | fee_amount | integer | 플랫폼 수수료(원 미만 버림) |
 | fee_vat | integer | 수수료 VAT |
 | payment_fee_rate | numeric | 원장님에게 받는 결제 수수료율(당시 값, 판매가의 N%) |
-| payment_fee | integer | 원장님에게 받는 결제 수수료 = base_amount × payment_fee_rate |
-| payout_amount | integer | 이 거래로 원장님이 받을 금액 = base_amount − fee_amount − fee_vat − payment_fee |
+| payment_fee | integer | 원장님에게 받는 결제 수수료 = base_amount × payment_fee_rate(원 미만 버림) |
+| payment_fee_vat | integer | 결제 수수료 VAT |
+| payout_amount | integer | 이 거래로 원장님이 받을 금액 = base_amount − fee_amount − fee_vat − payment_fee − payment_fee_vat |
 | pg_fee_actual | integer | 실제 PG 수수료(실제 결제액 기준). 투리 손익 계산용, 원장님 정산에는 쓰지 않는다 |
 | coupon_amount | integer, 기본 0 | 투리가 부담한 쿠폰 금액. 투리 손익 계산용 |
 | settlement_id | uuid, null → settlements | 어느 정산에 들어갔는지. 비어 있으면 정산 전 |
@@ -400,7 +401,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | period_start, period_end | date | 정산 기간(주기는 2단계 전에 정한다) |
 | item_count | integer | |
 | total_base_amount | integer | |
-| total_fee_amount | integer | 플랫폼 수수료 + VAT + 결제 수수료 합 |
+| total_fee_amount | integer | 플랫폼 수수료 + VAT + 결제 수수료 + VAT 합 |
 | penalty_deducted | integer | 이번에 뗀 패널티 |
 | payout_amount | integer | 최종 지급액 |
 | status | text | `pending`(지급 전) / `requested`(PG에 지급 요청) / `paid`(지급 완료) / `failed`(지급 실패, 재요청 필요) |
@@ -526,3 +527,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 2026-10-11 | 계정 모드는 로그인 토큰(Hook) 대신 httpOnly 쿠키 + 서버 DB 확인으로 한다(#13 Q4 변경) |
 | 2026-10-12 | 원장님 정산·수수료는 판매가(쿠폰 전) 기준. `settlement_items`의 PG 수수료 칸을 `payment_fee`(원장님에게 받는 결제 수수료, 판매가 기준)와 `pg_fee_actual`(실제 PG 비용)로 나누고, 쿠폰 보전액 칸 대신 `coupon_amount`(투리 부담 쿠폰)를 둔다 |
 | 2026-10-12 | 투리는 돈을 직접 보내지 않는다(PG 지급대행). `settlements`의 `paid_by`(수기 지급한 관리자)를 `payout_ref`(지급대행 요청 번호)로 바꾸고 상태에 `requested`·`failed`를 더한다 |
+| 2026-10-12 | 결제 수수료는 VAT 별도로 확정. `settlement_items`에 `payment_fee_vat`를 더한다. 계산 예시는 [settlement-examples.md](settlement-examples.md) |
