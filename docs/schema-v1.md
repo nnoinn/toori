@@ -4,6 +4,7 @@ DB 구조 설계안이다. 설계와 변경 승인은 현동훈, 구현(Drizzle 
 
 - 근거: CLAUDE.md "핵심 비즈니스 규칙", [feature-spec.md](feature-spec.md), [tech-guide.md](tech-guide.md) 7, 팀원 요청 #14(강규민)·#18(정찬형)·#22(정민석)
 - 이 문서를 바꾸려면 `schema` 라벨 Issue로 요청한다. 구현하다가 설계와 다르게 해야 하면 멈추고 nnoinn에게 묻는다
+- **승인: 2026-10-13 nnoinn.** 강규민은 10/23부터 이 문서대로 구현한다(W1)
 
 ## 원칙
 
@@ -15,6 +16,7 @@ DB 구조 설계안이다. 설계와 변경 승인은 현동훈, 구현(Drizzle 
 | 금액 | 원 단위 `integer`. 비율은 정수 퍼센트 `integer`(예: 30 = 30%) |
 | 상태 값 | 영어 소문자 문자열로 저장하고 화면에서 한국어로 바꿔 보여준다. 값 목록은 DB `check` 제약으로 막는다 |
 | 지우지 않기 | 매물·메뉴·예약·결제·환불·정산은 실제로 지우지 않는다. 숨김·마감·취소 같은 상태와 시각으로 남긴다 |
+| 보관 기간 | 탈퇴해도 주문·예약·결제·환불 기록은 5년, 이의제기 기록은 3년 보관한다(전자상거래법). 탈퇴하면 닉네임·연락처 같은 개인 식별 정보는 지우거나 가린다 |
 | 당시 값 저장 | 정가·할인율·수수료율·위약금 비율처럼 나중에 바뀔 수 있는 값은 계산한 그 시점의 값을 행에 같이 저장한다. 정책이 바뀌어도 지난 기록은 그대로 남는다 |
 | 접근 | 브라우저는 DB에 직접 접근하지 않는다. 모든 테이블에 RLS를 켜고 정책은 만들지 않는다(기본 거부). 서버 코드(Drizzle, `DATABASE_URL`)만 읽고 쓴다 |
 | 확장 | `postgis`(위치), `btree_gist`(매물 시간 겹침 제약) |
@@ -66,7 +68,7 @@ erDiagram
 | user_id | uuid, unique → profiles | 한 사람당 고객 계정 하나 |
 | nickname | text | |
 | phone | text, null 가능 | 예약 확인·노쇼 연락용. 인증 없이 형식만 검사. 예약 전에 꼭 입력 |
-| last_interest_push_at | timestamptz, null | 관심 지역 알림 빈도 제한(3시간)용 |
+| last_interest_push_at | timestamptz, null | 관심 지역 알림을 마지막으로 보낸 시각. 하루 1번(13시) 묶음 발송에서 "그 뒤에 새로 올라온 매물"을 고르는 기준 |
 | withdrawn_at | timestamptz, null | 탈퇴 시각(C-106, P1) |
 | created_at | timestamptz | |
 
@@ -90,9 +92,13 @@ erDiagram
 | id | uuid PK | |
 | user_id | uuid → profiles | |
 | account_type | text | `customer` / `owner` |
-| terms_type | text | `service`(이용약관) / `privacy`(개인정보) / `location`(위치정보) / `supplier`(공급자 약관) |
+| terms_type | text | `service`(이용약관) / `privacy`(개인정보) / `location`(위치정보) / `supplier`(공급자 약관) / `marketing`(광고성 정보 수신, 선택) |
 | version | text | 약관 버전. 예: `2026-10-01` |
 | agreed_at | timestamptz | |
+| withdrawn_at | timestamptz, null | 동의 철회 시각. 선택 동의(`marketing`)만 철회할 수 있다 |
+
+- 관심 지역 새 매물 알림(C-601)은 광고성 정보라서 `marketing`에 동의한 고객에게만 보낸다. 동의한 지 2년이 되기 전에 다시 확인하고, 동의·철회 결과를 고객에게 알린다(정보통신망법). 예약 알림(C-602)은 거래 안내라 동의가 필요 없다
+- 예약자 이름·연락처를 원장님에게 넘기는 것은 예약 이행에 필요한 제공이다. 별도 동의가 필요한지는 약관 법률 검토 때 확인하고, 필요하면 결제 동의(C-402)와 같이 받는다
 
 ### 지금 어느 계정으로 들어왔는지 (계정 모드)
 
@@ -137,12 +143,15 @@ erDiagram
 | business_registration_number | text | 사업자등록번호(숫자 10자리) |
 | opened_on | date | 개업일자 |
 | business_doc_path | text | 사업자등록증 사진 위치(비공개 버킷 `business-docs`) |
+| mail_order_report_number | text, null | 통신판매업 신고번호(신고한 원장님만). 통신판매중개자로서 결제 전에 판매자 정보를 보여줄 때 쓴다 |
 | status | text | 입점 상태: `pending`(승인 대기) / `approved`(승인) / `rejected`(반려) |
 | rejection_reason | text, null | 반려 사유. 원장님에게 보여준다 |
 | applied_at | timestamptz | 입점 신청(다시 신청 포함) 시각 |
 | reviewed_at | timestamptz, null | |
 | reviewed_by | uuid, null → profiles | 처리한 관리자 |
 | created_at, updated_at | timestamptz | |
+
+판매자 정보(전자상거래법 통신판매중개자 의무): 고객이 결제하기 전에 상호·대표자명·주소·전화번호·사업자등록번호(신고했으면 통신판매업 신고번호)를 보여준다. 전자우편은 원장님 로그인 이메일(`profiles.email`)을 쓴다.
 
 `business_hours` 예시: `[{ "weekday": 1, "open": "10:00", "close": "20:00" }, { "weekday": 0, "closed": true }]` (weekday 0=일 ~ 6=토, 한국 시간)
 
@@ -156,6 +165,9 @@ erDiagram
 | account_number_encrypted | text | 계좌번호 암호문. 서버에서 암호화(키는 서버 환경변수) |
 | account_last4 | text | 원장님 화면 표시용 뒷자리 |
 | account_holder | text | 예금주 |
+| pg_seller_id | text, null | 토스페이먼츠 지급대행에 등록한 셀러 번호 |
+| pg_seller_status | text | `not_registered`(등록 전) / `requested`(심사 중) / `approved`(지급 가능) / `rejected`(반려). `approved`일 때만 지급을 요청한다 |
+| pg_seller_checked_at | timestamptz, null | 셀러 상태를 마지막으로 확인한 시각 |
 | updated_at | timestamptz | |
 
 민감 정보라 샵 정보와 테이블을 나눈다. 전체 계좌번호는 운영자 화면에서만 복호화해 보여준다. 로그에 남기지 않는다.
@@ -265,6 +277,8 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | coupon_id | uuid, null → coupons | |
 | coupon_amount | integer, 기본 0 | 쿠폰으로 뺀 금액 |
 | amount | integer | 실제 결제액 = 할인가 − 쿠폰. 포트원 검증 기준 |
+| refund_policy_version | text | 고객이 동의한 환불 규정 버전(C-402) |
+| refund_policy_agreed_at | timestamptz | 결제 버튼 위 환불 규정 필수 동의를 누른 시각. 환불 분쟁 때 증거로 쓴다 |
 | status | text | `pending`(결제 대기) / `paid`(결제 확인) / `confirmed`(예약 확정) / `failed`(실패) / `auto_cancelled`(자동 취소) |
 | pg_status | text, null | 포트원에서 받은 결제 상태 |
 | pay_method | text, null | 결제 수단 |
@@ -295,6 +309,17 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | created_at | timestamptz | |
 
 신규 고객 판별(X-104): 고객이 그 샵 매물에 `confirmed` 또는 `completed` 예약이 있으면 "이력 있음"이다. 취소된 예약(위약금만 낸 건 포함)은 이력이 아니다.
+
+### location_use_logs — 위치정보 이용 기록
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| id | uuid PK | |
+| user_id | uuid, null → profiles | 로그인하지 않았으면 비움 |
+| purpose | text | `nearby_search`(내 주변 매물) / `map`(지도) |
+| created_at | timestamptz | |
+
+위치 좌표는 저장하지 않고 "언제, 누가, 무엇에 위치를 썼는지"만 남긴다. 위치정보법은 위치정보 이용 사실 확인자료를 자동으로 기록하고 6개월 이상 보관하라고 한다. 위치기반서비스사업 신고 때 기준을 다시 확인한다.
 
 ### webhook_events — 포트원 웹훅 수신 기록
 
@@ -488,7 +513,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | --- | --- | --- |
 | id | uuid PK | |
 | admin_id | uuid → profiles | |
-| action | text | 예: `shop.approve`, `shop.reject`, `visit.override`, `refund.exception`, `settlement.paid` |
+| action | text | 예: `shop.approve`, `shop.reject`, `visit.override`, `refund.exception`, `settlement.payout_request`, `settlement.payout_retry` |
 | target_type | text | 예: `shop`, `reservation`, `settlement` |
 | target_id | uuid | |
 | memo | text, null | |
@@ -501,7 +526,8 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 테이블 | 인덱스·제약 | 왜 |
 | --- | --- | --- |
 | shops | GIST(location), (status), (sigungu_code) | 지도·거리 검색, 승인된 샵만, 지역 필터 |
-| slots | (status, start_at), (shop_id, start_at), 시간 겹침 EXCLUDE | 목록 조회, 원장님 대시보드, S-209 |
+| slots | (status, start_at), (shop_id, start_at), (publish_at), 시간 겹침 EXCLUDE | 목록 조회, 원장님 대시보드, 관심 지역 묶음 알림, S-209 |
+| location_use_logs | (created_at) | 6개월 지난 기록 정리 |
 | slots | check: discount_rate 10~50, end_at > start_at | |
 | reservations | unique(code), unique(slot_id), (customer_id), (status) | 예약번호, 매물당 하나, 내 예약 |
 | orders | unique(payment_id), (customer_id), (status) | 결제 검증, 복구 |
@@ -528,3 +554,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 2026-10-12 | 원장님 정산·수수료는 판매가(쿠폰 전) 기준. `settlement_items`의 PG 수수료 칸을 `payment_fee`(원장님에게 받는 결제 수수료, 판매가 기준)와 `pg_fee_actual`(실제 PG 비용)로 나누고, 쿠폰 보전액 칸 대신 `coupon_amount`(투리 부담 쿠폰)를 둔다 |
 | 2026-10-12 | 투리는 돈을 직접 보내지 않는다(PG 지급대행). `settlements`의 `paid_by`(수기 지급한 관리자)를 `payout_ref`(지급대행 요청 번호)로 바꾸고 상태에 `requested`·`failed`를 더한다 |
 | 2026-10-12 | 결제 수수료는 VAT 별도로 확정. `settlement_items`에 `payment_fee_vat`를 더한다. 계산 예시는 [settlement-examples.md](settlement-examples.md) |
+| 2026-10-13 | 최종 검토 후 승인. 더한 것: 광고성 정보 수신 동의와 철회(`terms_agreements`), 환불 규정 동의 기록(`orders`), PG 지급대행 셀러 정보(`payout_accounts`), 통신판매업 신고번호(`shops`), 위치정보 이용 기록(`location_use_logs`), 보관 기간 원칙. 관심 지역 알림 기준 시각 설명을 하루 1번 방식으로 고침 |
