@@ -115,6 +115,13 @@ function briefing() {
     }
     const issues = ghJson('issue', 'list', '--assignee', '@me', '--state', 'open', '--json', 'number,title') || [];
     if (issues.length) sections.push(['나에게 배정된 Issue', issues.map((i) => `- #${i.number} ${i.title}`).join('\n')]);
+    const mine = ghJson('issue', 'list', '--author', '@me', '--state', 'open', '--json', 'number,title,comments') || [];
+    if (mine.length) {
+      sections.push([
+        '내가 올린 열린 Issue (답이 달렸으면 확인한다. 요청·질문이 모두 해결됐을 때만 닫을지 사용자에게 묻는다)',
+        mine.map((i) => `- #${i.number} ${i.title} — 코멘트 ${i.comments?.length ?? 0}개`).join('\n'),
+      ]);
+    }
     sections.unshift(['사용자', `- GitHub: ${me}`]);
   }
 

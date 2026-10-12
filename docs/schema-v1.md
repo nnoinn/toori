@@ -379,14 +379,15 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | shop_id | uuid → shops | |
 | order_id | uuid → orders | |
 | kind | text | `sale`(이용 완료) / `penalty`(고객 취소 위약금) / `no_show`(노쇼) |
-| base_amount | integer | 남은 금액 = 실제 결제액 − 환불액 |
+| base_amount | integer | 판매가 기준 남은 금액: 이용 완료·노쇼 = 판매가, 고객 취소 = 판매가 × 위약금 비율(쿠폰과 무관) |
 | fee_rate | integer | 적용한 수수료율(당시 값, %) |
 | fee_amount | integer | 플랫폼 수수료(원 미만 버림) |
 | fee_vat | integer | 수수료 VAT |
-| pg_fee | integer | PG 수수료 |
-| pg_fee_vat | integer | PG 수수료 VAT |
-| coupon_compensation | integer, 기본 0 | 줍줍이 채워 주는 쿠폰 금액(쿠폰 보전액) |
-| payout_amount | integer | 이 거래로 업주가 받을 금액 |
+| payment_fee_rate | numeric | 업주에게 받는 결제 수수료율(당시 값, 판매가의 N%) |
+| payment_fee | integer | 업주에게 받는 결제 수수료 = base_amount × payment_fee_rate |
+| payout_amount | integer | 이 거래로 업주가 받을 금액 = base_amount − fee_amount − fee_vat − payment_fee |
+| pg_fee_actual | integer | 실제 PG 수수료(실제 결제액 기준). 줍줍 손익 계산용, 업주 정산에는 쓰지 않는다 |
+| coupon_amount | integer, 기본 0 | 줍줍이 부담한 쿠폰 금액. 줍줍 손익 계산용 |
 | settlement_id | uuid, null → settlements | 어느 정산에 들어갔는지. 비어 있으면 정산 전 |
 | created_at | timestamptz | |
 
@@ -399,8 +400,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | period_start, period_end | date | 정산 기간(주기는 2단계 전에 정한다) |
 | item_count | integer | |
 | total_base_amount | integer | |
-| total_fee_amount | integer | 수수료 + VAT + PG 수수료 합 |
-| total_coupon_compensation | integer | |
+| total_fee_amount | integer | 플랫폼 수수료 + VAT + 결제 수수료 합 |
 | penalty_deducted | integer | 이번에 뗀 패널티 |
 | payout_amount | integer | 최종 지급액 |
 | status | text | `pending`(지급 대기) / `paid`(지급 완료) |
@@ -524,3 +524,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 날짜 | 결정 |
 | --- | --- |
 | 2026-10-11 | 계정 모드는 로그인 토큰(Hook) 대신 httpOnly 쿠키 + 서버 DB 확인으로 한다(#13 Q4 변경) |
+| 2026-10-12 | 업주 정산·수수료는 판매가(쿠폰 전) 기준. `settlement_items`의 PG 수수료 칸을 `payment_fee`(업주에게 받는 결제 수수료, 판매가 기준)와 `pg_fee_actual`(실제 PG 비용)로 나누고, 쿠폰 보전액 칸 대신 `coupon_amount`(줍줍 부담 쿠폰)를 둔다 |
