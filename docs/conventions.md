@@ -7,7 +7,7 @@ Claude는 코드를 만들거나 고칠 때 이 문서를 따른다. 1장은 정
 ### 언어와 이름
 
 - 코드의 이름(변수, 함수, 파일)은 영어로 쓴다. 주석, 커밋 메시지, PR, 화면 문구는 한국어로 쓴다
-- 파일·폴더 이름은 영어 소문자-하이픈: `slot-card.tsx`, `reservation-list/`
+- 파일·폴더 이름은 영어 소문자-하이픈: `slot-card.tsx`, `reservation-list/`. import 경로의 대소문자를 실제 파일과 똑같이 쓴다(Windows·Mac은 틀려도 동작하지만 리눅스인 자동 검사·Vercel에서는 실패한다)
 - React 컴포넌트는 PascalCase(`SlotCard`), 함수·변수는 camelCase(`getNearbySlots`), 상수는 UPPER_SNAKE_CASE(`MIN_DISCOUNT_RATE`)
 - DB 테이블·컬럼은 snake_case(`start_at`), 코드에서는 camelCase(`startAt`)로 쓴다. 변환은 Drizzle 설정으로 한다
 - 커밋 메시지와 PR 제목에 기능 ID를 넣는다: `feat: C-202 매물 카드 추가`
