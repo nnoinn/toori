@@ -335,7 +335,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | id | uuid PK | |
 | customer_id | uuid → customers | |
 | amount | integer | 예: 3,000원(정책 설정값) |
-| reason | text | `owner_fault_compensation` / `promotion` / `invite` |
+| reason | text | 지금은 `owner_fault_compensation`(원장님 귀책 보상)만 쓴다. 초대 쿠폰(C-701, P2)을 만들 때 값을 더한다 |
 | source_reservation_id | uuid, null → reservations | 원장님 귀책 보상일 때 원인 예약 |
 | issued_at | timestamptz | |
 | expires_at | timestamptz | 발급 + 90일(정책 설정값) |
