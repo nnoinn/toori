@@ -211,7 +211,7 @@ erDiagram
 | list_price | integer | 등록 당시 정가 |
 | duration_minutes | integer | 등록 당시 소요 시간 |
 | discount_rate | integer | 10/20/30/40/50 중 하나(정책 설정값, `check`로 10~50) |
-| sale_price | integer | 할인가 = 정가 × (1 − 할인율), 원 미만 버림 후 100원 단위 올림. 서버가 계산해서 저장(정렬·필터용) |
+| sale_price | integer | 할인가 = 정가 × (1 − 할인율) 그대로(올림 없음, 원 미만이 생기면 버림). 서버가 계산해서 저장(정렬·필터용) |
 | new_customer_only | boolean | 신규 고객 전용 |
 | start_at | timestamptz | 서비스 시작 |
 | end_at | timestamptz | 서비스 끝 = 시작 + 소요 시간 |

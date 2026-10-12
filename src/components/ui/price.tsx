@@ -13,7 +13,7 @@ type PriceProps = {
   className?: string;
 };
 
-/** 가격 표시: "30% 23,500원 ~~33,500원~~". 금액은 계산하지 않고 받은 값만 보여준다 */
+/** 가격 표시: "30% 23,450원 ~~33,500원~~". 금액은 계산하지 않고 받은 값만 보여준다 */
 export function Price({ listPrice, salePrice, discountRate, size = 'md', className }: PriceProps) {
   return (
     <span className={cn('inline-flex flex-wrap items-baseline gap-x-1.5', className)}>
