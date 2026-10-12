@@ -62,17 +62,18 @@ Claude Code에서 레포 폴더(10/12 전에 클론했다면 `jupjup`, 그 뒤�
 
 ```powershell
 winget install --id Git.Git -e
-winget install --id OpenJS.NodeJS.LTS -e
 winget install --id GitHub.cli -e
 ```
 
-**Mac:** 터미널에서 Homebrew를 설치한다(끝에 나오는 "Next steps" 명령을 꼭 실행). 그다음 `brew install git gh`를 실행하고, Node.js는 nodejs.org에서 LTS 설치 파일로 설치한다.
+**Mac:** 터미널에서 Homebrew를 설치한다(끝에 나오는 "Next steps" 명령을 꼭 실행). 그다음 `brew install git gh`를 실행한다.
+
+**Node.js(둘 다):** [nodejs.org/dist/latest-v24.x](https://nodejs.org/dist/latest-v24.x/)에서 **24 버전** 설치 파일을 받아 설치한다. Windows는 `node-v24.…-x64.msi`, Mac은 `node-v24.….pkg`다. 10월 말부터 "LTS" 최신이 26으로 바뀌므로 LTS 버튼 대신 24를 직접 고른다
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-설치 확인: `git --version`, `node -v`, `gh --version` 세 개가 버전을 출력하면 된다. **Node는 24 버전**(`v24.`로 시작)이어야 한다. 22보다 낮으면 위 방법으로 LTS를 다시 설치한다. 설치 후 **Claude 앱을 완전히 종료했다가 다시 켠다**(Windows는 작업 표시줄 트레이 아이콘에서 종료, Mac은 `Cmd`+`Q`).
+설치 확인: `git --version`, `node -v`, `gh --version` 세 개가 버전을 출력하면 된다. **Node는 24 버전**(`v24.`로 시작)이어야 한다. 다른 버전이면 위 링크에서 24를 다시 설치한다(GitHub 자동 검사와 Vercel도 24를 쓴다). 설치 후 **Claude 앱을 완전히 종료했다가 다시 켠다**(Windows는 작업 표시줄 트레이 아이콘에서 종료, Mac은 `Cmd`+`Q`).
 
 ### 2-2. GitHub 로그인 연결
 
@@ -94,18 +95,26 @@ gh로 내 GitHub 계정을 확인해서 git 전역 설정의 이름은 "영문 �
 ### 2-5. 환경변수 파일(.env.local) 받기
 
 - `.env.local`은 DB 비밀번호와 비밀 키가 들어 있어 GitHub에 올라가지 않는다. **현동훈이 팀원 4명만 있는 단톡방에 올린다** (개발용 키만, 뼈대 완성 후).
-- 받으면 바로 레포 최상위 폴더에 `.env.local`이라는 이름으로 저장한다. Claude에게 "단톡방에서 받은 내용을 .env.local로 저장할 거야. 파일 만들 위치만 알려줘"라고 하고, 키 값은 Claude 채팅에 붙이지 않고 파일에 직접 붙여넣는다. 어떤 변수가 있는지는 `.env.example`에서 볼 수 있다.
+- 받으면 바로 레포 최상위 폴더에 `.env.local`이라는 이름으로 저장한다. Claude에게 "레포 최상위 폴더에 빈 .env.local 파일을 만들고 메모장(Mac은 텍스트 편집기)으로 열어줘"라고 한 뒤, 열린 파일에 단톡방 내용을 붙여넣고 저장한다. 키 값은 Claude 채팅에 붙이지 않는다. 어떤 변수가 있는지는 `.env.example`에서 볼 수 있다.
+- **파일 이름이 틀리기 쉽다.** Windows 메모장으로 직접 만들면 `.env.local.txt`가 될 수 있고, Mac Finder에서는 점(.)으로 시작하는 파일이 숨겨진다(`Cmd`+`Shift`+`.`으로 보기). 저장한 뒤 2-7 점검으로 이름이 정확한지 확인한다.
 - 세 명 모두 저장했다고 답하면 현동훈이 단톡방의 그 메시지를 지운다. 받은 키를 다른 곳(다른 단톡방, 노션, Issue·PR, 스크린샷)에 다시 붙이지 않는다.
 - 잃어버리면 현동훈에게 다시 요청한다. 팀원이 바뀌거나 단톡방에 다른 사람이 들어오면 현동훈이 키를 새로 발급한다.
 
-### 2-6. 점검
+### 2-6. Windows와 Mac이 섞여 있어도 괜찮은 이유
+
+- 레포, 명령, 검사는 같다. 명령은 Claude에게 시키면 내 컴퓨터에 맞게 실행한다
+- 줄바꿈(Windows CRLF, Mac LF)은 레포 설정(`.gitattributes`)이 LF로 맞춘다. `npm run format`이 나머지를 정리한다
+- **파일 이름 대소문자만 조심한다.** Windows와 Mac은 `Button.tsx`와 `button.tsx`를 같은 파일로 보지만, GitHub 자동 검사와 Vercel(리눅스)은 다른 파일로 본다. import 경로의 대소문자가 실제 파일과 다르면 내 컴퓨터에서는 되고 PR 검사에서만 실패한다. 파일 이름의 대소문자를 바꿀 때는 Claude에게 "git mv로 이름 바꿔줘"라고 한다
+- 단축키는 Windows `Ctrl` = Mac `Cmd`. 문서와 코드의 경로는 `/`로 쓴다
+
+### 2-7. 점검
 
 ```text
 온보딩 점검해줘. git·node·gh 버전, gh 로그인 계정, git 작성자 이름·이메일,
 toori 레포 연결 상태(주소가 nnoinn/toori인지), .env.local이 있는지(값은 출력하지 말고)를 표로 보여줘.
 ```
 
-### 2-7. 처음 실행해 보기
+### 2-8. 처음 실행해 보기
 
 Claude에게 "처음 실행해줘"라고 하면 아래를 대신 해 준다.
 
