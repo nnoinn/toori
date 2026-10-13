@@ -301,10 +301,10 @@
 | 미리보기 | 브랜치에 푸시할 때마다 Vercel이 만드는 주소 | 폰에서 확인, PR 리뷰 | 개발용 Supabase, 포트원 테스트 채널 |
 | 운영 | main 배포 주소 (나중에 도메인 연결) | 실제 서비스 | 운영용 Supabase, 출시 후 실제 결제 채널 |
 
-- **Vercel 프로젝트는 nnoinn 계정이 소유한다.** Vercel 문서상, 무료(Hobby) 플랜의 "커밋 작성자 = 소유자" 제한은 GitHub 조직 레포에만 적용되고 개인 계정 레포의 협업자에게는 적용되지 않는다. 그래서 팀원 커밋도 배포된다. **레포를 GitHub 조직으로 옮기면 무료 플랜으로는 배포할 수 없으니, 옮기기 전에 Pro로 전환한다.**
+- **Vercel 프로젝트는 nnoinn 계정이 소유한다.** Vercel 문서상, 무료(Hobby) 플랜의 "커밋 작성자 = 소유자" 제한은 GitHub 조직 레포에만 적용되고 개인 계정 레포의 협업자에게는 적용되지 않는다. 그래서 팀원 커밋도 배포된다. **레포를 GitHub 조직으로 옮기면 무료 플랜으로는 배포할 수 없으니, 옮기기 전에 Pro로 전환한다.** 10/13 다시 확인: Vercel 문서 중 "Git 배포" 문서(9/18 갱신)는 위처럼 개인 계정 레포 협업자는 예외라고 하지만, "협업 문제 해결" 문서(3/13 갱신)는 무료 플랜의 비공개 레포는 소유자 커밋만 배포한다고 적혀 있다. 팀원이 처음 푸시할 때 미리보기가 만들어지는지 확인하고, 막히면 레포 공개 또는 Pro 전환을 정한다.
 - **미리보기 주소(팀원마다 다른 주소):** 브랜치를 푸시하면 Vercel이 그 브랜치만의 미리보기를 만든다. 팀원마다 작업 브랜치가 다르니 주소도 서로 다르다.
   - **브랜치 고정 주소:** `https://toori-git-<브랜치>-nnoinns-projects.vercel.app`(브랜치 이름의 `/`는 `-`). 예: `feat/owner-slot-register` → `toori-git-feat-owner-slot-register-nnoinns-projects.vercel.app`. 같은 브랜치에 다시 푸시하면 같은 주소가 최신 내용으로 바뀐다. 브랜치 이름이 30자를 넘으면 Vercel이 주소를 줄여 이 공식이 안 맞을 수 있으니 브랜치 이름은 짧게 짓는다
-  - **주소 찾는 법(Claude가 한다):** ① 위 공식으로 주소를 만들고 `curl -s -o /dev/null -w "%{http_code}" <주소>`로 200인지 본다 ② 페이지 제목이 "Deployment is building"이면 빌드 중이니 1~2분 뒤 다시 본다 ③ 404면 아직 푸시하지 않았거나 주소가 줄어든 것이다. PR의 Vercel 봇 코멘트나 `gh api "repos/nnoinn/toori/deployments?ref=<브랜치>"`에 주소가 있으면 그것을 쓰고, 없으면 nnoinn에게 알린다(10/13 기준 Vercel이 PR 코멘트를 달지 않아 확인 중)
+  - **주소 찾는 법(Claude가 한다):** ① PR이 있으면 PR의 Vercel 봇 코멘트(빌드가 끝나면 주소가 생긴다) ② PR이 없으면 위 공식으로 주소를 만들고 `curl -s -o /dev/null -w "%{http_code}" <주소>`로 200인지 본다. 페이지 제목이 "Deployment is building"이면 빌드 중이니 1~2분 뒤 다시 본다 ③ 404면 아직 푸시하지 않았거나 주소가 줄어든 것이니 `gh api "repos/nnoinn/toori/deployments?ref=<브랜치>"`의 배포 상태에서 `environment_url`을 찾는다 ④ 배포가 아예 없거나 Vercel이 "배포가 막혔다"는 코멘트를 달면 nnoinn에게 알린다
   - **다른 팀원 작업 보기:** "정찬형 작업 미리보기 보여줘"라고 하면 Claude가 그 사람의 열린 PR(`gh pr list --author <GitHub 아이디>`)과 최근 푸시한 브랜치를 찾아 미리보기 주소를 알려준다. GitHub 아이디: 정찬형 `chosanai`, 정민석 `alstjr62`, 강규민 `poiuyst282-ui`, 현동훈 `nnoinn`
   - **합쳐진 결과:** main에 머지된 것은 운영 주소 `https://toori-ruby.vercel.app`에서 본다. 여러 사람 작업이 같이 잘 돌아가는지는 여기서 확인한다
   - **미리보기도 개발용 DB를 같이 쓴다.** 미리보기에서 만든 테스트 데이터는 모두에게 보이니 이름에 자기 이름을 넣는다

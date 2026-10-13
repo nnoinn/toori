@@ -143,7 +143,6 @@ erDiagram
 | business_registration_number | text | 사업자등록번호(숫자 10자리) |
 | opened_on | date | 개업일자 |
 | business_doc_path | text | 사업자등록증 사진 위치(비공개 버킷 `business-docs`) |
-| mail_order_report_number | text, null | 통신판매업 신고번호. **선택 입력이고 받지 않아도 된다.** 직전 연도 통신판매 50회 미만이거나 간이과세자면 신고가 면제라 없는 원장님이 많다. 있으면 결제 전 판매자 정보에 같이 보여준다 |
 | status | text | 입점 상태: `pending`(승인 대기) / `approved`(승인) / `rejected`(반려) |
 | rejection_reason | text, null | 반려 사유. 원장님에게 보여준다 |
 | applied_at | timestamptz | 입점 신청(다시 신청 포함) 시각 |
@@ -151,7 +150,7 @@ erDiagram
 | reviewed_by | uuid, null → profiles | 처리한 관리자 |
 | created_at, updated_at | timestamptz | |
 
-판매자 정보(전자상거래법 통신판매중개자 의무): 고객이 결제하기 전에 상호·대표자명·주소·전화번호·사업자등록번호(신고했으면 통신판매업 신고번호)를 보여준다. 전자우편은 원장님 로그인 이메일(`profiles.email`)을 쓴다.
+판매자 정보(전자상거래법 통신판매중개자 의무): 고객이 결제하기 전에 상호·대표자명·주소·전화번호·사업자등록번호를 보여준다. 통신판매업 신고번호는 받지 않는다(10/13, 중개자가 확인·제공할 항목이 아니고 신고 면제인 원장님이 많다). 전자우편은 원장님 로그인 이메일(`profiles.email`)을 쓴다.
 
 `business_hours` 예시: `[{ "weekday": 1, "open": "10:00", "close": "20:00" }, { "weekday": 0, "closed": true }]` (weekday 0=일 ~ 6=토, 한국 시간)
 
@@ -557,3 +556,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 2026-10-12 | 투리는 돈을 직접 보내지 않는다(PG 지급대행). `settlements`의 `paid_by`(수기 지급한 관리자)를 `payout_ref`(지급대행 요청 번호)로 바꾸고 상태에 `requested`·`failed`를 더한다 |
 | 2026-10-12 | 결제 수수료는 VAT 별도로 확정. `settlement_items`에 `payment_fee_vat`를 더한다. 계산 예시는 [settlement-examples.md](settlement-examples.md) |
 | 2026-10-13 | 최종 검토 후 승인. 더한 것: 광고성 정보 수신 동의와 철회(`terms_agreements`), 환불 규정 동의 기록(`orders`), PG 지급대행 셀러 정보(`payout_accounts`), 통신판매업 신고번호(`shops`), 위치정보 이용 기록(`location_use_logs`), 보관 기간 원칙. 관심 지역 알림 기준 시각 설명을 하루 1번 방식으로 고침 |
+| 2026-10-13 | 통신판매업 신고번호(`shops.mail_order_report_number`)를 뺐다. 받지 않는다 |
