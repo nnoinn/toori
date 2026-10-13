@@ -543,7 +543,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 - `btree_gist`, `postgis` 확장은 첫 마이그레이션에서 `CREATE EXTENSION IF NOT EXISTS`로 켠다
 - 시간 겹침 EXCLUDE 제약과 RLS 켜기(`ALTER TABLE ... ENABLE ROW LEVEL SECURITY`)는 Drizzle로 표현이 안 되면 마이그레이션 SQL에 직접 쓴다
 - `profiles`는 로그인 콜백에서 처음 로그인할 때 만든다(트리거 대신 서버 코드)
-- 계좌번호 암호화 키는 새 서버 환경변수로 둔다(이름 제안: `PAYOUT_ACCOUNT_ENCRYPTION_KEY`). `.env.example`에 이름을 추가하는 PR을 같이 올리면 값은 nnoinn이 만든다
+- 계좌번호 암호화 키는 서버 환경변수 `PAYOUT_ACCOUNT_ENCRYPTION_KEY`다(AES-256-GCM, 32바이트 base64). `.env.example`에 이름을 넣었고 개발용 값은 nnoinn이 만들었다(10/13). 다른 암호화 방식을 쓰려면 먼저 nnoinn에게 알린다
 - 정책 숫자(할인율 선택지, 위약금 구간, 수수료율, 쿠폰·패널티 금액, 홀딩 10분)는 DB가 아니라 `src/server/policy/`에 둔다. DB에는 계산한 당시 값만 저장한다
 - 마이그레이션은 이 문서가 승인된 뒤 PR로 올리고, nnoinn이 머지하면 강규민만 개발 DB에 적용한다
 
