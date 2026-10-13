@@ -350,5 +350,6 @@
 | `DATABASE_URL` | **서버 전용** | Drizzle DB 접속 (트랜잭션 풀러, 포트 6543) |
 | `NEXT_PUBLIC_KAKAO_MAP_JS_KEY` | 브라우저에 보여도 됨 (등록한 도메인에서만 동작) | 카카오 지도 표시 |
 | `KAKAO_REST_API_KEY` | **서버 전용** | 주소→좌표 변환(카카오 로컬 API) |
+| `PAYOUT_ACCOUNT_ENCRYPTION_KEY` | **서버 전용** | 원장님 정산 계좌번호 암호화(AES-256-GCM, 32바이트 base64). 개발용 값은 nnoinn이 만들었고(10/13), 출시 때 운영용을 따로 만든다. 값을 바꾸면 이미 암호화한 계좌를 못 읽으니 바꾸지 않는다 |
 
 카카오·구글 로그인의 Client ID·Secret은 Supabase 대시보드에 들어 있어서 우리 코드에는 없다. 새 환경변수가 필요하면 `.env.example`에 이름을 추가하는 PR을 올리고, 값은 nnoinn에게 받는다.
