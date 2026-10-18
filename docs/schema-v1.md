@@ -406,7 +406,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | order_id | uuid → orders | |
 | kind | text | `sale`(이용 완료) / `penalty`(고객 취소 위약금) / `no_show`(노쇼) |
 | base_amount | integer | 판매가 기준 남은 금액: 이용 완료·노쇼 = 판매가, 고객 취소 = 판매가 × 위약금 비율(쿠폰과 무관) |
-| fee_rate | integer | 적용한 수수료율(당시 값, %) |
+| fee_rate | integer | 적용한 플랫폼 수수료율(당시 값, %). 오픈 기간은 0 |
 | fee_amount | integer | 플랫폼 수수료(원 미만 버림) |
 | fee_vat | integer | 수수료 VAT |
 | payment_fee_rate | numeric | 원장님에게 받는 결제 수수료율(당시 값, 판매가의 N%) |
@@ -557,3 +557,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 2026-10-12 | 결제 수수료는 VAT 별도로 확정. `settlement_items`에 `payment_fee_vat`를 더한다. 계산 예시는 [settlement-examples.md](settlement-examples.md) |
 | 2026-10-13 | 최종 검토 후 승인. 더한 것: 광고성 정보 수신 동의와 철회(`terms_agreements`), 환불 규정 동의 기록(`orders`), PG 지급대행 셀러 정보(`payout_accounts`), 통신판매업 신고번호(`shops`), 위치정보 이용 기록(`location_use_logs`), 보관 기간 원칙. 관심 지역 알림 기준 시각 설명을 하루 1번 방식으로 고침 |
 | 2026-10-13 | 통신판매업 신고번호(`shops.mail_order_report_number`)를 뺐다. 받지 않는다 |
+| 2026-10-18 | 오픈 기간 플랫폼 수수료 0%(10/14 결정). 컬럼은 그대로 두고 `fee_rate`·`fee_amount`에 0을 저장한다. 할인율별 수수료는 법인 전환 때 적용 |
