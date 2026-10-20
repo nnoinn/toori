@@ -541,6 +541,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 
 - PostGIS 위치는 거리 계산(m 단위)을 위해 `geography(Point, 4326)`을 추천한다. Drizzle 기본 `geometry`를 쓸 때는 거리 함수를 맞춰야 한다. 어느 쪽인지 PR에 적는다
 - `btree_gist`, `postgis` 확장은 첫 마이그레이션에서 `CREATE EXTENSION IF NOT EXISTS`로 켠다
+- Data API용 GRANT(`anon`·`authenticated`)는 넣지 않는다. 데이터는 서버에서 Drizzle로만 다루고, Supabase가 10/30부터 새 테이블에 권한을 자동으로 주지 않는 변경에도 영향이 없다(기술 가이드 2장)
 - 시간 겹침 EXCLUDE 제약과 RLS 켜기(`ALTER TABLE ... ENABLE ROW LEVEL SECURITY`)는 Drizzle로 표현이 안 되면 마이그레이션 SQL에 직접 쓴다
 - `profiles`는 로그인 콜백에서 처음 로그인할 때 만든다(트리거 대신 서버 코드)
 - 계좌번호 암호화 키는 서버 환경변수 `PAYOUT_ACCOUNT_ENCRYPTION_KEY`다(AES-256-GCM, 32바이트 base64). `.env.example`에 이름을 넣었고 개발용 값은 nnoinn이 만들었다(10/13). 다른 암호화 방식을 쓰려면 먼저 nnoinn에게 알린다
