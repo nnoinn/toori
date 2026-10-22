@@ -134,7 +134,7 @@ erDiagram
 | sigungu | text | 시·군·구. 예: 안산시 상록구 |
 | sigungu_code | text | 지역 필터·동네 선택·관심 지역 기준(X-502) |
 | location | PostGIS 점(WGS84, SRID 4326) | 지도·거리 검색. **GIST 인덱스** |
-| business_hours | jsonb | 요일별 여는·닫는 시각과 쉬는 날. 형식은 zod로 검사 |
+| business_hours | jsonb, 기본 `[]` | 요일별 여는·닫는 시각과 쉬는 날. 형식은 zod로 검사. 가입 때는 빈 목록으로 시작하고 매장 설정에서 입력한다(#47) |
 | description | text, null | 원장님 프로필의 서비스 설명 |
 | instagram_url | text, null | |
 | naver_place_url | text, null | |
@@ -143,7 +143,7 @@ erDiagram
 | business_registration_number | text | 사업자등록번호(숫자 10자리) |
 | opened_on | date | 개업일자 |
 | business_doc_path | text | 사업자등록증 사진 위치(비공개 버킷 `business-docs`) |
-| status | text | 입점 상태: `pending`(승인 대기) / `approved`(승인) / `rejected`(반려) |
+| status | text, 기본 `pending` | 입점 상태: `pending`(승인 대기) / `approved`(승인) / `rejected`(반려) |
 | rejection_reason | text, null | 반려 사유. 원장님에게 보여준다 |
 | applied_at | timestamptz | 입점 신청(다시 신청 포함) 시각 |
 | reviewed_at | timestamptz, null | |
@@ -165,7 +165,7 @@ erDiagram
 | account_last4 | text | 원장님 화면 표시용 뒷자리 |
 | account_holder | text | 예금주 |
 | pg_seller_id | text, null | 토스페이먼츠 지급대행에 등록한 셀러 번호 |
-| pg_seller_status | text | `not_registered`(등록 전) / `requested`(원장님 본인인증 대기 등 확인 중) / `approved`(지급 가능) / `rejected`(정보 오류, 수정 필요). `approved`일 때만 지급을 요청한다 |
+| pg_seller_status | text, 기본 `not_registered` | `not_registered`(등록 전) / `requested`(원장님 본인인증 대기 등 확인 중) / `approved`(지급 가능) / `rejected`(정보 오류, 수정 필요). `approved`일 때만 지급을 요청한다 |
 | pg_seller_checked_at | timestamptz, null | 셀러 상태를 마지막으로 확인한 시각 |
 | updated_at | timestamptz | |
 
@@ -225,7 +225,7 @@ erDiagram
 | duration_minutes | integer | 등록 당시 소요 시간 |
 | discount_rate | integer | 10/20/30/40/50 중 하나(정책 설정값, `check`로 10~50) |
 | sale_price | integer | 할인가 = 정가 × (1 − 할인율) 그대로(올림 없음, 원 미만이 생기면 버림). 서버가 계산해서 저장(정렬·필터용) |
-| new_customer_only | boolean | 신규 고객 전용 |
+| new_customer_only | boolean, 기본 false | 신규 고객 전용 |
 | start_at | timestamptz | 서비스 시작 |
 | end_at | timestamptz | 서비스 끝 = 시작 + 소요 시간 |
 | publish_at | timestamptz | 게시 시각. 시작 48시간 전보다 이르면 그때까지 '예약대기' |
@@ -344,7 +344,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | --- | --- | --- |
 | id | uuid PK | |
 | order_id | uuid → orders | |
-| reservation_id | uuid → reservations | |
+| reservation_id | uuid, null → reservations | 예약을 만들기 전에 결제를 취소하는 자동 취소(`auto_cancel`, C-406)에서는 비어 있다. 어떤 결제의 환불인지는 `order_id`로 안다(#64) |
 | reason | text | `customer_cancel` / `owner_fault` / `auto_cancel` / `admin_exception` |
 | band | text, null | 적용 구간: `over_24h`(30%) / `6h_to_24h`(50%) / `under_6h`(100%) |
 | penalty_rate | integer | 적용한 위약금 비율(당시 값) |
@@ -424,7 +424,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | --- | --- | --- |
 | id | uuid PK | |
 | shop_id | uuid → shops | |
-| period_start, period_end | date | 정산 기간(주기는 2단계 전에 정한다) |
+| period_start, period_end | date | 정산 기간(주기는 2단계 전에 정한다). unique(`shop_id`, `period_start`, `period_end`): 같은 기간을 두 번 묶어 두 번 지급 요청하는 실수를 막는다(#64) |
 | item_count | integer | |
 | total_base_amount | integer | |
 | total_fee_amount | integer | 플랫폼 수수료 + VAT + 결제 수수료 + VAT 합 |
@@ -559,3 +559,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 2026-10-13 | 최종 검토 후 승인. 더한 것: 광고성 정보 수신 동의와 철회(`terms_agreements`), 환불 규정 동의 기록(`orders`), PG 지급대행 셀러 정보(`payout_accounts`), 통신판매업 신고번호(`shops`), 위치정보 이용 기록(`location_use_logs`), 보관 기간 원칙. 관심 지역 알림 기준 시각 설명을 하루 1번 방식으로 고침 |
 | 2026-10-13 | 통신판매업 신고번호(`shops.mail_order_report_number`)를 뺐다. 받지 않는다 |
 | 2026-10-18 | 오픈 기간 플랫폼 수수료 0%(10/14 결정). 컬럼은 그대로 두고 `fee_rate`·`fee_amount`에 0을 저장한다. 할인율별 수수료는 법인 전환 때 적용 |
+| 2026-10-22 | W1a 구현(#63)에 맞춰 기본값 4개를 적었다(`shops.business_hours` `[]`, `shops.status` `pending`, `payout_accounts.pg_seller_status` `not_registered`, `slots.new_customer_only` false). W1b 전 확인(#64): `refunds.reservation_id` null 가능, `settlements` unique(`shop_id`, `period_start`, `period_end`) |
