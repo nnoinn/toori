@@ -10,11 +10,20 @@ import postgres from 'postgres';
 
 import { assertLocalTestDb } from './test-db';
 
-// auth.users는 profiles.id가 참조하는 id만 둔다. search_path는 Supabase 기본값과 같게 맞춘다
+// auth.users는 Drizzle의 authUsers(drizzle-orm/supabase)가 아는 컬럼만 둔다. search_path는 Supabase 기본값과 같게 맞춘다
 const SUPABASE_STUB = `
   CREATE SCHEMA IF NOT EXISTS extensions;
   CREATE SCHEMA IF NOT EXISTS auth;
-  CREATE TABLE IF NOT EXISTS auth.users (id uuid PRIMARY KEY);
+  CREATE TABLE IF NOT EXISTS auth.users (
+    id uuid PRIMARY KEY,
+    email varchar(255),
+    phone text UNIQUE,
+    email_confirmed_at timestamptz,
+    phone_confirmed_at timestamptz,
+    last_sign_in_at timestamptz,
+    created_at timestamptz,
+    updated_at timestamptz
+  );
   ALTER ROLE CURRENT_USER SET search_path = "$user", public, extensions;
 `;
 
