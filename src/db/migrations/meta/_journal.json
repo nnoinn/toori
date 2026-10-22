@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1792512353906,
+      "tag": "0000_enable_extensions",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792512396225,
+      "tag": "0001_accounts_shops_slots",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792512436689,
+      "tag": "0002_slots_no_overlap",
+      "breakpoints": true
+    }
+  ]
+}
