@@ -162,7 +162,11 @@
 - **외부 서비스 설정 (Week 0):** 카카오 개발자 앱(지도·로그인), Supabase 개발용·운영용 프로젝트와 로그인 복귀 주소, Vercel 프로젝트 연결과 미리보기 보호 해제, 환경변수. PR 미리보기 주소에서도 동작하는지 확인
 - **포트원 콘솔 설정 (결제 작업 시작 전, 2단계):** 가입, 토스페이먼츠 테스트 채널 추가, Store ID·채널 키·V2 API 시크릿·웹훅 시크릿 발급. 그 전까지 결제 코드는 연결 지점 8번의 임시 버전으로 개발한다. 결제 작업을 시작하려는데 포트원 값이 없으면 Claude는 nnoinn에게 요청하라고 안내한다
 - **QA:** 정책 자동 테스트(환불 구간 경계, 동시 결제, 48시간 게시, 신규 고객 전용, 권한)
-- **DB 테스트(10/14 결정):** DB 조건(SQL)과 마이그레이션은 PR 자동 검사(CI)에 테스트용 Postgres(PostGIS 포함)를 띄워 실제 DB로 확인한다. 개발 DB와 키는 쓰지 않는다(공개 레포라 CI에 키를 두지 않는다). 내 컴퓨터에 Docker가 없으면 DB 테스트는 건너뛰고 CI에서만 돈다. Supabase 전용 기능(로그인 사용자, RLS 정책)은 이 방식으로 확인하지 못하므로 필요해지면 따로 정한다. 강규민 W1a 머지 직후 nnoinn이 준비하고, 그 전에는 순수 함수 테스트만 둔다(#57)
+- **DB 테스트(10/14 결정, 10/22 준비됨):** DB 조건(SQL)과 마이그레이션은 PR 자동 검사(CI)가 띄우는 테스트용 Postgres(PostGIS 포함, 검사마다 새로 만드는 빈 DB)로 실제 DB에서 확인한다. 개발 DB와 키는 쓰지 않는다(공개 레포라 CI에 키를 두지 않는다). Supabase 전용 기능(로그인 사용자, RLS 정책)은 이 방식으로 확인하지 못하므로 필요해지면 따로 정한다(#57)
+  - 쓰는 법: 테스트를 `tests/db/test-db.ts`의 `describeDb`로 묶고, 테스트마다 `withRollback(async (tx) => { ... })` 안에서 데이터를 만든다(끝나면 모두 되돌린다). DB 제약을 어기는지는 `violatedConstraint(tx, (t) => ...)`가 제약 이름으로 알려준다. 예시: `tests/db/schema.test.ts`(매물 시간 겹침, 할인율, PostGIS 거리)
+  - 준비 과정: 검사가 시작될 때 `tests/db/global-setup.ts`가 Supabase가 미리 만들어 두는 것(`extensions` 스키마, `auth.users`, search_path)만 흉내 내고 `src/db/migrations`를 고치지 않고 그대로 적용한다. 그래서 새 마이그레이션이 SQL 오류로 실패하면 PR 검사에서 먼저 드러난다
+  - 테스트 안의 서버 코드(`getDb()`)도 테스트 DB에만 접속한다(`vitest.config.mts`가 테스트 중 `DATABASE_URL`을 테스트 DB 주소로 바꾸고, 테스트 DB가 없으면 비운다). `getDb()`로 저장한 데이터는 `withRollback`으로 되돌려지지 않으므로 매번 새 id로 만든다
+  - 내 컴퓨터에 Docker가 없으면 DB 테스트는 건너뛰고(skipped) CI에서만 돈다. Docker가 있으면 `postgis/postgis:17-3.5`를 띄우고 `TEST_DATABASE_URL`을 그 주소로 두고 `npm test`를 실행한다(Claude에게 부탁하면 된다). `TEST_DATABASE_URL`에는 localhost 주소만 넣을 수 있고, 다른 주소면 테스트가 멈춘다
 
 ---
 
