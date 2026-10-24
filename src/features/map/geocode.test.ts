@@ -122,6 +122,13 @@ describe('geocodeAddress', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('모양이 이상한 결과가 섞여 있으면 그것만 빼고 나머지로 처리한다', async () => {
+    const broken = { ...oryu.documents[0], address: { ...oryu.documents[0].address, b_code: '' } };
+    respondWith({ ...ansan, documents: [...ansan.documents, broken] });
+    const result = await geocodeAddress('경기 안산시 상록구 한양대학로 55');
+    expect(result.ok && result.data.region.sigunguCode).toBe('41271');
+  });
+
   describe('카카오를 쓸 수 없으면 GEOCODE_UNAVAILABLE이고 후보는 없다', () => {
     const unavailable = {
       ok: false,
@@ -140,8 +147,10 @@ describe('geocodeAddress', () => {
       expect(await geocodeAddress('경기 안산시 상록구 한양대학로 55')).toEqual(unavailable);
     });
 
-    it('응답 모양이 다를 때', async () => {
+    it('응답 모양이 다를 때(결과가 모두 이상하거나 목록이 없음)', async () => {
       respondWith({ documents: [{ x: '1', y: '2' }] });
+      expect(await geocodeAddress('경기 안산시 상록구 한양대학로 55')).toEqual(unavailable);
+      respondWith({ meta: {} });
       expect(await geocodeAddress('경기 안산시 상록구 한양대학로 55')).toEqual(unavailable);
     });
 

@@ -53,27 +53,26 @@ const KAKAO_TIMEOUT_MS = 5000;
 
 const addressSchema = z.string().trim().min(1);
 
-// 카카오 주소 검색 응답 중 쓰는 값만 확인한다. 좌표는 문자열로 온다
-const kakaoAddressResponseSchema = z.object({
-  documents: z.array(
-    z.object({
-      x: z.coerce.number(),
-      y: z.coerce.number(),
-      address: z
-        .object({
-          address_name: z.string(),
-          region_1depth_name: z.string(),
-          region_2depth_name: z.string(),
-          /** 법정동 코드 10자리. 앞 5자리가 시·군·구 코드 */
-          b_code: z.string().regex(/^\d{10}$/),
-        })
-        .nullable(),
-      road_address: z.object({ address_name: z.string() }).nullable(),
-    }),
-  ),
+// 카카오 주소 검색 결과 하나 중 쓰는 값만 확인한다. 좌표는 문자열로 온다
+const kakaoDocumentSchema = z.object({
+  x: z.coerce.number(),
+  y: z.coerce.number(),
+  address: z
+    .object({
+      address_name: z.string(),
+      region_1depth_name: z.string(),
+      region_2depth_name: z.string(),
+      /** 법정동 코드 10자리. 앞 5자리가 시·군·구 코드 */
+      b_code: z.string().regex(/^\d{10}$/),
+    })
+    .nullable(),
+  road_address: z.object({ address_name: z.string() }).nullable(),
 });
 
-type KakaoAddressDocument = z.infer<typeof kakaoAddressResponseSchema>['documents'][number];
+// 결과 목록은 하나씩 확인한다. 모양이 이상한 결과가 하나 있어도 나머지는 쓴다
+const kakaoAddressResponseSchema = z.object({ documents: z.array(z.unknown()) });
+
+type KakaoAddressDocument = z.infer<typeof kakaoDocumentSchema>;
 
 function geocodeFail(code: GeocodeErrorCode, candidates?: GeocodeCandidate[]): GeocodeResponse {
   const error: GeocodeError = { code, message: GEOCODE_ERRORS[code] };
@@ -127,7 +126,17 @@ async function searchKakaoAddress(query: string): Promise<KakaoAddressDocument[]
       console.error('[geocode] 카카오 주소 검색 응답 모양이 달라요');
       return null;
     }
-    return parsed.data.documents;
+    const { documents } = parsed.data;
+    const valid = documents.flatMap((doc) => {
+      const result = kakaoDocumentSchema.safeParse(doc);
+      return result.success ? [result.data] : [];
+    });
+    if (valid.length < documents.length) {
+      console.error(`[geocode] 모양이 다른 결과 ${documents.length - valid.length}개를 뺐어요`);
+    }
+    // 결과는 있는데 하나도 읽을 수 없으면 카카오 응답 모양이 바뀐 것이라 '잠시 후 다시'로 본다
+    if (documents.length > 0 && valid.length === 0) return null;
+    return valid;
   } catch (e) {
     console.error('[geocode] 카카오 주소 검색 호출 실패:', e instanceof Error ? e.name : e);
     return null;
