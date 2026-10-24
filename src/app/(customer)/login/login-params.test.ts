@@ -34,6 +34,11 @@ describe('safeNextPath', () => {
       'javascript:alert(1)',
       'slots/abc',
       '/\tevil',
+      // 정리하고 나면 //evil.example 이 되는 값
+      '/..//evil.example',
+      '/.//evil.example',
+      '/a/..//evil.example',
+      '/%2e%2e//evil.example',
       '',
       undefined,
     ]) {

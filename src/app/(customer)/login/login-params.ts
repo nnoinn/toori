@@ -35,7 +35,10 @@ export function safeNextPath(value: SearchValue): string | null {
   try {
     const url = new URL(raw, BASE);
     if (url.origin !== BASE) return null;
-    return `${url.pathname}${url.search}${url.hash}`;
+    const path = `${url.pathname}${url.search}${url.hash}`;
+    // "/..//evil.example"처럼 정리하고 나면 "//"로 시작해 다른 사이트 주소가 되는 값도 막는다
+    if (path.startsWith('//')) return null;
+    return path;
   } catch {
     return null;
   }
