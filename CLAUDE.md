@@ -17,7 +17,7 @@
 
 세션을 시작하면 `gh api user --jq .login`으로 지금 사용자가 누구인지 확인하고, 위 표의 담당에 맞게 돕는다. 폴더는 프로젝트 뼈대에서 위 표대로 만들어 두었다. 루트 설정 파일(`package.json`, `next.config.ts`, `tsconfig.json`, `eslint.config.mjs`, `.github/` 등)은 현동훈 담당이다.
 
-화면 주소: 고객 화면은 `src/app/(customer)/` 아래에 두어 기본 주소(`/`, `/slots/...`, `/reservations/...`)를 쓴다. 괄호 폴더는 주소에 나타나지 않으므로, 원장님 화면은 `src/app/owner/`(`/owner/...`), 운영자 화면은 `src/app/admin/`(`/admin/...`) 아래에만 만든다.
+화면 주소: 고객 화면은 `src/app/(customer)/` 아래에 두어 기본 주소(`/`, `/slots/...`, `/reservations/...`)를 쓴다. 아래 메뉴가 있는 화면은 `(customer)/(tabs)/`, 로그인·약관·결제처럼 메뉴 없이 한 가지 일을 끝내는 화면은 `(customer)/(focus)/`에 둔다(#71). 괄호 폴더는 주소에 나타나지 않으므로, 원장님 화면은 `src/app/owner/`(`/owner/...`), 운영자 화면은 `src/app/admin/`(`/admin/...`) 아래에만 만든다.
 
 ## 세션 시작 브리핑
 

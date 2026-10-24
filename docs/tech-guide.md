@@ -140,7 +140,8 @@
   | `Price` | `listPrice, salePrice, discountRate, size?` | "30% 23,450원 ~~33,500원~~" |
   | `Countdown` | `targetAt, serverNow, variant?: 'remaining' \| 'clock', onExpire?` | 남은 시간(C-203)과 10분 홀딩 타이머(C-404). 서버 시각 기준 |
   | `EmptyState`, `ErrorState`, `LoadingCards` | `title, description?, action?` | 목록·상세의 세 상태 |
-  | `CustomerBottomNav` | 고객 레이아웃에 들어 있음 | 홈 `/`, 내 예약 `/reservations`, 내 정보 `/me` |
+  | `CustomerBottomNav` | 고객 `(tabs)` 레이아웃에 들어 있음 | 홈 `/`, 내 예약 `/reservations`, 내 정보 `/me`. 로그인·약관·결제처럼 메뉴 없는 화면(`(focus)`)에는 없다(#71) |
+  | `BackButton` | `fallbackHref?`, `className?` | 메뉴 없는 화면의 왼쪽 위 뒤로가기. 이전 화면이 없으면(주소로 바로 들어옴) `fallbackHref`로 간다 |
   | `OwnerNav` | 원장님 레이아웃에 들어 있음. `canCreateSlot` | 대시보드 `/owner`, 매물 등록 `/owner/slots/new`(승인 전 잠금), 매장 설정 `/owner/settings`, 정산 `/owner/settlements`. PC는 왼쪽 메뉴, 폰은 메뉴 버튼 |
   | `AdminNav` | 운영자 레이아웃에 들어 있음 | 입점 승인, 회원, 매물·예약, 이의제기, 정산 |
   | shadcn 기본 부품 | `Button`, `Badge`, `Card`, `Sheet`, `Skeleton` | 더 필요하면 추가해도 된다 |
