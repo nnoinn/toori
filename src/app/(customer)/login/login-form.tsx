@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { cn } from 'cn';
 
+import { BackButton } from '@/components/ui/back-button';
 import { Button } from '@/components/ui/button';
 import { SITE_NAME } from '@/lib/site';
 
@@ -30,7 +31,8 @@ export function LoginForm({ initialMode, nextParam }: LoginFormProps) {
   const next = nextParam ?? DEFAULT_NEXT[mode];
 
   return (
-    <section className="flex flex-1 flex-col gap-8 px-4 py-12">
+    <section className="flex flex-1 flex-col gap-8 px-4 pt-2 pb-12">
+      <BackButton className="-ml-2 self-start" />
       <div className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-2xl font-bold">{SITE_NAME} 시작하기</h1>
         <p className="text-sm text-muted-foreground">
