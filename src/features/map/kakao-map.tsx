@@ -34,8 +34,12 @@ type KakaoMapProps = {
   /** 지도 이동·확대가 끝나면 보이는 영역을 알린다(잠깐 기다렸다가) */
   onBoundsChange?: (bounds: MapBounds) => void;
   onSelectShop?: (shopId: string) => void;
-  /** 이 값이 바뀌면 지도 크기를 다시 잰다(목록 시트 높이가 바뀔 때) */
-  layoutKey?: string;
+  /**
+   * 목록 시트를 전체로 키워 지도가 가려졌는지. 가려진 동안에는 지도 크기를 다시 재지 않고
+   * 보이는 영역도 알리지 않는다(높이 0으로 재면 영역이 0이 되어 목록이 비어 버린다).
+   * 다시 보이면 크기를 재고 가운데를 지킨다.
+   */
+  hidden?: boolean;
   className?: string;
 };
 
@@ -46,7 +50,7 @@ export function KakaoMap({
   shops = [],
   onBoundsChange,
   onSelectShop,
-  layoutKey,
+  hidden = false,
   className,
 }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -54,12 +58,14 @@ export function KakaoMap({
   const clustererRef = useRef<kakao.maps.MarkerClusterer | null>(null);
   const myMarkerRef = useRef<kakao.maps.Marker | null>(null);
   const callbacksRef = useRef({ onBoundsChange, onSelectShop });
+  const hiddenRef = useRef(hidden);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
     APP_KEY ? 'loading' : 'error',
   );
 
   useEffect(() => {
     callbacksRef.current = { onBoundsChange, onSelectShop };
+    hiddenRef.current = hidden;
   });
 
   // SDK가 준비되면 지도를 한 번 만든다
@@ -89,6 +95,7 @@ export function KakaoMap({
     const handleIdle = () => {
       clearTimeout(timer);
       timer = setTimeout(() => {
+        if (hiddenRef.current) return;
         const bounds = map.getBounds();
         const sw = bounds.getSouthWest();
         const ne = bounds.getNorthEast();
@@ -153,14 +160,14 @@ export function KakaoMap({
     clusterer.addMarkers(markers);
   }, [status, shops]);
 
-  // 목록 시트 높이가 바뀌면 지도 크기를 다시 재고 가운데를 지킨다
+  // 지도가 다시 보이면(목록 시트를 반으로 줄임) 크기를 다시 재고 가운데를 지킨다. 가려질 때는 재지 않는다
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || hidden) return;
     const keep = map.getCenter();
     map.relayout();
     map.setCenter(keep);
-  }, [layoutKey]);
+  }, [hidden]);
 
   return (
     <div className={cn('relative', className)}>

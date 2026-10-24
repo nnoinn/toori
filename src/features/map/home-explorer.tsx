@@ -51,7 +51,7 @@ export function HomeExplorer({ center, myLocation, header }: HomeExplorerProps) 
             setSelectedShopId(shopId);
             setSheet('half');
           }}
-          layoutKey={sheet}
+          hidden={sheet === 'full'}
         />
         <div className="absolute top-2 left-2 z-10 rounded-lg bg-background/90 shadow-sm">
           {header}
