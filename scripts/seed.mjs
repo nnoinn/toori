@@ -14,6 +14,14 @@ const DAY = 24 * HOUR;
 // 시드 전용 값. 정책값(src/server/policy, W4)과 같게 둔다: 매물은 시작 48시간 전에 게시(S-204), 홀딩 10분(C-404)
 const PUBLISH_BEFORE_HOURS = 48;
 const HOLD_MINUTES = 10;
+// 고객 취소 위약금 구간(X-202). 남은 시간이 기준 이상이면 그 비율. 정책값의 REFUND_BANDS(#48)와 같게 둔다
+const REFUND_BANDS = [
+  { band: 'over_24h', minHoursLeft: 24, penaltyRate: 30 },
+  { band: '6h_to_24h', minHoursLeft: 6, penaltyRate: 50 },
+  { band: 'under_6h', minHoursLeft: 0, penaltyRate: 100 },
+];
+// 예약번호: 영문 대문자+숫자 8자리, 헷갈리는 0/O·1/I 제외(docs/schema-v1.md reservations.code)
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 /** 할인가 = 정가 × (1 − 할인율), 원 미만 버림 (S-203) */
 export function salePrice(listPrice, discountRate) {
@@ -22,13 +30,40 @@ export function salePrice(listPrice, discountRate) {
 
 const pad = (n, width) => String(n).padStart(width, '0');
 
+function reservationCode() {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return Array.from(bytes, (b) => CODE_CHARS[b % CODE_CHARS.length]).join('');
+}
+
 /** 시드 계정(userIds)의 데이터를 지운다. 로그인 정보(auth.users)와 profiles는 다음 시드에서 다시 쓰려고 남긴다 */
 async function clearSeedData(sql, userIds) {
   // 조각(fragment)은 쿼리마다 새로 만든다
   const seedOwners = () => sql`select id from owners where user_id in ${sql(userIds)}`;
   const seedShops = () => sql`select id from shops where owner_id in (${seedOwners()})`;
   const seedCustomers = () => sql`select id from customers where user_id in ${sql(userIds)}`;
-  // W1b 테이블(예약·결제 등)이 생기면 시드 데이터를 가리키는 행을 여기서 먼저 지운다
+  const seedSlots = () =>
+    sql`select id from slots where shop_id in (${seedShops()}) or created_by in ${sql(userIds)}`;
+  const seedOrders = () =>
+    sql`select id from orders where slot_id in (${seedSlots()}) or customer_id in (${seedCustomers()})`;
+  const seedReservations = () =>
+    sql`select id from reservations where slot_id in (${seedSlots()}) or customer_id in (${seedCustomers()})`;
+  const seedPenalties = () =>
+    sql`select id from owner_penalties where shop_id in (${seedShops()}) or reservation_id in (${seedReservations()})`;
+  // 결제·예약·정산·알림(W1b): 시드 매물·고객·샵을 가리키는 행부터 지운다
+  await sql`delete from refunds where order_id in (${seedOrders()}) or reservation_id in (${seedReservations()})`;
+  await sql`delete from disputes where reservation_id in (${seedReservations()})`;
+  await sql`delete from penalty_collections where penalty_id in (${seedPenalties()}) or settlement_id in (select id from settlements where shop_id in (${seedShops()}))`;
+  await sql`delete from owner_penalties where id in (${seedPenalties()})`;
+  await sql`delete from settlement_items where shop_id in (${seedShops()}) or order_id in (${seedOrders()})`;
+  await sql`delete from settlements where shop_id in (${seedShops()})`;
+  await sql`update orders set coupon_id = null where id in (${seedOrders()})`;
+  await sql`delete from coupons where customer_id in (${seedCustomers()}) or source_reservation_id in (${seedReservations()}) or used_order_id in (${seedOrders()})`;
+  await sql`delete from reservations where id in (${seedReservations()})`;
+  await sql`delete from orders where id in (${seedOrders()})`;
+  await sql`delete from favorites where customer_id in (${seedCustomers()}) or shop_id in (${seedShops()})`;
+  await sql`delete from interest_areas where customer_id in (${seedCustomers()})`;
+  await sql`delete from notifications where user_id in ${sql(userIds)}`;
+  await sql`delete from push_subscriptions where user_id in ${sql(userIds)}`;
   await sql`update slots set hold_customer_id = null, hold_expires_at = null where hold_customer_id in (${seedCustomers()})`;
   await sql`delete from slots where shop_id in (${seedShops()}) or created_by in ${sql(userIds)}`;
   await sql`delete from shop_images where shop_id in (${seedShops()})`;
@@ -69,6 +104,8 @@ export async function seedDevData(sql, { now, userIds }) {
   }));
   await sql`insert into customers ${sql(customers)}`;
   const holdCustomerId = customers[0].id;
+  const customerIdByKey = Object.fromEntries(SEED_CUSTOMERS.map((c, i) => [c.key, customers[i].id]));
+  const bookings = [];
 
   const owners = [];
   const shops = [];
@@ -155,6 +192,7 @@ export async function seedDevData(sql, { now, userIds }) {
         relisted_from_slot_id: slot.relistOf ? slotIdByKey[slot.relistOf] : null,
         created_by: ownerUserId,
       });
+      if (slot.book) bookings.push({ row: slots.at(-1), slot, ownerUserId });
     }
   });
 
@@ -163,7 +201,81 @@ export async function seedDevData(sql, { now, userIds }) {
   await sql`insert into menus ${sql(menus)}`;
   await sql`insert into slots ${sql(slots)}`;
 
-  return { accounts: profiles.length, shops: shops.length, menus: menus.length, slots: slots.length };
+  // 예약된·완료된·취소된 매물마다 주문(결제)과 예약을 하나씩. 취소된 매물은 고객 취소와 환불 기록까지
+  const orders = [];
+  const reservations = [];
+  const refunds = [];
+  for (const { row, slot, ownerUserId } of bookings) {
+    const startMs = row.start_at.getTime();
+    const customerId = customerIdByKey[slot.book];
+    // 예약(결제)한 시각: 시작 20시간 전. 그게 아직 오지 않았으면 지금보다 1시간 전
+    const bookedAt = new Date(Math.min(startMs - 20 * HOUR, now.getTime() - HOUR));
+    const orderId = crypto.randomUUID();
+    orders.push({
+      id: orderId,
+      payment_id: `seed_${orderId}`,
+      slot_id: row.id,
+      customer_id: customerId,
+      sale_price: row.sale_price,
+      coupon_amount: 0,
+      amount: row.sale_price,
+      refund_policy_version: 'seed',
+      refund_policy_agreed_at: bookedAt,
+      status: 'confirmed',
+      pg_status: 'PAID',
+      pay_method: 'card',
+      paid_at: bookedAt,
+    });
+    const cancelled = row.status === 'cancelled';
+    const completed = row.status === 'completed';
+    const cancelledAt = cancelled ? ago(HOUR / 2) : null;
+    const hoursLeft = cancelled ? (startMs - cancelledAt.getTime()) / HOUR : null;
+    const reservationId = crypto.randomUUID();
+    reservations.push({
+      id: reservationId,
+      code: reservationCode(),
+      slot_id: row.id,
+      order_id: orderId,
+      customer_id: customerId,
+      status: cancelled ? 'cancelled' : completed ? 'completed' : 'confirmed',
+      visit_result: completed ? slot.visit : null,
+      visit_recorded_at: completed ? new Date(row.end_at.getTime() + HOUR) : null,
+      visit_recorded_by: completed ? ownerUserId : null,
+      cancelled_at: cancelledAt,
+      cancel_actor: cancelled ? 'customer' : null,
+      cancel_reason: cancelled ? '일정이 생겼어요' : null,
+      hours_before_start_at_cancel: cancelled ? Math.round(hoursLeft * 10) / 10 : null,
+      created_at: bookedAt,
+    });
+    if (cancelled) {
+      const { band, penaltyRate } = REFUND_BANDS.find((b) => hoursLeft >= b.minHoursLeft);
+      // 환불은 실제 결제액 × 환불율, 원 미만 버림. 남은 돈이 위약금(docs/settlement-examples.md)
+      const refundAmount = Math.floor((row.sale_price * (100 - penaltyRate)) / 100);
+      refunds.push({
+        order_id: orderId,
+        reservation_id: reservationId,
+        reason: 'customer_cancel',
+        band,
+        penalty_rate: penaltyRate,
+        refund_amount: refundAmount,
+        penalty_amount: row.sale_price - refundAmount,
+        processed_at: cancelledAt,
+      });
+    }
+  }
+  if (orders.length > 0) {
+    await sql`insert into orders ${sql(orders)}`;
+    await sql`insert into reservations ${sql(reservations)}`;
+  }
+  if (refunds.length > 0) await sql`insert into refunds ${sql(refunds)}`;
+
+  return {
+    accounts: profiles.length,
+    shops: shops.length,
+    menus: menus.length,
+    slots: slots.length,
+    reservations: reservations.length,
+  };
 }
 
 /** 시드 계정의 로그인 정보(auth.users)를 찾고, 없으면 Supabase 관리 기능으로 비밀번호 없이 만든다 */
@@ -194,7 +306,7 @@ async function ensureSeedUsers(sql, supabaseUrl, secretKey) {
 async function main() {
   if (!process.argv.includes('--yes')) {
     console.log(
-      `개발 DB의 시드 데이터(@${SEED_EMAIL_DOMAIN} 계정의 샵·메뉴·매물)를 지우고 다시 넣어요. 팀원 모두가 보는 데이터예요.\n` +
+      `개발 DB의 시드 데이터(@${SEED_EMAIL_DOMAIN} 계정의 샵·메뉴·매물·예약)를 지우고 다시 넣어요. 팀원 모두가 보는 데이터예요.\n` +
         '실행하려면: npm run db:seed -- --yes',
     );
     process.exitCode = 1;
@@ -218,10 +330,14 @@ async function main() {
 
   const sql = postgres(databaseUrl, { prepare: false, max: 1, onnotice: () => {} });
   try {
+    const [{ ready }] = await sql`select to_regclass('public.reservations') is not null as ready`;
+    if (!ready) {
+      throw new Error('개발 DB에 결제·예약 테이블(W1b)이 아직 없어요. 강규민이 npm run db:migrate로 적용한 뒤에 다시 실행해 주세요.');
+    }
     const userIds = await ensureSeedUsers(sql, supabaseUrl, secretKey);
     const result = await sql.begin((tx) => seedDevData(tx, { now: new Date(), userIds }));
     console.log(
-      `시드를 넣었어요: 계정 ${result.accounts}, 샵 ${result.shops}, 메뉴 ${result.menus}, 매물 ${result.slots}`,
+      `시드를 넣었어요: 계정 ${result.accounts}, 샵 ${result.shops}, 메뉴 ${result.menus}, 매물 ${result.slots}, 예약 ${result.reservations}`,
     );
   } finally {
     await sql.end();
