@@ -13,6 +13,11 @@ nnoinn이 팀원에게 알릴 내용을 PR과 함께 이 파일에 추가한다.
 
 ---
 
+## 2026-10-25 · 정찬형·강규민 (로그인 뒤 돌아갈 주소 확인 함수)
+- 로그인 뒤 돌아갈 주소(`next`)는 `safeNextPath(next, fallback)`(`src/lib/safe-next.ts`)로만 확인한다. 우리 사이트 안 주소만 통과하고, 다른 사이트로 보내는 주소는 fallback(고객 `/`, 원장님 `/owner`)이 된다. 각자 규칙을 따로 짜면 빈틈이 생겨서 한 곳에 모았다
+- 정찬형의 D21~D26(#19)은 nnoinn이 모두 OK했다
+- 할 일: 정찬형은 로그인 화면과 약관 화면(`/join`)에서, 강규민은 `signInWithProvider`·로그인 콜백·proxy·`ensure…Page`에서 이 함수를 쓴다
+
 ## 2026-10-25 · 정민석·강규민 (DB 테스트 공용 도우미)
 - DB 테스트에서 같이 쓰는 데이터 만들기를 `tests/db/fixtures.ts`에 모았다: `createTestUser`(로그인 정보+profiles), `createTestCustomer`(고객 계정), `createTestShop`(원장님 계정+샵+메뉴, 샵 값은 바꿔 넘길 수 있음), `testSlot`(매물 값). `withRollback` 안에서 쓴다
 - 할 일: 새 DB 테스트는 이 도우미를 쓴다. 이미 머지된 #68의 테스트는 다음에 그 파일을 고칠 때 바꿔도 된다(급하지 않음). 정찬형은 없음

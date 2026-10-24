@@ -150,6 +150,7 @@
 
   - **`serverNow` 만드는 법:** 서버 컴포넌트에서 `await getRequestNow()`(`src/lib/request-time.ts`)로 받고, 그 컴포넌트는 `<Suspense>` 안에 둔다(Cache Components 규칙). 예시는 `src/app/dev/ui/page.tsx`
   - **형식 함수:** `formatWon`, `formatRemaining`, `formatClock`(`src/lib/format.ts`), `formatKst`(`src/lib/time.ts`)
+  - **로그인 뒤 돌아갈 주소(`next`):** `safeNextPath(next, fallback)`(`src/lib/safe-next.ts`). 우리 사이트 안 주소만 통과시키고 나머지(`//evil.com`, `https://...`, 역슬래시·줄바꿈이 섞인 주소)는 fallback(고객 `/`, 원장님 `/owner`)으로 바꾼다. 로그인 화면·로그인 콜백·proxy·약관 화면이 모두 이 함수를 쓴다(#19 D21, #47 3장)
   - 메뉴 주소는 각 화면 담당자가 정하면서 바꿀 수 있다(바꾸면 nav 파일 한 곳만 고친다)
 - **시드 데이터(10/25 W1a 범위):** #18·#22의 조합을 안산시 실제 좌표로 만들고, 시작 시각은 시드를 넣는 시각 기준 상대값으로 둔다. 내용은 `scripts/seed-data.mjs`, 넣는 명령은 `npm run db:seed -- --yes`(`scripts/seed.mjs`)
   - 들어 있는 것: 시드 계정(`@seed.test`, 비밀번호가 없어 아무도 로그인할 수 없다)의 샵 12곳(안산 단원·상록 11곳 + 이웃 시흥시 1곳, 이름은 "샘플 …"), 메뉴(숨김 1개 포함), 매물. 원장님 A의 "샘플 헤어 중앙역점"에 매물 저장 상태 6가지와 임박·홀딩·재등록·시작 지난 예약이 모여 있다. 승인 대기(B)·반려(C)·다른 원장님(D, 영업시간 미입력)·매물 없는 시흥시 샵(L), 신규 고객 전용 매물 6개, 할인율 10~50%, 정가 2만~15만 원
