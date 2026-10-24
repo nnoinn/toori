@@ -36,7 +36,9 @@ export function SortTabs({ sort }: { sort: SlotSort }) {
   function select(next: SlotSort) {
     if (next === sort) return;
     const query = applySortToSearch(new URLSearchParams(window.location.search), next).toString();
-    router.replace(query ? `/?${query}` : '/', { scroll: false });
+    // 지금 화면 주소는 그대로 두고 주소 뒤 값만 바꾼다
+    const path = window.location.pathname;
+    router.replace(query ? `${path}?${query}` : path, { scroll: false });
   }
 
   return (
