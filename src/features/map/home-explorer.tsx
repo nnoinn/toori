@@ -6,18 +6,25 @@ import { cn } from 'cn';
 import { EmptyState } from '@/components/ui/state';
 
 import { KakaoMap } from './kakao-map';
+import { SlotList } from './slot-list/slot-list';
+import type { SlotSort } from './slot-list/sort';
+import type { SlotListItem } from './slot-list/types';
 import type { LatLng, MapBounds, MapShop } from './types';
 
 type SheetSize = 'half' | 'full';
 
 /** J4에서 매물 조회를 붙이기 전까지 비어 있다. 렌더마다 새 배열이 되지 않게 밖에 둔다 */
 const NO_SHOPS: MapShop[] = [];
+const NO_SLOTS: SlotListItem[] = [];
 
 type HomeExplorerProps = {
   center: LatLng;
   myLocation: LatLng | null;
   /** 지도 위 왼쪽 위에 띄울 것(동네 바꾸기 버튼) */
   header: React.ReactNode;
+  sort: SlotSort;
+  /** 서버가 준 "지금"(ISO). 카드 남은 시간 기준 */
+  serverNow: string;
 };
 
 /**
@@ -25,7 +32,7 @@ type HomeExplorerProps = {
  * 시트는 반(지도·목록 반반, 기본) / 전체(목록만) 2단계이고, 매물 개수는 손잡이에 보여준다(D13).
  * 매물 조회는 J4에서 붙인다. 지금은 보이는 영역만 받아 두고 목록은 비어 있다.
  */
-export function HomeExplorer({ center, myLocation, header }: HomeExplorerProps) {
+export function HomeExplorer({ center, myLocation, header, sort, serverNow }: HomeExplorerProps) {
   const [sheet, setSheet] = useState<SheetSize>('half');
   const [, setBounds] = useState<MapBounds | null>(null);
   const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
@@ -77,10 +84,17 @@ export function HomeExplorer({ center, myLocation, header }: HomeExplorerProps) 
           </span>
           <span className="sr-only">{sheet === 'half' ? '목록 크게 보기' : '지도 같이 보기'}</span>
         </button>
-        <div className="flex-1 overflow-y-auto">
-          <EmptyState
-            title="매물 목록은 준비 중이에요"
-            description="곧 이 동네의 임박 할인 매물을 보여 드릴게요."
+        <div className="flex-1 overflow-y-auto pb-4">
+          <SlotList
+            items={NO_SLOTS}
+            serverNow={serverNow}
+            sort={sort}
+            empty={
+              <EmptyState
+                title="매물 목록은 준비 중이에요"
+                description="곧 이 동네의 임박 할인 매물을 보여 드릴게요."
+              />
+            }
           />
         </div>
       </section>
