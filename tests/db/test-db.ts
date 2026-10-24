@@ -60,6 +60,27 @@ export async function withRollback(run: (tx: TestTx) => Promise<void>) {
   }
 }
 
+/** withRollback의 postgres.js 버전. Drizzle 없이 SQL을 쓰는 scripts/의 명령(시드 등)을 테스트할 때 쓴다 */
+export async function withRollbackSql(run: (sql: postgres.TransactionSql) => Promise<void>) {
+  const url = process.env.TEST_DATABASE_URL;
+  if (!url) {
+    throw new Error('TEST_DATABASE_URL이 없어요. DB 테스트는 describeDb 안에 써 주세요.');
+  }
+  assertLocalTestDb(url);
+  const client = postgres(url, { max: 1, onnotice: () => {} });
+  const rollback = new Error('rollback');
+  try {
+    await client.begin(async (sql) => {
+      await run(sql);
+      throw rollback;
+    });
+  } catch (error) {
+    if (error !== rollback) throw error;
+  } finally {
+    await client.end();
+  }
+}
+
 /**
  * 쿼리가 어긴 DB 제약 이름을 돌려준다. 어긴 게 없으면 undefined.
  * 예: expect(await violatedConstraint(tx, (t) => t.insert(slots).values(...))).toBe('slots_no_overlap')
