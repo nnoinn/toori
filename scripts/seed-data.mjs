@@ -1,6 +1,6 @@
 // 시드 데이터 내용 (연결 #3, #18·#22). 넣는 방법은 scripts/seed.mjs.
 // 매물 시각(at)은 시드를 넣는 시각 기준 몇 시간 뒤인지다(음수는 지난 시각). 언제 넣어도 같은 상태가 된다.
-// 지금은 W1a 테이블(계정·샵·메뉴·매물)만 채운다. 예약·결제·정산·이용 이력은 W1b 뒤, 샵 사진은 O6 뒤에 더한다.
+// 계정·샵·메뉴·매물과 예약·결제·환불(W1b)을 채운다. 정산은 결제 수수료율이 정해진 뒤, 샵 사진은 O6 뒤에 더한다.
 // 샵·사람 이름은 실제 가게와 헷갈리지 않게 '샘플'로 시작하고, 전화·사업자 번호는 쓸 수 없는 번호(0000)로 둔다.
 
 /** 시드 계정 이메일 도메인. 이 도메인의 계정과 그 데이터만 시드로 보고 지우고 다시 넣는다 */
@@ -31,6 +31,7 @@ const NAVER_PLACE = 'https://map.naver.com/';
  * b: 승인 대기, c: 반려, d: 다른 원장님(권한 확인용, 영업시간 미입력), l: 시흥시(매물 없음)
  * 매물: status 기본 published, newOnly = 신규 고객 전용, hold = 다른 고객(customer-a)이 결제 중,
  *       closeReason = 원장님 직접 마감, id·relistOf = 취소된 매물과 그 재등록 매물
+ *       book = 예약한 고객(customer-<key>). visit = 방문 결과(visited·no_show), 취소된 매물은 고객 취소로 넣는다
  */
 export const SEED_SHOPS = [
   {
@@ -54,25 +55,25 @@ export const SEED_SHOPS = [
     ],
     slots: [
       { menu: 'cut', at: 1, rate: 30 },
-      { menu: 'cut', at: 3, rate: 20, status: 'reserved' },
+      { menu: 'cut', at: 3, rate: 20, status: 'reserved', book: 'c' },
       { menu: 'perm', at: 5, rate: 40, newOnly: true },
       { menu: 'cut', at: 8, rate: 30, status: 'closed', closeReason: 'other_channel' },
       { menu: 'clinic', at: 10, rate: 20, hold: true },
       // 저장 값은 예약대기지만 게시 시각이 지나서 화면에서는 게시중으로 계산된다(#57)
       { menu: 'cut', at: 12, rate: 10, status: 'scheduled' },
       { menu: 'color', at: 20, rate: 20 },
-      { id: 'a-cancelled', menu: 'perm', at: 26, rate: 30, status: 'cancelled' },
+      { id: 'a-cancelled', menu: 'perm', at: 26, rate: 30, status: 'cancelled', book: 'c' },
       { menu: 'perm', at: 26, rate: 30, relistOf: 'a-cancelled' },
       { menu: 'clinic', at: 30, rate: 10 },
       { menu: 'cut', at: 47, rate: 50 },
       // 게시 시각(시작 48시간 전)이 아직 안 와서 예약대기
       { menu: 'cut', at: 72, rate: 30, status: 'scheduled' },
       // 시작 시각이 지났는데 방문·노쇼 처리를 안 한 예약
-      { menu: 'cut', at: -2, rate: 20, status: 'reserved' },
+      { menu: 'cut', at: -2, rate: 20, status: 'reserved', book: 'b' },
       // 팔리지 않고 시작 시각이 지나서 화면에서는 마감으로 계산된다(X-302)
       { menu: 'cut', at: -4, rate: 40 },
-      { menu: 'color', at: -26, rate: 30, status: 'completed' },
-      { menu: 'perm', at: -50, rate: 20, status: 'completed' },
+      { menu: 'color', at: -26, rate: 30, status: 'completed', book: 'b', visit: 'visited' },
+      { menu: 'perm', at: -50, rate: 20, status: 'completed', book: 'b', visit: 'no_show' },
     ],
   },
   {
@@ -198,8 +199,8 @@ export const SEED_SHOPS = [
     slots: [
       { menu: 'cut', at: 2, rate: 20 },
       { menu: 'color', at: 18, rate: 30 },
-      { menu: 'cut', at: 27, rate: 10, status: 'reserved' },
-      { menu: 'color', at: -30, rate: 20, status: 'completed' },
+      { menu: 'cut', at: 27, rate: 10, status: 'reserved', book: 'b' },
+      { menu: 'color', at: -30, rate: 20, status: 'completed', book: 'c', visit: 'visited' },
     ],
   },
   {
@@ -287,7 +288,12 @@ export const SEED_SHOPS = [
   },
 ];
 
-/** 고객 계정. a는 이력 없음이고 a의 매물 하나를 결제 중(홀딩)이다. b·c의 이용 이력·예약은 W1b 뒤에 더한다 */
+/**
+ * 고객 계정 (#18)
+ * a: 이력 없음. 원장님 A 샵 매물 하나를 결제 중(홀딩)
+ * b: 원장님 A 샵 이용 완료·노쇼 이력 있음 → A 샵의 신규 고객 전용 매물이 안 보여야 한다
+ * c: 예정·이용 완료·취소 예약이 하나씩(내 예약 탭)
+ */
 export const SEED_CUSTOMERS = [
   { key: 'a', nickname: '샘플 고객 A' },
   { key: 'b', nickname: '샘플 고객 B' },

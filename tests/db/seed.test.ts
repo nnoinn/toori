@@ -150,4 +150,76 @@ describeDb('시드 데이터 (실제 DB)', () => {
       expect(rows.find((r) => r.sigungu === '시흥시')?.slots).toBe(0);
     });
   });
+
+  it('예약된·완료된·취소된 매물마다 예약이 하나씩 있고, 고객 B·C 이력과 취소 환불이 맞다 (#18)', async () => {
+    await withRollbackSql(async (sql) => {
+      const userIds = await createSeedUsers(sql);
+      const result = await seedDevData(sql, { now: NOW, userIds });
+      const rows = await sql<
+        {
+          customer: string;
+          shop_owner: string;
+          slot_status: string;
+          status: string;
+          visit_result: string | null;
+          code: string;
+          amount: number;
+          band: string | null;
+          penalty_rate: number | null;
+          refund_amount: number | null;
+          penalty_amount: number | null;
+        }[]
+      >`
+        select p.email as customer, op.email as shop_owner, sl.status as slot_status,
+          r.status, r.visit_result, r.code, o.amount,
+          rf.band, rf.penalty_rate, rf.refund_amount, rf.penalty_amount
+        from reservations r
+        join orders o on o.id = r.order_id
+        join slots sl on sl.id = r.slot_id
+        join shops s on s.id = sl.shop_id
+        join owners ow on ow.id = s.owner_id
+        join profiles op on op.id = ow.user_id
+        join customers c on c.id = r.customer_id
+        join profiles p on p.id = c.user_id
+        left join refunds rf on rf.reservation_id = r.id
+        where c.user_id in ${sql(Object.values(userIds))}`;
+
+      expect(rows).toHaveLength(result.reservations);
+      const [{ booked }] = await sql<{ booked: number }[]>`
+        select count(*)::int as booked from slots sl join shops s on s.id = sl.shop_id
+        join owners ow on ow.id = s.owner_id
+        where ow.user_id in ${sql(Object.values(userIds))} and sl.status in ('reserved', 'completed', 'cancelled')`;
+      expect(rows).toHaveLength(booked);
+
+      const expected = { reserved: 'confirmed', completed: 'completed', cancelled: 'cancelled' };
+      for (const r of rows) {
+        expect(r.status).toBe(expected[r.slot_status as keyof typeof expected]);
+        expect(r.code).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
+      }
+
+      // 고객 A는 이력 없음, B는 원장님 A 샵 이용 이력(신규 고객 전용 매물이 안 보여야 한다)
+      expect(rows.filter((r) => r.customer.startsWith('customer-a@'))).toHaveLength(0);
+      expect(
+        rows.some(
+          (r) =>
+            r.customer.startsWith('customer-b@') &&
+            r.shop_owner.startsWith('owner-a@') &&
+            r.status === 'completed',
+        ),
+      ).toBe(true);
+
+      // 고객 C는 예정·이용 완료·취소가 하나씩
+      const c = rows.filter((r) => r.customer.startsWith('customer-c@')).map((r) => r.status);
+      expect(c.sort()).toEqual(['cancelled', 'completed', 'confirmed']);
+
+      // 취소: 시작 24시간 이상 전이라 위약금 30%, 환불 + 위약금 = 결제액
+      const cancelled = rows.find((r) => r.status === 'cancelled');
+      expect(cancelled?.band).toBe('over_24h');
+      expect(cancelled?.penalty_rate).toBe(30);
+      expect((cancelled?.refund_amount ?? 0) + (cancelled?.penalty_amount ?? 0)).toBe(
+        cancelled?.amount,
+      );
+      expect(rows.filter((r) => r.visit_result === 'no_show')).toHaveLength(1);
+    });
+  });
 });
