@@ -67,7 +67,9 @@ export function FilterSheet({ filters }: { filters: HomeFilters }) {
   function apply() {
     const search = applyFiltersToSearch(new URLSearchParams(window.location.search), draft);
     const query = search.toString();
-    router.replace(query ? `/?${query}` : '/', { scroll: false });
+    // 지금 화면 주소는 그대로 두고 주소 뒤 값만 바꾼다
+    const path = window.location.pathname;
+    router.replace(query ? `${path}?${query}` : path, { scroll: false });
     setOpen(false);
   }
 
