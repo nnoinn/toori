@@ -17,7 +17,8 @@
     "format:check": "prettier --check .",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "node scripts/seed.mjs"
+    "db:seed": "node scripts/seed.mjs",
+    "scenario": "node scripts/scenario.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
