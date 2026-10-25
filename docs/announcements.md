@@ -13,6 +13,11 @@ nnoinn이 팀원에게 알릴 내용을 PR과 함께 이 파일에 추가한다.
 
 ---
 
+## 2026-10-25 · 전원 (약관·동의 문구 초안)
+- **약관과 동의 문구 초안을 `docs/legal/`에 올렸다.** 고객 이용약관, 개인정보 처리방침, 위치기반서비스 이용약관, 원장님 이용약관, 화면에 넣을 동의 문구 모음, 컨시어지 동의, 법률 검토 질문. **법률 검토 전이라 그대로 게시하지 않는다**
+- 화면에 넣을 문구는 [동의 문구 모음](legal/consent-texts.md)을 쓴다. 고객 가입(1장), 원장님 가입(2장), 결제 환불 규정 동의(3장, 결제 버튼 바로 위 필수 체크박스 2개: 환불 규정, 샵에 예약자 정보 제공), 쿠폰(4장), 위치 권한 안내(5장), 광고성 알림(6장)
+- 할 일: 정찬형은 `/join`·결제 화면·위치 안내에, 정민석은 `/owner/join`에 이 문구를 임시로 넣는다. 강규민은 관심 동네 알림에 (광고) 표시·수신 거부 안내를 넣는다(6장)
+
 ## 2026-10-25 · 전원 (권한·정책값·위치 기록 함수 머지, 가짜 로그인)
 - **강규민 PR 3개가 main에 들어왔다.** 서버 함수 첫 줄의 권한 확인 `requireCustomer`·`requireOwner`·`requireShopOwner`·`requireAdmin`, 화면용 `ensureCustomerPage`·`ensureOwnerPage`·`ensureAdminPage`(`@/server/auth`, #83), 정책값과 계산 함수 `calcSalePrice`·`getSlotTimeFlags`·`getPlatformFeeRate`·`REFUND_BANDS`·필터 구간 등(`@/server/policy`, #84), 위치 이용 기록 `logLocationUse`(#82)
 - **로그인(W2) 전 가짜 로그인**: `.env.local`에 `DEV_LOGIN_EMAIL`·`DEV_LOGIN_MODE` 두 줄을 넣으면 `npm run dev`에서 그 시드 계정으로 로그인한 것처럼 된다. 어떤 계정이 어떤 상황인지는 `.env.example` 맨 아래에 적어 뒀다. 배포·미리보기에서는 늘 로그인 안 함이다
