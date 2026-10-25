@@ -40,9 +40,9 @@ export function JoinForm({ next }: JoinFormProps) {
     <section className="flex flex-1 flex-col gap-6 px-4 pt-2 pb-8">
       <BackButton className="-ml-2 self-start" />
       <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold">약관에 동의해 주세요</h1>
+        <h1 className="text-2xl font-bold">{SITE_NAME} 이용을 위해 동의해 주세요</h1>
         <p className="text-sm text-muted-foreground">
-          {SITE_NAME}를 이용하려면 아래 약관 동의가 필요해요.
+          필수 항목에 모두 동의하면 시작할 수 있어요. 선택 항목은 동의하지 않아도 돼요.
         </p>
       </div>
 
@@ -77,19 +77,25 @@ export function JoinForm({ next }: JoinFormProps) {
                   {item.label}
                 </span>
               </label>
-              {/* 약관 본문은 현동훈님 초안이 나오면 연결한다(#16 R7) */}
-              <button
-                type="button"
-                className="flex items-center text-xs text-muted-foreground"
-                aria-label={`${item.label} 내용 보기`}
-                onClick={() => setNotice('약관 내용은 준비 중이에요.')}
-              >
-                보기
-                <ChevronRight className="size-4" aria-hidden />
-              </button>
+              {/* 약관 본문(docs/legal/, 법률 검토 전)은 검토가 끝나면 화면으로 연결한다 */}
+              {item.hasDocument ? (
+                <button
+                  type="button"
+                  className="flex items-center text-xs text-muted-foreground"
+                  aria-label={`${item.label} 내용 보기`}
+                  onClick={() => setNotice('약관 내용은 준비 중이에요.')}
+                >
+                  보기
+                  <ChevronRight className="size-4" aria-hidden />
+                </button>
+              ) : null}
             </div>
             {item.description ? (
-              <p className="pl-8 text-xs text-muted-foreground">{item.description}</p>
+              <ul className="flex flex-col gap-0.5 pl-8 text-xs text-muted-foreground">
+                {item.description.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
             ) : null}
           </li>
         ))}
@@ -108,7 +114,7 @@ export function JoinForm({ next }: JoinFormProps) {
           disabled={!canSubmit}
           onClick={handleSubmit}
         >
-          동의하고 시작하기
+          시작하기
         </Button>
       </div>
     </section>
