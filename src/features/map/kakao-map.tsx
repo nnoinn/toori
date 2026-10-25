@@ -169,6 +169,22 @@ export function KakaoMap({
     map.setCenter(keep);
   }, [hidden]);
 
+  // 지도 칸 크기가 바뀌면(창 크기 바꾸기, 폰 돌리기, PC↔폰 배치 바뀜) 크기를 다시 재고 가운데를 지킨다.
+  // 카카오 지도는 칸 크기가 바뀐 것을 스스로 알지 못한다. 가려진 동안(높이 0)은 재지 않는다
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = containerRef.current;
+    if (!map || !container) return;
+    const observer = new ResizeObserver(() => {
+      if (hiddenRef.current || container.clientHeight === 0) return;
+      const keep = map.getCenter();
+      map.relayout();
+      map.setCenter(keep);
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [status]);
+
   return (
     <div className={cn('relative', className)}>
       {APP_KEY ? (

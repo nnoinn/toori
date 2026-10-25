@@ -84,5 +84,6 @@ describe('문구 안의 시각·기간', () => {
     expect(text).toContain('오후 1시');
     expect(text).toContain('밤 9시부터 아침 8시까지');
     expect(text).toContain('2년마다');
+    expect(text).toContain('받는 정보: 관심 동네의 새 할인 매물 소식');
   });
 });
