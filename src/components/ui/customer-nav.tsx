@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from 'cn';
@@ -16,34 +17,46 @@ function isActive(pathname: string, href: string) {
   return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function CustomerBottomNav() {
-  const pathname = usePathname();
+// 지금 주소(usePathname)는 주소가 바뀌는 화면(예: /slots/[slotId])에서 미리 만들 때 알 수 없어서,
+// 읽는 부분만 <Suspense>로 감싼다(Cache Components). 그동안은 선택 표시 없는 메뉴를 보여준다.
+function NavItems({ pathname }: { pathname: string | null }) {
+  return (
+    <ul className="grid grid-cols-3">
+      {ITEMS.map(({ href, label, icon: Icon }) => {
+        const active = pathname !== null && isActive(pathname, href);
+        return (
+          <li key={href}>
+            <Link
+              href={href}
+              aria-current={active ? 'page' : undefined}
+              className={cn(
+                'flex h-14 flex-col items-center justify-center gap-0.5 text-xs',
+                active ? 'font-semibold text-foreground' : 'text-muted-foreground',
+              )}
+            >
+              <Icon className="size-5" aria-hidden />
+              {label}
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
+function ActiveNavItems() {
+  return <NavItems pathname={usePathname()} />;
+}
+
+export function CustomerBottomNav() {
   return (
     <nav
       aria-label="고객 메뉴"
       className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[480px] border-t bg-background pb-[env(safe-area-inset-bottom)]"
     >
-      <ul className="grid grid-cols-3">
-        {ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = isActive(pathname, href);
-          return (
-            <li key={href}>
-              <Link
-                href={href}
-                aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'flex h-14 flex-col items-center justify-center gap-0.5 text-xs',
-                  active ? 'font-semibold text-foreground' : 'text-muted-foreground',
-                )}
-              >
-                <Icon className="size-5" aria-hidden />
-                {label}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      <Suspense fallback={<NavItems pathname={null} />}>
+        <ActiveNavItems />
+      </Suspense>
     </nav>
   );
 }

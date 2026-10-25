@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from 'cn';
@@ -27,20 +27,22 @@ type SideNavProps = {
   rootHref: string;
 };
 
+type NavLinksProps = Omit<SideNavProps, 'title'> & { onNavigate?: () => void };
+
 function NavLinks({
   items,
   rootHref,
   onNavigate,
-}: Omit<SideNavProps, 'title'> & { onNavigate?: () => void }) {
-  const pathname = usePathname();
-
+  pathname,
+}: NavLinksProps & { pathname: string | null }) {
   return (
     <ul className="flex flex-col gap-1">
       {items.map(({ href, label, icon: Icon, locked, lockedReason }) => {
         const active =
-          href === rootHref
+          pathname !== null &&
+          (href === rootHref
             ? pathname === href
-            : pathname === href || pathname.startsWith(`${href}/`);
+            : pathname === href || pathname.startsWith(`${href}/`));
         if (locked) {
           return (
             <li key={href}>
@@ -79,6 +81,20 @@ function NavLinks({
   );
 }
 
+function ActiveNavLinks(props: NavLinksProps) {
+  return <NavLinks {...props} pathname={usePathname()} />;
+}
+
+// 지금 주소(usePathname)는 주소에 값이 들어가는 화면(예: /owner/slots/[id])을 미리 만들 때 알 수 없어서,
+// 읽는 부분만 <Suspense>로 감싼다(Cache Components). 그동안은 선택 표시 없는 메뉴를 보여준다.
+function NavLinksWithPath(props: NavLinksProps) {
+  return (
+    <Suspense fallback={<NavLinks {...props} pathname={null} />}>
+      <ActiveNavLinks {...props} />
+    </Suspense>
+  );
+}
+
 /** 원장님·운영자 화면 메뉴. PC는 왼쪽 고정 메뉴, 폰은 위쪽 막대의 메뉴 버튼으로 연다 */
 export function SideNav({ title, items, rootHref }: SideNavProps) {
   const [open, setOpen] = useState(false);
@@ -87,7 +103,7 @@ export function SideNav({ title, items, rootHref }: SideNavProps) {
     <>
       <aside className="hidden w-56 shrink-0 border-r p-4 md:block" aria-label={`${title} 메뉴`}>
         <p className="mb-4 px-3 font-bold">{title}</p>
-        <NavLinks items={items} rootHref={rootHref} />
+        <NavLinksWithPath items={items} rootHref={rootHref} />
       </aside>
 
       <div className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background px-4 md:hidden">
@@ -101,7 +117,7 @@ export function SideNav({ title, items, rootHref }: SideNavProps) {
             <SheetHeader className="p-0">
               <SheetTitle className="px-3">{title}</SheetTitle>
             </SheetHeader>
-            <NavLinks items={items} rootHref={rootHref} onNavigate={() => setOpen(false)} />
+            <NavLinksWithPath items={items} rootHref={rootHref} onNavigate={() => setOpen(false)} />
           </SheetContent>
         </Sheet>
         <p className="font-bold">{title}</p>
