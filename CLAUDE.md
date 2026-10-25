@@ -17,7 +17,7 @@
 
 세션을 시작하면 `gh api user --jq .login`으로 지금 사용자가 누구인지 확인하고, 위 표의 담당에 맞게 돕는다. 폴더는 프로젝트 뼈대에서 위 표대로 만들어 두었다. 루트 설정 파일(`package.json`, `next.config.ts`, `tsconfig.json`, `eslint.config.mjs`, `.github/` 등)은 현동훈 담당이다.
 
-화면 주소: 고객 화면은 `src/app/(customer)/` 아래에 두어 기본 주소(`/`, `/slots/...`, `/reservations/...`)를 쓴다. 괄호 폴더는 주소에 나타나지 않으므로, 원장님 화면은 `src/app/owner/`(`/owner/...`), 운영자 화면은 `src/app/admin/`(`/admin/...`) 아래에만 만든다.
+화면 주소: 고객 화면은 `src/app/(customer)/` 아래에 두어 기본 주소(`/`, `/slots/...`, `/reservations/...`)를 쓴다. 아래 메뉴가 있는 화면은 `(customer)/(tabs)/`, 로그인·약관·결제처럼 메뉴 없이 한 가지 일을 끝내는 화면은 `(customer)/(focus)/`에 둔다(#71). 괄호 폴더는 주소에 나타나지 않으므로, 원장님 화면은 `src/app/owner/`(`/owner/...`), 운영자 화면은 `src/app/admin/`(`/admin/...`) 아래에만 만든다.
 
 ## 세션 시작 브리핑
 
@@ -72,6 +72,7 @@ nnoinn과 작업할 때: 팀원에게 영향을 주는 변경(규칙, 문서, �
 | `docs/schema-v1.md` | DB 테이블·컬럼·상태 값을 쓰거나 바꿀 때. 바꾸려면 `schema` Issue로 요청한다 |
 | `docs/settlement-examples.md` | 결제·환불·정산 금액을 계산하거나 화면에 보여줄 때. 쿠폰 유무, 할인율별, 취소 예시가 있고 정산 함수의 테스트 기댓값으로 쓴다 |
 | `docs/tech-guide.md` | 새 기능을 시작할 때(공통 원칙, 담당 섹션, 연결 지점), 환경변수·외부 서비스 문제를 다룰 때 |
+| `docs/legal/` | 약관·개인정보 동의·결제 동의 문구가 들어가는 화면을 만들 때. 법률 검토 전 초안이라 화면에는 임시 문구로 쓴다 |
 
 새 기능을 시작할 때:
 1. main을 받고 새 브랜치를 만든다

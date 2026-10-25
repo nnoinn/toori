@@ -1,0 +1,43 @@
+{
+  "documents": [
+    {
+      "address": {
+        "address_name": "세종특별자치시 보람동 718",
+        "b_code": "3611010300",
+        "h_code": "3611056000",
+        "main_address_no": "718",
+        "mountain_yn": "N",
+        "region_1depth_name": "세종특별자치시",
+        "region_2depth_name": "",
+        "region_3depth_h_name": "보람동",
+        "region_3depth_name": "보람동",
+        "sub_address_no": "",
+        "x": "127.289039408864",
+        "y": "36.4800579897497"
+      },
+      "address_name": "세종특별자치시 한누리대로 2130",
+      "address_type": "ROAD_ADDR",
+      "road_address": {
+        "address_name": "세종특별자치시 한누리대로 2130",
+        "building_name": "세종특별자치시청",
+        "main_building_no": "2130",
+        "region_1depth_name": "세종특별자치시",
+        "region_2depth_name": "",
+        "region_3depth_name": "보람동",
+        "road_name": "한누리대로",
+        "sub_building_no": "",
+        "underground_yn": "N",
+        "x": "127.289039408864",
+        "y": "36.4800579897497",
+        "zone_no": "30151"
+      },
+      "x": "127.289039408864",
+      "y": "36.4800579897497"
+    }
+  ],
+  "meta": {
+    "is_end": true,
+    "pageable_count": 1,
+    "total_count": 1
+  }
+}
