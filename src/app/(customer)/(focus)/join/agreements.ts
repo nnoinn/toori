@@ -47,6 +47,8 @@ export const AGREEMENT_ITEMS: readonly AgreementItem[] = [
     hasDocument: true,
     description: [
       `관심 동네에 새 매물이 올라오면 하루 한 번(${formatHourLabel(INTEREST_DIGEST_HOUR)}) 웹 푸시로 알려 드려요.`,
+      // 광고성 정보 동의는 무엇을 보내는지 알려야 한다(동의 문구 1-2, #88 리뷰)
+      '받는 정보: 관심 동네의 새 할인 매물 소식',
       `${formatHourLabel(PUSH_QUIET_HOURS.start)}부터 ${formatHourLabel(PUSH_QUIET_HOURS.end)}까지는 보내지 않아요.`,
       '동의하지 않아도 서비스는 그대로 쓸 수 있고, 내 정보 > 알림 설정에서 언제든 끌 수 있어요.',
       `동의하신 날부터 ${formatMonthsLabel(MARKETING_CONSENT_RECHECK_MONTHS)}마다 동의 여부를 다시 알려 드려요.`,

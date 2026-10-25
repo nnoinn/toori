@@ -64,3 +64,25 @@ export function telHref(phone: string): string | null {
   const digits = phone.replace(/[^\d+]/g, '');
   return digits.length >= 8 ? `tel:${digits}` : null;
 }
+
+type RefundBand = { minHoursLeft: number; penaltyRate: number };
+
+/**
+ * 환불 규정 안내 줄(C-305 펼친 내용). 정책값 REFUND_BANDS(#48)로 만들고 숫자를 직접 쓰지 않는다.
+ * 예: "시작 24시간 전까지: 70% 환불(위약금 30%)", "24~6시간 전: 50% 환불(위약금 50%)", "6시간 이내: 환불 불가"
+ */
+export function refundPolicyLines(bands: readonly RefundBand[]): string[] {
+  return bands.map((band, index) => {
+    const upper = index === 0 ? null : bands[index - 1].minHoursLeft;
+    const when =
+      upper === null
+        ? `시작 ${band.minHoursLeft}시간 전까지`
+        : band.minHoursLeft === 0
+          ? `${upper}시간 이내`
+          : `${upper}~${band.minHoursLeft}시간 전`;
+    const refundRate = 100 - band.penaltyRate;
+    return refundRate === 0
+      ? `${when}: 환불 불가`
+      : `${when}: ${refundRate}% 환불(위약금 ${band.penaltyRate}%)`;
+  });
+}
