@@ -23,5 +23,8 @@ export function safeNextPath(next: string | null | undefined, fallback: string):
     return fallback;
   }
   if (url.origin !== BASE) return fallback;
-  return `${url.pathname}${url.search}${url.hash}`;
+  // 점(.·..)을 정리한 결과가 '//'로 시작할 수 있다('/..//evil.com' → '//evil.com', #89). 결과도 한 번 더 확인한다
+  const path = `${url.pathname}${url.search}${url.hash}`;
+  if (path.startsWith('//')) return fallback;
+  return path;
 }
