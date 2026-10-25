@@ -7,7 +7,12 @@ import { afterAll, expect, it, vi } from 'vitest';
 import { getDb } from '@/db';
 import { type LocationUsePurpose, locationUseLogs } from '@/db/schema';
 
-import { closeTestDb, describeDb, violatedConstraint, withRollback } from '../../tests/db/test-db';
+import {
+  closeTestDb,
+  describeDb,
+  violatedConstraint,
+  withRollback,
+} from '../../../tests/db/test-db';
 import { logLocationUse } from './location-log';
 
 it('저장에 실패하면 에러를 던진다(기록 없이 위치를 쓰지 않게)', async () => {
