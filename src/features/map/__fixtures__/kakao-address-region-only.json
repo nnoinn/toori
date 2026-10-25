@@ -1,0 +1,30 @@
+{
+  "documents": [
+    {
+      "address": {
+        "address_name": "경기 안산시 상록구",
+        "b_code": "4127100000",
+        "h_code": "4127100000",
+        "main_address_no": "",
+        "mountain_yn": "N",
+        "region_1depth_name": "경기",
+        "region_2depth_name": "안산시 상록구",
+        "region_3depth_h_name": "",
+        "region_3depth_name": "",
+        "sub_address_no": "",
+        "x": "126.846482563885",
+        "y": "37.3009718344204"
+      },
+      "address_name": "경기 안산시 상록구",
+      "address_type": "REGION",
+      "road_address": null,
+      "x": "126.846482563885",
+      "y": "37.3009718344204"
+    }
+  ],
+  "meta": {
+    "is_end": true,
+    "pageable_count": 1,
+    "total_count": 1
+  }
+}
