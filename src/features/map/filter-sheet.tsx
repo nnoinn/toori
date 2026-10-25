@@ -14,7 +14,12 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { SHOP_CATEGORIES } from '@/server/policy';
+import {
+  DISCOUNT_RATE_OPTIONS,
+  PRICE_FILTER_RANGES,
+  SHOP_CATEGORIES,
+  TIME_FILTER_RANGES,
+} from '@/server/policy';
 
 import {
   applyFiltersToSearch,
@@ -22,12 +27,12 @@ import {
   EMPTY_FILTERS,
   selectCategory,
   serviceTypesOf,
+  toggleDiscount,
+  togglePrice,
   toggleService,
+  toggleTime,
   type HomeFilters,
 } from './filters';
-
-/** 가격대·시간대·할인율은 정책값(강규민 W4, #48)이 들어오면 연결한다 */
-const PENDING_SECTIONS = ['가격대', '시간대', '할인율'];
 
 function Chip({
   selected,
@@ -138,12 +143,50 @@ export function FilterSheet({ filters }: { filters: HomeFilters }) {
             )}
           </section>
 
-          {PENDING_SECTIONS.map((title) => (
-            <section key={title} className="flex flex-col gap-1">
-              <h3 className="text-sm font-semibold">{title}</h3>
-              <p className="text-sm text-muted-foreground">준비 중이에요.</p>
-            </section>
-          ))}
+          <section className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold">가격대 (할인가)</h3>
+            <div className="flex flex-wrap gap-2">
+              {PRICE_FILTER_RANGES.map((range) => (
+                <Chip
+                  key={range.key}
+                  selected={draft.prices.includes(range.key)}
+                  onClick={() => setDraft(togglePrice(draft, range.key))}
+                >
+                  {range.label}
+                </Chip>
+              ))}
+            </div>
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold">시간대</h3>
+            <div className="flex flex-wrap gap-2">
+              {TIME_FILTER_RANGES.map((range) => (
+                <Chip
+                  key={range.key}
+                  selected={draft.times.includes(range.key)}
+                  onClick={() => setDraft(toggleTime(draft, range.key))}
+                >
+                  {range.label}
+                </Chip>
+              ))}
+            </div>
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold">할인율</h3>
+            <div className="flex flex-wrap gap-2">
+              {DISCOUNT_RATE_OPTIONS.map((rate) => (
+                <Chip
+                  key={rate}
+                  selected={draft.discounts.includes(rate)}
+                  onClick={() => setDraft(toggleDiscount(draft, rate))}
+                >
+                  {rate}%
+                </Chip>
+              ))}
+            </div>
+          </section>
         </div>
 
         <SheetFooter className="flex-row gap-2">
