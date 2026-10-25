@@ -6,6 +6,7 @@ import { refresh } from 'next/cache';
 import { cookies } from 'next/headers';
 
 import { fail, ok, type Result } from '@/lib/result';
+import { logLocationUse } from '@/server/auth/location-log';
 
 import { LOCATION_COOKIE_MAX_AGE, LOCATION_COOKIES, MY_LOCATION_ENABLED } from './location-config';
 import { latLngSchema, serializeLatLng } from './location';
@@ -42,8 +43,13 @@ export async function saveMyLocation(point: unknown): Promise<Result<null>> {
   if (!parsed.success)
     return fail('INVALID_LOCATION', '위치를 확인하지 못했어요. 동네를 골라 주세요');
 
-  // TODO(#47 7장): 강규민님 logLocationUse가 들어오면 여기서 await logLocationUse('nearby_search')를
-  // 부르고 MY_LOCATION_ENABLED를 true로 바꾼다. 위치를 새로 받아 보낼 때 1번만 남긴다(D14).
+  // 위치정보 이용 기록(위치정보법, #47 7장). 위치를 새로 받아 보낼 때 1번만 남긴다(D14).
+  // 기록을 남기지 못하면 위치를 저장하지 않고 동네 선택으로 안내한다(기록 없이 위치를 쓰지 않는다)
+  try {
+    await logLocationUse('nearby_search');
+  } catch {
+    return fail('LOCATION_LOG_FAILED', '지금은 위치를 쓸 수 없어요. 동네를 골라 주세요');
+  }
 
   const store = await cookies();
   store.set(LOCATION_COOKIES.myLocation, serializeLatLng(parsed.data), {

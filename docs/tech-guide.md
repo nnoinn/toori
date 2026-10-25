@@ -141,12 +141,19 @@
   | `Price` | `listPrice, salePrice, discountRate, size?` | "30% 23,450원 ~~33,500원~~" |
   | `Countdown` | `targetAt, serverNow, variant?: 'remaining' \| 'clock', onExpire?` | 남은 시간(C-203)과 10분 홀딩 타이머(C-404). 서버 시각 기준 |
   | `EmptyState`, `ErrorState`, `LoadingCards` | `title, description?, action?` | 목록·상세의 세 상태 |
-  | `CustomerBottomNav` | 고객 `(tabs)` 레이아웃에 들어 있음 | 홈 `/`, 내 예약 `/reservations`, 내 정보 `/me`. 로그인·약관·결제처럼 메뉴 없는 화면(`(focus)`)에는 없다(#71) |
+  | `CustomerBottomNav`, `CustomerTopNav` | 고객 `(tabs)` 레이아웃에 들어 있음 | 홈 `/`, 내 예약 `/reservations`, 내 정보 `/me`. 폰은 아래 메뉴, PC(md 이상)는 위쪽 메뉴(왼쪽 서비스 이름, 오른쪽 메뉴). 로그인·약관·결제처럼 메뉴 없는 화면(`(focus)`)에는 없다(#71) |
   | `BackButton` | `fallbackHref?`, `className?` | 메뉴 없는 화면의 왼쪽 위 뒤로가기. 이전 화면이 없으면(주소로 바로 들어옴) `fallbackHref`로 간다 |
   | `OwnerNav` | 원장님 레이아웃에 들어 있음. `canCreateSlot` | 대시보드 `/owner`, 매물 등록 `/owner/slots/new`(승인 전 잠금), 매장 설정 `/owner/settings`, 정산 `/owner/settlements`. PC는 왼쪽 메뉴, 폰은 메뉴 버튼 |
   | `AdminNav` | 운영자 레이아웃에 들어 있음 | 입점 승인, 회원, 매물·예약, 이의제기, 정산 |
   | shadcn 기본 부품 | `Button`, `Badge`, `Card`, `Sheet`, `Skeleton` | 더 필요하면 추가해도 된다 |
 
+  - **고객 화면 PC 버전(10/25 결정):** 원장님 화면처럼 고객 화면도 폰과 PC를 둘 다 맞춘다. 기준은 Tailwind `md`(768px) 하나다. 틀(현동훈)은 메뉴와 바깥 폭을 맡고, 화면 안쪽 배치는 각 화면(정찬형)이 맡는다
+    - 틀이 하는 것: 폰은 최대 폭 480px + 아래 메뉴, PC는 화면 전체 폭 + 위쪽 메뉴(`CustomerTopNav`). 메뉴 없는 화면(`(focus)`)은 PC에서 가운데 흰 카드(폭 480px)에 담는다
+    - 홈 지도(J3): PC는 지도를 화면 전체로 두고, 목록은 아래 시트 대신 오른쪽 고정 패널(폭 400px 안팎)로 보여준다
+    - 매물 상세(J7): PC는 가운데 최대 폭 1024px(`max-w-5xl`) 두 칸. 왼쪽 사진, 오른쪽 정보·가격과 예약하기 상자(스크롤해도 따라오게 `sticky`). 아래 고정 예약 바는 폰에서만 쓴다
+    - 내 예약·내 정보: PC는 가운데 최대 폭 768px(`max-w-3xl`)
+    - 메뉴 없는 화면: 폰의 "아래 고정 버튼"은 PC에서는 카드 안 일반 버튼으로 둔다(`md:static` 등)
+    - 사진의 `sizes`는 PC 폭도 적는다(예: `(max-width: 768px) 100vw, 50vw`)
   - **v1은 출발점이다.** 팀원이 화면을 만들면서 모양·크기(PC·폰)·받는 값을 고치거나 새 부품을 추가할 수 있다. 기존 사용법은 깨지 않게 하고 PR에 "공통 UI 변경"을 적는다. 브랜드 색이 정해지면 색도 바뀐다
 
   - **`serverNow` 만드는 법:** 서버 컴포넌트에서 `await getRequestNow()`(`src/lib/request-time.ts`)로 받고, 그 컴포넌트는 `<Suspense>` 안에 둔다(Cache Components 규칙). 예시는 `src/app/dev/ui/page.tsx`
