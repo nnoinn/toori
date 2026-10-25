@@ -8,8 +8,9 @@ import { z } from 'zod';
 
 import { LOCATION_COOKIES, MY_LOCATION_ENABLED } from './location-config';
 import { findRegion, type Region } from './regions';
+import type { LatLng } from './types';
 
-export type LatLng = { lat: number; lng: number };
+export type { LatLng };
 
 export type CustomerLocation =
   /** 브라우저에서 받은 내 위치. region은 예전에 고른 동네(없으면 null) */
