@@ -13,6 +13,13 @@ nnoinn이 팀원에게 알릴 내용을 PR과 함께 이 파일에 추가한다.
 
 ---
 
+## 2026-10-25 · 전원 (권한·정책값·위치 기록 함수 머지, 가짜 로그인)
+- **강규민 PR 3개가 main에 들어왔다.** 서버 함수 첫 줄의 권한 확인 `requireCustomer`·`requireOwner`·`requireShopOwner`·`requireAdmin`, 화면용 `ensureCustomerPage`·`ensureOwnerPage`·`ensureAdminPage`(`@/server/auth`, #83), 정책값과 계산 함수 `calcSalePrice`·`getSlotTimeFlags`·`getPlatformFeeRate`·`REFUND_BANDS`·필터 구간 등(`@/server/policy`, #84), 위치 이용 기록 `logLocationUse`(#82)
+- **로그인(W2) 전 가짜 로그인**: `.env.local`에 `DEV_LOGIN_EMAIL`·`DEV_LOGIN_MODE` 두 줄을 넣으면 `npm run dev`에서 그 시드 계정으로 로그인한 것처럼 된다. 어떤 계정이 어떤 상황인지는 `.env.example` 맨 아래에 적어 뒀다. 배포·미리보기에서는 늘 로그인 안 함이다
+- 로그인 확인 함수는 `<Suspense>` 안의 서버 컴포넌트에서 부른다(기술 가이드 2장)
+- 개발 DB 시드에 예약·결제·환불이 들어갔다(예약 7건, #80)
+- 할 일: 정민석은 O2·O3 서버 함수 첫 줄에 `requireShopOwner`를 쓰고, 원장님 화면은 `DEV_LOGIN_EMAIL=owner-a@seed.test`, `DEV_LOGIN_MODE=owner`로 확인한다. 정찬형은 `saveMyLocation`에 `logLocationUse`를 연결하고 `MY_LOCATION_ENABLED`를 켜는 PR, 배지·필터는 `@/server/policy` 값을 쓴다. 강규민은 W2 로그인
+
 ## 2026-10-25 · 전원 (시나리오 명령 준비됨)
 - **내 계정에 테스트 상황을 만드는 명령을 만들었다**: `npm run scenario -- <명령> --email <로그인 이메일> [값]`. 기존/신규 고객 전환, 내 예약 탭용 예약 4건, 다른 고객이 결제 중인 매물, 내 원장님 샵과 입점 상태, 매물 상태 6가지, 처음으로 되돌리기(reset). 자세한 것은 기술 가이드 3-4 "시나리오 명령"
 - 로그인(W2)이 들어와서 앱에서 한 번 로그인한 뒤부터 쓸 수 있다. Claude에게 "나를 샘플 헤어 중앙역점 기존 고객으로 만들어줘"처럼 말하면 된다. 시드와 달리 각자 실행해도 된다(내 계정과 이 명령이 만든 것만 바꾼다)
