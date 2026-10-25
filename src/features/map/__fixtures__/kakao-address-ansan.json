@@ -1,0 +1,43 @@
+{
+  "documents": [
+    {
+      "address": {
+        "address_name": "경기 안산시 상록구 사동 1271",
+        "b_code": "4127110300",
+        "h_code": "4127153700",
+        "main_address_no": "1271",
+        "mountain_yn": "N",
+        "region_1depth_name": "경기",
+        "region_2depth_name": "안산시 상록구",
+        "region_3depth_h_name": "해양동",
+        "region_3depth_name": "사동",
+        "sub_address_no": "",
+        "x": "126.834494326011",
+        "y": "37.2980046949606"
+      },
+      "address_name": "경기 안산시 상록구 한양대학로 55",
+      "address_type": "ROAD_ADDR",
+      "road_address": {
+        "address_name": "경기 안산시 상록구 한양대학로 55",
+        "building_name": "",
+        "main_building_no": "55",
+        "region_1depth_name": "경기",
+        "region_2depth_name": "안산시 상록구",
+        "region_3depth_name": "사동",
+        "road_name": "한양대학로",
+        "sub_building_no": "",
+        "underground_yn": "N",
+        "x": "126.834494326011",
+        "y": "37.2980046949606",
+        "zone_no": "15588"
+      },
+      "x": "126.834494326011",
+      "y": "37.2980046949606"
+    }
+  ],
+  "meta": {
+    "is_end": true,
+    "pageable_count": 1,
+    "total_count": 1
+  }
+}
