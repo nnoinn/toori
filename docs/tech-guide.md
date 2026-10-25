@@ -51,6 +51,7 @@
 - **권한은 서버에서 검사한다 (X-102).** 서버 함수마다 "로그인했는가, 역할이 맞는가, 본인 데이터인가"를 확인한다. DB 도구(Drizzle·Prisma)는 Supabase RLS를 거치지 않으므로, RLS는 브라우저 직접 접근을 막는 안전장치로만 켠다.
 - **Supabase Data API(supabase-js의 `.from()`, PostgREST)로 테이블에 접근하지 않는다(10/20).** 데이터는 서버에서 Drizzle(`DATABASE_URL`)로만 읽고 쓴다. Supabase가 10/30부터 `public` 스키마의 새 테이블에 Data API 권한(GRANT)을 자동으로 주지 않는데, 우리는 Data API를 쓰지 않으므로 영향이 없고 오히려 더 안전하다. 그래서 마이그레이션에 `anon`·`authenticated`용 GRANT를 넣지 않는다. 로그인(Auth)과 사진 저장소(Storage)는 별도 API라 상관없다. Realtime 등으로 브라우저가 테이블을 직접 봐야 하는 일이 생기면, 그 테이블 마이그레이션에 GRANT와 RLS 정책을 함께 쓰고 nnoinn 승인을 받는다
 - **레이아웃의 권한 확인만 믿지 않는다(10/14).** Next.js 레이아웃은 화면을 이동할 때 다시 실행되지 않는다(Partial Rendering). 그래서 `ensureOwnerPage()` 같은 레이아웃 확인은 첫 진입 안내용으로 두고, 데이터를 읽는 서버 함수와 저장하는 서버 함수 모두 첫 줄에서 `requireCustomer()`·`requireOwner()`·`requireShopOwner(shopId)`·`requireAdmin()`(#47)을 부른다
+- **로그인 확인은 `<Suspense>` 안에서 부른다(10/25, #83).** `getCurrentAccount()`·`ensure…Page()`는 요청마다 값이 달라서 빌드 때 미리 그릴 수 없다(Cache Components). 레이아웃·페이지 맨 위에서 기다리지 말고 `<Suspense>`로 감싼 서버 컴포넌트에서 부른다. 함수는 `@/server/auth`에서 가져온다
 - **비밀 키를 쓰거나 서버에서만 돌아야 하는 파일은 맨 위에 `import 'server-only';`를 쓴다(10/20).** 화면(`'use client'`) 코드가 그 파일을 가져오면 빌드가 실패해서 실수를 바로 알 수 있다. Next.js에 들어 있어서 패키지를 따로 설치하지 않는다. 테스트(Vitest)에서는 설정(`vitest.config.mts`)이 빈 모듈로 바꿔 주므로 그대로 테스트할 수 있다. 예: 카카오 REST 키를 쓰는 주소→좌표 변환, `src/server/` 아래 결제·정산·권한 함수
 - **금액·시간·상태는 서버가 계산하고, 화면은 표시만 한다.** 브라우저에서 보낸 가격이나 환불액은 믿지 않는다.
 - **금액은 원 단위 정수**로 다룬다. **할인가는 정가 × (1 − 할인율)을 그대로 쓰고 100원 단위로 올리지 않는다** (예: 정가 33,500원에 30% 할인 → 23,450원). 표시한 할인율과 실제 할인율이 같아야 하기 때문이다. 원 미만이 생기면 버린다. 수수료와 정산은 이 금액으로 계산한다. 수수료와 그 VAT는 원 미만만 버린다.
@@ -370,5 +371,6 @@
 | `NEXT_PUBLIC_KAKAO_MAP_JS_KEY` | 브라우저에 보여도 됨 (등록한 도메인에서만 동작) | 카카오 지도 표시 |
 | `KAKAO_REST_API_KEY` | **서버 전용** | 주소→좌표 변환(카카오 로컬 API) |
 | `PAYOUT_ACCOUNT_ENCRYPTION_KEY` | **서버 전용** | 원장님 정산 계좌번호 암호화(AES-256-GCM, 32바이트 base64). 개발용 값은 nnoinn이 만들었고(10/13), 출시 때 운영용을 따로 만든다. 값을 바꾸면 이미 암호화한 계좌를 못 읽으니 바꾸지 않는다 |
+| `DEV_LOGIN_EMAIL`, `DEV_LOGIN_MODE` | 공개돼도 됨(내 컴퓨터 개발 전용) | 로그인(W2) 전 가짜 로그인(#83). `npm run dev`에서만, 시드 계정(`@seed.test`)만. 쓰는 법은 `.env.example`. W2 머지 뒤 지운다 |
 
 카카오·구글 로그인의 Client ID·Secret은 Supabase 대시보드에 들어 있어서 우리 코드에는 없다. 새 환경변수가 필요하면 `.env.example`에 이름을 추가하는 PR을 올리고, 값은 nnoinn에게 받는다.
