@@ -23,10 +23,10 @@ const EMPTY_TEXT: Record<ReservationTab, string> = {
   cancelled: '취소한 예약이 없어요',
 };
 
-// 내 예약 목록 (J12, C-501). 로그인 확인은 <Suspense> 안에서 한다(기술 가이드 2장).
+// 내 예약 목록 (J12, C-501). 로그인 확인은 <Suspense> 안에서 한다(기술 가이드 2장). PC는 가운데 최대 768px
 export default function ReservationsPage({ searchParams }: { searchParams: SearchParams }) {
   return (
-    <main className="flex flex-1 flex-col">
+    <main className="flex flex-1 flex-col md:mx-auto md:w-full md:max-w-3xl md:px-6 md:py-6">
       <h1 className="px-4 pt-4 pb-2 text-xl font-bold">내 예약</h1>
       <Suspense fallback={<LoadingCards count={3} />}>
         <ReservationsContent searchParams={searchParams} />

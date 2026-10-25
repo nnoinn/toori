@@ -22,7 +22,7 @@ const STATUS_LABEL = { confirmed: '예정', completed: '이용 완료', cancelle
 // 예약 상세 (J12, C-502). 본인 예약만 열린다. 예약 취소(C-503)는 J13에서 붙인다
 export default function ReservationDetailPage({ params }: { params: Params }) {
   return (
-    <main className="flex flex-1 flex-col">
+    <main className="flex flex-1 flex-col md:mx-auto md:w-full md:max-w-3xl md:px-6 md:py-6">
       <Suspense fallback={<LoadingCards count={2} />}>
         <DetailContent params={params} />
       </Suspense>
