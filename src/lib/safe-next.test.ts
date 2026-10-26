@@ -41,4 +41,18 @@ describe('safeNextPath', () => {
     expect(safeNextPath('/owner/../slots/abc', '/')).toBe('/slots/abc');
     expect(safeNextPath('/%2F%2Fevil.com', '/')).toBe('/%2F%2Fevil.com');
   });
+
+  it('점을 정리한 결과가 //로 시작하면 fallback (#89)', () => {
+    for (const bad of [
+      '/..//evil.example',
+      '/.//evil.example',
+      '/a/..//evil.example',
+      '/%2e%2e//evil.example',
+      '/%2E//evil.example',
+    ]) {
+      expect(safeNextPath(bad, '/'), JSON.stringify(bad)).toBe('/');
+    }
+    // '//'가 맨 앞이 아니면 우리 사이트 안이라 그대로 둔다
+    expect(safeNextPath('/a//b', '/')).toBe('/a//b');
+  });
 });

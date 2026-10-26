@@ -10,7 +10,7 @@ import { LocationSwitcher } from '@/features/map/location-switcher';
 import { parseSort } from '@/features/map/slot-list/sort';
 import { getRequestNow } from '@/lib/request-time';
 
-// 홈 = 지도 + 목록 시트 탐색 화면(J3). 매물 목록은 J4에서 붙인다.
+// 홈 = 지도 + 목록 탐색 화면(J3). 목록 정렬·카드는 J4, 실제 매물 조회는 #49·#50 뒤에 붙인다.
 // 위치·동네가 없으면 먼저 위치 안내·동네 선택(C-102, J2)을 보여준다. 필터는 주소창 값(J5)이다.
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 

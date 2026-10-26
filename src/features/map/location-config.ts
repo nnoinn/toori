@@ -2,11 +2,10 @@
 // 위치와 고른 동네는 DB에 저장하지 않고 쿠키에만 둔다.
 
 /**
- * '내 위치 허용'을 보여줄지.
- * 위치를 받으면 위치 이용 기록(logLocationUse, 강규민 #47 7장)을 남겨야 하는데 그 함수가 아직 없다.
- * 함수가 들어오면 saveMyLocation에서 부르도록 연결하고 true로 바꾼다. 그 전에는 동네 선택만 쓴다.
+ * '내 위치 허용'을 보여줄지. 위치를 받으면 saveMyLocation이 위치 이용 기록(logLocationUse, #47 7장)을 남긴다.
+ * 위치 기능을 잠시 막아야 할 때(예: 위치기반서비스 신고 전 점검) false로 바꾸면 동네 선택만 남는다.
  */
-export const MY_LOCATION_ENABLED = false;
+export const MY_LOCATION_ENABLED = true;
 
 export const LOCATION_COOKIES = {
   /** 고른 동네의 시·군·구 코드 */

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatBusinessHours, formatDuration, safeExternalUrl, telHref } from './detail-format';
+import { REFUND_BANDS } from '@/server/policy';
+
+import {
+  formatBusinessHours,
+  formatDuration,
+  refundPolicyLines,
+  safeExternalUrl,
+  telHref,
+} from './detail-format';
 
 describe('영업시간', () => {
   it('월요일부터 7줄, 입력 안 한 요일은 "정보 없음"', () => {
@@ -71,5 +79,24 @@ describe('전화 링크', () => {
   it('숫자만 남긴다', () => {
     expect(telHref('031-123-4567')).toBe('tel:0311234567');
     expect(telHref('123')).toBeNull();
+  });
+});
+
+describe('환불 규정 안내', () => {
+  it('정책값으로 3구간을 만든다', () => {
+    expect(refundPolicyLines(REFUND_BANDS)).toEqual([
+      '시작 24시간 전까지: 70% 환불(위약금 30%)',
+      '24~6시간 전: 50% 환불(위약금 50%)',
+      '6시간 이내: 환불 불가',
+    ]);
+  });
+
+  it('정책값이 바뀌면 문구도 바뀐다', () => {
+    expect(
+      refundPolicyLines([
+        { minHoursLeft: 48, penaltyRate: 10 },
+        { minHoursLeft: 0, penaltyRate: 100 },
+      ]),
+    ).toEqual(['시작 48시간 전까지: 90% 환불(위약금 10%)', '48시간 이내: 환불 불가']);
   });
 });
