@@ -1,11 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
-import { REFUND_BANDS } from '@/server/policy';
+import { NO_SHOW_PENALTY_RATE, OWNER_FAULT_COUPON_AMOUNT, REFUND_BANDS } from '@/server/policy';
 
 import {
   formatBusinessHours,
   formatDuration,
   refundPolicyLines,
+  refundPolicyNotes,
   safeExternalUrl,
   telHref,
 } from './detail-format';
@@ -83,20 +87,55 @@ describe('전화 링크', () => {
 });
 
 describe('환불 규정 안내', () => {
-  it('정책값으로 3구간을 만든다', () => {
-    expect(refundPolicyLines(REFUND_BANDS)).toEqual([
-      '시작 24시간 전까지: 70% 환불(위약금 30%)',
-      '24~6시간 전: 50% 환불(위약금 50%)',
-      '6시간 이내: 환불 불가',
+  it('정책값으로 만든 3구간이 결제 동의 문구(consent-texts.md 3장)와 글자까지 같다', () => {
+    expect(refundPolicyLines(REFUND_BANDS, NO_SHOW_PENALTY_RATE)).toEqual([
+      '24시간 이상 남음: 70% 환불(위약금 30%)',
+      '6시간 이상 24시간 미만: 50% 환불(위약금 50%)',
+      '6시간 미만·노쇼: 환불 없음',
     ]);
   });
 
-  it('정책값이 바뀌면 문구도 바뀐다', () => {
+  it('경계는 "N시간 이상"이 위 구간이다(딱 6시간 남으면 50% 환불)', () => {
+    const [, middle, last] = refundPolicyLines(REFUND_BANDS, NO_SHOW_PENALTY_RATE);
+    expect(middle.startsWith('6시간 이상')).toBe(true);
+    expect(last.startsWith('6시간 미만')).toBe(true);
+    // 정책값의 구간 경계와 문구가 같은 숫자를 쓴다
+    expect(REFUND_BANDS.map((band) => band.minHoursLeft)).toEqual([24, 6, 0]);
+  });
+
+  it('정책값이 바뀌면 문구도 바뀐다. 노쇼 위약금과 다르면 "·노쇼"를 붙이지 않는다', () => {
     expect(
-      refundPolicyLines([
-        { minHoursLeft: 48, penaltyRate: 10 },
-        { minHoursLeft: 0, penaltyRate: 100 },
-      ]),
-    ).toEqual(['시작 48시간 전까지: 90% 환불(위약금 10%)', '48시간 이내: 환불 불가']);
+      refundPolicyLines(
+        [
+          { minHoursLeft: 48, penaltyRate: 10 },
+          { minHoursLeft: 12, penaltyRate: 40 },
+          { minHoursLeft: 0, penaltyRate: 100 },
+        ],
+        90,
+      ),
+    ).toEqual([
+      '48시간 이상 남음: 90% 환불(위약금 10%)',
+      '12시간 이상 48시간 미만: 60% 환불(위약금 40%)',
+      '12시간 미만: 환불 없음',
+    ]);
+  });
+
+  it('문서(docs/legal/consent-texts.md)가 바뀌어 코드와 어긋나면 알려 준다', () => {
+    const doc = readFileSync(join(process.cwd(), 'docs/legal/consent-texts.md'), 'utf8');
+    const notes = refundPolicyNotes(OWNER_FAULT_COUPON_AMOUNT);
+    for (const line of refundPolicyLines(REFUND_BANDS, NO_SHOW_PENALTY_RATE)) {
+      expect(doc).toContain(`- ${line}`);
+    }
+    for (const line of [...notes.before, notes.after]) expect(doc).toContain(line);
+  });
+
+  it('앞뒤 안내 문구는 결제 동의 문구 3장과 같고, 쿠폰 금액은 정책값', () => {
+    expect(refundPolicyNotes(OWNER_FAULT_COUPON_AMOUNT)).toEqual({
+      before: [
+        '임박 특가 상품이라 결제 직후에도 무료 취소가 되지 않아요.',
+        '서비스 시작까지 남은 시간에 따라 환불돼요.',
+      ],
+      after: '원장님 사정으로 취소되면 전액 환불하고 3,000원 쿠폰을 드려요.',
+    });
   });
 });

@@ -68,21 +68,37 @@ export function telHref(phone: string): string | null {
 type RefundBand = { minHoursLeft: number; penaltyRate: number };
 
 /**
- * 환불 규정 안내 줄(C-305 펼친 내용). 정책값 REFUND_BANDS(#48)로 만들고 숫자를 직접 쓰지 않는다.
- * 예: "시작 24시간 전까지: 70% 환불(위약금 30%)", "24~6시간 전: 50% 환불(위약금 50%)", "6시간 이내: 환불 불가"
+ * 환불 규정 구간 줄. 결제 동의 문구(docs/legal/consent-texts.md 3장)와 같은 모양이고,
+ * 매물 상세(C-305)와 결제 화면(C-402)이 같이 쓴다. 숫자는 정책값(REFUND_BANDS 등, #48)에서만 온다.
+ * 경계는 정책 그대로 "N시간 이상"이 위 구간이다(예: 딱 6시간 남으면 50% 환불).
+ * 예: "24시간 이상 남음: 70% 환불(위약금 30%)", "6시간 이상 24시간 미만: 50% 환불(위약금 50%)", "6시간 미만·노쇼: 환불 없음"
  */
-export function refundPolicyLines(bands: readonly RefundBand[]): string[] {
+export function refundPolicyLines(
+  bands: readonly RefundBand[],
+  noShowPenaltyRate: number,
+): string[] {
   return bands.map((band, index) => {
     const upper = index === 0 ? null : bands[index - 1].minHoursLeft;
-    const when =
-      upper === null
-        ? `시작 ${band.minHoursLeft}시간 전까지`
-        : band.minHoursLeft === 0
-          ? `${upper}시간 이내`
-          : `${upper}~${band.minHoursLeft}시간 전`;
+    let when: string;
+    if (upper === null) when = `${band.minHoursLeft}시간 이상 남음`;
+    else if (band.minHoursLeft === 0) when = `${upper}시간 미만`;
+    else when = `${band.minHoursLeft}시간 이상 ${upper}시간 미만`;
+    // 노쇼는 마지막 구간과 같은 위약금이라 같은 줄에 적는다(S-406)
+    if (index === bands.length - 1 && band.penaltyRate === noShowPenaltyRate) when += '·노쇼';
     const refundRate = 100 - band.penaltyRate;
     return refundRate === 0
-      ? `${when}: 환불 불가`
+      ? `${when}: 환불 없음`
       : `${when}: ${refundRate}% 환불(위약금 ${band.penaltyRate}%)`;
   });
+}
+
+/** 환불 규정 앞뒤 안내(결제 동의 문구 3장). 원장님 귀책 쿠폰 금액은 정책값으로 받는다 */
+export function refundPolicyNotes(ownerFaultCouponAmount: number) {
+  return {
+    before: [
+      '임박 특가 상품이라 결제 직후에도 무료 취소가 되지 않아요.',
+      '서비스 시작까지 남은 시간에 따라 환불돼요.',
+    ],
+    after: `원장님 사정으로 취소되면 전액 환불하고 ${ownerFaultCouponAmount.toLocaleString('ko-KR')}원 쿠폰을 드려요.`,
+  };
 }
