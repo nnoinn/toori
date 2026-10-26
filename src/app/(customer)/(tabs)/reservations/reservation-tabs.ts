@@ -29,3 +29,12 @@ export function statusOfTab(tab: ReservationTab): ReservationStatus {
 export function tabHref(tab: ReservationTab): string {
   return tab === DEFAULT_TAB ? '/reservations' : `/reservations?${TAB_PARAM}=${tab}`;
 }
+
+/**
+ * "방문 확인 중": 시작 시각이 지났는데(같은 시각 포함) 아직 예정(confirmed)인 예약.
+ * 원장님이 방문·노쇼 처리를 하기 전이라 '예정' 탭에 두고 표시만 붙인다(10/25 결정, #92 리뷰).
+ * now는 서버 시각(getRequestNow)을 넘긴다. 기기 시계를 믿지 않는다.
+ */
+export function isVisitPending(status: ReservationStatus, startAt: string, now: Date): boolean {
+  return status === 'confirmed' && new Date(startAt).getTime() <= now.getTime();
+}

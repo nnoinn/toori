@@ -7,11 +7,19 @@ import { ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState, ErrorState, LoadingCards } from '@/components/ui/state';
 import { formatWon } from '@/lib/format';
+import { getRequestNow } from '@/lib/request-time';
 import { formatKst } from '@/lib/time';
 import { ensureCustomerPage } from '@/server/auth';
 
 import { getMyReservations } from './queries';
-import { parseTab, RESERVATION_TABS, tabHref, type ReservationTab } from './reservation-tabs';
+import {
+  isVisitPending,
+  parseTab,
+  RESERVATION_TABS,
+  statusOfTab,
+  tabHref,
+  type ReservationTab,
+} from './reservation-tabs';
 
 export const metadata: Metadata = { title: '내 예약' };
 
@@ -40,7 +48,7 @@ async function ReservationsContent({ searchParams }: { searchParams: SearchParam
   const tab = parseTab(params.tab);
   // 로그인하지 않았으면 로그인 화면, 약관 동의 전이면 /join 으로 보낸다
   await ensureCustomerPage(tabHref(tab));
-  const result = await getMyReservations(tab);
+  const [result, now] = await Promise.all([getMyReservations(tab), getRequestNow()]);
 
   return (
     <>
@@ -80,6 +88,9 @@ async function ReservationsContent({ searchParams }: { searchParams: SearchParam
                   <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <span className="truncate">{item.shopName}</span>
                     {item.noShow ? <Badge variant="destructive">노쇼</Badge> : null}
+                    {isVisitPending(statusOfTab(tab), item.startAt, now) ? (
+                      <Badge variant="secondary">방문 확인 중</Badge>
+                    ) : null}
                   </p>
                   <p className="truncate font-semibold">{item.menuName}</p>
                   <p className="text-sm">{formatKst(new Date(item.startAt))}</p>
