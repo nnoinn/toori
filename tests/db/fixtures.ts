@@ -3,7 +3,18 @@
 
 import { authUsers } from 'drizzle-orm/supabase';
 
-import { customers, menus, owners, profiles, shops, slots } from '@/db/schema';
+import {
+  customers,
+  menus,
+  orders,
+  owners,
+  profiles,
+  type ReservationStatus,
+  reservations,
+  shops,
+  type SlotStatus,
+  slots,
+} from '@/db/schema';
 
 import type { TestTx } from './test-db';
 
@@ -96,4 +107,58 @@ export function testSlot(
     status: 'published',
     ...extra,
   } satisfies typeof slots.$inferInsert;
+}
+
+/** 예약 상태에 맞는 매물 상태(확정 → 예약됨, 이용 완료 → 완료, 취소 → 취소) */
+const SLOT_STATUS_OF = {
+  confirmed: 'reserved',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const satisfies Record<ReservationStatus, SlotStatus>;
+
+/**
+ * 매물 → 주문(결제 완료) → 예약 한 벌. 매물 상태는 예약 상태에 맞춘다. 시각은 testSlot과 같은 'HH:MM'.
+ * 노쇼·취소 시각 등 예약에 더 넣을 값은 reservation으로 넘긴다.
+ * 예: createTestReservation(tx, shop, customerId, '09:00', '10:00', 'completed', { visitResult: 'no_show' })
+ */
+export async function createTestReservation(
+  tx: TestTx,
+  shop: TestShop,
+  customerId: string,
+  start: string,
+  end: string,
+  status: ReservationStatus,
+  reservation: Partial<typeof reservations.$inferInsert> = {},
+) {
+  const [slot] = await tx
+    .insert(slots)
+    .values(testSlot(shop, start, end, { status: SLOT_STATUS_OF[status] }))
+    .returning();
+  const [order] = await tx
+    .insert(orders)
+    .values({
+      paymentId: `test_${crypto.randomUUID()}`,
+      slotId: slot.id,
+      customerId,
+      salePrice: slot.salePrice,
+      amount: slot.salePrice,
+      refundPolicyVersion: 'test',
+      refundPolicyAgreedAt: new Date('2026-10-30T10:00:00+09:00'),
+      status: 'confirmed',
+      paidAt: new Date('2026-10-30T10:05:00+09:00'),
+    })
+    .returning();
+  // 예약 번호는 유일해야 해서, 여러 테스트 파일이 동시에 돌아도 겹치지 않게 무작위로 만든다
+  const [row] = await tx
+    .insert(reservations)
+    .values({
+      code: `T${crypto.randomUUID().slice(0, 8)}`,
+      slotId: slot.id,
+      orderId: order.id,
+      customerId,
+      status,
+      ...reservation,
+    })
+    .returning();
+  return { slot, order, reservation: row };
 }

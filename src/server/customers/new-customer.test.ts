@@ -3,11 +3,11 @@
 import { and, inArray } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
-import { orders, reservations, slots } from '@/db/schema';
-import type { ReservationStatus } from '@/db/schema/payments';
+import { slots } from '@/db/schema';
 
 import {
   createTestCustomer,
+  createTestReservation,
   createTestShop,
   testSlot,
   type TestShop,
@@ -24,46 +24,6 @@ function nextWindow(): [string, string] {
   const hm = (minutes: number) =>
     `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
   return [hm(i * 20), hm(i * 20 + 15)];
-}
-
-/** 매물 → 주문 → 예약 한 벌(이력 판별에 쓰는 예약) */
-async function createReservation(
-  tx: TestTx,
-  shop: TestShop,
-  customerId: string,
-  status: ReservationStatus,
-  visitResult: 'visited' | 'no_show' | null = null,
-) {
-  const [start, end] = nextWindow();
-  const slotStatus = { confirmed: 'reserved', completed: 'completed', cancelled: 'cancelled' }[
-    status
-  ];
-  const [slot] = await tx
-    .insert(slots)
-    .values(testSlot(shop, start, end, { status: slotStatus }))
-    .returning();
-  const [order] = await tx
-    .insert(orders)
-    .values({
-      paymentId: `test_${seq}_${crypto.randomUUID()}`,
-      slotId: slot.id,
-      customerId,
-      salePrice: 14000,
-      amount: 14000,
-      refundPolicyVersion: 'test',
-      refundPolicyAgreedAt: new Date('2026-10-30T10:00:00+09:00'),
-      status: 'confirmed',
-      paidAt: new Date('2026-10-30T10:05:00+09:00'),
-    })
-    .returning();
-  await tx.insert(reservations).values({
-    code: `N${String(seq).padStart(7, '0')}`,
-    slotId: slot.id,
-    orderId: order.id,
-    customerId,
-    status,
-    visitResult,
-  });
 }
 
 /** 게시중인 매물 하나(일반 또는 신규 고객 전용) */
@@ -98,7 +58,9 @@ describeDb('신규 고객 판별 (실제 DB)', () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
       const { customerId } = await createTestCustomer(tx);
-      if (status) await createReservation(tx, shop, customerId, status, visitResult);
+      if (status) {
+        await createTestReservation(tx, shop, customerId, ...nextWindow(), status, { visitResult });
+      }
 
       expect(await isNewCustomer(customerId, shop.shopId, tx)).toBe(isNew);
 
@@ -117,8 +79,12 @@ describeDb('신규 고객 판별 (실제 DB)', () => {
       const otherShop = await createTestShop(tx, { status: 'approved' });
       const { customerId } = await createTestCustomer(tx);
       const other = await createTestCustomer(tx);
-      await createReservation(tx, otherShop, customerId, 'completed', 'visited');
-      await createReservation(tx, shop, other.customerId, 'completed', 'visited');
+      await createTestReservation(tx, otherShop, customerId, ...nextWindow(), 'completed', {
+        visitResult: 'visited',
+      });
+      await createTestReservation(tx, shop, other.customerId, ...nextWindow(), 'completed', {
+        visitResult: 'visited',
+      });
 
       expect(await isNewCustomer(customerId, shop.shopId, tx)).toBe(true);
       const newOnly = await createListedSlot(tx, shop, true);
@@ -130,7 +96,9 @@ describeDb('신규 고객 판별 (실제 DB)', () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
       const { customerId } = await createTestCustomer(tx);
-      await createReservation(tx, shop, customerId, 'completed', 'visited');
+      await createTestReservation(tx, shop, customerId, ...nextWindow(), 'completed', {
+        visitResult: 'visited',
+      });
       const newOnly = await createListedSlot(tx, shop, true);
 
       expect(await visibleSlotIds(tx, null, [newOnly])).toEqual(new Set([newOnly]));
@@ -144,9 +112,11 @@ describeDb('신규 고객 판별 (실제 DB)', () => {
       const cancelledOnly = await createTestShop(tx, { status: 'approved' });
       const untouched = await createTestShop(tx, { status: 'approved' });
       const { customerId } = await createTestCustomer(tx);
-      await createReservation(tx, visited, customerId, 'completed', 'visited');
-      await createReservation(tx, visited, customerId, 'confirmed');
-      await createReservation(tx, cancelledOnly, customerId, 'cancelled');
+      await createTestReservation(tx, visited, customerId, ...nextWindow(), 'completed', {
+        visitResult: 'visited',
+      });
+      await createTestReservation(tx, visited, customerId, ...nextWindow(), 'confirmed');
+      await createTestReservation(tx, cancelledOnly, customerId, ...nextWindow(), 'cancelled');
 
       const shopIds = [visited.shopId, cancelledOnly.shopId, untouched.shopId, visited.shopId];
       expect(await getVisitedShopIds(customerId, shopIds, tx)).toEqual(new Set([visited.shopId]));
