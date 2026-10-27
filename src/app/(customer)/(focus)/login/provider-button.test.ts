@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { PROVIDER_LABELS } from './provider-button';
+import { PROVIDER_LABELS } from './provider-labels';
 
 describe('간편 로그인 버튼', () => {
   it('문구는 카카오·구글 디자인 가이드가 허용하는 것만 쓴다', () => {
@@ -20,5 +20,18 @@ describe('간편 로그인 버튼', () => {
     expect(css).toContain('--google: #ffffff;');
     expect(css).toContain('--google-foreground: #1f1f1f;');
     expect(css).toContain('--google-border: #747775;');
+  });
+
+  it('글꼴: 카카오는 기기 기본 서체, 구글은 Google Sans가 맨 앞', () => {
+    const css = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8');
+    expect(css).toMatch(/--kakao-font:\s*system-ui,/);
+    expect(css).toMatch(/--font-google:\s*var\(--font-google-sans\),/);
+    const source = readFileSync(
+      join(process.cwd(), 'src/app/(customer)/(focus)/login/provider-button.tsx'),
+      'utf8',
+    );
+    // Google Sans Medium(500) 14/20
+    expect(source).toMatch(/Google_Sans\(\{\s*weight: '500'/);
+    expect(source).toContain('text-[14px] leading-5 font-medium');
   });
 });

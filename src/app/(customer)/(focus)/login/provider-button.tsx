@@ -1,16 +1,29 @@
+import { Google_Sans } from 'next/font/google';
 import Image from 'next/image';
 import { cn } from 'cn';
 
 import googleLogo from './google-g-logo.png';
+import { PROVIDER_LABELS, type ProviderKey } from './provider-labels';
+
+export type { ProviderKey };
 
 // 간편 로그인 버튼 (C-101). 카카오·구글 공식 버튼 디자인 가이드를 따른다(10/28).
 // - 카카오: 배경 #FEE500, 말풍선 심볼(모양·비율·색 변경 불가, 심볼 없이 쓰지 않음), 문구 "카카오 로그인", 글자 85%, 모서리 12px
 //   https://developers.kakao.com/docs/latest/ko/kakaologin/design-guide
 // - 구글(Light): 흰 배경, 테두리 #747775, 글자 #1F1F1F, 표준 색 "G" 로고(색·크기 변경 불가), 현지화한 "Sign in with Google"
 //   https://developers.google.com/identity/branding-guidelines
-// 색은 globals.css의 kakao·google 토큰에서만 가져온다.
+// 색과 글꼴은 globals.css의 kakao·google 토큰에서만 가져온다.
+// 글꼴: 카카오 "OS 기본 시스템 서체"(30pt ≒ 웹 15px), 구글 "Google Sans Medium 14/20"
 
-export type ProviderKey = 'kakao' | 'google';
+// Google Sans에는 한글이 없어서 라틴 글자만 받는다. 한글은 globals.css --font-google의 기기 기본 서체로 보인다.
+// adjustFontFallback: Next.js에 Google Sans 크기 맞춤값이 없어서(빌드 경고) 끈다. 버튼 높이가 고정이라 흔들림은 없다
+const googleSans = Google_Sans({
+  weight: '500',
+  subsets: ['latin'],
+  variable: '--font-google-sans',
+  display: 'swap',
+  adjustFontFallback: false,
+});
 
 /** 카카오 말풍선 심볼. 경로는 공식 리소스(login-simple-ko.svg)의 심볼 그대로, 둘레만 심볼에 맞춰 잘랐다 */
 function KakaoSymbol({ className }: { className?: string }) {
@@ -23,13 +36,6 @@ function KakaoSymbol({ className }: { className?: string }) {
     </svg>
   );
 }
-
-export const PROVIDER_LABELS: Record<ProviderKey, string> = {
-  // 카카오 가이드가 허용하는 완성형 문구
-  kakao: '카카오 로그인',
-  // "Sign in with Google"의 한국어(구글 공식 한국어 버튼 문구)
-  google: 'Google 계정으로 로그인',
-};
 
 type ProviderButtonProps = {
   provider: ProviderKey;
@@ -49,10 +55,13 @@ export function ProviderButton({ provider, disabled, pending, onClick }: Provide
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'relative flex h-12 w-full items-center justify-center gap-2.5 rounded-[12px] px-4 text-[15px] font-semibold transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60',
+        'relative flex h-12 w-full items-center justify-center gap-2.5 rounded-[12px] px-4 transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60',
         isKakao
-          ? 'bg-kakao text-kakao-foreground hover:opacity-90'
-          : 'border border-google-border bg-google text-google-foreground hover:bg-muted',
+          ? 'bg-kakao font-kakao text-[15px] font-semibold text-kakao-foreground hover:opacity-90'
+          : cn(
+              googleSans.variable,
+              'border border-google-border bg-google font-google text-[14px] leading-5 font-medium text-google-foreground hover:bg-muted',
+            ),
       )}
     >
       {isKakao ? (
