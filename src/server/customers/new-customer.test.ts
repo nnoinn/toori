@@ -17,13 +17,12 @@ import { getVisitedShopIds, isNewCustomer, newCustomerOnlyVisible } from './new-
 
 let seq = 0;
 
-/** 같은 샵 매물끼리 시간이 겹치지 않게(slots_no_overlap) 매번 다른 20분 칸의 'HH:MM' 시작·끝을 준다 */
+/** 같은 샵 매물끼리 시간이 겹치지 않게(slots_no_overlap) 매번 다른 정시 1시간 칸의 'HH:MM' 시작·끝을 준다(30분 단위, #108) */
 function nextWindow(): [string, string] {
   seq += 1;
-  const i = seq % 72;
-  const hm = (minutes: number) =>
-    `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
-  return [hm(i * 20), hm(i * 20 + 15)];
+  const hour = seq % 23;
+  const hm = (h: number) => `${String(h).padStart(2, '0')}:00`;
+  return [hm(hour), hm(hour + 1)];
 }
 
 /** 게시중인 매물 하나(일반 또는 신규 고객 전용) */
