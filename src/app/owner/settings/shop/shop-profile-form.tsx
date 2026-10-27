@@ -7,14 +7,22 @@ import { cn } from 'cn';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import type { GeocodeCandidate } from '@/features/map/geocode';
 import { SHOP_CATEGORIES } from '@/server/policy/catalog';
 
-import { saveShopProfile } from './actions';
+import { getCategoryChangeImpact, saveShopProfile } from './actions';
 import { AddressSearchButton } from './address-search-button';
+import type { CategoryChangeImpact } from './category-change-store';
 import {
   type HoursRow,
   SHOP_PROFILE_LIMITS,
@@ -25,7 +33,11 @@ import {
   WEEKDAY_LABELS,
 } from './shop-profile';
 
-type Status = { kind: 'idle' } | { kind: 'saved' } | { kind: 'error'; message: string };
+type Status =
+  { kind: 'idle' } | { kind: 'saved'; message: string } | { kind: 'error'; message: string };
+
+/** 업종 변경 확인 창. 1단계 "정말 바꿀까요?" → 2단계 "매물·메뉴가 내려가요" */
+type ConfirmState = { step: 1 } | { step: 2; impact: CategoryChangeImpact } | null;
 
 export function ShopProfileForm({
   shopId,
@@ -39,6 +51,9 @@ export function ShopProfileForm({
   const [candidates, setCandidates] = useState<GeocodeCandidate[]>([]);
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [pending, startTransition] = useTransition();
+  // 마지막으로 저장된 업종. 이것과 다르면 업종 변경 확인(2단계)을 거친다
+  const [savedCategory, setSavedCategory] = useState(initial.category);
+  const [confirm, setConfirm] = useState<ConfirmState>(null);
 
   function update<K extends keyof ShopProfileInput>(key: K, value: ShopProfileInput[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -52,6 +67,7 @@ export function ShopProfileForm({
     );
   }
 
+  /** 저장 버튼. 업종이 바뀌었으면 바로 저장하지 않고 확인 창(1단계)을 띄운다 */
   function save(next: ShopProfileInput) {
     const checked = validateShopProfile(next);
     if (!checked.ok) {
@@ -61,15 +77,55 @@ export function ShopProfileForm({
     }
     setErrors({});
     setCandidates([]);
+    if (next.category !== savedCategory) {
+      setConfirm({ step: 1 });
+      return;
+    }
+    submit(next, false);
+  }
+
+  function submit(next: ShopProfileInput, confirmCategoryChange: boolean) {
     startTransition(async () => {
-      const result = await saveShopProfile(shopId, next);
+      const result = await saveShopProfile(shopId, next, { confirmCategoryChange });
+      setConfirm(null);
       if (result.ok) {
-        setStatus({ kind: 'saved' });
+        setSavedCategory(next.category);
+        setStatus({
+          kind: 'saved',
+          message: confirmCategoryChange
+            ? `업종을 바꿨어요. 매물 ${result.data.closedSlots}개를 마감하고 메뉴 ${result.data.hiddenMenus}개를 숨겼어요. 매장 설정 > 메뉴에서 새 업종에 맞는 메뉴를 등록해 주세요`
+            : '저장했어요',
+        });
         return;
       }
       setErrors(result.error.fieldErrors ?? {});
       setCandidates(result.error.candidates ?? []);
       setStatus({ kind: 'error', message: result.error.message });
+    });
+  }
+
+  /** 1단계 "변경하기": 마감될 매물·숨겨질 메뉴 수를 받아 2단계를 띄운다. 없으면 바로 저장한다 */
+  function confirmStep1() {
+    startTransition(async () => {
+      const impact = await getCategoryChangeImpact(shopId);
+      if (!impact.ok) {
+        setConfirm(null);
+        setStatus({ kind: 'error', message: impact.error.message });
+        return;
+      }
+      if (impact.data.heldSlots > 0) {
+        setConfirm(null);
+        setStatus({
+          kind: 'error',
+          message: '다른 고객이 결제 중인 매물이 있어요. 10분 뒤에 다시 시도해 주세요',
+        });
+        return;
+      }
+      if (impact.data.openSlots === 0 && impact.data.visibleMenus === 0) {
+        submit(form, true);
+        return;
+      }
+      setConfirm({ step: 2, impact: impact.data });
     });
   }
 
@@ -293,14 +349,95 @@ export function ShopProfileForm({
             status.kind === 'error' ? 'text-destructive' : 'text-muted-foreground',
           )}
         >
-          {status.kind === 'saved' ? '저장했어요' : null}
-          {status.kind === 'error' ? status.message : null}
+          {status.kind === 'idle' ? null : status.message}
         </p>
         <Button type="submit" size="lg" disabled={pending}>
           {pending ? '저장 중…' : '저장'}
         </Button>
       </div>
+
+      <CategoryChangeDialog
+        state={confirm}
+        nextCategoryLabel={
+          SHOP_CATEGORIES.find((category) => category.key === form.category)?.label ?? ''
+        }
+        pending={pending}
+        onCancel={() => setConfirm(null)}
+        onConfirmStep1={confirmStep1}
+        onConfirmStep2={() => submit(form, true)}
+      />
     </form>
+  );
+}
+
+/** 업종 변경 2단계 확인 창 (정민석 결정 10/28) */
+export function CategoryChangeDialog({
+  state,
+  nextCategoryLabel,
+  pending,
+  onCancel,
+  onConfirmStep1,
+  onConfirmStep2,
+}: {
+  state: ConfirmState;
+  nextCategoryLabel: string;
+  pending: boolean;
+  onCancel: () => void;
+  onConfirmStep1: () => void;
+  onConfirmStep2: () => void;
+}) {
+  return (
+    <Dialog open={state !== null} onOpenChange={(open) => !open && !pending && onCancel()}>
+      <DialogContent>
+        {state?.step === 2 ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>지금 올린 매물과 메뉴가 모두 내려가요</DialogTitle>
+              <DialogDescription>
+                업종을 바꾸면 아래 내용이 바로 적용되고 되돌릴 수 없어요.
+              </DialogDescription>
+            </DialogHeader>
+            <ul className="flex list-disc flex-col gap-1 pl-5">
+              <li>
+                예약대기·게시중 매물 <strong>{state.impact.openSlots}개</strong>가 모두 마감돼요
+              </li>
+              <li>
+                메뉴 <strong>{state.impact.visibleMenus}개</strong>가 모두 숨겨져요. 새 업종에 맞게
+                메뉴를 다시 등록해 주세요
+              </li>
+              <li>이미 예약된 매물은 그대로 진행돼요</li>
+            </ul>
+          </>
+        ) : (
+          <DialogHeader>
+            <DialogTitle>업종을 정말 변경할까요?</DialogTitle>
+            <DialogDescription>
+              업종을 &apos;{nextCategoryLabel}&apos;(으)로 바꿔요.
+            </DialogDescription>
+          </DialogHeader>
+        )}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" size="lg" onClick={onCancel} disabled={pending}>
+            취소
+          </Button>
+          {state?.step === 2 ? (
+            <Button
+              type="button"
+              variant="destructive"
+              size="lg"
+              onClick={onConfirmStep2}
+              disabled={pending}
+            >
+              {pending ? '바꾸는 중…' : '마감하고 변경하기'}
+            </Button>
+          ) : (
+            <Button type="button" size="lg" onClick={onConfirmStep1} disabled={pending}>
+              {pending ? '확인 중…' : '변경하기'}
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
