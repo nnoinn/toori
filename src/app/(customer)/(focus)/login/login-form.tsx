@@ -1,13 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
+import { unstable_rethrow } from 'next/navigation';
 import { cn } from 'cn';
 
 import { BackButton } from '@/components/ui/back-button';
 import { Button } from '@/components/ui/button';
 import { SITE_NAME } from '@/lib/site';
+import { signInWithProvider } from '@/server/auth/session';
 
-import { DEFAULT_NEXT, type LoginMode } from './login-params';
+import {
+  DEFAULT_NEXT,
+  LOGIN_ERROR_MESSAGES,
+  type LoginErrorCode,
+  type LoginMode,
+} from './login-params';
 
 const MODES: { mode: LoginMode; label: string }[] = [
   { mode: 'customer', label: '고객' },
@@ -23,12 +30,56 @@ type LoginFormProps = {
   initialMode: LoginMode;
   /** 주소에 있던 안전한 next. 없으면 고른 모드의 기본 주소로 돌아간다 */
   nextParam: string | null;
+  /** 로그인 콜백이 돌려보낸 실패 이유(?error=) */
+  error: LoginErrorCode | null;
 };
 
-/** 로그인 화면 (J8, C-101). 고객/원장님 토글과 간편 로그인 버튼 */
-export function LoginForm({ initialMode, nextParam }: LoginFormProps) {
+type Provider = (typeof PROVIDERS)[number]['provider'];
+
+// 서버 함수를 부르지도 못했을 때(네트워크 등). 서버의 LOGIN_UNAVAILABLE 문구와 같게 둔다
+const LOGIN_START_FAILED_MESSAGE = '로그인을 시작하지 못했어요. 잠시 후 다시 시도해 주세요';
+
+/**
+ * 로그인 화면 (J8, C-101). 고객/원장님 토글과 간편 로그인 버튼.
+ * 버튼을 누르면 signInWithProvider(#47 3장)가 카카오·구글 로그인 화면으로 보낸다.
+ * 성공하면 이 화면으로 돌아오지 않고, 시작하지 못했을 때만 실패 문구를 보여준다
+ */
+export function LoginForm({ initialMode, nextParam, error }: LoginFormProps) {
   const [mode, setMode] = useState<LoginMode>(initialMode);
+  const [pendingProvider, setPendingProvider] = useState<Provider | null>(null);
+  const [message, setMessage] = useState<string | null>(error ? LOGIN_ERROR_MESSAGES[error] : null);
+  const [, startTransition] = useTransition();
   const next = nextParam ?? DEFAULT_NEXT[mode];
+
+  // 카카오·구글 화면에서 뒤로가기로 돌아오면 브라우저가 이 화면을 그대로 되살려서(bfcache)
+  // 버튼이 "이동 중…"으로 멈춰 있다. 돌아오면 다시 누를 수 있게 푼다
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setPendingProvider(null);
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, []);
+
+  function start(provider: Provider) {
+    setMessage(null);
+    setPendingProvider(provider);
+    startTransition(async () => {
+      try {
+        // 성공하면 서버가 카카오·구글로 보내서 아래로 내려오지 않는다
+        const result = await signInWithProvider({ provider, mode, next });
+        if (!result.ok) {
+          setMessage(result.error.message);
+          setPendingProvider(null);
+        }
+      } catch (error) {
+        // 화면 이동(redirect) 같은 Next.js 내부 신호는 다시 던진다. 그 밖(네트워크 등)은 안내만 한다
+        unstable_rethrow(error);
+        setMessage(LOGIN_START_FAILED_MESSAGE);
+        setPendingProvider(null);
+      }
+    });
+  }
 
   return (
     <section className="flex flex-1 flex-col gap-8 px-4 pt-2 pb-12">
@@ -65,22 +116,29 @@ export function LoginForm({ initialMode, nextParam }: LoginFormProps) {
       </div>
 
       <div className="flex flex-col gap-2">
+        {message ? (
+          <p
+            role="alert"
+            className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
+            {message}
+          </p>
+        ) : null}
         {PROVIDERS.map(({ provider, label }) => (
-          // TODO(#47 3장): 강규민님 signInWithProvider({ provider, mode, next })가 들어오면 연결하고 disabled를 뗀다
           <Button
             key={provider}
             type="button"
             variant="outline"
             size="lg"
             className="h-12 text-base"
-            disabled
+            disabled={pendingProvider !== null}
             data-provider={provider}
             data-next={next}
+            onClick={() => start(provider)}
           >
-            {label}
+            {pendingProvider === provider ? '로그인 화면으로 이동 중…' : label}
           </Button>
         ))}
-        <p className="text-center text-xs text-muted-foreground">로그인 연결은 준비 중이에요.</p>
       </div>
 
       <p className="text-center text-xs text-muted-foreground">

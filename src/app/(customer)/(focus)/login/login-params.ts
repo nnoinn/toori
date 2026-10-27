@@ -30,3 +30,18 @@ export function parseLoginMode(value: SearchValue): LoginMode {
 export function readNextParam(value: SearchValue): string | null {
   return safeNextPath(first(value), '') || null;
 }
+
+/** 로그인 콜백이 돌려보내는 실패 이유(#47 3장, src/server/auth/paths.ts LoginError)와 화면 문구 */
+export const LOGIN_ERROR_MESSAGES = {
+  login_failed: '로그인하지 못했어요. 다시 시도해 주세요.',
+  email_required:
+    '이메일 제공에 동의해야 가입할 수 있어요. 다시 로그인하면서 이메일 제공에 동의해 주세요.',
+} as const;
+
+export type LoginErrorCode = keyof typeof LOGIN_ERROR_MESSAGES;
+
+/** 주소의 error 값. 모르는 값이면 null(문구를 보여주지 않음) */
+export function parseLoginError(value: SearchValue): LoginErrorCode | null {
+  const raw = first(value);
+  return raw && Object.hasOwn(LOGIN_ERROR_MESSAGES, raw) ? (raw as LoginErrorCode) : null;
+}
