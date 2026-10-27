@@ -90,6 +90,19 @@ export function SlotCreateForm({
     setMessage(null);
   }
 
+  // 고른 단계(할인율은 O5에서 고른다). 앞 단계를 다 골라야 다음 단계 버튼을 누를 수 있다
+  const stepDone = { 1: menu !== null, 2: menu !== null && start !== null, 3: false } as const;
+  const canOpen = (target: 1 | 2 | 3) =>
+    target === 1 || (target === 2 && stepDone[1]) || (target === 3 && stepDone[2]);
+
+  /** 단계 버튼. ③으로 갈 때는 [다음]처럼 서버가 ①② 값을 다시 확인한다 */
+  function goTo(target: 1 | 2 | 3) {
+    if (!canOpen(target) || target === step) return;
+    setMessage(null);
+    if (target === 3) next();
+    else setStep(target);
+  }
+
   function next() {
     if (!menu || !start) return;
     setMessage(null);
@@ -108,21 +121,32 @@ export function SlotCreateForm({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* 단계 버튼: 앞 단계를 다 고르면 눌러서 오갈 수 있다. 고른 단계는 브랜드 색으로 채우고 ✓를 붙인다 */}
       <ol className="flex gap-2" aria-label="등록 단계">
         {STEPS.map((label, index) => {
-          const number = index + 1;
+          const number = (index + 1) as 1 | 2 | 3;
+          const done = stepDone[number];
+          const current = step === number;
           return (
-            <li
-              key={label}
-              aria-current={step === number ? 'step' : undefined}
-              className={cn(
-                'flex items-center gap-2 rounded-full border px-3 py-1 text-sm',
-                step === number && 'border-primary bg-primary/10 font-semibold',
-                step > number && 'text-muted-foreground',
-              )}
-            >
-              {step > number ? <Check className="size-4" aria-hidden /> : <span>{number}</span>}
-              {label}
+            <li key={label}>
+              <button
+                type="button"
+                aria-current={current ? 'step' : undefined}
+                disabled={!canOpen(number) || pending}
+                onClick={() => goTo(number)}
+                className={cn(
+                  'flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50',
+                  done
+                    ? 'border-primary bg-primary text-primary-foreground hover:bg-primary/80'
+                    : 'bg-card hover:bg-muted',
+                  current && 'font-semibold ring-2 ring-primary/40 ring-offset-1',
+                  current && !done && 'border-primary',
+                )}
+              >
+                {done ? <Check className="size-4" aria-hidden /> : <span>{number}</span>}
+                {label}
+                {done ? <span className="sr-only">(고름)</span> : null}
+              </button>
             </li>
           );
         })}
