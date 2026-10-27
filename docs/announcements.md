@@ -13,6 +13,15 @@ nnoinn이 팀원에게 알릴 내용을 PR과 함께 이 파일에 추가한다.
 
 ---
 
+## 2026-10-27 · 전원 (고객 가입 저장·입점 승인·신규 고객 판별 함수 머지)
+- **강규민의 함수 세 묶음이 main에 들어왔다.**
+  - 고객 가입 저장·광고성 동의(#104): `createCustomerAccount`, `setMarketingConsent`, `getMarketingConsent`. 화면(`'use client'`)에서는 `@/server/auth/customer-account`에서 가져온다. 약관 종류에 `age14`가 더해졌다(마이그레이션 0004). **강규민이 개발 DB에 0004를 적용해야 가입이 실제로 저장된다**(적용하면 #47에 알린다)
+  - 입점 승인 상태(#105): 서버 코드는 `@/server/shops`(`assertShopApproved`, `customerVisibleShop`), 화면은 `@/server/shops/review`(`getShopReviewStatus`, `resubmitShopForReview`)와 `@/server/shops/status`(`SHOP_STATUS_LABELS`). 쓰는 법은 #50
+  - 신규 고객 판별(#106): `@/server/customers`(`newCustomerOnlyVisible`, `getVisitedShopIds`, `isNewCustomer`). 바깥 쿼리의 `slots`에 별칭을 붙이면 안 된다. 쓰는 법은 #49
+- **가입 때 고른 광고성 정보 수신 동의는 가입 직후 처음 보이는 화면에 "{날짜}에 광고성 정보 수신 동의 처리가 끝났어요"를 한 번 보여준다(nnoinn 결정).** 법상 동의 처리 결과를 알려야 하는데, 가입 때는 푸시 권한이 없고 약관 동의 화면은 가입이 끝나면 바로 넘어가기 때문이다(동의 문구 6-1장, 기술 가이드 7장)
+- DB 테스트에서 예약이 필요하면 공통 도우미 `createTestReservation`(`tests/db/fixtures.ts`, 매물→주문→예약 한 벌)을 쓴다. 정찬형 내 예약 테스트와 강규민 신규 고객 테스트도 이걸 쓰게 바꿨다
+- 할 일: 강규민은 개발 DB에 0004를 적용하고 #47에 알린 뒤, 가입 직후 한 번만 보이는 표시를 작은 PR로 올린다(방식은 #47 4장에 적기). 정찬형은 로그인 버튼 연결 다음에 `/join` 연결(그 표시를 읽어 한 번 띄우기 포함)을 하고, 목록·지도·상세 조회에 `customerVisibleShop()`·`newCustomerOnlyVisible()`를 넣는다. 정민석은 매물 등록·수정·마감 서버 함수에서 `requireShopOwner` 다음에 `assertShopApproved`를 부르고, 승인 대기 화면은 `getShopReviewStatus`로 만든다
+
 ## 2026-10-27 · 전원 (진짜 로그인 머지, 가짜 로그인 없앰)
 - **진짜 카카오·구글 로그인이 main에 들어왔다(강규민 #101).** 로그인·로그아웃, 고객↔원장님 계정 전환, 로그인 안 한 사람이 원장님 화면(`/owner`)에 오면 로그인 화면으로, 운영자 화면(`/admin`)은 404. 함수 이름은 #47 3장 그대로이고, 화면(`'use client'`)에서는 `@/server/auth/session`에서 가져온다
 - **가짜 로그인(`DEV_LOGIN_EMAIL`·`DEV_LOGIN_MODE`)은 없어졌다.** `.env.local`에 남은 두 줄은 무시되니 지우지 않아도 된다
