@@ -137,7 +137,7 @@ export function SlotCreateForm({
                 className={cn(
                   'flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50',
                   done
-                    ? 'border-primary bg-primary text-primary-foreground hover:bg-primary/80'
+                    ? 'border-transparent bg-primary/75 text-primary-foreground hover:bg-primary/65'
                     : 'bg-card hover:bg-muted',
                   current && 'font-semibold ring-2 ring-primary/40 ring-offset-1',
                   current && !done && 'border-primary',
