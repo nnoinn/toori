@@ -34,6 +34,12 @@
   --color-sale: var(--sale);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-kakao: var(--kakao);
+  --color-kakao-foreground: var(--kakao-foreground);
+  --color-kakao-symbol: var(--kakao-symbol);
+  --color-google: var(--google);
+  --color-google-foreground: var(--google-foreground);
+  --color-google-border: var(--google-border);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -83,6 +89,17 @@
   --sale: oklch(0.6 0.22 25);
   --warning: oklch(0.85 0.16 80);
   --warning-foreground: oklch(0.42 0.1 60);
+  /*
+   * 간편 로그인 버튼 색. 카카오·구글의 공식 버튼 디자인 가이드 값이라 브랜드 색과 따로 두고 바꾸지 않는다.
+   * 카카오: 배경 #FEE500, 심볼 #000000, 글자 #000000 85% (developers.kakao.com 로그인 디자인 가이드)
+   * 구글(Light): 배경 #FFFFFF, 테두리 #747775, 글자 #1F1F1F (developers.google.com/identity/branding-guidelines)
+   */
+  --kakao: #fee500;
+  --kakao-foreground: rgb(0 0 0 / 0.85);
+  --kakao-symbol: #000000;
+  --google: #ffffff;
+  --google-foreground: #1f1f1f;
+  --google-border: #747775;
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: #10b981;

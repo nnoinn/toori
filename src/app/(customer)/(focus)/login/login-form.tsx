@@ -5,7 +5,6 @@ import { unstable_rethrow } from 'next/navigation';
 import { cn } from 'cn';
 
 import { BackButton } from '@/components/ui/back-button';
-import { Button } from '@/components/ui/button';
 import { SITE_NAME } from '@/lib/site';
 import { signInWithProvider } from '@/server/auth/session';
 
@@ -15,16 +14,15 @@ import {
   type LoginErrorCode,
   type LoginMode,
 } from './login-params';
+import { ProviderButton, type ProviderKey } from './provider-button';
 
 const MODES: { mode: LoginMode; label: string }[] = [
   { mode: 'customer', label: '고객' },
   { mode: 'owner', label: '원장님' },
 ];
 
-const PROVIDERS = [
-  { provider: 'kakao', label: '카카오로 시작하기' },
-  { provider: 'google', label: '구글로 시작하기' },
-] as const;
+// 카카오·구글을 먼저 만든다(C-101). 네이버는 강규민님 W21 뒤에 더한다
+const PROVIDERS: ProviderKey[] = ['kakao', 'google'];
 
 type LoginFormProps = {
   initialMode: LoginMode;
@@ -34,7 +32,7 @@ type LoginFormProps = {
   error: LoginErrorCode | null;
 };
 
-type Provider = (typeof PROVIDERS)[number]['provider'];
+type Provider = ProviderKey;
 
 // 서버 함수를 부르지도 못했을 때(네트워크 등). 서버의 LOGIN_UNAVAILABLE 문구와 같게 둔다
 const LOGIN_START_FAILED_MESSAGE = '로그인을 시작하지 못했어요. 잠시 후 다시 시도해 주세요';
@@ -124,20 +122,14 @@ export function LoginForm({ initialMode, nextParam, error }: LoginFormProps) {
             {message}
           </p>
         ) : null}
-        {PROVIDERS.map(({ provider, label }) => (
-          <Button
+        {PROVIDERS.map((provider) => (
+          <ProviderButton
             key={provider}
-            type="button"
-            variant="outline"
-            size="lg"
-            className="h-12 text-base"
+            provider={provider}
             disabled={pendingProvider !== null}
-            data-provider={provider}
-            data-next={next}
+            pending={pendingProvider === provider}
             onClick={() => start(provider)}
-          >
-            {pendingProvider === provider ? '로그인 화면으로 이동 중…' : label}
-          </Button>
+          />
         ))}
       </div>
 
