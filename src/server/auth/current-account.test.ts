@@ -13,6 +13,7 @@ import { ensureProfile, getCurrentAccount, loadAccount } from './current-account
 const db = vi.hoisted(() => ({ getDb: vi.fn() }));
 vi.mock('@/db', () => db);
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
+vi.mock('next/server', () => ({ connection: async () => {} }));
 vi.mock('@/server/supabase/server', () => ({
   createSupabaseServerClient: async () => ({
     auth: { getClaims: async () => ({ data: null, error: null }) },

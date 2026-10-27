@@ -9,6 +9,7 @@ import 'server-only';
 
 import { and, eq, isNull } from 'drizzle-orm';
 import { cookies } from 'next/headers';
+import { connection } from 'next/server';
 import { cache } from 'react';
 
 import { getDb } from '@/db';
@@ -45,6 +46,9 @@ export const getCurrentAccount = cache(async (): Promise<CurrentAccount | null> 
 
 /** 로그인 세션의 사용자 id. 로그인 토큰의 서명을 확인한 값이라 믿을 수 있다. 로그인 안 했으면 null */
 export async function getSessionUserId(): Promise<string | null> {
+  // 토큰 만료를 확인하느라 지금 시각을 읽는다. 쿠키만 읽으면 미리 그리는 단계(Partial Prefetching)에서도 돌 수 있어서,
+  // 실제 요청이 올 때까지 기다린 뒤에 확인한다(Cache Components의 Date.now() 오류 방지)
+  await connection();
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.getClaims();
   if (error || !data) return null;
