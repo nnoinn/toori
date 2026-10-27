@@ -8,12 +8,13 @@ import { Countdown } from '@/components/ui/countdown';
 import { Price } from '@/components/ui/price';
 import { SlotBadges } from '@/components/ui/slot-badge';
 import { formatKst } from '@/lib/time';
-import { REFUND_BANDS } from '@/server/policy';
+import { NO_SHOW_PENALTY_RATE, OWNER_FAULT_COUPON_AMOUNT, REFUND_BANDS } from '@/server/policy';
 
 import {
   formatBusinessHours,
   formatDuration,
   refundPolicyLines,
+  refundPolicyNotes,
   safeExternalUrl,
   telHref,
 } from './detail-format';
@@ -66,6 +67,7 @@ export function SlotDetailView({ slot, serverNow }: SlotDetailViewProps) {
   // TODO(J8·J10): 로그인 확인(#47)과 10분 홀딩(강규민 W10)이 들어오면 예약 확인 화면으로 연결한다.
   // 지금은 로그인 화면으로 보내고, 로그인 뒤 이 매물로 돌아온다(D1).
   const reserveHref = `/login?next=${encodeURIComponent(`/slots/${slot.slotId}`)}`;
+  const refundNotes = refundPolicyNotes(OWNER_FAULT_COUPON_AMOUNT);
 
   return (
     <article className="flex flex-1 flex-col pb-24 md:mx-auto md:grid md:w-full md:max-w-5xl md:grid-cols-[minmax(0,1fr)_380px] md:items-start md:gap-x-8 md:px-6 md:py-6">
@@ -130,13 +132,18 @@ export function SlotDetailView({ slot, serverNow }: SlotDetailViewProps) {
               aria-hidden
             />
           </summary>
-          {/* 정책값 REFUND_BANDS(#48)로 만든 3구간. 전체 규정과 동의는 결제 화면(C-402)에서 */}
-          <ul className="flex flex-col gap-0.5 pt-2 text-muted-foreground">
-            {refundPolicyLines(REFUND_BANDS).map((line) => (
-              <li key={line}>{line}</li>
+          {/* 결제 동의 문구(docs/legal/consent-texts.md 3장)와 같은 내용. 숫자는 정책값(#48)에서. 동의는 결제 화면(C-402)에서 받는다 */}
+          <div className="flex flex-col gap-1 pt-2 text-muted-foreground">
+            {refundNotes.before.map((line) => (
+              <p key={line}>{line}</p>
             ))}
-            <li>결제 직후에도 무료 취소는 없어요.</li>
-          </ul>
+            <ul className="flex flex-col gap-0.5">
+              {refundPolicyLines(REFUND_BANDS, NO_SHOW_PENALTY_RATE).map((line) => (
+                <li key={line}>- {line}</li>
+              ))}
+            </ul>
+            <p>{refundNotes.after}</p>
+          </div>
         </details>
         <div className="hidden md:block">
           <ReserveAction availability={slot.availability} href={reserveHref} />
