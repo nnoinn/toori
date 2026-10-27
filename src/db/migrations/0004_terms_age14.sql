@@ -1,0 +1,2 @@
+ALTER TABLE "terms_agreements" DROP CONSTRAINT "terms_agreements_terms_type_check";--> statement-breakpoint
+ALTER TABLE "terms_agreements" ADD CONSTRAINT "terms_agreements_terms_type_check" CHECK ("terms_agreements"."terms_type" in ('service', 'privacy', 'location', 'supplier', 'marketing', 'age14'));
