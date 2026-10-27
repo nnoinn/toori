@@ -5,8 +5,9 @@ import {
   countActiveFilters,
   EMPTY_FILTERS,
   parseFilters,
+  MIN_DISCOUNT_OPTIONS,
   selectCategory,
-  toggleDiscount,
+  selectMinDiscount,
   togglePrice,
   toggleService,
   toggleTime,
@@ -55,7 +56,7 @@ describe('parseFilters', () => {
       ...EMPTY_FILTERS,
       prices: ['30k_50k', 'under_30k'],
       times: ['evening'],
-      discounts: [30, 50],
+      minDiscount: 30,
     });
   });
 });
@@ -68,7 +69,7 @@ describe('applyFiltersToSearch', () => {
         services: ['cut', 'color'],
         prices: ['50k_100k'],
         times: ['morning'],
-        discounts: [40],
+        minDiscount: 40,
       }),
     );
     expect(next.toString()).toBe(
@@ -91,7 +92,7 @@ describe('applyFiltersToSearch', () => {
       services: ['lash_perm'],
       prices: ['over_100k'],
       times: ['afternoon', 'evening'],
-      discounts: [20, 50],
+      minDiscount: 20,
     } satisfies HomeFilters;
     const search = applyFiltersToSearch(new URLSearchParams(), filters);
     const params = Object.fromEntries(
@@ -105,14 +106,14 @@ describe('선택 바꾸기', () => {
   it('업종을 바꾸면 서비스 종류만 비우고 나머지 선택은 그대로', () => {
     expect(
       selectCategory(
-        hair({ services: ['cut'], prices: ['under_30k'], discounts: [30] }),
+        hair({ services: ['cut'], prices: ['under_30k'], minDiscount: 30 }),
         'nail_lash',
       ),
     ).toEqual({
       ...EMPTY_FILTERS,
       category: 'nail_lash',
       prices: ['under_30k'],
-      discounts: [30],
+      minDiscount: 30,
     });
   });
 
@@ -127,7 +128,8 @@ describe('선택 바꾸기', () => {
     expect(toggleService(on, 'perm').services).toEqual([]);
     expect(togglePrice(EMPTY_FILTERS, 'under_30k').prices).toEqual(['under_30k']);
     expect(toggleTime(EMPTY_FILTERS, 'morning').times).toEqual(['morning']);
-    expect(toggleDiscount(toggleDiscount(EMPTY_FILTERS, 30), 30).discounts).toEqual([]);
+    expect(selectMinDiscount(EMPTY_FILTERS, 30).minDiscount).toBe(30);
+    expect(selectMinDiscount(selectMinDiscount(EMPTY_FILTERS, 30), null).minDiscount).toBeNull();
   });
 
   it('고른 개수는 업종 1 + 고른 버튼 수', () => {
@@ -138,9 +140,36 @@ describe('선택 바꾸기', () => {
           services: ['cut', 'perm'],
           prices: ['under_30k'],
           times: ['evening'],
-          discounts: [10],
+          minDiscount: 10,
         }),
       ),
     ).toBe(6);
+  });
+});
+
+describe('할인율 "N% 이상"', () => {
+  it('선택지는 정책값에서 만들고, 가장 큰 값만 "이상"을 붙이지 않는다', () => {
+    expect(MIN_DISCOUNT_OPTIONS.map((option) => option.label)).toEqual([
+      '10% 이상',
+      '20% 이상',
+      '30% 이상',
+      '40% 이상',
+      '50%',
+    ]);
+  });
+
+  it('주소에는 하나만 쓴다(여러 개가 와도 첫 번째 맞는 값)', () => {
+    expect(parseFilters({ discount: ['35', '20', '40'] }).minDiscount).toBe(20);
+    expect(parseFilters({ discount: 'abc' }).minDiscount).toBeNull();
+    expect(
+      applyFiltersToSearch(new URLSearchParams('discount=10&discount=20'), {
+        ...EMPTY_FILTERS,
+        minDiscount: 30,
+      }).getAll('discount'),
+    ).toEqual(['30']);
+  });
+
+  it('할인율을 고르면 필터 개수는 1만 늘어난다', () => {
+    expect(countActiveFilters({ ...EMPTY_FILTERS, minDiscount: 30 })).toBe(1);
   });
 });
