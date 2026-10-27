@@ -9,15 +9,17 @@ import 'server-only';
 import { getDb } from '@/db';
 import { type LocationUsePurpose, locationUseLogs } from '@/db/schema';
 
+import { getCurrentAccount } from './current-account';
+
 /**
  * 위치정보 이용 사실을 기록한다.
  * 저장에 실패하면 에러를 던진다(10/25). 기록 없이 위치를 쓰지 않도록, 부르는 쪽은 에러가 나면
  * 위치를 저장하지 말고 동네 선택으로 안내한다.
  */
 export async function logLocationUse(purpose: LocationUsePurpose): Promise<void> {
-  // TODO(W2): 로그인(getCurrentAccount)이 생기면 로그인한 사람의 id(profiles.id)를 채운다. 지금은 비로그인으로 남긴다
-  const userId = null;
   try {
+    // 로그인하지 않은 고객도 위치를 쓸 수 있어서 그때는 사용자를 비운다
+    const userId = (await getCurrentAccount())?.userId ?? null;
     await getDb().insert(locationUseLogs).values({ userId, purpose });
   } catch (error) {
     console.error(
