@@ -3,6 +3,7 @@
 // 샵 정보 입력 폼 (O2, S-103). 저장 전에 화면에서 한 번 검사하고, 서버 함수가 다시 검사한다.
 
 import { useState, useTransition } from 'react';
+import Link from 'next/link';
 import { cn } from 'cn';
 
 import { Button } from '@/components/ui/button';
@@ -34,7 +35,9 @@ import {
 } from './shop-profile';
 
 type Status =
-  { kind: 'idle' } | { kind: 'saved'; message: string } | { kind: 'error'; message: string };
+  | { kind: 'idle' }
+  | { kind: 'saved'; message: string; showMenuLink?: boolean }
+  | { kind: 'error'; message: string };
 
 /** 업종 변경 확인 창. 1단계 "정말 바꿀까요?" → 2단계 "매물·메뉴가 내려가요" */
 type ConfirmState = { step: 1 } | { step: 2; impact: CategoryChangeImpact } | null;
@@ -93,8 +96,9 @@ export function ShopProfileForm({
         setStatus({
           kind: 'saved',
           message: confirmCategoryChange
-            ? `업종을 바꿨어요. 매물 ${result.data.closedSlots}개를 마감하고 메뉴 ${result.data.hiddenMenus}개를 숨겼어요. 매장 설정 > 메뉴에서 새 업종에 맞는 메뉴를 등록해 주세요`
+            ? `업종을 바꿨어요. 매물 ${result.data.closedSlots}개를 마감하고 메뉴 ${result.data.hiddenMenus}개를 숨겼어요. 새 업종에 맞는 메뉴를 등록해 주세요`
             : '저장했어요',
+          showMenuLink: confirmCategoryChange,
         });
         return;
       }
@@ -351,6 +355,11 @@ export function ShopProfileForm({
         >
           {status.kind === 'idle' ? null : status.message}
         </p>
+        {status.kind === 'saved' && status.showMenuLink ? (
+          <Button asChild variant="outline" size="lg">
+            <Link href="/owner/settings/menu">메뉴 등록하기</Link>
+          </Button>
+        ) : null}
         <Button type="submit" size="lg" disabled={pending}>
           {pending ? '저장 중…' : '저장'}
         </Button>

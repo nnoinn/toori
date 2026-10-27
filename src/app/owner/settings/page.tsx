@@ -6,14 +6,18 @@ import { Card } from '@/components/ui/card';
 
 export const metadata: Metadata = { title: '매장 설정' };
 
-// 매장 설정 첫 화면. 샵 정보(O2)부터 만들고 메뉴(O3)·사진·링크(O6)·정산 계좌(O7)는 만들 때 href를 채운다
+// 매장 설정 첫 화면. 샵 정보(O2)·메뉴(O3)부터 만들고 사진·링크(O6)·정산 계좌(O7)는 만들 때 href를 채운다
 const SECTIONS: { title: string; description: string; href?: string }[] = [
   {
     title: '샵 정보',
     description: '샵 이름, 업종, 전화번호, 주소, 영업시간, 서비스 설명',
     href: '/owner/settings/shop',
   },
-  { title: '메뉴·가격표', description: '서비스 이름, 정가, 소요 시간' },
+  {
+    title: '메뉴·가격표',
+    description: '서비스 이름, 정가, 소요 시간',
+    href: '/owner/settings/menu',
+  },
   { title: '사진·링크', description: '대표 사진, 스타일 사진, 인스타그램·네이버 플레이스' },
   { title: '정산 계좌', description: '정산금을 받을 계좌' },
 ];
