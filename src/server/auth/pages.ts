@@ -6,15 +6,8 @@ import 'server-only';
 
 import { notFound, redirect } from 'next/navigation';
 
-import { safeNextPath } from '@/lib/safe-next';
-
-import type { AccountMode } from './current-account';
+import { customerJoinPath, loginPath, OWNER_JOIN_PATH } from './paths';
 import { type OwnerAuth, requireAdmin, requireCustomer, requireOwner } from './require';
-
-/** 로그인 화면(정찬형, #47 8장). 토글 처음 값과 로그인 뒤 돌아갈 주소를 붙인다 */
-function loginPath(mode: AccountMode, next: string) {
-  return `/login?${new URLSearchParams({ mode, next })}`;
-}
 
 /**
  * 고객 화면. 로그인 안 했거나 원장님 모드면 로그인 화면으로, 고객 계정이 없으면 약관 화면(/join)으로 보낸다.
@@ -25,11 +18,8 @@ export async function ensureCustomerPage(
 ): Promise<{ userId: string; customerId: string }> {
   const result = await requireCustomer();
   if (result.ok) return result.data;
-  const back = safeNextPath(next, '/');
-  if (result.error.code === 'NO_CUSTOMER_ACCOUNT') {
-    redirect(`/join?${new URLSearchParams({ next: back })}`);
-  }
-  redirect(loginPath('customer', back));
+  if (result.error.code === 'NO_CUSTOMER_ACCOUNT') redirect(customerJoinPath(next));
+  redirect(loginPath('customer', next));
 }
 
 /**
@@ -39,8 +29,8 @@ export async function ensureCustomerPage(
 export async function ensureOwnerPage(next?: string): Promise<OwnerAuth> {
   const result = await requireOwner();
   if (result.ok) return result.data;
-  if (result.error.code === 'NO_OWNER_ACCOUNT') redirect('/owner/join');
-  redirect(loginPath('owner', safeNextPath(next, '/owner')));
+  if (result.error.code === 'NO_OWNER_ACCOUNT') redirect(OWNER_JOIN_PATH);
+  redirect(loginPath('owner', next));
 }
 
 /** 운영자 화면. 관리자가 아니면 화면이 있다는 것도 알리지 않게 404를 보여준다 */

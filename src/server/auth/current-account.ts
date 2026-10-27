@@ -1,9 +1,6 @@
 // 지금 들어온 사람 확인 (X-101, 연결 #2, Issue #47 1장). 서버에서만 부른다.
+// Supabase 로그인 세션으로 누구인지 확인하고, account_mode 쿠키로 어느 계정으로 들어왔는지 본다.
 // 쿠키만 믿지 않고 DB에서 계정을 다시 읽는다. 탈퇴한 고객·원장님 계정은 없는 것으로 본다.
-//
-// 지금은 로그인(W2) 전이라 "누가 로그인했나"만 가짜다. 내 컴퓨터의 next dev에서만 .env.local의
-// DEV_LOGIN_EMAIL(시드 계정)·DEV_LOGIN_MODE로 로그인한 것처럼 처리하고, 그 밖에는 늘 로그인 안 함(null)이다.
-// W2에서 이 부분만 Supabase 로그인 정보와 account_mode 쿠키로 바꾼다. 함수 이름·입출력은 그대로다.
 //
 // 화면에서 부를 때: 요청마다 다른 값이라 정적 화면에 미리 그려 둘 수 없다(Cache Components).
 // 레이아웃·페이지 맨 위에서 기다리지 말고 <Suspense> 안의 서버 컴포넌트에서 부른다.
@@ -11,12 +8,16 @@
 import 'server-only';
 
 import { and, eq, isNull } from 'drizzle-orm';
-import { connection } from 'next/server';
+import { cookies } from 'next/headers';
+import { cache } from 'react';
 
 import { getDb } from '@/db';
 import { customers, owners, profiles, shops } from '@/db/schema';
+import { createSupabaseServerClient } from '@/server/supabase/server';
 
-export type AccountMode = 'customer' | 'owner';
+import { ACCOUNT_MODE_COOKIE, type AccountMode, parseAccountMode } from './account-mode';
+
+export type { AccountMode } from './account-mode';
 
 export type CurrentAccount = {
   /** profiles.id (= Supabase 로그인 사용자 ID) */
@@ -34,27 +35,27 @@ export type CurrentAccount = {
   isAdmin: boolean;
 };
 
-/** 로그인 안 했으면 null */
-export async function getCurrentAccount(): Promise<CurrentAccount | null> {
-  // 로그인 정보는 요청마다 다르다. 빌드 때 미리 계산하지 않고 요청이 올 때까지 기다린다
-  await connection();
-  const devLogin = readDevLogin();
-  if (!devLogin) return null;
+/** 로그인 안 했으면 null. 한 요청 안에서 여러 번 불러도 한 번만 읽는다 */
+export const getCurrentAccount = cache(async (): Promise<CurrentAccount | null> => {
+  const userId = await getSessionUserId();
+  if (!userId) return null;
+  const mode = parseAccountMode((await cookies()).get(ACCOUNT_MODE_COOKIE)?.value);
+  return loadAccount(getDb(), userId, mode);
+});
 
-  const db = getDb();
-  const [profile] = await db
-    .select({ id: profiles.id })
-    .from(profiles)
-    .where(eq(profiles.email, devLogin.email));
-  if (!profile) return null;
-  return loadAccount(db, profile.id, devLogin.mode);
+/** 로그인 세션의 사용자 id. 로그인 토큰의 서명을 확인한 값이라 믿을 수 있다. 로그인 안 했으면 null */
+export async function getSessionUserId(): Promise<string | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.auth.getClaims();
+  if (error || !data) return null;
+  return data.claims.sub ?? null;
 }
 
-type Db = Pick<ReturnType<typeof getDb>, 'select'>;
+type Db = Pick<ReturnType<typeof getDb>, 'select' | 'insert'>;
 
-/** userId의 고객·원장님 계정과 샵을 DB에서 읽는다. 로그인 정보(profiles)가 없으면 null. W2 로그인과 테스트가 같이 쓴다 */
+/** userId의 고객·원장님 계정과 샵을 DB에서 읽는다. 로그인 정보(profiles)가 없으면 null. 로그인 콜백과 테스트가 같이 쓴다 */
 export async function loadAccount(
-  db: Db,
+  db: Pick<Db, 'select'>,
   userId: string,
   mode: AccountMode,
 ): Promise<CurrentAccount | null> {
@@ -76,15 +77,14 @@ export async function loadAccount(
   return { ...row, mode };
 }
 
-// --- 로그인(W2) 전 임시. W2에서 지운다 ---
-
-/** 가짜 로그인은 시드 계정만 쓸 수 있다(scripts/seed-data.mjs의 SEED_EMAIL_DOMAIN) */
-const DEV_LOGIN_EMAIL_SUFFIX = '@seed.test';
-
-function readDevLogin(): { email: string; mode: AccountMode } | null {
-  // next dev에서만 켠다. 배포·미리보기(next build)와 테스트에서는 늘 로그인 안 함이다
-  if (process.env.NODE_ENV !== 'development') return null;
-  const email = process.env.DEV_LOGIN_EMAIL?.trim().toLowerCase();
-  if (!email?.endsWith(DEV_LOGIN_EMAIL_SUFFIX)) return null;
-  return { email, mode: process.env.DEV_LOGIN_MODE === 'owner' ? 'owner' : 'customer' };
+/** 첫 로그인이면 profiles를 만든다. 이미 있으면 그대로 둔다(로그인 콜백) */
+export async function ensureProfile(
+  db: Pick<Db, 'insert'>,
+  userId: string,
+  email: string,
+): Promise<void> {
+  await db
+    .insert(profiles)
+    .values({ id: userId, email })
+    .onConflictDoNothing({ target: profiles.id });
 }
