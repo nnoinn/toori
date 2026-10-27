@@ -7,11 +7,13 @@ import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
 import { ErrorState, LoadingCards } from '@/components/ui/state';
 import { formatWon } from '@/lib/format';
+import { getRequestNow } from '@/lib/request-time';
 import { formatKst } from '@/lib/time';
 import { ensureCustomerPage } from '@/server/auth';
 
 import { formatDuration } from '../../slots/[slotId]/detail-format';
 import { getMyReservationDetail } from '../queries';
+import { isVisitPending } from '../reservation-tabs';
 
 export const metadata: Metadata = { title: '예약 상세' };
 
@@ -42,7 +44,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 async function DetailContent({ params }: { params: Params }) {
   const { reservationId } = await params;
   await ensureCustomerPage(`/reservations/${reservationId}`);
-  const result = await getMyReservationDetail(reservationId);
+  const [result, now] = await Promise.all([getMyReservationDetail(reservationId), getRequestNow()]);
   if (!result.ok) {
     if (result.error.code === 'NOT_FOUND') notFound();
     return <ErrorState description={result.error.message} />;
@@ -63,6 +65,9 @@ async function DetailContent({ params }: { params: Params }) {
             {STATUS_LABEL[r.status]}
           </Badge>
           {r.noShow ? <Badge variant="destructive">노쇼</Badge> : null}
+          {isVisitPending(r.status, r.startAt, now) ? (
+            <Badge variant="secondary">방문 확인 중</Badge>
+          ) : null}
           <span>예약번호 {r.code}</span>
         </p>
         <h2 className="text-xl font-bold">{r.menuName}</h2>
