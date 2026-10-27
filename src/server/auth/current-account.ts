@@ -46,13 +46,25 @@ export const getCurrentAccount = cache(async (): Promise<CurrentAccount | null> 
 
 /** 로그인 세션의 사용자 id. 로그인 토큰의 서명을 확인한 값이라 믿을 수 있다. 로그인 안 했으면 null */
 export async function getSessionUserId(): Promise<string | null> {
+  return (await getSessionUser())?.userId ?? null;
+}
+
+/**
+ * 로그인 세션의 사용자 id와 간편 로그인 프로필 이름(카카오 닉네임·구글 이름, 없으면 null).
+ * 이름은 고객 가입 때 처음 닉네임으로 쓴다(C-103에서 바꿀 수 있다). 로그인 안 했으면 null
+ */
+export async function getSessionUser(): Promise<{ userId: string; name: string | null } | null> {
   // 토큰 만료를 확인하느라 지금 시각을 읽는다. 쿠키만 읽으면 미리 그리는 단계(Partial Prefetching)에서도 돌 수 있어서,
   // 실제 요청이 올 때까지 기다린 뒤에 확인한다(Cache Components의 Date.now() 오류 방지)
   await connection();
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.getClaims();
-  if (error || !data) return null;
-  return data.claims.sub ?? null;
+  if (error || !data?.claims.sub) return null;
+  const metadata = data.claims.user_metadata ?? {};
+  const name = [metadata.full_name, metadata.name].find(
+    (value): value is string => typeof value === 'string' && value.trim() !== '',
+  );
+  return { userId: data.claims.sub, name: name?.trim() ?? null };
 }
 
 type Db = Pick<ReturnType<typeof getDb>, 'select' | 'insert'>;
