@@ -14,6 +14,7 @@ import {
   openDevDb,
   PUBLISH_BEFORE_HOURS,
   salePrice,
+  SLOT_TIME_STEP_MINUTES,
 } from './dev-db.mjs';
 import { SEED_ACCOUNTS, SEED_CUSTOMERS, SEED_EMAIL_DOMAIN, SEED_SHOPS } from './seed-data.mjs';
 
@@ -75,8 +76,9 @@ export async function seedDevData(sql, { now, userIds }) {
   });
   await clearSeedData(sql, ids);
 
-  // 시드를 넣는 시각을 10분 단위로 내려서 매물 시작 시각이 14:37 같은 어중간한 값이 되지 않게 한다
-  const base = Math.floor(now.getTime() / (10 * 60 * 1000)) * 10 * 60 * 1000;
+  // 시드를 넣는 시각을 30분 단위로 내려서 매물 시작 시각이 정책 단위(#108)에 맞게 한다(14:37 → 14:30)
+  const step = SLOT_TIME_STEP_MINUTES * 60 * 1000;
+  const base = Math.floor(now.getTime() / step) * step;
   const at = (hours) => new Date(base + hours * HOUR);
   const ago = (ms) => new Date(now.getTime() - ms);
 
