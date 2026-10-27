@@ -1,29 +1,54 @@
-// 지금 들어온 사람 확인. 로그인 세션이 없으면 DB를 보지 않고 null인지(DB 없이),
+// 지금 들어온 사람 확인. 로그인 세션이 없으면 DB를 보지 않고 null인지, 프로필 이름을 맞게 읽는지(DB 없이),
 // loadAccount·ensureProfile이 DB에서 계정·샵을 맞게 읽고 쓰는지(실제 DB, TEST_DATABASE_URL이 있을 때만) 확인한다.
 
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { customers, owners, profiles } from '@/db/schema';
 
 import { createTestCustomer, createTestShop, createTestUser } from '../../../tests/db/fixtures';
 import { closeTestDb, describeDb, withRollback } from '../../../tests/db/test-db';
-import { ensureProfile, getCurrentAccount, loadAccount } from './current-account';
+import { ensureProfile, getCurrentAccount, getSessionUser, loadAccount } from './current-account';
 
 const db = vi.hoisted(() => ({ getDb: vi.fn() }));
+const session = vi.hoisted(() => ({ claims: null as Record<string, unknown> | null }));
 vi.mock('@/db', () => db);
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('next/server', () => ({ connection: async () => {} }));
 vi.mock('@/server/supabase/server', () => ({
   createSupabaseServerClient: async () => ({
-    auth: { getClaims: async () => ({ data: null, error: null }) },
+    auth: {
+      getClaims: async () => ({
+        data: session.claims ? { claims: session.claims } : null,
+        error: null,
+      }),
+    },
   }),
 }));
+
+beforeEach(() => {
+  session.claims = null;
+});
 
 describe('getCurrentAccount', () => {
   it('로그인 세션이 없으면 null이고 DB는 보지 않는다', async () => {
     expect(await getCurrentAccount()).toBeNull();
     expect(db.getDb).not.toHaveBeenCalled();
+  });
+});
+
+describe('getSessionUser', () => {
+  it('카카오·구글 프로필 이름(full_name, 없으면 name)을 앞뒤 공백 없이 읽는다', async () => {
+    session.claims = { sub: 'user-1', user_metadata: { full_name: ' 김투리 ', name: '다른 이름' } };
+    expect(await getSessionUser()).toEqual({ userId: 'user-1', name: '김투리' });
+
+    session.claims = { sub: 'user-1', user_metadata: { full_name: '  ', name: '투리' } };
+    expect(await getSessionUser()).toEqual({ userId: 'user-1', name: '투리' });
+  });
+
+  it('프로필 이름이 없으면 name은 null', async () => {
+    session.claims = { sub: 'user-1' };
+    expect(await getSessionUser()).toEqual({ userId: 'user-1', name: null });
   });
 });
 

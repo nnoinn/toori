@@ -9,4 +9,5 @@ export const TERMS_VERSIONS = {
   location: 'draft-2026-10',
   supplier: 'draft-2026-10',
   marketing: 'draft-2026-10',
+  age14: 'draft-2026-10',
 } as const satisfies Record<TermsType, string>;
