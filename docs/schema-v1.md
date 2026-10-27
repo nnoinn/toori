@@ -195,7 +195,7 @@ erDiagram
 | name | text | 서비스 이름(원장님 자유) |
 | description | text, null | 상세 설명(원장님 자유) |
 | list_price | integer | 정가(원) |
-| duration_minutes | integer | 소요 시간(분) |
+| duration_minutes | integer | 소요 시간(분). 30분 단위(#108, 저장할 때 서버에서 확인) |
 | sort_order | integer | |
 | hidden_at | timestamptz, null | 숨김(삭제 대신). 숨겨도 이미 올린 매물·예약은 그대로 |
 | created_at, updated_at | timestamptz | |
@@ -226,7 +226,7 @@ erDiagram
 | discount_rate | integer | 10/20/30/40/50 중 하나(정책 설정값, `check`로 10~50) |
 | sale_price | integer | 할인가 = 정가 × (1 − 할인율) 그대로(올림 없음, 원 미만이 생기면 버림). 서버가 계산해서 저장(정렬·필터용) |
 | new_customer_only | boolean, 기본 false | 신규 고객 전용 |
-| start_at | timestamptz | 서비스 시작 |
+| start_at | timestamptz | 서비스 시작. 30분 단위(#108, 저장할 때 서버에서 확인) |
 | end_at | timestamptz | 서비스 끝 = 시작 + 소요 시간 |
 | publish_at | timestamptz | 게시 시각. 시작 48시간 전보다 이르면 그때까지 '예약대기' |
 | status | text | 저장된 상태(아래) |
