@@ -103,6 +103,28 @@ describeDb('매물 등록 ①② 검증 (실제 DB)', () => {
     });
   });
 
+  it('영업시간을 입력한 요일은 영업시간 안에 끝나야 하고, 쉬는 날은 막는다', async () => {
+    await withRollback(async (tx) => {
+      // 2026-11-01은 일요일
+      const shop = await createTestShop(tx, {
+        businessHours: [{ weekday: 0, open: '10:00', close: '20:00' }],
+      });
+      const draft = (startAt: string) =>
+        validateSlotDraft(tx, shop.shopId, { menuId: shop.menuId, startAt }, now);
+
+      expect((await draft(at('10:00'))).ok).toBe(true);
+      expect((await draft(at('19:00'))).ok).toBe(true);
+      expect(await draft(at('19:10'))).toMatchObject({ error: { code: 'OUTSIDE_HOURS' } });
+      expect(await draft(at('09:50'))).toMatchObject({ error: { code: 'OUTSIDE_HOURS' } });
+
+      await tx
+        .update(shops)
+        .set({ businessHours: [{ weekday: 0, closed: true }] })
+        .where(eq(shops.id, shop.shopId));
+      expect(await draft(at('12:00'))).toMatchObject({ error: { code: 'CLOSED_DAY' } });
+    });
+  });
+
   it('지난 시각, 48시간 밖, 단위가 안 맞는 시각, 모양이 틀린 입력은 막는다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);

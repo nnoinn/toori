@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { PUBLISH_WINDOW_HOURS, SLOT_START_STEP_MINUTES } from '@/server/policy';
 
 import {
+  checkBusinessHours,
   checkStart,
   groupByKstDate,
   isOnStep,
@@ -92,6 +93,53 @@ describe('startCandidates', () => {
     expect(starts[0]).toEqual(at(`2026-10-31T09:${String(step).padStart(2, '0')}:00`));
     // 48시간 뒤 정각은 포함한다
     expect(starts.at(-1)).toEqual(at('2026-11-02T09:00:00'));
+  });
+});
+
+describe('checkBusinessHours', () => {
+  // 2026-11-01은 일요일, 11-02는 월요일
+  const hours = [
+    { weekday: 0, closed: true as const },
+    { weekday: 1, open: '10:00', close: '20:00' },
+    { weekday: 2, open: '10:00', close: '24:00' },
+  ];
+  const range = (start: string, end: string) => ({ start: at(start), end: at(end) });
+
+  it('쉬는 날은 막는다', () => {
+    expect(checkBusinessHours(range('2026-11-01T12:00:00', '2026-11-01T13:00:00'), hours)).toBe(
+      'CLOSED_DAY',
+    );
+  });
+
+  it('여는 시각부터 시작해 닫는 시각에 끝나면 괜찮다', () => {
+    expect(
+      checkBusinessHours(range('2026-11-02T10:00:00', '2026-11-02T11:00:00'), hours),
+    ).toBeNull();
+    expect(
+      checkBusinessHours(range('2026-11-02T19:00:00', '2026-11-02T20:00:00'), hours),
+    ).toBeNull();
+  });
+
+  it('여는 시각 전에 시작하거나 닫는 시각 뒤에 끝나면 막는다', () => {
+    expect(checkBusinessHours(range('2026-11-02T09:50:00', '2026-11-02T10:50:00'), hours)).toBe(
+      'OUTSIDE_HOURS',
+    );
+    expect(checkBusinessHours(range('2026-11-02T19:10:00', '2026-11-02T20:10:00'), hours)).toBe(
+      'OUTSIDE_HOURS',
+    );
+  });
+
+  it('자정을 넘기면 막는다', () => {
+    expect(checkBusinessHours(range('2026-11-03T23:30:00', '2026-11-04T00:30:00'), hours)).toBe(
+      'OUTSIDE_HOURS',
+    );
+  });
+
+  it('영업시간을 입력하지 않은 요일은 막지 않는다', () => {
+    expect(
+      checkBusinessHours(range('2026-11-05T03:00:00', '2026-11-05T04:00:00'), hours),
+    ).toBeNull();
+    expect(checkBusinessHours(range('2026-11-02T03:00:00', '2026-11-02T04:00:00'), [])).toBeNull();
   });
 });
 

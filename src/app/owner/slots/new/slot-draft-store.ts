@@ -7,12 +7,20 @@ import { and, eq, gt, inArray, isNull, lt } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
-import { menus, slots } from '@/db/schema';
+import { menus, shops, slots } from '@/db/schema';
+import type { BusinessHours } from '@/db/schema/shops';
 import { fail, ok, type Result } from '@/lib/result';
+import type { ShopCategory } from '@/server/policy';
 
 import { isServiceTypeOf } from '../../settings/menu/menu';
-import { selectShopCategory } from '../../settings/menu/menu-store';
-import { checkStart, START_PROBLEM_MESSAGES, slotEnd, type TimeRange } from './slot-time';
+import {
+  checkBusinessHours,
+  checkStart,
+  HOURS_PROBLEM_MESSAGES,
+  START_PROBLEM_MESSAGES,
+  slotEnd,
+  type TimeRange,
+} from './slot-time';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select'>;
 
@@ -38,6 +46,18 @@ export type SlotDraft = { menu: DraftMenu; start: Date; end: Date };
 
 const draftSchema = z.object({ menuId: z.uuid(), startAt: z.iso.datetime({ offset: true }) });
 
+/** 매물 등록에 필요한 샵 값(업종, 영업시간). 샵이 없으면 null */
+export async function selectSlotShop(
+  db: Db,
+  shopId: string,
+): Promise<{ category: ShopCategory; businessHours: BusinessHours } | null> {
+  const [row] = await db
+    .select({ category: shops.category, businessHours: shops.businessHours })
+    .from(shops)
+    .where(eq(shops.id, shopId));
+  return row ? { ...row, category: row.category as ShopCategory } : null;
+}
+
 /** 그 샵에서 [from, to)와 겹치는 매물 시간(예약대기·게시중·예약됨) */
 export async function selectBusyRanges(
   db: Db,
@@ -62,7 +82,8 @@ export async function selectBusyRanges(
 
 /**
  * ①② 고른 값을 검증한다. 권한·입점 승인은 부른 쪽이 먼저 확인한다.
- * 메뉴: 그 샵의 숨기지 않은 메뉴이고 지금 업종의 서비스 종류 → 시작 시각: 단위·지금 이후·48시간 안 → 시간 겹침
+ * 메뉴: 그 샵의 숨기지 않은 메뉴이고 지금 업종의 서비스 종류 → 시작 시각: 단위·지금 이후·48시간 안
+ * → 영업시간 안(입력한 요일만) → 시간 겹침
  */
 export async function validateSlotDraft(
   db: Db,
@@ -73,8 +94,8 @@ export async function validateSlotDraft(
   const parsed = draftSchema.safeParse(input);
   if (!parsed.success) return fail('INVALID_INPUT', '메뉴와 시작 시각을 골라 주세요');
 
-  const [category, [menu]] = await Promise.all([
-    selectShopCategory(db, shopId),
+  const [shop, [menu]] = await Promise.all([
+    selectSlotShop(db, shopId),
     db
       .select({
         id: menus.id,
@@ -89,7 +110,7 @@ export async function validateSlotDraft(
         and(eq(menus.id, parsed.data.menuId), eq(menus.shopId, shopId), isNull(menus.hiddenAt)),
       ),
   ]);
-  if (!category || !menu || !isServiceTypeOf(category, menu.serviceType)) {
+  if (!shop || !menu || !isServiceTypeOf(shop.category, menu.serviceType)) {
     return fail('MENU_NOT_FOUND', SLOT_DRAFT_ERRORS.MENU_NOT_FOUND);
   }
 
@@ -98,6 +119,9 @@ export async function validateSlotDraft(
   if (problem) return fail(problem, START_PROBLEM_MESSAGES[problem]);
 
   const end = slotEnd(start, menu.durationMinutes);
+  const hoursProblem = checkBusinessHours({ start, end }, shop.businessHours);
+  if (hoursProblem) return fail(hoursProblem, HOURS_PROBLEM_MESSAGES[hoursProblem]);
+
   if ((await selectBusyRanges(db, shopId, start, end)).length > 0) {
     return fail('SLOT_OVERLAP', SLOT_DRAFT_ERRORS.SLOT_OVERLAP);
   }

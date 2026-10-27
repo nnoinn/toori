@@ -1,6 +1,7 @@
 // 매물 등록 ② 시간 고르기 계산 (O4, S-204, S-209, #23 D10). 화면('use client')과 서버가 같이 쓴다.
 // "지금"은 서버 시각을 받는다. 시각은 UTC Date로 다루고, 단위(분)는 한국 시간 기준으로 맞춘다.
 
+import type { BusinessHours } from '@/db/schema/shops';
 import { addMinutes, kstToUtc, utcToKst } from '@/lib/time';
 import { PUBLISH_WINDOW_HOURS, SLOT_START_STEP_MINUTES } from '@/server/policy';
 
@@ -62,6 +63,39 @@ export function startCandidates(now: Date): Date[] {
     cursor = addMinutes(cursor, SLOT_START_STEP_MINUTES);
   }
   return result;
+}
+
+export type HoursProblem = 'CLOSED_DAY' | 'OUTSIDE_HOURS';
+
+export const HOURS_PROBLEM_MESSAGES: Record<HoursProblem, string> = {
+  CLOSED_DAY: '쉬는 날에는 매물을 올릴 수 없어요',
+  OUTSIDE_HOURS: '영업시간 안에 끝나는 시각을 골라 주세요',
+};
+
+const minutesOfDay = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
+
+/**
+ * 매물 시간이 샵 영업시간(O2) 안이면 null(정민석 결정 10/28). 시작 요일(한국 시간)의 영업시간으로 본다.
+ * 그 요일 영업시간을 입력하지 않았으면 막지 않는다. 끝 시각이 닫는 시각과 같으면 괜찮다
+ */
+export function checkBusinessHours(range: TimeRange, hours: BusinessHours): HoursProblem | null {
+  const start = utcToKst(range.start);
+  const entry = hours.find((item) => item.weekday === start.weekday);
+  if (!entry) return null;
+  if ('closed' in entry) return 'CLOSED_DAY';
+  const end = utcToKst(range.end);
+  const sameDay = kstDateKey(range.start) === kstDateKey(range.end);
+  const startMinutes = start.hour * 60 + start.minute;
+  // 자정에 딱 끝나면 다음 날 0시라서 24:00으로 본다
+  const endMinutes = sameDay
+    ? end.hour * 60 + end.minute
+    : end.hour === 0 && end.minute === 0
+      ? 1440
+      : Infinity;
+  if (startMinutes < minutesOfDay(entry.open) || endMinutes > minutesOfDay(entry.close)) {
+    return 'OUTSIDE_HOURS';
+  }
+  return null;
 }
 
 /** 한국 날짜 key. 예: "2026-11-01" */

@@ -13,9 +13,9 @@ import { SHOP_STATUS_LABELS } from '@/server/shops/status';
 import { getShopReviewStatus } from '@/server/shops/review';
 
 import { isServiceTypeOf, MENU_DURATION } from '../../settings/menu/menu';
-import { selectMenus, selectShopCategory } from '../../settings/menu/menu-store';
+import { selectMenus } from '../../settings/menu/menu-store';
 import { SlotCreateForm } from './slot-create-form';
-import { selectBusyRanges } from './slot-draft-store';
+import { selectBusyRanges, selectSlotShop } from './slot-draft-store';
 import { latestStart } from './slot-time';
 
 export const metadata: Metadata = { title: '매물 등록' };
@@ -63,16 +63,16 @@ async function SlotCreateContent() {
 
   const db = getDb();
   const now = await getRequestNow();
-  const [category, menus, busy] = await Promise.all([
-    selectShopCategory(db, auth.shopId),
+  const [shop, menus, busy] = await Promise.all([
+    selectSlotShop(db, auth.shopId),
     selectMenus(db, auth.shopId),
     // 고를 수 있는 마지막 시작 시각 + 가장 긴 소요 시간까지 본다
     selectBusyRanges(db, auth.shopId, now, addMinutes(latestStart(now), MENU_DURATION.max)),
   ]);
-  if (!category) return <ErrorState description="샵을 찾을 수 없어요" />;
+  if (!shop) return <ErrorState description="샵을 찾을 수 없어요" />;
 
   const usable = menus.filter(
-    (menu) => !menu.hidden && isServiceTypeOf(category, menu.serviceType),
+    (menu) => !menu.hidden && isServiceTypeOf(shop.category, menu.serviceType),
   );
   if (usable.length === 0) {
     return (
@@ -94,6 +94,7 @@ async function SlotCreateContent() {
     <SlotCreateForm
       shopId={auth.shopId}
       nowIso={now.toISOString()}
+      businessHours={shop.businessHours}
       menus={usable.map((menu) => ({
         id: menu.id,
         serviceType: menu.serviceType,

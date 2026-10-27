@@ -10,13 +10,20 @@ import { Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { BusinessHours } from '@/db/schema/shops';
 import { formatWon } from '@/lib/format';
 import { formatKst, utcToKst } from '@/lib/time';
 import { PUBLISH_WINDOW_HOURS } from '@/server/policy';
 
 import { formatMinutes, serviceTypeLabel } from '../../settings/menu/menu';
 import { checkSlotDraft } from './actions';
-import { groupByKstDate, rangesOverlap, slotEnd, startCandidates } from './slot-time';
+import {
+  checkBusinessHours,
+  groupByKstDate,
+  rangesOverlap,
+  slotEnd,
+  startCandidates,
+} from './slot-time';
 
 type MenuOption = {
   id: string;
@@ -32,11 +39,14 @@ const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;
 export function SlotCreateForm({
   shopId,
   nowIso,
+  businessHours,
   menus,
   busy,
 }: {
   shopId: string;
   nowIso: string;
+  /** 샵 영업시간(O2). 입력하지 않은 요일은 24시간 다 보여준다 */
+  businessHours: BusinessHours;
   menus: MenuOption[];
   /** 같은 샵의 예약대기·게시중·예약됨 매물 시간(ISO) */
   busy: { start: string; end: string }[];
@@ -50,7 +60,11 @@ export function SlotCreateForm({
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [menuId, setMenuId] = useState<string | null>(null);
-  const [dateKey, setDateKey] = useState(days[0]?.dateKey ?? '');
+  // 처음에는 쉬는 날이 아닌 첫 날을 보여준다
+  const [dateKey, setDateKey] = useState(
+    () =>
+      (days.find((item) => !isClosedDay(item.starts[0], businessHours)) ?? days[0])?.dateKey ?? '',
+  );
   const [startIso, setStartIso] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -58,6 +72,16 @@ export function SlotCreateForm({
   const menu = menus.find((item) => item.id === menuId) ?? null;
   const start = startIso ? new Date(startIso) : null;
   const day = days.find((item) => item.dateKey === dateKey) ?? days[0];
+  // 영업시간(입력한 요일만) 안에 끝나는 시작 시각만 보여준다(정민석 결정 10/28)
+  const openStarts = menu
+    ? (day?.starts ?? []).filter(
+        (candidate) =>
+          checkBusinessHours(
+            { start: candidate, end: slotEnd(candidate, menu.durationMinutes) },
+            businessHours,
+          ) === null,
+      )
+    : [];
 
   function chooseMenu(id: string) {
     setMenuId(id);
@@ -143,21 +167,32 @@ export function SlotCreateForm({
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="flex gap-2" role="tablist" aria-label="날짜">
-              {days.map((item, index) => (
-                <Button
-                  key={item.dateKey}
-                  type="button"
-                  role="tab"
-                  aria-selected={item.dateKey === day?.dateKey}
-                  variant={item.dateKey === day?.dateKey ? 'default' : 'outline'}
-                  onClick={() => setDateKey(item.dateKey)}
-                >
-                  {dayLabel(item.starts[0], index)}
-                </Button>
-              ))}
+              {days.map((item, index) => {
+                const closed = isClosedDay(item.starts[0], businessHours);
+                return (
+                  <Button
+                    key={item.dateKey}
+                    type="button"
+                    role="tab"
+                    aria-selected={item.dateKey === day?.dateKey}
+                    variant={item.dateKey === day?.dateKey ? 'default' : 'outline'}
+                    disabled={closed}
+                    onClick={() => setDateKey(item.dateKey)}
+                  >
+                    {dayLabel(item.starts[0], index)}
+                    {closed ? ' 휴무' : ''}
+                  </Button>
+                );
+              })}
             </div>
+            {openStarts.length === 0 ? (
+              <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
+                이 날은 영업시간 안에 {menu.name}을(를) 끝낼 수 있는 시각이 없어요. 다른 날을 골라
+                주세요.
+              </p>
+            ) : null}
             <div className="grid grid-cols-6 gap-2">
-              {day?.starts.map((candidate) => {
+              {openStarts.map((candidate) => {
                 const range = { start: candidate, end: slotEnd(candidate, menu.durationMinutes) };
                 const blocked = busyRanges.some((busyRange) => rangesOverlap(range, busyRange));
                 const selected = startIso === candidate.toISOString();
@@ -180,8 +215,8 @@ export function SlotCreateForm({
               })}
             </div>
             <p className="text-xs text-muted-foreground">
-              줄이 그어진 시각은 이미 올린 매물(예약대기·게시중·예약됨)과 시간이 겹쳐서 고를 수
-              없어요.
+              매장 설정의 영업시간 안에 끝나는 시각만 보여요. 줄이 그어진 시각은 이미 올린
+              매물(예약대기·게시중·예약됨)과 시간이 겹쳐서 고를 수 없어요.
             </p>
           </CardContent>
         </Card>
@@ -247,6 +282,13 @@ export function SlotCreateForm({
       </div>
     </div>
   );
+}
+
+/** 그 날짜(한국 요일)를 쉬는 날로 입력했으면 true */
+function isClosedDay(date: Date | undefined, hours: BusinessHours): boolean {
+  if (!date) return false;
+  const weekday = utcToKst(date).weekday;
+  return hours.some((item) => item.weekday === weekday && 'closed' in item);
 }
 
 /** 날짜 버튼. 예: "10/31(금) 오늘" */
