@@ -22,6 +22,7 @@ import { NO_SHOW_PENALTY_RATE, REFUND_BANDS } from './refund';
 import {
   HOLD_MINUTES,
   IMMINENT_WITHIN_HOURS,
+  MENU_DURATION_STEP_MINUTES,
   NON_REFUNDABLE_WITHIN_HOURS,
   PUBLISH_WINDOW_HOURS,
   SLOT_START_STEP_MINUTES,
@@ -30,12 +31,13 @@ import { TERMS_VERSIONS } from './terms';
 import { BUSINESS_DOC_URL_TTL_SECONDS, UPLOAD_ALLOWED_TYPES, UPLOAD_MAX_BYTES } from './upload';
 
 describe('시간 (#48 1장)', () => {
-  it('48시간 게시, 6시간 임박·환불 불가, 10분 홀딩, 10분 간격', () => {
+  it('48시간 게시, 6시간 임박·환불 불가, 10분 홀딩, 시작 시각·소요 시간 30분 단위', () => {
     expect(PUBLISH_WINDOW_HOURS).toBe(48);
     expect(IMMINENT_WITHIN_HOURS).toBe(6);
     expect(NON_REFUNDABLE_WITHIN_HOURS).toBe(6);
     expect(HOLD_MINUTES).toBe(10);
-    expect(SLOT_START_STEP_MINUTES).toBe(10);
+    expect(SLOT_START_STEP_MINUTES).toBe(30);
+    expect(MENU_DURATION_STEP_MINUTES).toBe(30);
   });
 });
 
