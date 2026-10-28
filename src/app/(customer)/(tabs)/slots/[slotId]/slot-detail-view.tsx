@@ -13,11 +13,13 @@ import { NO_SHOW_PENALTY_RATE, OWNER_FAULT_COUPON_AMOUNT, REFUND_BANDS } from '@
 import {
   formatBusinessHours,
   formatDuration,
+  kakaoMapLink,
   refundPolicyLines,
   refundPolicyNotes,
   safeExternalUrl,
   telHref,
 } from './detail-format';
+import { ShopLocationMap } from './shop-location-map';
 import type { SlotAvailability, SlotDetail } from './types';
 
 const ACTION_LABEL: Record<SlotAvailability, string> = {
@@ -162,6 +164,16 @@ export function SlotDetailView({ slot, serverNow }: SlotDetailViewProps) {
             {shop.addressDetail ? ` ${shop.addressDetail}` : ''}
           </span>
         </p>
+        <ShopLocationMap shopId={shop.shopId} name={shop.name} lat={shop.lat} lng={shop.lng} />
+        <a
+          href={kakaoMapLink(shop.name, shop.lat, shop.lng)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 self-start text-sm text-muted-foreground"
+        >
+          카카오맵에서 크게 보기
+          <ExternalLink className="size-3.5" aria-hidden />
+        </a>
         {tel ? (
           <a href={tel} className="flex items-center gap-2 text-sm">
             <Phone className="size-4 text-muted-foreground" aria-hidden />

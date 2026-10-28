@@ -9,15 +9,15 @@ import { and, asc, count, desc, eq, gt, gte, inArray, lt, or, type SQL, sql } fr
 
 import { getDb } from '@/db';
 import { shopImages, shops, slots } from '@/db/schema';
-import { isSlotOnHold } from '@/features/slot-status/slot-status';
 import { slotStatusIs } from '@/features/slot-status/slot-status-sql';
 import { KST_TIME_ZONE } from '@/lib/time';
 import { newCustomerOnlyVisible } from '@/server/customers';
-import { getSlotTimeFlags, PRICE_FILTER_RANGES, TIME_FILTER_RANGES } from '@/server/policy';
+import { PRICE_FILTER_RANGES, TIME_FILTER_RANGES } from '@/server/policy';
 import { customerVisibleShop } from '@/server/shops/visibility';
 
 import type { HomeFilters } from '../filters';
 import type { LatLng, MapBounds, MapShop } from '../types';
+import { slotBadges } from './badges';
 import { encodeCursor, SLOT_PAGE_SIZE, type SlotCursor } from './cursor';
 import { shopImageUrl } from './image-url';
 import type { SlotSort } from './sort';
@@ -230,12 +230,8 @@ type SlotRow = {
   imagePath: string | null;
 };
 
-/** 배지는 서버 시각으로 정한다(공통 UI SlotCard 규칙). 내가 홀딩한 매물은 "다른 고객이 결제 중"이 아니다 */
+/** 배지는 서버 시각으로 정한다(공통 UI SlotCard 규칙, badges.ts) */
 function toListItem(row: SlotRow, query: Pick<HomeSlotQuery, 'customerId' | 'now'>): SlotListItem {
-  const flags = getSlotTimeFlags(row.startAt, query.now);
-  const heldByOther =
-    isSlotOnHold(row, query.now) &&
-    (query.customerId === null || row.holdCustomerId !== query.customerId);
   return {
     slotId: row.slotId,
     shopId: row.shopId,
@@ -247,11 +243,6 @@ function toListItem(row: SlotRow, query: Pick<HomeSlotQuery, 'customerId' | 'now
     discountRate: row.discountRate,
     imageUrl: shopImageUrl(row.imagePath),
     distanceMeters: row.distanceMeters,
-    badges: [
-      ...(flags.nonRefundable ? (['nonRefundable'] as const) : []),
-      ...(flags.imminent ? (['imminent'] as const) : []),
-      ...(row.newCustomerOnly ? (['newCustomerOnly'] as const) : []),
-      ...(heldByOther ? (['onHold'] as const) : []),
-    ],
+    badges: slotBadges(row, query.customerId, query.now),
   };
 }

@@ -59,6 +59,11 @@ export function safeExternalUrl(raw: string | null | undefined): string | null {
   }
 }
 
+/** 카카오맵에서 샵 위치 크게 보기(새 창). 이름의 쉼표 등은 주소에 맞게 바꾼다 */
+export function kakaoMapLink(name: string, lat: number, lng: number): string {
+  return `https://map.kakao.com/link/map/${encodeURIComponent(name)},${lat},${lng}`;
+}
+
 /** 전화 걸기 링크용 숫자만. 예: "031-123-4567" → "tel:0311234567" */
 export function telHref(phone: string): string | null {
   const digits = phone.replace(/[^\d+]/g, '');

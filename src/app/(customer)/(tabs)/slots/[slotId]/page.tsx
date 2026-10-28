@@ -2,14 +2,19 @@ import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 
 import { Skeleton } from '@/components/ui/skeleton';
-import { getRequestNow } from '@/lib/request-time';
+import { z } from 'zod';
 
+import { getDb } from '@/db';
+import { getRequestNow } from '@/lib/request-time';
+import { getCurrentAccount } from '@/server/auth';
+
+import { selectSlotDetail } from './queries';
 import { SlotDetailView } from './slot-detail-view';
-import type { SlotDetail } from './types';
 
 type Params = Promise<{ slotId: string }>;
 
 // 매물 상세 (J7). 주소: /slots/[slotId]
+// 승인되지 않은 샵, 이력 있는 고객의 신규 고객 전용, 게시 전 매물은 주소로 바로 들어와도 404다(queries.ts).
 export default function SlotDetailPage({ params }: { params: Params }) {
   return (
     <Suspense fallback={<DetailSkeleton />}>
@@ -18,19 +23,18 @@ export default function SlotDetailPage({ params }: { params: Params }) {
   );
 }
 
-/**
- * TODO(J7 조회): 매물 상태(#68 getSlotStatus·isSlotOnHold), 승인 샵(#50), 신규 고객 판별(#49)이
- * 들어오면 이 화면 폴더 안에서 DB를 조회해 SlotDetail을 만든다. 신규 고객 전용·미승인 샵 매물은
- * 주소로 바로 들어와도 여기서 막는다(없는 매물처럼 404). 지금은 조회가 없어서 항상 404다.
- */
-async function getSlotDetail(slotId: string): Promise<SlotDetail | null> {
-  void slotId;
-  return null;
+/** 고객 모드로 로그인한 고객 계정만. 원장님 모드로 둘러보면 null(#49 3장) */
+async function currentCustomerId(): Promise<string | null> {
+  const account = await getCurrentAccount();
+  return account?.mode === 'customer' ? account.customerId : null;
 }
 
 async function DetailContent({ params }: { params: Params }) {
   const { slotId } = await params;
-  const [slot, now] = await Promise.all([getSlotDetail(slotId), getRequestNow()]);
+  // 매물 ID 모양이 아니면 DB에 묻지 않고 없는 매물로 본다
+  if (!z.uuid().safeParse(slotId).success) notFound();
+  const [customerId, now] = await Promise.all([currentCustomerId(), getRequestNow()]);
+  const slot = await selectSlotDetail(getDb(), { slotId, customerId, now });
   if (!slot) notFound();
   return <SlotDetailView slot={slot} serverNow={now.toISOString()} />;
 }
