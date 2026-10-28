@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { holdBlockReason } from './checkout-rules';
+import { holdBlockReason, isMyActiveHold } from './checkout-rules';
 import type { CheckoutSlot } from './checkout-store';
 
 const NOW = new Date('2026-11-01T03:00:00.000Z');
@@ -39,5 +39,26 @@ describe('holdBlockReason', () => {
     ['내 홀딩', { holdCustomerId: 'me', holdExpiresAt: at(5) }, null],
   ])('%s → %s', (_, change, expected) => {
     expect(holdBlockReason(slot(change), 'me', NOW)).toBe(expected);
+  });
+});
+
+describe('isMyActiveHold', () => {
+  it.each<[string, Partial<CheckoutSlot>, boolean]>([
+    ['내 홀딩', { holdCustomerId: 'me', holdExpiresAt: at(5) }, true],
+    ['내 홀딩이 딱 끝남', { holdCustomerId: 'me', holdExpiresAt: at(0) }, false],
+    ['다른 고객 홀딩', { holdCustomerId: 'other', holdExpiresAt: at(5) }, false],
+    ['홀딩 없음', {}, false],
+    [
+      '내 홀딩인데 시작 시각이 지남',
+      { holdCustomerId: 'me', holdExpiresAt: at(5), startAt: at(0) },
+      false,
+    ],
+    [
+      '내 홀딩인데 예약됨',
+      { holdCustomerId: 'me', holdExpiresAt: at(5), status: 'reserved' },
+      false,
+    ],
+  ])('%s → %s', (_, change, expected) => {
+    expect(isMyActiveHold(slot(change), 'me', NOW)).toBe(expected);
   });
 });

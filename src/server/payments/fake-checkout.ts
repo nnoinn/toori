@@ -1,5 +1,6 @@
-// 가짜 결과 버전(W9)에서만 쓰는 것. 서버에서만 부른다. W10(진짜 홀딩)·W11(포트원 결제)에서 지운다.
-// - 홀딩·결제 번호·확정 결과를 DB 대신 httpOnly 쿠키 하나에 둔다. 누구의 값인지 사용자 id로 확인한다
+// 가짜 결과 버전에서만 쓰는 것. 서버에서만 부른다. W11(포트원 결제)에서 지운다.
+// 홀딩은 W10부터 DB에 진짜로 건다. 여기에는 결제 부분만 남았다.
+// - 결제 번호·확정 결과를 DB 대신 httpOnly 쿠키 하나에 둔다. 누구의 값인지 사용자 id로 확인한다
 // - 로컬(npm run dev)에서 .env.local에 DEV_FAKE_PAYMENT_FAILURE=<함수>:<코드>를 적으면 그 함수가 그 실패를 돌려준다
 //   예: DEV_FAKE_PAYMENT_FAILURE=confirmPayment:AMOUNT_MISMATCH. 실패 화면 확인용이고 배포 주소에서는 꺼져 있다
 
@@ -18,7 +19,7 @@ import {
 
 export const FAKE_CHECKOUT_COOKIE = 'fake_checkout';
 
-/** 홀딩이 끝난 뒤에도 "시간이 지났어요"와 새로고침한 결과 화면을 보여줄 수 있게 하루 둔다 */
+/** 새로고침한 결과 화면을 보여줄 수 있게 하루 둔다 */
 const COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: 'lax',
@@ -30,8 +31,7 @@ const COOKIE_OPTIONS = {
 const stateSchema = z.object({
   userId: z.string(),
   slotId: z.string(),
-  holdExpiresAt: z.iso.datetime(),
-  /** 이 홀딩에서 startPayment가 만든 결제 번호들(다시 결제하면 늘어난다) */
+  /** 이 매물에서 startPayment가 만든 결제 번호들(다시 결제하면 늘어난다) */
   paymentIds: z.array(z.string()),
   confirmed: z
     .object({ paymentId: z.string(), reservationId: z.string(), reservationCode: z.string() })
@@ -61,11 +61,6 @@ export async function writeFakeCheckout(state: FakeCheckout): Promise<void> {
 
 export async function clearFakeCheckout(): Promise<void> {
   (await cookies()).delete(FAKE_CHECKOUT_COOKIE);
-}
-
-/** 아직 확정 전이고 만료 시각 전이면 홀딩 중 */
-export function isFakeHoldActive(state: FakeCheckout, now: Date): boolean {
-  return state.confirmed === null && now.getTime() < Date.parse(state.holdExpiresAt);
 }
 
 export function newFakePaymentId(): string {

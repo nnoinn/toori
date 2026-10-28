@@ -15,3 +15,12 @@ export function holdBlockReason(
   if (isSlotOnHold(slot, now) && slot.holdCustomerId !== customerId) return 'HELD_BY_OTHER';
   return null;
 }
+
+/** 이 고객의 살아 있는 홀딩인지(게시중이고, 홀딩한 사람이 이 고객이고, 만료 전). 예약 확인 화면·결제 시작에서 본다 */
+export function isMyActiveHold(slot: CheckoutSlot, customerId: string, now: Date): boolean {
+  return (
+    getSlotStatus(slot, now) === 'published' &&
+    isSlotOnHold(slot, now) &&
+    slot.holdCustomerId === customerId
+  );
+}
