@@ -6,13 +6,17 @@ import 'server-only';
 
 export const MARKETING_NOTICE_COOKIE = 'marketing_consent_notice';
 
-/** 화면 스크립트가 읽지 못하게(httpOnly) 하고, 가입 직후에만 쓰므로 1시간 뒤 사라진다 */
+/**
+ * 화면 스크립트가 읽지 못하게(httpOnly) 하고, 14일 뒤 사라진다. 법이 동의 처리 결과를 14일 안에 알리게 해서,
+ * 가입 직후 창을 닫아도 14일 안에 다시 들어오면 안내를 볼 수 있게 한다(10/28 결정, #115 리뷰).
+ * 사용자 id를 확인하고 로그아웃 때 지우므로 길게 둬도 남에게 보이지 않는다
+ */
 export const MARKETING_NOTICE_COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: 'lax',
   secure: process.env.NODE_ENV === 'production',
   path: '/',
-  maxAge: 60 * 60,
+  maxAge: 14 * 24 * 60 * 60,
 } as const;
 
 /** 쿠키 값: 누구의 동의인지와 동의 시각. 같은 브라우저에서 다른 사람이 로그인했을 때 남의 결과를 보여주지 않으려고 사용자 id를 같이 둔다 */

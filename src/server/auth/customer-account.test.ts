@@ -148,7 +148,7 @@ describe('createCustomerAccount', () => {
 const AGREED_AT = new Date('2026-10-28T03:00:00.000Z');
 
 describe('가입 직후 광고성 동의 처리 결과 안내', () => {
-  it('가입 때 광고성 동의를 골랐으면 누구의 동의인지와 동의 시각을 1시간짜리 쿠키로 남긴다', async () => {
+  it('가입 때 광고성 동의를 골랐으면 누구의 동의인지와 동의 시각을 14일짜리 쿠키로 남긴다', async () => {
     state.saved = { customerId: 'customer-1', marketingAgreedAt: AGREED_AT };
     await expect(
       createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: true } }),
@@ -156,7 +156,7 @@ describe('가입 직후 광고성 동의 처리 결과 안내', () => {
     expect(state.cookieSet).toHaveBeenCalledWith(
       'marketing_consent_notice',
       `user-1|${AGREED_AT.toISOString()}`,
-      expect.objectContaining({ httpOnly: true, maxAge: 60 * 60 }),
+      expect.objectContaining({ httpOnly: true, maxAge: 14 * 24 * 60 * 60 }),
     );
   });
 
