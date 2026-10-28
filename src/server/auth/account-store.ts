@@ -1,5 +1,5 @@
 // 계정 만들기와 약관 동의 기록 (DB, #47 4·5장). 서버에서만 부른다.
-// 화면이 부르는 'use server' 함수(customer-account.ts)가 권한·입력을 확인한 뒤 이 함수들을 부른다.
+// 화면이 부르는 'use server' 함수(customer-account.ts, owner-account.ts)가 권한·입력을 확인한 뒤 이 함수들을 부른다.
 // 'use server' 파일에서 내보내는 함수는 화면에서 바로 부를 수 있으므로, db를 받는 함수는 여기에 둔다.
 
 import 'server-only';
@@ -7,8 +7,9 @@ import 'server-only';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
-import { customers, termsAgreements } from '@/db/schema';
+import { customers, owners, payoutAccounts, shops, termsAgreements } from '@/db/schema';
 import type { AccountType, TermsType } from '@/db/schema/accounts';
+import type { GeoPoint } from '@/db/schema/types';
 import { TERMS_VERSIONS } from '@/server/policy';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select' | 'insert' | 'update'>;
@@ -124,4 +125,81 @@ function marketingOf(userId: string, accountType: AccountType) {
     eq(termsAgreements.accountType, accountType),
     eq(termsAgreements.termsType, 'marketing'),
   );
+}
+
+/** 원장님 가입의 필수 동의(S-101, #47 4장). 광고성 정보 수신(marketing)만 선택 */
+export const OWNER_REQUIRED_TERMS = [
+  'supplier',
+  'service',
+  'privacy',
+] as const satisfies readonly TermsType[];
+
+export type NewOwnerAccount = {
+  userId: string;
+  owner: { name: string; phone: string };
+  /** 화면에서 받은 값과 서버가 주소로 만든 좌표·지역(geocodeAddress) */
+  shop: {
+    name: string;
+    category: string;
+    phone: string;
+    roadAddress: string;
+    jibunAddress: string | null;
+    addressDetail: string | null;
+    sido: string;
+    sigungu: string;
+    sigunguCode: string;
+    location: GeoPoint;
+    businessName: string;
+    representativeName: string;
+    businessRegistrationNumber: string;
+    openedOn: string;
+    businessDocPath: string;
+  };
+  /** 계좌번호는 암호화한 값만 받는다 */
+  payout: {
+    bankCode: string;
+    accountNumberEncrypted: string;
+    accountLast4: string;
+    accountHolder: string;
+  };
+  marketing: boolean;
+};
+
+/**
+ * 원장님 계정·샵·정산 계좌·약관 동의를 저장한다(S-101, S-107). 이미 원장님 계정이 있으면 아무것도 저장하지 않고 null.
+ * 샵은 승인 대기(pending)·영업시간 빈 목록·PG 셀러 등록 전(not_registered)으로 시작한다(DB 기본값).
+ * 모두 함께 저장되도록 트랜잭션 안에서 부른다
+ */
+export async function saveOwnerAccount(
+  tx: Db,
+  input: NewOwnerAccount,
+): Promise<{ ownerId: string; shopId: string; marketingAgreedAt: Date | null } | null> {
+  const [owner] = await tx
+    .insert(owners)
+    .values({ userId: input.userId, ...input.owner })
+    .onConflictDoNothing({ target: owners.userId })
+    .returning({ id: owners.id });
+  if (!owner) return null;
+
+  const [shop] = await tx
+    .insert(shops)
+    .values({ ownerId: owner.id, ...input.shop })
+    .returning({ id: shops.id });
+  await tx.insert(payoutAccounts).values({ shopId: shop.id, ...input.payout });
+
+  const termsTypes: TermsType[] = [...OWNER_REQUIRED_TERMS];
+  if (input.marketing) termsTypes.push('marketing');
+  const agreed = await tx
+    .insert(termsAgreements)
+    .values(
+      termsTypes.map((termsType) => ({
+        userId: input.userId,
+        accountType: 'owner',
+        termsType,
+        version: TERMS_VERSIONS[termsType],
+      })),
+    )
+    .returning({ termsType: termsAgreements.termsType, agreedAt: termsAgreements.agreedAt });
+  const marketing = agreed.find((row) => row.termsType === 'marketing');
+  return { ownerId: owner.id, shopId: shop.id, marketingAgreedAt: marketing?.agreedAt ?? null };
 }
