@@ -29,7 +29,8 @@ export function LocationIntro() {
   const regionStep = showRegions || status === 'failed';
 
   return (
-    <section className="flex flex-1 flex-col gap-6 px-4 py-10">
+    // PC에서는 버튼·동네 목록이 화면 폭만큼 늘어나지 않게 가운데 좁은 칸에 모은다
+    <section className="flex flex-1 flex-col gap-6 px-4 py-10 md:mx-auto md:w-full md:max-w-md md:py-16">
       <div className="flex flex-col items-center gap-3 text-center">
         <MapPin className="size-10 text-primary" aria-hidden />
         <h1 className="text-xl font-bold">

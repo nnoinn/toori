@@ -24,6 +24,8 @@ declare namespace kakao.maps {
     getLevel(): number;
     getBounds(): LatLngBounds;
     relayout(): void;
+    /** 휠·두 손가락 확대·축소를 켜고 끈다 */
+    setZoomable(zoomable: boolean): void;
   }
 
   type MarkerOptions = {
