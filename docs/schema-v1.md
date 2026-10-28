@@ -67,7 +67,7 @@ erDiagram
 | id | uuid PK | |
 | user_id | uuid, unique → profiles | 한 사람당 고객 계정 하나 |
 | nickname | text | |
-| phone | text, null 가능 | 예약 확인·노쇼 연락용. 인증 없이 형식만 검사. 예약 전에 꼭 입력 |
+| phone | text, null 가능 | 예약 확인·노쇼 연락용. 인증 없이 형식만 검사. 예약 전에 꼭 입력. 휴대폰만, 하이픈 넣은 모양(`010-1234-5678`, `normalizePhone(…, 'mobile')`) |
 | last_interest_push_at | timestamptz, null | 관심 지역 알림을 마지막으로 보낸 시각. 하루 1번(13시) 묶음 발송에서 "그 뒤에 새로 올라온 매물"을 고르는 기준 |
 | withdrawn_at | timestamptz, null | 탈퇴 시각(C-106, P1) |
 | created_at | timestamptz | |
@@ -79,7 +79,7 @@ erDiagram
 | id | uuid PK | |
 | user_id | uuid, unique → profiles | 한 사람당 원장님 계정 하나 |
 | name | text | 원장님 이름(표시용) |
-| phone | text | 원장님 연락처 |
+| phone | text | 원장님 연락처. 하이픈 넣은 모양(`normalizePhone`) |
 | withdrawn_at | timestamptz, null | |
 | created_at | timestamptz | |
 
@@ -126,7 +126,7 @@ erDiagram
 | owner_id | uuid, unique → owners | MVP는 원장님 하나에 샵 하나. 여러 샵이 필요해지면 unique를 푼다 |
 | name | text | 샵 이름 |
 | category | text | 업종: `hair`(미용실) / `nail_lash`(네일·속눈썹) |
-| phone | text | 샵 전화번호 |
+| phone | text | 샵 전화번호. 하이픈 넣은 모양(`031-123-4567`, `0507-1234-5678`, `normalizePhone`) |
 | road_address | text | 도로명 주소(좌표 변환 기준) |
 | jibun_address | text, null | |
 | address_detail | text, null | 상세 주소(동·호수) |
@@ -280,6 +280,8 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | amount | integer | 실제 결제액 = 할인가 − 쿠폰. 포트원 검증 기준 |
 | refund_policy_version | text | 고객이 동의한 환불 규정 버전(C-402) |
 | refund_policy_agreed_at | timestamptz | 결제 버튼 위 환불 규정 필수 동의를 누른 시각. 환불 분쟁 때 증거로 쓴다 |
+| booker_info_version | text | 고객이 동의한 예약자 정보 제공 동의 문구 버전(C-402, 동의 문구 3-1장). 10/28 추가, 결제 함수 때 마이그레이션 |
+| booker_info_agreed_at | timestamptz | 결제 버튼 위 예약자 정보 제공 필수 동의(샵에 닉네임·휴대폰 번호 제공)를 누른 시각. 동의를 받았다는 증거 |
 | status | text | `pending`(결제 대기) / `paid`(결제 확인) / `confirmed`(예약 확정) / `failed`(실패) / `auto_cancelled`(자동 취소) |
 | pg_status | text, null | 포트원에서 받은 결제 상태 |
 | pay_method | text, null | 결제 수단 |
@@ -561,3 +563,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 2026-10-18 | 오픈 기간 플랫폼 수수료 0%(10/14 결정). 컬럼은 그대로 두고 `fee_rate`·`fee_amount`에 0을 저장한다. 할인율별 수수료는 법인 전환 때 적용 |
 | 2026-10-22 | W1a 구현(#63)에 맞춰 기본값 4개를 적었다(`shops.business_hours` `[]`, `shops.status` `pending`, `payout_accounts.pg_seller_status` `not_registered`, `slots.new_customer_only` false). W1b 전 확인(#64): `refunds.reservation_id` null 가능, `settlements` unique(`shop_id`, `period_start`, `period_end`) |
 | 2026-10-25 | `terms_agreements.terms_type`에 `age14`(만 14세 이상 확인)를 더한다. 만 14세 미만은 가입을 받지 않으므로 고객 가입 때 확인을 받았다는 기록을 남긴다(#88 질문, #47 결정). 마이그레이션 0004 |
+| 2026-10-28 | `orders`에 예약자 정보 제공 동의 기록(`booker_info_version`·`booker_info_agreed_at`)을 더한다(#121). 강규민이 결제 함수(W9~)와 같이 마이그레이션한다. 전화번호(`customers`·`owners`·`shops`의 `phone`)는 모두 하이픈 넣은 모양으로 저장한다(`src/lib/phone.ts`) |

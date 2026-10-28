@@ -15,7 +15,7 @@ import {
   type SlotStatus,
   slots,
 } from '@/db/schema';
-import { SLOT_START_STEP_MINUTES } from '@/server/policy';
+import { MENU_DURATION_STEP_MINUTES, SLOT_START_STEP_MINUTES } from '@/server/policy';
 
 import type { TestTx } from './test-db';
 
@@ -102,13 +102,12 @@ export function testSlot(
     return h * 60 + m;
   };
   const durationMinutes = minutesOf(end) - minutesOf(start);
-  // TODO(#108): 강규민의 MENU_DURATION_STEP_MINUTES가 생기면 소요 시간은 그 값으로 확인한다
   if (
     minutesOf(start) % SLOT_START_STEP_MINUTES !== 0 ||
-    durationMinutes % SLOT_START_STEP_MINUTES !== 0
+    durationMinutes % MENU_DURATION_STEP_MINUTES !== 0
   ) {
     throw new Error(
-      `testSlot: 매물 시작 시각과 소요 시간은 ${SLOT_START_STEP_MINUTES}분 단위로 넣어요(#108). 받은 값 ${start}~${end}`,
+      `testSlot: 매물 시작 시각은 ${SLOT_START_STEP_MINUTES}분, 소요 시간은 ${MENU_DURATION_STEP_MINUTES}분 단위로 넣어요(#108). 받은 값 ${start}~${end}`,
     );
   }
   return {
