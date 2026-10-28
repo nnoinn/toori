@@ -26,7 +26,7 @@ import {
   SLOT_START_STEP_MINUTES,
 } from './slot-time';
 import { TERMS_VERSIONS } from './terms';
-import { UPLOAD_MAX_BYTES } from './upload';
+import { BUSINESS_DOC_URL_TTL_SECONDS, UPLOAD_ALLOWED_TYPES, UPLOAD_MAX_BYTES } from './upload';
 
 describe('시간 (#48 1장)', () => {
   it('48시간 게시, 6시간 임박·환불 불가, 10분 홀딩, 10분 간격', () => {
@@ -99,7 +99,9 @@ describe('필터 구간 (#48 7장)', () => {
 });
 
 describe('업로드 (#48 8장)', () => {
-  it('5MB = 5,242,880바이트', () => {
-    expect(UPLOAD_MAX_BYTES).toBe(5_242_880);
+  it('5MB는 Storage 버킷 설정과 같은 5,000,000바이트, 형식은 jpeg·png·webp, 등록증 주소는 5분', () => {
+    expect(UPLOAD_MAX_BYTES).toBe(5_000_000);
+    expect(UPLOAD_ALLOWED_TYPES).toEqual(['image/jpeg', 'image/png', 'image/webp']);
+    expect(BUSINESS_DOC_URL_TTL_SECONDS).toBe(300);
   });
 });
