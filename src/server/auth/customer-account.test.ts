@@ -9,19 +9,31 @@ import {
   createCustomerAccount,
   getMarketingConsent,
   setMarketingConsent,
+  takeMarketingConsentNotice,
 } from './customer-account';
 
 const state = vi.hoisted(() => ({
   user: null as { userId: string; name: string | null } | null,
   customerAuth: null as unknown,
-  savedCustomerId: 'customer-1' as string | null,
+  saved: null as { customerId: string; marketingAgreedAt: Date | null } | null,
+  cookies: new Map<string, string>(),
   saveCustomerAccount: vi.fn(),
   readMarketingConsent: vi.fn(),
   writeMarketingConsent: vi.fn(),
   cookieSet: vi.fn(),
+  cookieDelete: vi.fn(),
 }));
 
-vi.mock('next/headers', () => ({ cookies: async () => ({ set: state.cookieSet }) }));
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: (name: string) => {
+      const value = state.cookies.get(name);
+      return value === undefined ? undefined : { name, value };
+    },
+    set: state.cookieSet,
+    delete: state.cookieDelete,
+  }),
+}));
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
     throw new Error(`redirect:${url}`);
@@ -52,8 +64,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.user = { userId: 'user-1', name: '김투리' };
   state.customerAuth = ok({ userId: 'user-1', customerId: 'customer-1' });
-  state.saveCustomerAccount.mockImplementation(async () => state.savedCustomerId);
-  state.savedCustomerId = 'customer-1';
+  state.saved = { customerId: 'customer-1', marketingAgreedAt: null };
+  state.saveCustomerAccount.mockImplementation(async () => state.saved);
+  state.cookies.clear();
+  state.cookieDelete.mockImplementation((name: string) => state.cookies.delete(name));
 });
 
 describe('createCustomerAccount', () => {
@@ -122,12 +136,60 @@ describe('createCustomerAccount', () => {
   });
 
   it('이미 고객 계정이 있으면 ALREADY_EXISTS이고 쿠키를 바꾸지 않는다', async () => {
-    state.savedCustomerId = null;
+    state.saved = null;
     const result = await createCustomerAccount({
       agreements: { ...ALL_REQUIRED, marketing: false },
     });
     expect(result).toEqual(fail('ALREADY_EXISTS', '이미 가입한 계정이에요'));
     expect(state.cookieSet).not.toHaveBeenCalled();
+  });
+});
+
+const AGREED_AT = new Date('2026-10-28T03:00:00.000Z');
+
+describe('가입 직후 광고성 동의 처리 결과 안내', () => {
+  it('가입 때 광고성 동의를 골랐으면 누구의 동의인지와 동의 시각을 1시간짜리 쿠키로 남긴다', async () => {
+    state.saved = { customerId: 'customer-1', marketingAgreedAt: AGREED_AT };
+    await expect(
+      createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: true } }),
+    ).rejects.toThrow('redirect:/');
+    expect(state.cookieSet).toHaveBeenCalledWith(
+      'marketing_consent_notice',
+      `user-1|${AGREED_AT.toISOString()}`,
+      expect.objectContaining({ httpOnly: true, maxAge: 60 * 60 }),
+    );
+  });
+
+  it('광고성 동의를 고르지 않았으면 남기지 않는다', async () => {
+    await expect(
+      createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: false } }),
+    ).rejects.toThrow('redirect:/');
+    expect(state.cookieSet).not.toHaveBeenCalledWith(
+      'marketing_consent_notice',
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it('takeMarketingConsentNotice는 동의 시각을 한 번만 돌려주고 쿠키를 지운다', async () => {
+    state.cookies.set('marketing_consent_notice', `user-1|${AGREED_AT.toISOString()}`);
+    expect(await takeMarketingConsentNotice()).toEqual(ok({ agreedAt: AGREED_AT }));
+    expect(state.cookieDelete).toHaveBeenCalledWith('marketing_consent_notice');
+    expect(await takeMarketingConsentNotice()).toEqual(ok(null));
+  });
+
+  it('다른 사람의 값이거나 로그인하지 않았거나 모양이 틀리면 보여주지 않고 지운다', async () => {
+    for (const [user, value] of [
+      [{ userId: 'user-2', name: null }, `user-1|${AGREED_AT.toISOString()}`],
+      [null, `user-1|${AGREED_AT.toISOString()}`],
+      [{ userId: 'user-1', name: null }, 'user-1|not-a-date'],
+      [{ userId: 'user-1', name: null }, 'broken'],
+    ] as const) {
+      state.user = user;
+      state.cookies.set('marketing_consent_notice', value);
+      expect(await takeMarketingConsentNotice()).toEqual(ok(null));
+      expect(state.cookies.has('marketing_consent_notice')).toBe(false);
+    }
   });
 });
 

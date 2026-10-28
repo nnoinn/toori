@@ -26,12 +26,12 @@ export const DEFAULT_CUSTOMER_NICKNAME = '고객';
 
 /**
  * 고객 계정과 약관 동의 기록을 저장한다. 이미 고객 계정이 있으면 아무것도 저장하지 않고 null.
- * 둘이 함께 저장되도록 트랜잭션 안에서 부른다
+ * 광고성 정보 수신에 동의했으면 그 동의 시각도 돌려준다(가입 직후 처리 결과 안내). 둘이 함께 저장되도록 트랜잭션 안에서 부른다
  */
 export async function saveCustomerAccount(
   tx: Db,
   input: { userId: string; nickname: string; marketing: boolean },
-): Promise<string | null> {
+): Promise<{ customerId: string; marketingAgreedAt: Date | null } | null> {
   const [customer] = await tx
     .insert(customers)
     .values({ userId: input.userId, nickname: input.nickname })
@@ -41,15 +41,19 @@ export async function saveCustomerAccount(
 
   const termsTypes: TermsType[] = [...CUSTOMER_REQUIRED_TERMS];
   if (input.marketing) termsTypes.push('marketing');
-  await tx.insert(termsAgreements).values(
-    termsTypes.map((termsType) => ({
-      userId: input.userId,
-      accountType: 'customer',
-      termsType,
-      version: TERMS_VERSIONS[termsType],
-    })),
-  );
-  return customer.id;
+  const agreed = await tx
+    .insert(termsAgreements)
+    .values(
+      termsTypes.map((termsType) => ({
+        userId: input.userId,
+        accountType: 'customer',
+        termsType,
+        version: TERMS_VERSIONS[termsType],
+      })),
+    )
+    .returning({ termsType: termsAgreements.termsType, agreedAt: termsAgreements.agreedAt });
+  const marketing = agreed.find((row) => row.termsType === 'marketing');
+  return { customerId: customer.id, marketingAgreedAt: marketing?.agreedAt ?? null };
 }
 
 export type MarketingConsent = {
