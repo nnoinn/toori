@@ -1,5 +1,5 @@
 // 원장님 가입 저장(saveOwnerAccount, #47 4장)을 실제 DB(TEST_DATABASE_URL이 있을 때만)로 확인한다.
-// 원장님 계정·샵·정산 계좌·약관 동의가 한 번에 들어가는지, 시작 상태가 맞는지, 이미 있으면 아무것도 남기지 않는지 본다.
+// 원장님 계정·샵·정산 계좌·약관 동의(supplier·privacy 두 줄)가 한 번에 들어가는지, 시작 상태가 맞는지, 이미 있으면 아무것도 남기지 않는지 본다.
 
 import { eq } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
@@ -10,7 +10,7 @@ import { createTestCustomer, createTestUser, TEST_LOCATION } from '../../../test
 import { closeTestDb, describeDb, type TestTx, withRollback } from '../../../tests/db/test-db';
 import { type NewOwnerAccount, saveOwnerAccount } from './account-store';
 
-function newOwner(userId: string, marketing = false): NewOwnerAccount {
+function newOwner(userId: string): NewOwnerAccount {
   return {
     userId,
     owner: { name: '김원장', phone: '010-0000-0000' },
@@ -37,7 +37,6 @@ function newOwner(userId: string, marketing = false): NewOwnerAccount {
       accountLast4: '6789',
       accountHolder: '김원장',
     },
-    marketing,
   };
 }
 
@@ -54,7 +53,6 @@ describeDb('원장님 가입 저장 (실제 DB)', () => {
     await withRollback(async (tx) => {
       const userId = await createTestUser(tx);
       const saved = await saveOwnerAccount(tx, newOwner(userId));
-      expect(saved).toMatchObject({ marketingAgreedAt: null });
 
       const [owner] = await tx.select().from(owners).where(eq(owners.userId, userId));
       expect(owner).toMatchObject({ id: saved?.ownerId, name: '김원장' });
@@ -84,19 +82,7 @@ describeDb('원장님 가입 저장 (실제 DB)', () => {
 
       expect(
         (await ownerTerms(tx, userId)).map((row) => `${row.accountType}:${row.termsType}`).sort(),
-      ).toEqual(['owner:privacy', 'owner:service', 'owner:supplier']);
-    });
-  });
-
-  it('광고성 정보 수신에 동의하면 원장님 계정 기준으로 기록하고 동의 시각을 돌려준다', async () => {
-    await withRollback(async (tx) => {
-      const userId = await createTestUser(tx);
-      const saved = await saveOwnerAccount(tx, newOwner(userId, true));
-      expect(saved?.marketingAgreedAt).toBeInstanceOf(Date);
-      expect(await ownerTerms(tx, userId)).toContainEqual({
-        accountType: 'owner',
-        termsType: 'marketing',
-      });
+      ).toEqual(['owner:privacy', 'owner:supplier']);
     });
   });
 
@@ -114,7 +100,7 @@ describeDb('원장님 가입 저장 (실제 DB)', () => {
       const shopCount = (await tx.select().from(shops)).length;
       const termsCount = (await ownerTerms(tx, userId)).length;
 
-      expect(await saveOwnerAccount(tx, newOwner(userId, true))).toBeNull();
+      expect(await saveOwnerAccount(tx, newOwner(userId))).toBeNull();
       expect((await tx.select().from(shops)).length).toBe(shopCount);
       expect((await ownerTerms(tx, userId)).length).toBe(termsCount);
     });

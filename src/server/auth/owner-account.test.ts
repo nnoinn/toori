@@ -9,7 +9,6 @@ import { createOwnerAccount, type CreateOwnerAccountInput } from './owner-accoun
 
 const USER = '3b1557e8-0000-4000-8000-000000000001';
 const DOC = `users/${USER}/0a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d.jpg`;
-const AGREED_AT = new Date('2026-10-28T06:00:00Z');
 
 const state = vi.hoisted(() => ({
   user: null as { userId: string; name: string | null } | null,
@@ -36,11 +35,7 @@ vi.mock('@/server/payouts/account-crypto', () => ({
   encryptAccountNumber: (value: string) => `enc(${value})`,
 }));
 vi.mock('./current-account', () => ({ getSessionUser: async () => state.user }));
-vi.mock('./account-store', async (importOriginal) => ({
-  OWNER_REQUIRED_TERMS: (await importOriginal<typeof import('./account-store')>())
-    .OWNER_REQUIRED_TERMS,
-  saveOwnerAccount: state.saveOwnerAccount,
-}));
+vi.mock('./account-store', () => ({ saveOwnerAccount: state.saveOwnerAccount }));
 
 function input(change: (value: CreateOwnerAccountInput) => void = () => {}) {
   const value: CreateOwnerAccountInput = {
@@ -58,7 +53,7 @@ function input(change: (value: CreateOwnerAccountInput) => void = () => {}) {
       addressDetail: ' 2층 ',
     },
     payout: { bankCode: '088', accountNumber: '110-123-456789', accountHolder: '김원장' },
-    agreements: { supplier: true, service: true, privacy: true, marketing: true },
+    agreements: { supplier: true, privacy: true, payoutInfo: true },
   };
   change(value);
   return value;
@@ -77,18 +72,12 @@ beforeEach(() => {
   state.user = { userId: USER, name: null };
   state.existingOwner = false;
   state.geocode.mockResolvedValue({ ok: true, data: GEOCODED });
-  state.saveOwnerAccount.mockResolvedValue({
-    ownerId: 'owner-1',
-    shopId: 'shop-1',
-    marketingAgreedAt: AGREED_AT,
-  });
+  state.saveOwnerAccount.mockResolvedValue({ ownerId: 'owner-1', shopId: 'shop-1' });
 });
 
 describe('createOwnerAccount', () => {
   it('주소는 서버가 바꾼 값으로, 계좌번호는 암호화해서 저장하고 원장님 모드로 둔다', async () => {
-    expect(await createOwnerAccount(input())).toEqual(
-      ok({ ownerId: 'owner-1', shopId: 'shop-1', marketingAgreedAt: AGREED_AT }),
-    );
+    expect(await createOwnerAccount(input())).toEqual(ok({ ownerId: 'owner-1', shopId: 'shop-1' }));
     expect(state.geocode).toHaveBeenCalledWith('경기 안산시 단원구 중앙대로 1');
     expect(state.saveOwnerAccount).toHaveBeenCalledWith('tx', {
       userId: USER,
@@ -116,7 +105,6 @@ describe('createOwnerAccount', () => {
         accountLast4: '6789',
         accountHolder: '김원장',
       },
-      marketing: true,
     });
     expect(state.cookieSet).toHaveBeenCalledWith(
       'account_mode',
@@ -135,12 +123,31 @@ describe('createOwnerAccount', () => {
     expect(state.saveOwnerAccount.mock.calls[0][1].shop.addressDetail).toBeNull();
   });
 
+  it.each([
+    ['하이픈 없는 휴대폰', '01012345678', '010-1234-5678'],
+    ['하이픈 없는 지역번호', '0311234567', '031-123-4567'],
+    ['0507 안심번호', '0507-1234-5678', '0507-1234-5678'],
+    ['하이픈 없는 안심번호', '050712345678', '0507-1234-5678'],
+    ['대표번호', '15881234', '1588-1234'],
+  ])('전화번호(%s)는 하이픈 넣은 모양으로 저장한다', async (_, raw, saved) => {
+    await createOwnerAccount(
+      input((v) => {
+        v.owner.phone = raw;
+        v.shop.phone = raw;
+      }),
+    );
+    const { owner, shop } = state.saveOwnerAccount.mock.calls[0][1];
+    expect([owner.phone, shop.phone]).toEqual([saved, saved]);
+  });
+
   it.each<[string, (v: CreateOwnerAccountInput) => void]>([
     ['사업자등록번호 9자리', (v) => void (v.shop.businessRegistrationNumber = '123-45-6789')],
     ['목록에 없는 은행 코드', (v) => void (v.payout.bankCode = '999')],
     ['계좌번호에 글자', (v) => void (v.payout.accountNumber = '110-abc-456789')],
     ['계좌번호 7자리', (v) => void (v.payout.accountNumber = '1234567')],
-    ['전화번호 모양', (v) => void (v.owner.phone = '1234')],
+    ['원장님 전화번호 모양', (v) => void (v.owner.phone = '1234')],
+    ['샵 전화번호 자릿수', (v) => void (v.shop.phone = '010-1234-567')],
+    ['전화번호에 글자', (v) => void (v.shop.phone = '031-123-abcd')],
     ['없는 업종', (v) => void ((v.shop as { category: string }).category = 'spa')],
     ['날짜 모양', (v) => void (v.shop.openedOn = '2025/03/01')],
     ['미래 개업일', (v) => void (v.shop.openedOn = '2026-10-29')],
@@ -152,7 +159,7 @@ describe('createOwnerAccount', () => {
     expect(state.saveOwnerAccount).not.toHaveBeenCalled();
   });
 
-  it.each(['supplier', 'service', 'privacy'] as const)(
+  it.each(['supplier', 'privacy', 'payoutInfo'] as const)(
     '필수 동의(%s)가 빠지면 REQUIRED_TERMS_MISSING',
     async (key) => {
       const result = await createOwnerAccount(

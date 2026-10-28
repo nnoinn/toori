@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { getDb } from '@/db';
 import { owners } from '@/db/schema';
 import { geocodeAddress, type GeocodeError } from '@/features/map/geocode';
+import { normalizePhone } from '@/lib/phone';
 import { getRequestNow } from '@/lib/request-time';
 import { fail, ok } from '@/lib/result';
 import { utcToKst } from '@/lib/time';
@@ -18,16 +19,16 @@ import { BANK_CODES, SHOP_CATEGORIES, type ShopCategory } from '@/server/policy'
 import { assertBusinessDocPath } from '@/server/storage';
 
 import { ACCOUNT_MODE_COOKIE, ACCOUNT_MODE_COOKIE_OPTIONS } from './account-mode';
-import { OWNER_REQUIRED_TERMS, saveOwnerAccount } from './account-store';
+import { saveOwnerAccount } from './account-store';
 import { getSessionUser } from './current-account';
 import { AUTH_ERRORS } from './require';
 
 const text = z.string().trim().min(1);
-/** 0으로 시작하는 9~11자리. 하이픈은 있어도 된다. 입력한 모양 그대로 저장한다 */
+/** 하이픈 넣은 모양으로 맞춰 저장한다(10/28 결정). 지역번호·070·0507 안심번호·대표번호도 받는다. 번호 모양이 아니면 실패 */
 const phone = z
   .string()
-  .trim()
-  .regex(/^0\d{1,2}-?\d{3,4}-?\d{4}$/);
+  .transform((value) => normalizePhone(value))
+  .pipe(z.string());
 /** 하이픈·공백을 빼고 숫자만 */
 const digits = (pattern: RegExp) =>
   z
@@ -60,9 +61,8 @@ const inputSchema = z.object({
   }),
   agreements: z.object({
     supplier: z.boolean(),
-    service: z.boolean(),
     privacy: z.boolean(),
-    marketing: z.boolean(),
+    payoutInfo: z.boolean(),
   }),
 });
 
@@ -84,19 +84,18 @@ export type CreateOwnerAccountInput = {
     addressDetail?: string;
   };
   payout: { bankCode: string; accountNumber: string; accountHolder: string };
-  agreements: { supplier: true; service: true; privacy: true; marketing: boolean };
+  /** 동의 문구 2장의 필수 3개: 원장님 이용약관, 개인정보 수집·이용(원장님), 정산을 위한 정보 제공 */
+  agreements: { supplier: true; privacy: true; payoutInfo: true };
 };
 
 /** 실패하면 주소 후보(ADDRESS_AMBIGUOUS일 때 candidates)도 같이 온다(#51) */
 export type CreateOwnerAccountResult =
-  | { ok: true; data: { ownerId: string; shopId: string; marketingAgreedAt: Date | null } }
-  | { ok: false; error: GeocodeError };
+  { ok: true; data: { ownerId: string; shopId: string } } | { ok: false; error: GeocodeError };
 
 /**
  * 원장님 계정·샵(승인 대기)·정산 계좌·약관 동의를 한 번에 만든다.
  * 좌표·지역은 화면에서 받지 않고 서버가 geocodeAddress(#51)로 만든다. 계좌번호는 암호화해서 저장하고 뒷자리 4개만 따로 둔다.
- * 성공하면 원장님 모드로 두고 결과를 돌려준다(화면이 /owner로 이동). marketingAgreedAt이 있으면 화면이
- * "{날짜}에 광고성 정보 수신 동의 처리가 끝났어요"를 바로 보여준다(동의 문구 6-1)
+ * 전화번호는 하이픈 넣은 모양으로 맞춘다. 성공하면 원장님 모드로 두고 결과를 돌려준다(화면이 /owner로 이동)
  */
 export async function createOwnerAccount(
   input: CreateOwnerAccountInput,
@@ -104,7 +103,7 @@ export async function createOwnerAccount(
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) return fail('INVALID_INPUT', '입력한 내용을 다시 확인해 주세요');
   const { owner, shop, payout, agreements } = parsed.data;
-  if (OWNER_REQUIRED_TERMS.some((type) => !agreements[type])) {
+  if (Object.values(agreements).includes(false)) {
     return fail('REQUIRED_TERMS_MISSING', '필수 항목에 모두 동의해 주세요');
   }
   if (shop.openedOn > (await kstToday())) {
@@ -149,7 +148,6 @@ export async function createOwnerAccount(
         accountLast4: payout.accountNumber.slice(-4),
         accountHolder: payout.accountHolder,
       },
-      marketing: agreements.marketing,
     }),
   );
   if (!saved) return fail('ALREADY_EXISTS', ALREADY_EXISTS_MESSAGE);

@@ -127,12 +127,11 @@ function marketingOf(userId: string, accountType: AccountType) {
   );
 }
 
-/** 원장님 가입의 필수 동의(S-101, #47 4장). 광고성 정보 수신(marketing)만 선택 */
-export const OWNER_REQUIRED_TERMS = [
-  'supplier',
-  'service',
-  'privacy',
-] as const satisfies readonly TermsType[];
+/**
+ * 원장님 가입 때 남기는 약관 동의(S-101, 동의 문구 2장, 10/28 결정). 화면의 필수 3개 중 '정산을 위한 정보 제공'은
+ * supplier(원장님 이용약관)에 포함해서 두 줄로 남긴다. 고객용 이용약관(service)과 광고성 정보 수신(marketing)은 받지 않는다
+ */
+export const OWNER_TERMS = ['supplier', 'privacy'] as const satisfies readonly TermsType[];
 
 export type NewOwnerAccount = {
   userId: string;
@@ -162,7 +161,6 @@ export type NewOwnerAccount = {
     accountLast4: string;
     accountHolder: string;
   };
-  marketing: boolean;
 };
 
 /**
@@ -173,7 +171,7 @@ export type NewOwnerAccount = {
 export async function saveOwnerAccount(
   tx: Db,
   input: NewOwnerAccount,
-): Promise<{ ownerId: string; shopId: string; marketingAgreedAt: Date | null } | null> {
+): Promise<{ ownerId: string; shopId: string } | null> {
   const [owner] = await tx
     .insert(owners)
     .values({ userId: input.userId, ...input.owner })
@@ -187,19 +185,13 @@ export async function saveOwnerAccount(
     .returning({ id: shops.id });
   await tx.insert(payoutAccounts).values({ shopId: shop.id, ...input.payout });
 
-  const termsTypes: TermsType[] = [...OWNER_REQUIRED_TERMS];
-  if (input.marketing) termsTypes.push('marketing');
-  const agreed = await tx
-    .insert(termsAgreements)
-    .values(
-      termsTypes.map((termsType) => ({
-        userId: input.userId,
-        accountType: 'owner',
-        termsType,
-        version: TERMS_VERSIONS[termsType],
-      })),
-    )
-    .returning({ termsType: termsAgreements.termsType, agreedAt: termsAgreements.agreedAt });
-  const marketing = agreed.find((row) => row.termsType === 'marketing');
-  return { ownerId: owner.id, shopId: shop.id, marketingAgreedAt: marketing?.agreedAt ?? null };
+  await tx.insert(termsAgreements).values(
+    OWNER_TERMS.map((termsType) => ({
+      userId: input.userId,
+      accountType: 'owner' as const,
+      termsType,
+      version: TERMS_VERSIONS[termsType],
+    })),
+  );
+  return { ownerId: owner.id, shopId: shop.id };
 }
