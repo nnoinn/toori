@@ -1,43 +1,58 @@
-// 지금 들어온 사람 확인. 가짜 로그인은 next dev·시드 계정에서만 켜지는지(DB 없이),
-// loadAccount가 DB에서 계정·샵을 맞게 읽는지(실제 DB, TEST_DATABASE_URL이 있을 때만) 확인한다.
+// 지금 들어온 사람 확인. 로그인 세션이 없으면 DB를 보지 않고 null인지, 프로필 이름을 맞게 읽는지(DB 없이),
+// loadAccount·ensureProfile이 DB에서 계정·샵을 맞게 읽고 쓰는지(실제 DB, TEST_DATABASE_URL이 있을 때만) 확인한다.
 
 import { eq } from 'drizzle-orm';
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { customers, owners, profiles } from '@/db/schema';
 
 import { createTestCustomer, createTestShop, createTestUser } from '../../../tests/db/fixtures';
 import { closeTestDb, describeDb, withRollback } from '../../../tests/db/test-db';
-import { getCurrentAccount, loadAccount } from './current-account';
+import { ensureProfile, getCurrentAccount, getSessionUser, loadAccount } from './current-account';
 
 const db = vi.hoisted(() => ({ getDb: vi.fn() }));
+const session = vi.hoisted(() => ({ claims: null as Record<string, unknown> | null }));
 vi.mock('@/db', () => db);
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('next/server', () => ({ connection: async () => {} }));
+vi.mock('@/server/supabase/server', () => ({
+  createSupabaseServerClient: async () => ({
+    auth: {
+      getClaims: async () => ({
+        data: session.claims ? { claims: session.claims } : null,
+        error: null,
+      }),
+    },
+  }),
+}));
 
-describe('getCurrentAccount의 가짜 로그인 (W2 전 임시)', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    db.getDb.mockReset();
-  });
+beforeEach(() => {
+  session.claims = null;
+});
 
-  it('next dev가 아니면(배포·미리보기·테스트) 늘 로그인 안 함이고 DB도 보지 않는다', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('DEV_LOGIN_EMAIL', 'owner-a@seed.test');
-    expect(await getCurrentAccount()).toBeNull();
-    expect(db.getDb).not.toHaveBeenCalled();
-  });
-
-  it('next dev여도 시드 계정이 아니거나 비어 있으면 로그인 안 함이다', async () => {
-    vi.stubEnv('NODE_ENV', 'development');
-    vi.stubEnv('DEV_LOGIN_EMAIL', 'someone@example.com');
-    expect(await getCurrentAccount()).toBeNull();
-    vi.stubEnv('DEV_LOGIN_EMAIL', '');
+describe('getCurrentAccount', () => {
+  it('로그인 세션이 없으면 null이고 DB는 보지 않는다', async () => {
     expect(await getCurrentAccount()).toBeNull();
     expect(db.getDb).not.toHaveBeenCalled();
   });
 });
 
-describeDb('loadAccount (실제 DB)', () => {
+describe('getSessionUser', () => {
+  it('카카오·구글 프로필 이름(full_name, 없으면 name)을 앞뒤 공백 없이 읽는다', async () => {
+    session.claims = { sub: 'user-1', user_metadata: { full_name: ' 김투리 ', name: '다른 이름' } };
+    expect(await getSessionUser()).toEqual({ userId: 'user-1', name: '김투리' });
+
+    session.claims = { sub: 'user-1', user_metadata: { full_name: '  ', name: '투리' } };
+    expect(await getSessionUser()).toEqual({ userId: 'user-1', name: '투리' });
+  });
+
+  it('프로필 이름이 없으면 name은 null', async () => {
+    session.claims = { sub: 'user-1' };
+    expect(await getSessionUser()).toEqual({ userId: 'user-1', name: null });
+  });
+});
+
+describeDb('loadAccount·ensureProfile (실제 DB)', () => {
   afterAll(closeTestDb);
 
   it('로그인 정보가 없으면 null', async () => {
@@ -98,6 +113,16 @@ describeDb('loadAccount (실제 DB)', () => {
       const userId = await createTestUser(tx);
       await tx.update(profiles).set({ isAdmin: true }).where(eq(profiles.id, userId));
       expect(await loadAccount(tx, userId, 'customer')).toMatchObject({ isAdmin: true });
+    });
+  });
+
+  it('ensureProfile은 첫 로그인에만 profiles를 만들고, 다시 불러도 그대로 둔다', async () => {
+    await withRollback(async (tx) => {
+      const userId = await createTestUser(tx);
+      // createTestUser가 이미 profiles를 만들었다. 다른 이메일로 다시 불러도 바뀌지 않는다
+      await ensureProfile(tx, userId, 'changed@test.invalid');
+      const [row] = await tx.select().from(profiles).where(eq(profiles.id, userId));
+      expect(row.email).toBe(`${userId}@test.invalid`);
     });
   });
 });

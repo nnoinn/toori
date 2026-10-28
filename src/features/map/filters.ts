@@ -1,6 +1,7 @@
 // 홈 필터 값 (J5, C-206). 주소창에 key로 둔다. 예: /?category=hair&service=cut&price=30k_50k&discount=30
 // 업종·서비스 종류·가격대·시간대·할인율 선택지는 모두 정책 폴더(src/server/policy, #48)에서 가져온다(D7).
-// 가격대·시간대·할인율은 여러 개 고를 수 있다(D7: 구간 버튼, 여러 개 선택). 지역은 위쪽 동네 버튼(J2, D24)으로 고른다.
+// 가격대·시간대는 여러 개 고른다(D7). 할인율은 "N% 이상" 하나만 고른다(10/25 결정, #95 리뷰).
+// 지역은 위쪽 동네 버튼(J2, D24)으로 고른다.
 
 import {
   DISCOUNT_RATE_OPTIONS,
@@ -25,8 +26,8 @@ export type HomeFilters = {
   prices: PriceRangeKey[];
   /** 서비스 시작 시각 구간(여러 개) */
   times: TimeRangeKey[];
-  /** 할인율(여러 개) */
-  discounts: DiscountRate[];
+  /** 최소 할인율("N% 이상"). 없으면 전체 */
+  minDiscount: DiscountRate | null;
 };
 
 export const EMPTY_FILTERS: HomeFilters = {
@@ -34,8 +35,14 @@ export const EMPTY_FILTERS: HomeFilters = {
   services: [],
   prices: [],
   times: [],
-  discounts: [],
+  minDiscount: null,
 };
+
+/** 할인율 선택지. 가장 큰 값은 그 값뿐이라 "이상"을 붙이지 않는다. 예: 10% 이상 … 40% 이상, 50% */
+export const MIN_DISCOUNT_OPTIONS = DISCOUNT_RATE_OPTIONS.map((rate) => ({
+  rate,
+  label: rate === Math.max(...DISCOUNT_RATE_OPTIONS) ? `${rate}%` : `${rate}% 이상`,
+}));
 
 export const FILTER_PARAMS = {
   category: 'category',
@@ -93,9 +100,11 @@ export function parseFilters(params: Record<string, SearchValue>): HomeFilters {
     services,
     prices: pickAllowed(params[FILTER_PARAMS.price], PRICE_KEYS),
     times: pickAllowed(params[FILTER_PARAMS.time], TIME_KEYS),
-    discounts: pickAllowed(params[FILTER_PARAMS.discount], DISCOUNT_RATE_OPTIONS, (raw) =>
-      /^\d+$/.test(raw) ? Number(raw) : raw,
-    ),
+    // 할인율은 하나만. 여러 개가 오면 첫 번째 맞는 값
+    minDiscount:
+      pickAllowed(params[FILTER_PARAMS.discount], DISCOUNT_RATE_OPTIONS, (raw) =>
+        /^\d+$/.test(raw) ? Number(raw) : raw,
+      )[0] ?? null,
   };
 }
 
@@ -112,7 +121,7 @@ export function applyFiltersToSearch(
   }
   for (const price of filters.prices) next.append(FILTER_PARAMS.price, price);
   for (const time of filters.times) next.append(FILTER_PARAMS.time, time);
-  for (const discount of filters.discounts) next.append(FILTER_PARAMS.discount, String(discount));
+  if (filters.minDiscount !== null) next.set(FILTER_PARAMS.discount, String(filters.minDiscount));
   return next;
 }
 
@@ -137,17 +146,21 @@ export function toggleTime(filters: HomeFilters, time: TimeRangeKey): HomeFilter
   return { ...filters, times: toggle(filters.times, time) };
 }
 
-export function toggleDiscount(filters: HomeFilters, discount: DiscountRate): HomeFilters {
-  return { ...filters, discounts: toggle(filters.discounts, discount) };
+/** 최소 할인율을 고른다. null이면 전체 */
+export function selectMinDiscount(
+  filters: HomeFilters,
+  minDiscount: DiscountRate | null,
+): HomeFilters {
+  return { ...filters, minDiscount };
 }
 
-/** 필터 버튼에 보여줄 고른 개수(업종 1 + 고른 버튼 수) */
+/** 필터 버튼에 보여줄 고른 개수(업종 1 + 고른 버튼 수 + 할인율 1) */
 export function countActiveFilters(filters: HomeFilters): number {
   return (
     (filters.category ? 1 : 0) +
     filters.services.length +
     filters.prices.length +
     filters.times.length +
-    filters.discounts.length
+    (filters.minDiscount !== null ? 1 : 0)
   );
 }

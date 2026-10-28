@@ -38,8 +38,9 @@ describe('고객 약관 동의', () => {
     expect(toAgreementsInput(EMPTY_AGREEMENTS)).toBeNull();
   });
 
-  it('필수만 체크하면 시작할 수 있고 광고성 동의는 false로 넘긴다(만 14세는 넘기지 않음)', () => {
+  it('필수만 체크하면 시작할 수 있고 광고성 동의는 false로 넘긴다', () => {
     expect(toAgreementsInput(REQUIRED_ONLY)).toEqual({
+      age14: true,
       service: true,
       privacy: true,
       location: true,

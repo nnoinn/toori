@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { LoginForm } from './login-form';
-import { parseLoginMode, readNextParam } from './login-params';
+import { parseLoginError, parseLoginMode, readNextParam } from './login-params';
 
 export const metadata: Metadata = { title: '로그인' };
 
@@ -23,7 +23,11 @@ export default function LoginPage({ searchParams }: { searchParams: SearchParams
 async function LoginContent({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   return (
-    <LoginForm initialMode={parseLoginMode(params.mode)} nextParam={readNextParam(params.next)} />
+    <LoginForm
+      initialMode={parseLoginMode(params.mode)}
+      nextParam={readNextParam(params.next)}
+      error={parseLoginError(params.error)}
+    />
   );
 }
 

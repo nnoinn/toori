@@ -92,7 +92,7 @@ erDiagram
 | id | uuid PK | |
 | user_id | uuid → profiles | |
 | account_type | text | `customer` / `owner` |
-| terms_type | text | `service`(이용약관) / `privacy`(개인정보) / `location`(위치정보) / `supplier`(공급자 약관) / `marketing`(광고성 정보 수신, 선택) |
+| terms_type | text | `service`(이용약관) / `privacy`(개인정보) / `location`(위치정보) / `supplier`(공급자 약관) / `marketing`(광고성 정보 수신, 선택) / `age14`(만 14세 이상 확인, 고객 가입 필수) |
 | version | text | 약관 버전. 예: `2026-10-01` |
 | agreed_at | timestamptz | |
 | withdrawn_at | timestamptz, null | 동의 철회 시각. 선택 동의(`marketing`)만 철회할 수 있다 |
@@ -195,7 +195,7 @@ erDiagram
 | name | text | 서비스 이름(원장님 자유) |
 | description | text, null | 상세 설명(원장님 자유) |
 | list_price | integer | 정가(원) |
-| duration_minutes | integer | 소요 시간(분) |
+| duration_minutes | integer | 소요 시간(분). 30분 단위(#108, 저장할 때 서버에서 확인) |
 | sort_order | integer | |
 | hidden_at | timestamptz, null | 숨김(삭제 대신). 숨겨도 이미 올린 매물·예약은 그대로 |
 | created_at, updated_at | timestamptz | |
@@ -226,7 +226,7 @@ erDiagram
 | discount_rate | integer | 10/20/30/40/50 중 하나(정책 설정값, `check`로 10~50) |
 | sale_price | integer | 할인가 = 정가 × (1 − 할인율) 그대로(올림 없음, 원 미만이 생기면 버림). 서버가 계산해서 저장(정렬·필터용) |
 | new_customer_only | boolean, 기본 false | 신규 고객 전용 |
-| start_at | timestamptz | 서비스 시작 |
+| start_at | timestamptz | 서비스 시작. 30분 단위(#108, 저장할 때 서버에서 확인) |
 | end_at | timestamptz | 서비스 끝 = 시작 + 소요 시간 |
 | publish_at | timestamptz | 게시 시각. 시작 48시간 전보다 이르면 그때까지 '예약대기' |
 | status | text | 저장된 상태(아래) |
@@ -560,3 +560,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 2026-10-13 | 통신판매업 신고번호(`shops.mail_order_report_number`)를 뺐다. 받지 않는다 |
 | 2026-10-18 | 오픈 기간 플랫폼 수수료 0%(10/14 결정). 컬럼은 그대로 두고 `fee_rate`·`fee_amount`에 0을 저장한다. 할인율별 수수료는 법인 전환 때 적용 |
 | 2026-10-22 | W1a 구현(#63)에 맞춰 기본값 4개를 적었다(`shops.business_hours` `[]`, `shops.status` `pending`, `payout_accounts.pg_seller_status` `not_registered`, `slots.new_customer_only` false). W1b 전 확인(#64): `refunds.reservation_id` null 가능, `settlements` unique(`shop_id`, `period_start`, `period_end`) |
+| 2026-10-25 | `terms_agreements.terms_type`에 `age14`(만 14세 이상 확인)를 더한다. 만 14세 미만은 가입을 받지 않으므로 고객 가입 때 확인을 받았다는 기록을 남긴다(#88 질문, #47 결정). 마이그레이션 0004 |

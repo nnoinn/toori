@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useSyncExternalStore } from 'react';
+import { useState } from 'react';
 import { cn } from 'cn';
 
 import { EmptyState } from '@/components/ui/state';
@@ -10,26 +10,9 @@ import { SlotList } from './slot-list/slot-list';
 import type { SlotSort } from './slot-list/sort';
 import type { SlotListItem } from './slot-list/types';
 import type { LatLng, MapBounds, MapShop } from './types';
+import { useIsDesktop } from './use-is-desktop';
 
 type SheetSize = 'half' | 'full';
-
-// PC 버전 기준(md, 768px). 기술 가이드 "고객 화면 PC 버전"
-const DESKTOP_QUERY = '(min-width: 768px)';
-
-function subscribeDesktop(onChange: () => void) {
-  const query = window.matchMedia(DESKTOP_QUERY);
-  query.addEventListener('change', onChange);
-  return () => query.removeEventListener('change', onChange);
-}
-
-/** PC 폭인지. 서버에서 그릴 때는 폰으로 본다 */
-function useIsDesktop() {
-  return useSyncExternalStore(
-    subscribeDesktop,
-    () => window.matchMedia(DESKTOP_QUERY).matches,
-    () => false,
-  );
-}
 
 /** J4에서 매물 조회를 붙이기 전까지 비어 있다. 렌더마다 새 배열이 되지 않게 밖에 둔다 */
 const NO_SHOPS: MapShop[] = [];

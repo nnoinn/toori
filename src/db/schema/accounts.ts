@@ -11,8 +11,15 @@ import { createdAt, inValues, timestamptz } from './types';
 export const ACCOUNT_TYPES = ['customer', 'owner'] as const;
 export type AccountType = (typeof ACCOUNT_TYPES)[number];
 
-/** 약관 종류. marketing(광고성 정보 수신)만 선택이고 철회할 수 있다 */
-export const TERMS_TYPES = ['service', 'privacy', 'location', 'supplier', 'marketing'] as const;
+/** 약관 종류. marketing(광고성 정보 수신)만 선택이고 철회할 수 있다. age14는 고객 가입의 만 14세 이상 확인(#47, 10/25) */
+export const TERMS_TYPES = [
+  'service',
+  'privacy',
+  'location',
+  'supplier',
+  'marketing',
+  'age14',
+] as const;
 export type TermsType = (typeof TERMS_TYPES)[number];
 
 /** 로그인한 사람 (auth.users와 1:1). 처음 로그인할 때 로그인 콜백이 만든다 */
