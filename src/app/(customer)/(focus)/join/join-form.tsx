@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
+import { unstable_rethrow, useRouter } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 
 import { BackButton } from '@/components/ui/back-button';
 import { Button } from '@/components/ui/button';
 import { SITE_NAME } from '@/lib/site';
+import { createCustomerAccount } from '@/server/auth/customer-account';
 
 import {
   AGREEMENT_ITEMS,
@@ -17,6 +19,8 @@ import {
   type AgreementState,
 } from './agreements';
 
+const JOIN_FAILED_MESSAGE = '가입하지 못했어요. 잠시 후 다시 시도해 주세요.';
+
 type JoinFormProps = {
   /** 가입을 마치면 돌아갈 곳(로그인 콜백이 넘겨준 안전한 주소) */
   next: string;
@@ -26,14 +30,32 @@ type JoinFormProps = {
 export function JoinForm({ next }: JoinFormProps) {
   const [state, setState] = useState<AgreementState>(EMPTY_AGREEMENTS);
   const [notice, setNotice] = useState<string | null>(null);
-  const canSubmit = allRequiredChecked(state);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+  const canSubmit = allRequiredChecked(state) && !pending;
 
   function handleSubmit() {
     const agreements = toAgreementsInput(state);
     if (!agreements) return;
-    // TODO(#47 1장): 강규민님 createCustomerAccount({ agreements, next })가 들어오면 연결한다
-    void next;
-    setNotice('가입 연결은 준비 중이에요.');
+    setNotice(null);
+    setError(null);
+    startTransition(async () => {
+      try {
+        // 성공하면 서버가 next로 보내서 돌아오지 않는다(#47 4장)
+        const result = await createCustomerAccount({ agreements, next });
+        if (result.ok) return;
+        // 다른 창에서 먼저 가입을 마친 경우. 이미 계정이 있으니 보던 화면으로 보낸다
+        if (result.error.code === 'ALREADY_EXISTS') {
+          router.replace(next);
+          return;
+        }
+        setError(result.error.message);
+      } catch (caught) {
+        unstable_rethrow(caught);
+        setError(JOIN_FAILED_MESSAGE);
+      }
+    });
   }
 
   return (
@@ -102,7 +124,11 @@ export function JoinForm({ next }: JoinFormProps) {
       </ul>
 
       <div className="mt-auto flex flex-col gap-2">
-        {notice ? (
+        {error ? (
+          <p role="alert" className="text-center text-sm text-destructive">
+            {error}
+          </p>
+        ) : notice ? (
           <p role="status" className="text-center text-sm text-muted-foreground">
             {notice}
           </p>
@@ -114,7 +140,7 @@ export function JoinForm({ next }: JoinFormProps) {
           disabled={!canSubmit}
           onClick={handleSubmit}
         >
-          시작하기
+          {pending ? '가입하는 중…' : '시작하기'}
         </Button>
       </div>
     </section>
