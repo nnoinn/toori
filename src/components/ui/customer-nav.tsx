@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from 'cn';
 import { CalendarCheck, House, User } from 'lucide-react';
 
-import { SITE_NAME } from '@/lib/site';
+import { Logo } from '@/components/ui/logo';
 
 // 고객 화면 메뉴(홈 / 내 예약 / 내 정보). 폰은 아래 메뉴(CustomerBottomNav), PC(md 이상)는 위쪽 메뉴(CustomerTopNav). 주소는 정찬형이 화면을 만들면서 바꿀 수 있다(바꾸면 여기만 고친다).
 const ITEMS = [
@@ -68,13 +68,13 @@ export function CustomerBottomNav() {
   );
 }
 
-/** PC(md 이상) 위쪽 메뉴. 왼쪽에 서비스 이름(로고가 정해지면 로고), 오른쪽에 메뉴. 폰에서는 숨긴다 */
+/** PC(md 이상) 위쪽 메뉴. 왼쪽에 로고, 오른쪽에 메뉴. 폰에서는 숨긴다 */
 export function CustomerTopNav() {
   return (
     <header className="sticky top-0 z-40 hidden h-16 border-b bg-card md:block">
       <div className="flex h-full w-full items-center justify-between px-6">
-        <Link href="/" className="text-xl font-extrabold tracking-tight">
-          {SITE_NAME}
+        <Link href="/" className="flex items-center">
+          <Logo className="h-7" />
         </Link>
         <nav aria-label="고객 메뉴">
           <Suspense fallback={<NavItems pathname={null} variant="top" />}>
