@@ -16,6 +16,12 @@ import { useIsDesktop } from './use-is-desktop';
 
 type SheetSize = 'half' | 'full';
 
+function isSameBounds(a: MapBounds, b: MapBounds): boolean {
+  return (
+    a.sw.lat === b.sw.lat && a.sw.lng === b.sw.lng && a.ne.lat === b.ne.lat && a.ne.lng === b.ne.lng
+  );
+}
+
 type HomeExplorerProps = {
   center: LatLng;
   myLocation: LatLng | null;
@@ -62,6 +68,9 @@ export function HomeExplorer({ center, myLocation, header, sort, serverNow }: Ho
           myLocation={myLocation}
           shops={home.shops}
           onBoundsChange={(next) => {
+            // 핀을 다시 그려도 카카오 지도가 'idle'을 다시 보낸다. 영역이 그대로면 다시 불러오지 않는다
+            // (그대로 두면 불러오기 → 핀 다시 그리기 → idle → 불러오기가 끝없이 반복된다)
+            if (bounds && isSameBounds(bounds, next)) return;
             setBounds(next);
             setSelectedShopId(null);
           }}
