@@ -19,6 +19,7 @@ import {
   type AccountMode,
   hasAccountFor,
 } from './account-mode';
+import { MARKETING_NOTICE_COOKIE } from './consent-notice';
 import { getSessionUserId, loadAccount } from './current-account';
 import { DEFAULT_NEXT } from './paths';
 import { AUTH_ERRORS } from './require';
@@ -67,7 +68,9 @@ const LOGIN_UNAVAILABLE_MESSAGE = '로그인을 시작하지 못했어요. 잠�
 export async function signOut(): Promise<Result<null>> {
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signOut({ scope: 'local' });
-  (await cookies()).delete(ACCOUNT_MODE_COOKIE);
+  const store = await cookies();
+  store.delete(ACCOUNT_MODE_COOKIE);
+  store.delete(MARKETING_NOTICE_COOKIE);
   if (error) {
     console.error('[auth] 로그아웃 실패:', error.name);
     return fail('SIGN_OUT_FAILED', '로그아웃하지 못했어요. 잠시 후 다시 시도해 주세요');
