@@ -6,23 +6,20 @@ import {
   formatKstDate,
   marketingResultMessage,
   NICKNAME_MAX_LENGTH,
-  normalizePhone,
   profileSchema,
 } from './profile-rules';
 
-describe('연락처 형식', () => {
-  it('휴대폰 번호를 010-1234-5678 모양으로 맞춘다', () => {
-    expect(normalizePhone('01012345678')).toBe('010-1234-5678');
-    expect(normalizePhone('010 1234 5678')).toBe('010-1234-5678');
-    expect(normalizePhone('010-1234-5678')).toBe('010-1234-5678');
-    expect(normalizePhone('011-123-4567')).toBe('011-123-4567');
+describe('연락처 형식 (공통 normalizePhone의 휴대폰만)', () => {
+  it('휴대폰 번호는 010-1234-5678 모양으로 맞춰 저장한다', () => {
+    for (const phone of ['01012345678', '010 1234 5678', '010-1234-5678']) {
+      expect(profileSchema.parse({ nickname: '찬형', phone }).phone).toBe('010-1234-5678');
+    }
   });
 
-  it('휴대폰 번호가 아니면 null', () => {
-    expect(normalizePhone('031-123-4567')).toBeNull();
-    expect(normalizePhone('010-12-5678')).toBeNull();
-    expect(normalizePhone('0101234567890')).toBeNull();
-    expect(normalizePhone('010-abcd-5678')).toBeNull();
+  it('지역번호·안심번호·대표번호는 고객 연락처로 받지 않는다', () => {
+    for (const phone of ['031-123-4567', '0507-1234-5678', '1588-1234', '010-12-5678']) {
+      expect(profileSchema.safeParse({ nickname: '찬형', phone }).success).toBe(false);
+    }
   });
 });
 

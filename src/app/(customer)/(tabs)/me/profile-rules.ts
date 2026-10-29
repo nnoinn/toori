@@ -4,22 +4,12 @@
 
 import { z } from 'zod';
 
+import { normalizePhone } from '@/lib/phone';
 import { SITE_NAME } from '@/lib/site';
 import { utcToKst } from '@/lib/time';
 
 /** 닉네임 최대 글자 수 */
 export const NICKNAME_MAX_LENGTH = 20;
-
-/**
- * 휴대폰 번호를 "010-1234-5678" 모양으로. 숫자 사이의 띄어쓰기·하이픈은 무시한다.
- * 010·011·016·017·018·019로 시작하는 10~11자리만 받는다. 아니면 null
- */
-export function normalizePhone(raw: string): string | null {
-  const digits = raw.replace(/[\s-]/g, '');
-  const match = /^(01[016789])(\d{3,4})(\d{4})$/.exec(digits);
-  if (!match) return null;
-  return `${match[1]}-${match[2]}-${match[3]}`;
-}
 
 export const profileSchema = z.object({
   nickname: z
@@ -33,7 +23,8 @@ export const profileSchema = z.object({
     .trim()
     .transform((value, ctx) => {
       if (value === '') return null;
-      const phone = normalizePhone(value);
+      // 고객 연락처는 휴대폰만(#19 D31). 저장 모양은 고객·원장님·샵 공통(010-1234-5678, 10/28 결정)
+      const phone = normalizePhone(value, 'mobile');
       if (!phone) {
         ctx.addIssue({ code: 'custom', message: '휴대폰 번호를 확인해 주세요. 예: 010-1234-5678' });
         return z.NEVER;
