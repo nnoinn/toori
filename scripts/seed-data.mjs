@@ -91,7 +91,7 @@ export const SEED_SHOPS = [
     menus: [
       { key: 'gel', serviceType: 'gel_nail', name: '젤네일 원컬러', price: 40000, minutes: 60 },
       { key: 'art', serviceType: 'gel_nail', name: '아트 젤네일', price: 65000, minutes: 90 },
-      { key: 'pedi', serviceType: 'pedicure', name: '젤 페디큐어', price: 50000, minutes: 70 },
+      { key: 'pedi', serviceType: 'pedicure', name: '젤 페디큐어', price: 50000, minutes: 60 },
     ],
     slots: [
       { menu: 'gel', at: 2, rate: 20 },
@@ -112,7 +112,7 @@ export const SEED_SHOPS = [
     hours: NAIL_HOURS,
     menus: [
       { key: 'ext', serviceType: 'lash_extension', name: '속눈썹 연장', price: 60000, minutes: 90 },
-      { key: 'lperm', serviceType: 'lash_perm', name: '속눈썹 펌', price: 35000, minutes: 50 },
+      { key: 'lperm', serviceType: 'lash_perm', name: '속눈썹 펌', price: 35000, minutes: 60 },
     ],
     slots: [
       { menu: 'ext', at: 4, rate: 40 },
@@ -154,7 +154,7 @@ export const SEED_SHOPS = [
     hours: HAIR_HOURS,
     menus: [
       { key: 'perm', serviceType: 'perm', name: '볼륨 펌', price: 90000, minutes: 150 },
-      { key: 'cut', serviceType: 'cut', name: '커트', price: 20000, minutes: 50 },
+      { key: 'cut', serviceType: 'cut', name: '커트', price: 20000, minutes: 60 },
     ],
     slots: [
       { menu: 'perm', at: 3, rate: 10 },
@@ -173,7 +173,7 @@ export const SEED_SHOPS = [
     links: {},
     hours: NAIL_HOURS,
     menus: [
-      { key: 'care', serviceType: 'nail_care', name: '손톱 케어', price: 20000, minutes: 40 },
+      { key: 'care', serviceType: 'nail_care', name: '손톱 케어', price: 20000, minutes: 30 },
       { key: 'gel', serviceType: 'gel_nail', name: '젤네일 그라데이션', price: 45000, minutes: 60 },
     ],
     slots: [

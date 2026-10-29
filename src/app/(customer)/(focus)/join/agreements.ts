@@ -81,13 +81,17 @@ export function toggleAll(state: AgreementState): AgreementState {
   return { age14: next, service: next, privacy: next, location: next, marketing: next };
 }
 
-/**
- * createCustomerAccount에 넘길 모양. 필수가 빠졌으면 null.
- * '만 14세 이상'은 가입 조건이라 체크해야 넘어가지만, #47 약속에는 저장할 자리가 없어서 넘기지 않는다(확인 요청 중)
- */
-export function toAgreementsInput(
-  state: AgreementState,
-): { service: true; privacy: true; location: true; marketing: boolean } | null {
+/** createCustomerAccount에 넘길 동의 값(#47 4장) */
+export type AgreementsInput = {
+  age14: true;
+  service: true;
+  privacy: true;
+  location: true;
+  marketing: boolean;
+};
+
+/** createCustomerAccount에 넘길 모양. 필수가 빠졌으면 null */
+export function toAgreementsInput(state: AgreementState): AgreementsInput | null {
   if (!allRequiredChecked(state)) return null;
-  return { service: true, privacy: true, location: true, marketing: state.marketing };
+  return { age14: true, service: true, privacy: true, location: true, marketing: state.marketing };
 }

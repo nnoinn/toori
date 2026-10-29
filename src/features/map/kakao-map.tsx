@@ -40,6 +40,8 @@ type KakaoMapProps = {
    * 다시 보이면 크기를 재고 가운데를 지킨다.
    */
   hidden?: boolean;
+  /** 마우스 휠·두 손가락으로 확대·축소. 페이지 안의 작은 지도는 끈다(휠로 페이지를 내리다 지도가 줄어들지 않게) */
+  zoomable?: boolean;
   className?: string;
 };
 
@@ -51,6 +53,7 @@ export function KakaoMap({
   onBoundsChange,
   onSelectShop,
   hidden = false,
+  zoomable = true,
   className,
 }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -76,13 +79,14 @@ export function KakaoMap({
       center: new maps.LatLng(center.lat, center.lng),
       level: MAP_INITIAL_LEVEL,
     });
+    map.setZoomable(zoomable);
     mapRef.current = map;
     clustererRef.current = new maps.MarkerClusterer({
       map,
       averageCenter: true,
       minLevel: MAP_CLUSTER_MIN_LEVEL,
     });
-    // center는 처음 만들 때만 쓰고, 바뀌면 아래 효과에서 옮긴다
+    // center·zoomable은 처음 만들 때만 쓴다. center가 바뀌면 아래 효과에서 옮긴다
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 

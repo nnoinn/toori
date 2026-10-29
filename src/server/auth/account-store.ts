@@ -1,5 +1,5 @@
 // 계정 만들기와 약관 동의 기록 (DB, #47 4·5장). 서버에서만 부른다.
-// 화면이 부르는 'use server' 함수(customer-account.ts)가 권한·입력을 확인한 뒤 이 함수들을 부른다.
+// 화면이 부르는 'use server' 함수(customer-account.ts, owner-account.ts)가 권한·입력을 확인한 뒤 이 함수들을 부른다.
 // 'use server' 파일에서 내보내는 함수는 화면에서 바로 부를 수 있으므로, db를 받는 함수는 여기에 둔다.
 
 import 'server-only';
@@ -7,8 +7,9 @@ import 'server-only';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
-import { customers, termsAgreements } from '@/db/schema';
+import { customers, owners, payoutAccounts, shops, termsAgreements } from '@/db/schema';
 import type { AccountType, TermsType } from '@/db/schema/accounts';
+import type { GeoPoint } from '@/db/schema/types';
 import { TERMS_VERSIONS } from '@/server/policy';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select' | 'insert' | 'update'>;
@@ -26,12 +27,12 @@ export const DEFAULT_CUSTOMER_NICKNAME = '고객';
 
 /**
  * 고객 계정과 약관 동의 기록을 저장한다. 이미 고객 계정이 있으면 아무것도 저장하지 않고 null.
- * 둘이 함께 저장되도록 트랜잭션 안에서 부른다
+ * 광고성 정보 수신에 동의했으면 그 동의 시각도 돌려준다(가입 직후 처리 결과 안내). 둘이 함께 저장되도록 트랜잭션 안에서 부른다
  */
 export async function saveCustomerAccount(
   tx: Db,
   input: { userId: string; nickname: string; marketing: boolean },
-): Promise<string | null> {
+): Promise<{ customerId: string; marketingAgreedAt: Date | null } | null> {
   const [customer] = await tx
     .insert(customers)
     .values({ userId: input.userId, nickname: input.nickname })
@@ -41,15 +42,19 @@ export async function saveCustomerAccount(
 
   const termsTypes: TermsType[] = [...CUSTOMER_REQUIRED_TERMS];
   if (input.marketing) termsTypes.push('marketing');
-  await tx.insert(termsAgreements).values(
-    termsTypes.map((termsType) => ({
-      userId: input.userId,
-      accountType: 'customer',
-      termsType,
-      version: TERMS_VERSIONS[termsType],
-    })),
-  );
-  return customer.id;
+  const agreed = await tx
+    .insert(termsAgreements)
+    .values(
+      termsTypes.map((termsType) => ({
+        userId: input.userId,
+        accountType: 'customer',
+        termsType,
+        version: TERMS_VERSIONS[termsType],
+      })),
+    )
+    .returning({ termsType: termsAgreements.termsType, agreedAt: termsAgreements.agreedAt });
+  const marketing = agreed.find((row) => row.termsType === 'marketing');
+  return { customerId: customer.id, marketingAgreedAt: marketing?.agreedAt ?? null };
 }
 
 export type MarketingConsent = {
@@ -124,4 +129,73 @@ function marketingOf(userId: string, accountType: AccountType) {
     eq(termsAgreements.accountType, accountType),
     eq(termsAgreements.termsType, 'marketing'),
   );
+}
+
+/**
+ * 원장님 가입 때 남기는 약관 동의(S-101, 동의 문구 2장, 10/28 결정). 화면의 필수 3개 중 '정산을 위한 정보 제공'은
+ * supplier(원장님 이용약관)에 포함해서 두 줄로 남긴다. 고객용 이용약관(service)과 광고성 정보 수신(marketing)은 받지 않는다
+ */
+export const OWNER_TERMS = ['supplier', 'privacy'] as const satisfies readonly TermsType[];
+
+export type NewOwnerAccount = {
+  userId: string;
+  owner: { name: string; phone: string };
+  /** 화면에서 받은 값과 서버가 주소로 만든 좌표·지역(geocodeAddress) */
+  shop: {
+    name: string;
+    category: string;
+    phone: string;
+    roadAddress: string;
+    jibunAddress: string | null;
+    addressDetail: string | null;
+    sido: string;
+    sigungu: string;
+    sigunguCode: string;
+    location: GeoPoint;
+    businessName: string;
+    representativeName: string;
+    businessRegistrationNumber: string;
+    openedOn: string;
+    businessDocPath: string;
+  };
+  /** 계좌번호는 암호화한 값만 받는다 */
+  payout: {
+    bankCode: string;
+    accountNumberEncrypted: string;
+    accountLast4: string;
+    accountHolder: string;
+  };
+};
+
+/**
+ * 원장님 계정·샵·정산 계좌·약관 동의를 저장한다(S-101, S-107). 이미 원장님 계정이 있으면 아무것도 저장하지 않고 null.
+ * 샵은 승인 대기(pending)·영업시간 빈 목록·PG 셀러 등록 전(not_registered)으로 시작한다(DB 기본값).
+ * 모두 함께 저장되도록 트랜잭션 안에서 부른다
+ */
+export async function saveOwnerAccount(
+  tx: Db,
+  input: NewOwnerAccount,
+): Promise<{ ownerId: string; shopId: string } | null> {
+  const [owner] = await tx
+    .insert(owners)
+    .values({ userId: input.userId, ...input.owner })
+    .onConflictDoNothing({ target: owners.userId })
+    .returning({ id: owners.id });
+  if (!owner) return null;
+
+  const [shop] = await tx
+    .insert(shops)
+    .values({ ownerId: owner.id, ...input.shop })
+    .returning({ id: shops.id });
+  await tx.insert(payoutAccounts).values({ shopId: shop.id, ...input.payout });
+
+  await tx.insert(termsAgreements).values(
+    OWNER_TERMS.map((termsType) => ({
+      userId: input.userId,
+      accountType: 'owner' as const,
+      termsType,
+      version: TERMS_VERSIONS[termsType],
+    })),
+  );
+  return { ownerId: owner.id, shopId: shop.id };
 }

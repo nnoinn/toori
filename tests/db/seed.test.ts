@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { SLOT_STATUSES } from '@/db/schema';
 
+import { SLOT_TIME_STEP_MINUTES } from '../../scripts/dev-db.mjs';
 import { SEED_ACCOUNTS, SEED_SHOPS } from '../../scripts/seed-data.mjs';
 import { salePrice, seedDevData } from '../../scripts/seed.mjs';
 
@@ -69,6 +70,16 @@ describe('salePrice', () => {
   });
 });
 
+describe('시간 단위 (#108)', () => {
+  it('시드 메뉴 소요 시간과 매물 시작 시각(넣는 시각 기준 상대값)은 30분 단위다', () => {
+    for (const shop of SEED_SHOPS) {
+      for (const menu of shop.menus) expect(menu.minutes % SLOT_TIME_STEP_MINUTES).toBe(0);
+      for (const slot of shop.slots ?? [])
+        expect(Math.abs((slot.at * 60) % SLOT_TIME_STEP_MINUTES)).toBe(0);
+    }
+  });
+});
+
 describeDb('시드 데이터 (실제 DB)', () => {
   it('DB 제약을 통과하고, 다시 넣어도 같은 수이며 시드가 아닌 데이터는 남긴다', async () => {
     await withRollbackSql(async (sql) => {
@@ -116,6 +127,9 @@ describeDb('시드 데이터 (실제 DB)', () => {
         where o.user_id = ${userIds['owner-a']}`;
 
       expect(new Set(slots.map((s) => s.status))).toEqual(new Set(SLOT_STATUSES));
+      // 넣는 시각(05:03 UTC)을 30분 단위로 내려서 시작 시각이 모두 :00·:30이다(#108)
+      for (const s of slots)
+        expect(s.start_at.getTime() % (SLOT_TIME_STEP_MINUTES * 60 * 1000)).toBe(0);
       for (const s of slots) {
         expect(s.sale_price).toBe(salePrice(s.list_price, s.discount_rate));
       }

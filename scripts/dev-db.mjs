@@ -8,6 +8,8 @@ export const DAY = 24 * HOUR;
 // 시드 전용 값. 정책값(src/server/policy, #48)과 같게 둔다: 매물은 시작 48시간 전에 게시(S-204), 홀딩 10분(C-404)
 export const PUBLISH_BEFORE_HOURS = 48;
 export const HOLD_MINUTES = 10;
+// 매물 시작 시각과 메뉴 소요 시간의 단위(#108, 10/28). 정책값 SLOT_START_STEP_MINUTES·MENU_DURATION_STEP_MINUTES와 같게 둔다
+export const SLOT_TIME_STEP_MINUTES = 30;
 // 고객 취소 위약금 구간(X-202). 남은 시간이 기준 이상이면 그 비율. 정책값의 REFUND_BANDS(#48)와 같게 둔다
 export const REFUND_BANDS = [
   { band: 'over_24h', minHoursLeft: 24, penaltyRate: 30 },
