@@ -15,6 +15,13 @@ export function ProfileForm({ nickname, phone }: { nickname: string; phone: stri
   const [values, setValues] = useState({ nickname, phone });
   const [message, setMessage] = useState<{ kind: 'error' | 'done'; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
+  // 화면을 떠났다 와도 Next.js는 이 화면의 입력값을 그대로 남겨 둔다(Activity).
+  // 다른 화면(예약 확인)에서 연락처를 바꿔 서버 값이 달라졌으면 입력칸도 맞춘다. 안 맞추면 옛 번호로 덮어쓴다
+  const [server, setServer] = useState({ nickname, phone });
+  if (server.nickname !== nickname || server.phone !== phone) {
+    setServer({ nickname, phone });
+    setValues({ nickname, phone });
+  }
   const changed = values.nickname !== nickname || values.phone !== phone;
 
   function handleSubmit(event: React.FormEvent) {
