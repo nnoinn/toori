@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useLayoutEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { unstable_rethrow, useRouter } from 'next/navigation';
 
@@ -38,6 +38,8 @@ export function ReserveButton({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<{ message: string; heldSlotId?: string } | null>(null);
+  // 상세를 떠나면 Next.js가 이 화면을 숨겨 두었다가 그대로 다시 보여준다(Activity). 지난 실패 문구는 떠날 때 지운다
+  useLayoutEffect(() => () => setError(null), []);
   const className = 'h-12 w-full text-base';
 
   if (availability === 'mine') {
