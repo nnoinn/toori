@@ -55,7 +55,11 @@ function briefing() {
       } else {
         notes.push(`main 브랜치에 커밋 안 된 변경이 ${dirty}개 있다. main에서는 작업하지 않으므로, 새 브랜치로 옮기도록 안내한다.`);
       }
-    } else if (git('merge-base', '--is-ancestor', 'main', 'origin/main').ok) {
+    } else if (
+      git('merge-base', '--is-ancestor', 'main', 'origin/main').ok &&
+      // 다른 폴더(worktree)에 main이 열려 있으면 그 폴더 파일과 어긋나므로 건드리지 않는다
+      !git('worktree', 'list', '--porcelain').out.split('\n').includes('branch refs/heads/main')
+    ) {
       git('update-ref', 'refs/heads/main', 'origin/main');
     }
   }
@@ -115,6 +119,23 @@ function briefing() {
         sections.push(['리뷰할 팀원 PR', others.map((p) => `- #${p.number} ${p.title} (${p.author?.login}) — ${REVIEW_LABEL[p.reviewDecision] || '리뷰 대기'}`).join('\n')]);
       }
     }
+    // 아직 PR이 없는 내 작업: main에 없는 커밋이 있는데 어떤 PR도 없는 로컬 브랜치(마지막 커밋이 내 것만)
+    const allPrs = ghJson('pr', 'list', '--state', 'all', '--limit', '300', '--json', 'headRefName') || [];
+    const withPr = new Set(allPrs.map((p) => p.headRefName));
+    const myEmail = git('config', 'user.email').out;
+    const unpr = [];
+    for (const b of git('for-each-ref', '--format=%(refname:short)', 'refs/heads').out.split('\n').filter(Boolean)) {
+      if (b === 'main' || withPr.has(b) || !originMain) continue;
+      if (git('log', '-1', '--format=%ae', b).out !== myEmail) continue;
+      const times = git('log', '--format=%ct', `${originMain}..${b}`).out.split('\n').filter(Boolean).map(Number);
+      if (!times.length) continue;
+      const days = Math.floor((Date.now() / 1000 - Math.min(...times)) / 86400);
+      unpr.push(`- ${b}: main에 없는 커밋 ${times.length}개, 가장 오래된 커밋 ${days === 0 ? '오늘' : `${days}일 전`}`);
+    }
+    if (unpr.length) {
+      sections.push(['아직 PR이 없는 내 브랜치 (기능 하나가 끝났으면 지금 PR을 올리자고 먼저 제안한다)', unpr.join('\n')]);
+    }
+
     const issues = ghJson('issue', 'list', '--assignee', '@me', '--state', 'open', '--json', 'number,title') || [];
     if (issues.length) sections.push(['나에게 배정된 Issue', issues.map((i) => `- #${i.number} ${i.title}`).join('\n')]);
     const mine = ghJson('issue', 'list', '--author', '@me', '--state', 'open', '--json', 'number,title,comments') || [];
@@ -132,7 +153,7 @@ function briefing() {
   const header = [
     '[세션 시작 브리핑 — scripts/session-start.mjs가 자동으로 모은 정보]',
     'Claude가 할 일: 사용자의 첫 메시지에 답하기 전에 이 브리핑을 3~6줄로 먼저 알린다.',
-    '우선순위: ① 수정 요청된 내 PR ② 새 공지의 "할 일" ③ 바뀐 규칙·문서는 지금 다시 읽고 무엇이 바뀌었는지 한 줄 ④ 현재 브랜치 상태와 오늘의 다음 단계 제안.',
+    '우선순위: ① 수정 요청된 내 PR ② 나에게 배정된 Issue와 새 공지의 "할 일" ③ PR이 없는 내 브랜치(기능 하나가 끝났으면 PR부터) ④ 바뀐 규칙·문서는 지금 다시 읽고 무엇이 바뀌었는지 한 줄 ⑤ 현재 브랜치 상태와 오늘의 다음 단계 제안.',
     '새 소식이 없으면 "새 소식 없음"이라고 한 줄만 말하고 바로 사용자 요청을 처리한다.',
   ];
   const body = sections.map(([title, text]) => `### ${title}\n${text}`).join('\n\n');

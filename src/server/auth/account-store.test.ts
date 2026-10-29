@@ -59,14 +59,15 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
   it('고객 계정과 필수 동의(만 14세 확인 포함)를 저장한다. 광고성 동의는 고른 때만', async () => {
     await withRollback(async (tx) => {
       const userId = await createTestUser(tx);
-      const customerId = await saveCustomerAccount(tx, {
+      const saved = await saveCustomerAccount(tx, {
         userId,
         nickname: '김투리',
         marketing: false,
       });
 
       const [customer] = await tx.select().from(customers).where(eq(customers.userId, userId));
-      expect(customer).toMatchObject({ id: customerId, nickname: '김투리' });
+      expect(saved).toEqual({ customerId: customer.id, marketingAgreedAt: null });
+      expect(customer).toMatchObject({ nickname: '김투리' });
       expect(await termsOf(tx, userId)).toEqual(
         ['age14', 'location', 'privacy', 'service'].map((termsType) => ({
           accountType: 'customer',
@@ -78,12 +79,14 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
     });
   });
 
-  it('광고성 정보 수신에 동의하면 marketing 기록도 남긴다', async () => {
+  it('광고성 정보 수신에 동의하면 marketing 기록도 남기고 그 동의 시각을 돌려준다', async () => {
     await withRollback(async (tx) => {
       const userId = await createTestUser(tx);
-      await saveCustomerAccount(tx, { userId, nickname: '김투리', marketing: true });
+      const saved = await saveCustomerAccount(tx, { userId, nickname: '김투리', marketing: true });
       expect((await termsOf(tx, userId)).map((row) => row.termsType)).toContain('marketing');
-      expect(await readMarketingConsent(tx, userId, 'customer')).toMatchObject({ agreed: true });
+      const consent = await readMarketingConsent(tx, userId, 'customer');
+      expect(consent).toMatchObject({ agreed: true });
+      expect(saved?.marketingAgreedAt).toEqual(consent.agreedAt);
     });
   });
 
