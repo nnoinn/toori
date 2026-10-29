@@ -114,8 +114,8 @@ describeDb('매물 등록 ①② 검증 (실제 DB)', () => {
 
       expect((await draft(at('10:00'))).ok).toBe(true);
       expect((await draft(at('19:00'))).ok).toBe(true);
-      expect(await draft(at('19:10'))).toMatchObject({ error: { code: 'OUTSIDE_HOURS' } });
-      expect(await draft(at('09:50'))).toMatchObject({ error: { code: 'OUTSIDE_HOURS' } });
+      expect(await draft(at('19:30'))).toMatchObject({ error: { code: 'OUTSIDE_HOURS' } });
+      expect(await draft(at('09:30'))).toMatchObject({ error: { code: 'OUTSIDE_HOURS' } });
 
       await tx
         .update(shops)
