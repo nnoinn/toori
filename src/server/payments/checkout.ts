@@ -3,11 +3,9 @@
 // 예약·결제 (C-401~C-406, C-404, X-201, X-304, 연결 #8, #121). 매물 상세 '예약하기', 예약 확인 화면(/checkout/[slotId]),
 // 결제 뒤 돌아오는 화면(/payment/result)에서 부른다(정찬형 J10·J11). 화면에서는 '@/server/payments/checkout'에서 가져온다.
 //
-// 모양(입력·결과·실패 코드)은 그대로 두고 속을 단계별로 바꾼다.
-// - 진짜: 로그인·고객 모드, 10분 홀딩(W10, DB), 매물(게시중, 남의 홀딩, 신규 고객 전용, 판매가), 연락처, 입력 확인,
-//   결제 시작의 주문 저장(W11 ①, 결제 대기 주문과 동의 2개의 버전·시각)
-// - 아직 가짜(W11 ②에서 진짜): 결제 확인은 포트원에 묻지 않고 성공으로 보고, 예약을 만들지 않는다
-//   (예약 id로 /reservations/…를 열면 없다). 실패 화면은 로컬에서 DEV_FAKE_PAYMENT_FAILURE로 흉내 낸다
+// 모두 진짜다: 10분 홀딩(W10), 결제 대기 주문(W11 ①), 포트원 결제 조회와 예약 확정(W11 ②).
+// 결제는 됐는데 확정할 수 없는 경우(홀딩 시간이 지난 뒤 결제, 금액 다름, 팔림)는 주문에 기록만 하고(autoCancelled: false),
+// 포트원 자동 취소는 W12에서 붙인다. 진짜 결제로 만들기 어려운 실패 화면은 로컬에서 DEV_FAKE_PAYMENT_FAILURE로 흉내 낸다
 
 import { headers } from 'next/headers';
 import { z } from 'zod';
@@ -21,16 +19,12 @@ import { isNewCustomer } from '@/server/customers';
 import { calcPaymentAmount } from './amount';
 import { isMyActiveHold } from './checkout-rules';
 import { readCheckoutSlot, readCustomerPhone } from './checkout-store';
-import { autoCancelFail, type PaymentResult, paymentFail } from './errors';
-import {
-  clearFakeCheckout,
-  devFakeFailure,
-  readFakeCheckout,
-  writeFakeCheckout,
-} from './fake-checkout';
+import { confirmPaidOrder, type MyOrder, readMyOrder, recordOrderOutcome } from './confirm-store';
+import { devFakeFailure } from './dev-fake-failure';
+import { type PaymentResult, paymentFail, unconfirmedFail } from './errors';
 import { acquireHold, releaseMyHold } from './hold-store';
 import { createPendingOrder, newPaymentId } from './order-store';
-import { newReservationCode } from './reservation-code';
+import { getPortOnePayment } from './portone';
 import type { ConfirmedReservation, HoldInfo, MyHold, PaymentRequest } from './types';
 
 const slotIdSchema = z.uuid();
@@ -71,8 +65,6 @@ export async function releaseHold(slotId: string): Promise<PaymentResult<null>> 
   if (!id.success) return ok(null);
 
   await releaseMyHold(getDb(), { slotId: id.data, customerId: auth.data.customerId });
-  const fake = await readFakeCheckout(auth.data.userId);
-  if (fake && fake.confirmed === null && fake.slotId === id.data) await clearFakeCheckout();
   return ok(null);
 }
 
@@ -121,7 +113,7 @@ export async function startPayment(input: {
   if (switched) return switched;
   if (!slotIdSchema.safeParse(slotId).success) return paymentFail('NOT_HOLDER');
 
-  const { userId, customerId } = auth.data;
+  const { customerId } = auth.data;
   const now = await getRequestNow();
   const slot = await readCheckoutSlot(slotId);
   if (!slot || slot.holdCustomerId !== customerId) return paymentFail('NOT_HOLDER');
@@ -143,16 +135,6 @@ export async function startPayment(input: {
   const amount = calcPaymentAmount({ salePrice: slot.salePrice });
   const paymentId = newPaymentId();
   await createPendingOrder(getDb(), { paymentId, slotId, customerId, ...amount, agreedAt: now });
-
-  // 결제 확인은 ②까지 가짜라, 확인할 결제 번호를 쿠키에도 남긴다(②에서 지운다)
-  const fake = await readFakeCheckout(userId);
-  const sameSlot = fake && fake.slotId === slotId && fake.confirmed === null;
-  await writeFakeCheckout({
-    userId,
-    slotId,
-    paymentIds: [...(sameSlot ? fake.paymentIds : []), paymentId],
-    confirmed: null,
-  });
   return ok({
     storeId,
     channelKey,
@@ -172,8 +154,8 @@ const confirmSchema = z.object({
 
 /**
  * 결제 뒤 돌아온 화면(/payment/result)에서 부른다. 복귀 주소의 paymentId(실패하면 code·message도)를 그대로 넘긴다.
- * 성공하면 예약이 확정된다. 새로고침으로 다시 불러도 같은 결과다.
- * 화면이 열린 뒤 'use client' 컴포넌트에서 한 번 부른다(서버 렌더링 중에는 부르지 않는다)
+ * 브라우저가 보낸 결과는 믿지 않고 포트원에 결제를 물어본 뒤, 결제 완료·금액이 맞으면 예약을 확정한다.
+ * 새로고침으로 다시 불러도 같은 결과다. 화면이 열린 뒤 'use client' 컴포넌트에서 한 번 부른다(서버 렌더링 중에는 부르지 않는다)
  */
 export async function confirmPayment(input: {
   paymentId: string;
@@ -185,32 +167,100 @@ export async function confirmPayment(input: {
   const parsed = confirmSchema.safeParse(input);
   if (!parsed.success) return paymentFail('PAYMENT_NOT_FOUND');
   const { paymentId, code } = parsed.data;
-  const { userId, customerId } = auth.data;
+  const { customerId } = auth.data;
 
+  const db = getDb();
+  const order = await readMyOrder(db, paymentId, customerId);
   const now = await getRequestNow();
-  const fake = await readFakeCheckout(userId);
-  const slot = fake ? await readCheckoutSlot(fake.slotId) : null;
-  const holdActive = slot !== null && isMyActiveHold(slot, customerId, now);
-  const switched = devFakeFailure('confirmPayment', { slotId: fake?.slotId, holdActive });
-  if (switched) return switched;
-
-  if (!fake || !fake.paymentIds.includes(paymentId)) return paymentFail('PAYMENT_NOT_FOUND');
-  if (fake.confirmed !== null) {
-    if (fake.confirmed.paymentId !== paymentId) return paymentFail('PAYMENT_NOT_FOUND');
-    const { reservationId, reservationCode } = fake.confirmed;
-    return ok({ reservationId, reservationCode });
-  }
-  // 포트원이 code를 붙여 보내면 결제가 안 된 것이다. 고객이 닫은 것과 실패를 나누는 일은 W11에서 실제 코드를 보고 한다
-  if (code) return paymentFail('PAYMENT_CANCELLED', { slotId: fake.slotId, holdActive });
-  if (!holdActive) return autoCancelFail('HOLD_EXPIRED');
-
-  // 가짜 확정: 예약을 만들지 않으므로 홀딩만 푼다(W11에서 예약 저장과 함께 '예약됨'으로 바꾼다)
-  await releaseMyHold(getDb(), { slotId: fake.slotId, customerId });
-  const confirmed = {
-    paymentId,
-    reservationId: crypto.randomUUID(),
-    reservationCode: newReservationCode(),
+  /** 결제가 안 됐을 때 예약 확인 화면으로 돌아가 다시 결제할 수 있는지(D12) */
+  const notPaid = async (failure: 'PAYMENT_CANCELLED' | 'PAYMENT_FAILED') => {
+    const slot = order ? await readCheckoutSlot(order.slotId) : null;
+    const holdActive = slot !== null && isMyActiveHold(slot, customerId, now);
+    return paymentFail(failure, { slotId: order?.slotId, holdActive });
   };
-  await writeFakeCheckout({ ...fake, confirmed });
+
+  const switched = devFakeFailure('confirmPayment', { slotId: order?.slotId, holdActive: true });
+  if (switched) return switched;
+  if (!order) return paymentFail('PAYMENT_NOT_FOUND');
+
+  // 이미 결과가 정해진 주문(새로고침, 웹훅이 먼저 처리)
+  const settled = settledResult(order);
+  if (settled === 'not_paid')
+    return notPaid(order.pgStatus === 'FAILED' ? 'PAYMENT_FAILED' : 'PAYMENT_CANCELLED');
+  if (settled) return settled;
+
+  const lookup = await getPortOnePayment(paymentId);
+  if (!lookup.ok) {
+    // not_found: 결제창까지 가지 않았다(결제창을 열기 전에 닫음 등). 주문은 결제 대기로 둔다
+    return lookup.reason === 'not_found'
+      ? notPaid('PAYMENT_CANCELLED')
+      : paymentFail('PAYMENT_CHECK_UNAVAILABLE');
+  }
+  const payment = lookup.payment;
+  switch (payment.status) {
+    case 'PAID':
+      break;
+    case 'READY':
+      // 결제창에서 결제하지 않고 돌아왔다(code가 붙어 옴). code가 없으면 아직 진행 중으로 본다
+      return code ? notPaid('PAYMENT_CANCELLED') : paymentFail('PAYMENT_PENDING');
+    case 'PENDING':
+    case 'VIRTUAL_ACCOUNT_ISSUED':
+      return paymentFail('PAYMENT_PENDING');
+    case 'FAILED':
+    case 'CANCELLED':
+    case 'PARTIAL_CANCELLED':
+      await recordOrderOutcome(db, order.orderId, {
+        status: 'failed',
+        pgStatus: payment.status,
+        failureCode: payment.status,
+        failureMessage: payment.failureReason,
+      });
+      return notPaid(payment.status === 'FAILED' ? 'PAYMENT_FAILED' : 'PAYMENT_CANCELLED');
+    default:
+      console.error('[payments] 알 수 없는 포트원 결제 상태:', payment.status);
+      return paymentFail('PAYMENT_CHECK_UNAVAILABLE');
+  }
+
+  if (payment.amountTotal !== order.amount || (payment.currency && payment.currency !== 'KRW')) {
+    console.error('[payments] 결제 금액이 주문과 달라요:', order.orderId);
+    await recordOrderOutcome(db, order.orderId, {
+      status: 'paid',
+      pgStatus: payment.status,
+      payMethod: payment.method,
+      paidAt: payment.paidAt,
+      failureCode: 'AMOUNT_MISMATCH',
+    });
+    return unconfirmedFail('AMOUNT_MISMATCH');
+  }
+
+  const confirmed = await db.transaction((tx) =>
+    confirmPaidOrder(tx, {
+      orderId: order.orderId,
+      pgStatus: payment.status,
+      payMethod: payment.method,
+      // 결제 시각이 없으면(포트원 응답 모양이 다를 때) 지금으로 본다
+      paidAt: payment.paidAt ?? now,
+    }),
+  );
+  if (!confirmed.ok) return unconfirmedFail(confirmed.code);
   return ok({ reservationId: confirmed.reservationId, reservationCode: confirmed.reservationCode });
+}
+
+/** 결과가 이미 정해진 주문의 답. 결제 대기면 null(포트원에 물어본다) */
+function settledResult(order: MyOrder): PaymentResult<ConfirmedReservation> | 'not_paid' | null {
+  switch (order.status) {
+    case 'confirmed':
+      return order.reservation ? ok(order.reservation) : null;
+    case 'paid':
+    case 'auto_cancelled': {
+      const code = order.failureCode;
+      return code === 'HOLD_EXPIRED' || code === 'AMOUNT_MISMATCH' || code === 'SLOT_SOLD'
+        ? unconfirmedFail(code)
+        : unconfirmedFail('SLOT_SOLD');
+    }
+    case 'failed':
+      return 'not_paid';
+    default:
+      return null;
+  }
 }
