@@ -31,6 +31,12 @@ describe('경로 만들기', () => {
     );
   });
 
+  it('등록증은 PDF면 .pdf', () => {
+    expect(newBusinessDocPath({ userId: USER }, 'application/pdf')).toMatch(
+      new RegExp(`^users/${USER}/[0-9a-f-]{36}\\.pdf$`),
+    );
+  });
+
   it('매번 다른 이름이라 덮어쓰지 않는다', () => {
     expect(newShopImagePath(SHOP, 'image/jpeg')).not.toBe(newShopImagePath(SHOP, 'image/jpeg'));
   });
@@ -47,6 +53,7 @@ describe('assertShopImagePath', () => {
     ['한 단계 더 들어감', `${SHOP}/x/${FILE}.jpg`],
     ['상위 폴더로 나감', `${SHOP}/../${OTHER_SHOP}/${FILE}.jpg`],
     ['허용하지 않는 확장자', `${SHOP}/${FILE}.html`],
+    ['PDF(샵 사진은 사진만)', `${SHOP}/${FILE}.pdf`],
     ['서버가 만든 이름이 아님', `${SHOP}/photo.jpg`],
     ['등록증 경로', `shops/${SHOP}/${FILE}.jpg`],
   ])('%s → INVALID_PATH', async (_, path) => {
@@ -60,6 +67,11 @@ describe('assertBusinessDocPath', () => {
     const mine = newBusinessDocPath({ userId: USER }, 'image/jpeg');
     const shopDoc = newBusinessDocPath({ shopId: SHOP }, 'image/jpeg');
     expect((await assertBusinessDocPath({ userId: USER }, mine)).ok).toBe(true);
+    const pdf = newBusinessDocPath({ userId: USER }, 'application/pdf');
+    expect((await assertBusinessDocPath({ userId: USER }, pdf)).ok).toBe(true);
+    expect((await assertBusinessDocPath({ userId: USER }, `users/${USER}/${FILE}.html`)).ok).toBe(
+      false,
+    );
     expect((await assertBusinessDocPath({ shopId: SHOP }, shopDoc)).ok).toBe(true);
 
     expect((await assertBusinessDocPath({ userId: USER }, shopDoc)).ok).toBe(false);

@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { TERMS_TYPES } from '@/db/schema/accounts';
 
+import { BANK_CODES, BANKS } from './banks';
 import { PRICE_FILTER_RANGES, TIME_FILTER_RANGES } from './filters';
 import {
   INTEREST_DIGEST_HOUR,
@@ -27,7 +28,12 @@ import {
   SLOT_START_STEP_MINUTES,
 } from './slot-time';
 import { TERMS_VERSIONS } from './terms';
-import { BUSINESS_DOC_URL_TTL_SECONDS, UPLOAD_ALLOWED_TYPES, UPLOAD_MAX_BYTES } from './upload';
+import {
+  BUSINESS_DOC_ALLOWED_TYPES,
+  BUSINESS_DOC_URL_TTL_SECONDS,
+  UPLOAD_ALLOWED_TYPES,
+  UPLOAD_MAX_BYTES,
+} from './upload';
 
 describe('시간 (#48 1장)', () => {
   it('48시간 게시, 6시간 임박·환불 불가, 10분 홀딩, 시작 시각·소요 시간 30분 단위', () => {
@@ -101,9 +107,23 @@ describe('필터 구간 (#48 7장)', () => {
 });
 
 describe('업로드 (#48 8장)', () => {
-  it('5MB는 Storage 버킷 설정과 같은 5,000,000바이트, 형식은 jpeg·png·webp, 등록증 주소는 5분', () => {
+  it('5MB는 5,000,000바이트(버킷 5MiB보다 작게), 샵 사진은 jpeg·png·webp, 등록증은 PDF까지, 등록증 주소는 5분', () => {
     expect(UPLOAD_MAX_BYTES).toBe(5_000_000);
     expect(UPLOAD_ALLOWED_TYPES).toEqual(['image/jpeg', 'image/png', 'image/webp']);
+    expect(BUSINESS_DOC_ALLOWED_TYPES).toEqual([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'application/pdf',
+    ]);
     expect(BUSINESS_DOC_URL_TTL_SECONDS).toBe(300);
+  });
+});
+
+describe('정산 계좌 은행 (S-107)', () => {
+  it('금융결제원 3자리 코드이고 겹치지 않는다', () => {
+    expect(BANK_CODES.every((code) => /^\d{3}$/.test(code))).toBe(true);
+    expect(new Set(BANK_CODES).size).toBe(BANKS.length);
+    expect(BANKS.find((bank) => bank.code === '004')?.name).toBe('KB국민은행');
   });
 });
