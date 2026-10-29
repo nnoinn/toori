@@ -4,6 +4,7 @@
 import { z } from 'zod';
 
 import type { BusinessHours } from '@/db/schema/shops';
+import { normalizePhone } from '@/lib/phone';
 import { SHOP_CATEGORY_KEYS, type ShopCategory } from '@/server/policy/catalog';
 
 export const SHOP_PROFILE_LIMITS = {
@@ -45,8 +46,6 @@ export type ShopProfileField = Exclude<keyof ShopProfileInput, 'hours'> | `hours
 export type ShopProfileFieldErrors = Partial<Record<ShopProfileField, string>>;
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
-// 하이픈·띄어쓰기를 뺀 숫자: 0으로 시작하는 9~11자리(지역번호·휴대폰·070) 또는 15xx·16xx·18xx 대표번호 8자리
-const PHONE_DIGITS = /^(0\d{8,10}|1[5-8]\d{6})$/;
 
 /** 저장된 영업시간을 월~일 7줄 입력값으로. 저장 안 된 요일은 빈 줄 */
 export function toHoursRows(stored: BusinessHours): HoursRow[] {
@@ -106,8 +105,9 @@ export function validateShopProfile(
   if (!(SHOP_CATEGORY_KEYS as readonly string[]).includes(value.category))
     errors.category = '업종을 골라 주세요';
 
-  if (!PHONE_DIGITS.test(value.phone.replace(/[\s-]/g, '')))
-    errors.phone = '전화번호를 확인해 주세요. 예: 031-123-4567';
+  // 전화번호는 하이픈 넣은 모양으로 맞춰 저장한다(10/28 결정, normalizePhone)
+  const phone = normalizePhone(value.phone);
+  if (!phone) errors.phone = '전화번호를 확인해 주세요. 예: 031-123-4567';
 
   if (!value.roadAddress) errors.roadAddress = '주소 찾기로 도로명 주소를 골라 주세요';
   else if (value.roadAddress.length > SHOP_PROFILE_LIMITS.roadAddress)
@@ -126,14 +126,14 @@ export function validateShopProfile(
     if (problem) errors[`hours.${index}`] = problem;
   });
 
-  if (Object.keys(errors).length > 0) return { ok: false, fieldErrors: errors };
+  if (!phone || Object.keys(errors).length > 0) return { ok: false, fieldErrors: errors };
 
   return {
     ok: true,
     data: {
       name: value.name,
       category: value.category as ShopCategory,
-      phone: value.phone,
+      phone,
       roadAddress: value.roadAddress,
       addressDetail: value.addressDetail || null,
       description: value.description || null,
