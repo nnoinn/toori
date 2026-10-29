@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
 import { Skeleton } from '@/components/ui/skeleton';
+import { getCurrentAccount } from '@/server/auth';
 
 import { LoginForm } from './login-form';
 import { parseLoginError, parseLoginMode, readNextParam } from './login-params';
@@ -12,6 +13,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 // 로그인 화면 (J8, C-101). 주소: /login?mode=customer|owner&next=/... (#47 8장)
 // 주소 값(searchParams)은 요청 때만 알 수 있어서 <Suspense> 안에서 읽는다(Cache Components).
+// 이미 로그인했는데 다른 계정 모드로 들어와 있으면(예: 원장님 모드에서 고객 화면) 다시 로그인하지 않고 계속하게 한다.
 export default function LoginPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <Suspense fallback={<LoginSkeleton />}>
@@ -21,12 +23,13 @@ export default function LoginPage({ searchParams }: { searchParams: SearchParams
 }
 
 async function LoginContent({ searchParams }: { searchParams: SearchParams }) {
-  const params = await searchParams;
+  const [params, account] = await Promise.all([searchParams, getCurrentAccount()]);
   return (
     <LoginForm
       initialMode={parseLoginMode(params.mode)}
       nextParam={readNextParam(params.next)}
       error={parseLoginError(params.error)}
+      signedInEmail={account?.email ?? null}
     />
   );
 }
