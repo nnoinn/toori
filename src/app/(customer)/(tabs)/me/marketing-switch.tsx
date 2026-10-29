@@ -15,6 +15,12 @@ export function MarketingSwitch({ initialAgreed }: { initialAgreed: boolean }) {
   const [agreed, setAgreed] = useState(initialAgreed);
   const [message, setMessage] = useState<{ kind: 'error' | 'done'; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
+  // 화면을 떠났다 와도 예전 상태가 남으므로(Activity) 서버 값이 바뀌었으면 맞춘다
+  const [serverAgreed, setServerAgreed] = useState(initialAgreed);
+  if (serverAgreed !== initialAgreed) {
+    setServerAgreed(initialAgreed);
+    setAgreed(initialAgreed);
+  }
 
   function toggle() {
     const next = !agreed;
