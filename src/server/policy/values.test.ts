@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { TERMS_TYPES } from '@/db/schema/accounts';
 
+import { BANK_CODES, BANKS } from './banks';
 import { PRICE_FILTER_RANGES, TIME_FILTER_RANGES } from './filters';
 import {
   INTEREST_DIGEST_HOUR,
@@ -105,5 +106,13 @@ describe('업로드 (#48 8장)', () => {
     expect(UPLOAD_MAX_BYTES).toBe(5_000_000);
     expect(UPLOAD_ALLOWED_TYPES).toEqual(['image/jpeg', 'image/png', 'image/webp']);
     expect(BUSINESS_DOC_URL_TTL_SECONDS).toBe(300);
+  });
+});
+
+describe('정산 계좌 은행 (S-107)', () => {
+  it('금융결제원 3자리 코드이고 겹치지 않는다', () => {
+    expect(BANK_CODES.every((code) => /^\d{3}$/.test(code))).toBe(true);
+    expect(new Set(BANK_CODES).size).toBe(BANKS.length);
+    expect(BANKS.find((bank) => bank.code === '004')?.name).toBe('KB국민은행');
   });
 });
