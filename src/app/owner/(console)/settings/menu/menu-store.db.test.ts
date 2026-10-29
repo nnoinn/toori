@@ -6,13 +6,13 @@ import { afterAll, expect, it } from 'vitest';
 
 import { slots } from '@/db/schema';
 
-import { createTestShop, testSlot } from '../../../../../tests/db/fixtures';
+import { createTestShop, testSlot } from '../../../../../../tests/db/fixtures';
 import {
   closeTestDb,
   describeDb,
   type TestTx,
   withRollback,
-} from '../../../../../tests/db/test-db';
+} from '../../../../../../tests/db/test-db';
 import type { MenuValues } from './menu';
 import {
   insertMenu,

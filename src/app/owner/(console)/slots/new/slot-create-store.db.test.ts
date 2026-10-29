@@ -6,8 +6,8 @@ import { afterAll, expect, it } from 'vitest';
 
 import { menus, slots } from '@/db/schema';
 
-import { createTestShop, testSlot } from '../../../../../tests/db/fixtures';
-import { closeTestDb, describeDb, withRollback } from '../../../../../tests/db/test-db';
+import { createTestShop, testSlot } from '../../../../../../tests/db/fixtures';
+import { closeTestDb, describeDb, withRollback } from '../../../../../../tests/db/test-db';
 import { createSlotInDb } from './slot-create-store';
 
 afterAll(closeTestDb);

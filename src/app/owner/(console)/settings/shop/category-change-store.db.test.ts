@@ -11,13 +11,13 @@ import {
   createTestReservation,
   createTestShop,
   testSlot,
-} from '../../../../../tests/db/fixtures';
+} from '../../../../../../tests/db/fixtures';
 import {
   closeTestDb,
   describeDb,
   type TestTx,
   withRollback,
-} from '../../../../../tests/db/test-db';
+} from '../../../../../../tests/db/test-db';
 import { closeSlotsAndHideMenus, selectCategoryChangeImpact } from './category-change-store';
 
 afterAll(closeTestDb);
