@@ -221,7 +221,9 @@ export function SlotCreateForm({
                   menuId === item.id && 'border-primary bg-primary/10',
                 )}
               >
-                <Badge variant="secondary">{serviceTypeLabel(item.serviceType)}</Badge>
+                <Badge variant="secondary" className="bg-accent text-accent-foreground">
+                  {serviceTypeLabel(item.serviceType)}
+                </Badge>
                 <span className="font-semibold">{item.name}</span>
                 <span className="text-sm text-muted-foreground">
                   정가 {formatWon(item.listPrice)} · {formatMinutes(item.durationMinutes)}
@@ -494,7 +496,7 @@ function CreatedCard({ created, onAgain }: { created: CreatedSummary; onAgain: (
             size="sm"
           />
           {created.newCustomerOnly ? (
-            <Badge variant="secondary" className="w-fit">
+            <Badge variant="secondary" className="w-fit bg-accent text-accent-foreground">
               신규 고객 전용
             </Badge>
           ) : null}
