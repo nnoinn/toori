@@ -39,7 +39,15 @@ async function ResultContent({ searchParams }: { searchParams: SearchParams }) {
   if (message) back.set('message', message);
   await ensureCustomerPage(`/payment/result${back.size > 0 ? `?${back}` : ''}`);
 
-  return <PaymentResultView paymentId={paymentId} code={code} message={message} />;
+  // Next.js는 떠난 화면을 결과 그대로 남겨 둔다(Activity). 결제 번호가 다르면 새로 확인한다(두 번째 결제에 첫 결과가 보이지 않게)
+  return (
+    <PaymentResultView
+      key={`${paymentId ?? ''}:${code ?? ''}`}
+      paymentId={paymentId}
+      code={code}
+      message={message}
+    />
+  );
 }
 
 function ResultSkeleton() {
