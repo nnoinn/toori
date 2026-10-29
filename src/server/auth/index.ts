@@ -2,7 +2,7 @@
 // loadAccount는 아무 userId나 읽을 수 있어서 내보내지 않는다(로그인 콜백과 테스트만 파일에서 직접 쓴다).
 // 화면('use client')에서도 부르는 함수는 여기 말고 파일에서 직접 가져온다(이 파일은 server-only 파일을 같이 내보내서 화면에서 가져올 수 없다).
 // - 로그인·로그아웃·계정 전환(signInWithProvider, signOut, switchAccountMode): '@/server/auth/session'
-// - 고객 가입·광고성 동의(createCustomerAccount, setMarketingConsent, getMarketingConsent): '@/server/auth/customer-account'
+// - 고객 가입·광고성 동의(createCustomerAccount, takeMarketingConsentNotice, setMarketingConsent, getMarketingConsent): '@/server/auth/customer-account'
 
 export { type AccountMode } from './account-mode';
 export { type MarketingConsent } from './account-store';

@@ -91,6 +91,7 @@ describe('createShopImageUploadUrl', () => {
   it.each([
     ['허용하지 않는 형식', { contentType: 'image/gif', size: 1000 }, 'INVALID_FILE_TYPE'],
     ['HTML', { contentType: 'text/html', size: 1000 }, 'INVALID_FILE_TYPE'],
+    ['PDF(샵 사진은 사진만)', { contentType: 'application/pdf', size: 1000 }, 'INVALID_FILE_TYPE'],
     ['5MB 초과', { contentType: 'image/png', size: 5_000_001 }, 'FILE_TOO_LARGE'],
     ['크기 0', { contentType: 'image/png', size: 0 }, 'FILE_TOO_LARGE'],
   ])('%s → %s', async (_, file, code) => {
@@ -120,6 +121,22 @@ describe('createBusinessDocUploadUrl', () => {
     const result = await createBusinessDocUploadUrl(FILE);
     expect(state.bucket).toHaveBeenCalledWith('business-docs');
     expect(result.ok && result.data.path).toMatch(/^users\/user-1\/[0-9a-f-]{36}\.jpg$/);
+  });
+
+  it('PDF도 받는다(10/28 결정)', async () => {
+    const result = await createBusinessDocUploadUrl({ contentType: 'application/pdf', size: 1000 });
+    expect(result.ok && result.data.path).toMatch(/^users\/user-1\/[0-9a-f-]{36}\.pdf$/);
+  });
+
+  it('사진·PDF가 아니거나 5MB를 넘으면 주소를 만들지 않는다', async () => {
+    const gif = await createBusinessDocUploadUrl({ contentType: 'image/gif', size: 1000 });
+    expect(gif).toEqual(fail('INVALID_FILE_TYPE', 'JPG·PNG·WEBP 사진이나 PDF만 올릴 수 있어요'));
+    const big = await createBusinessDocUploadUrl({
+      contentType: 'application/pdf',
+      size: 5_000_001,
+    });
+    expect(big.ok === false && big.error.code).toBe('FILE_TOO_LARGE');
+    expect(state.createSignedUploadUrl).not.toHaveBeenCalled();
   });
 
   it('가입 중인데 로그인 안 함·고객 모드·이미 원장님 계정이 있으면 거절한다', async () => {
