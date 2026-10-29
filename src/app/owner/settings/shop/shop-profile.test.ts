@@ -100,12 +100,17 @@ describe('validateShopProfile', () => {
     expect(result).toEqual({ ok: false, fieldErrors: { 'hours.1': '같은 요일이 두 번 있어요' } });
   });
 
-  it.each(['031-123-4567', '02-123-4567', '010 1234 5678', '0701234567', '1588-1234'])(
-    '전화번호 %s는 통과한다',
-    (phone) => {
-      expect(validateShopProfile(valid({ phone })).ok).toBe(true);
-    },
-  );
+  it.each([
+    ['031-123-4567', '031-123-4567'],
+    ['02-123-4567', '02-123-4567'],
+    ['010 1234 5678', '010-1234-5678'],
+    ['0701234567', '070-123-4567'],
+    ['050712345678', '0507-1234-5678'],
+    ['1588-1234', '1588-1234'],
+  ])('전화번호 %s는 %s 모양으로 저장한다(normalizePhone)', (phone, saved) => {
+    const result = validateShopProfile(valid({ phone }));
+    expect(result.ok && result.data.phone).toBe(saved);
+  });
 
   it.each(['', '123-4567', '031-123-456a', '010-1234-56789', '1234-5678'])(
     '전화번호 "%s"는 막는다',

@@ -6,8 +6,10 @@ on:
   push:
     branches: [main]
 
+# PR은 새로 푸시하면 앞의 검사를 멈추고 새 커밋만 검사한다.
+# main은 커밋마다 따로 묶어서 끝까지 검사한다(PR을 연달아 머지해도 앞 검사가 "cancelled"로 멈추지 않게)
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.event_name == 'pull_request' && format('ci-{0}', github.ref) || format('ci-main-{0}', github.sha) }}
   cancel-in-progress: true
 
 jobs:

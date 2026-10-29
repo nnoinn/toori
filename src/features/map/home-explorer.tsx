@@ -1,40 +1,56 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { X } from 'lucide-react';
 import { cn } from 'cn';
 
 import { EmptyState } from '@/components/ui/state';
 
 import { KakaoMap } from './kakao-map';
-import type { LatLng, MapBounds, MapShop } from './types';
+import { SlotList } from './slot-list/slot-list';
+import type { SlotSort } from './slot-list/sort';
+import { useHomeSlots } from './slot-list/use-home-slots';
+import type { LatLng, MapBounds } from './types';
 import { useIsDesktop } from './use-is-desktop';
 
 type SheetSize = 'half' | 'full';
 
-/** J4에서 매물 조회를 붙이기 전까지 비어 있다. 렌더마다 새 배열이 되지 않게 밖에 둔다 */
-const NO_SHOPS: MapShop[] = [];
+function isSameBounds(a: MapBounds, b: MapBounds): boolean {
+  return (
+    a.sw.lat === b.sw.lat && a.sw.lng === b.sw.lng && a.ne.lat === b.ne.lat && a.ne.lng === b.ne.lng
+  );
+}
 
 type HomeExplorerProps = {
   center: LatLng;
   myLocation: LatLng | null;
   /** 지도 위 왼쪽 위에 띄울 것(동네 바꾸기 버튼) */
   header: React.ReactNode;
+  sort: SlotSort;
+  /** 서버가 준 "지금"(ISO). 목록을 받기 전 카드 남은 시간 기준 */
+  serverNow: string;
 };
 
 /**
- * 홈 = 지도 + 목록 (J3, C-201, #17 Q2).
+ * 홈 = 지도 + 목록 (J3·J4, C-201·C-204, #17 Q2).
  * 폰: 아래 목록 시트. 반(지도·목록 반반, 기본) / 전체(목록만) 2단계이고, 매물 개수는 손잡이에 보여준다(D13).
  * PC(md 이상): 지도는 왼쪽 전체, 목록은 오른쪽 고정 패널(폭 400px). 시트 크기 바꾸기는 쓰지 않는다(10/25 결정).
- * 매물 조회는 J4에서 붙인다. 지금은 보이는 영역만 받아 두고 목록은 비어 있다.
+ * 지도를 움직이면 보이는 영역 안의 매물을 다시 불러온다(D4). 마커를 누르면 그 샵 매물만 보고, 지도를 움직이면 다시 전체다.
  */
-export function HomeExplorer({ center, myLocation, header }: HomeExplorerProps) {
+export function HomeExplorer({ center, myLocation, header, sort, serverNow }: HomeExplorerProps) {
   const [sheet, setSheet] = useState<SheetSize>('half');
   const isDesktop = useIsDesktop();
-  const [, setBounds] = useState<MapBounds | null>(null);
+  const [bounds, setBounds] = useState<MapBounds | null>(null);
   const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
-  const shops = NO_SHOPS;
-  const slotCount = shops.reduce((sum, shop) => sum + shop.slotCount, 0);
-  const selectedShop = shops.find((shop) => shop.shopId === selectedShopId) ?? null;
+  const search = useSearchParams().toString();
+
+  const home = useHomeSlots({ bounds, search, shopId: selectedShopId });
+  const selectedShop = home.shops.find((shop) => shop.shopId === selectedShopId) ?? null;
+  const slotCount = selectedShop
+    ? selectedShop.slotCount
+    : home.shops.reduce((sum, shop) => sum + shop.slotCount, 0);
+  const title = `${selectedShop ? `${selectedShop.name} · ` : ''}${home.shopsReady ? `매물 ${slotCount}개` : '매물 불러오는 중'}`;
 
   return (
     <main className="flex h-[calc(100dvh-3.5rem-env(safe-area-inset-bottom))] flex-col overflow-hidden md:h-[calc(100dvh-4rem)] md:flex-row">
@@ -50,8 +66,14 @@ export function HomeExplorer({ center, myLocation, header }: HomeExplorerProps) 
           className="absolute inset-0"
           center={center}
           myLocation={myLocation}
-          shops={shops}
-          onBoundsChange={setBounds}
+          shops={home.shops}
+          onBoundsChange={(next) => {
+            // 핀을 다시 그려도 카카오 지도가 'idle'을 다시 보낸다. 영역이 그대로면 다시 불러오지 않는다
+            // (그대로 두면 불러오기 → 핀 다시 그리기 → idle → 불러오기가 끝없이 반복된다)
+            if (bounds && isSameBounds(bounds, next)) return;
+            setBounds(next);
+            setSelectedShopId(null);
+          }}
           onSelectShop={(shopId) => {
             setSelectedShopId(shopId);
             setSheet('half');
@@ -78,18 +100,39 @@ export function HomeExplorer({ center, myLocation, header }: HomeExplorerProps) 
           onClick={() => setSheet(sheet === 'half' ? 'full' : 'half')}
         >
           <span className="h-1 w-10 rounded-full bg-muted-foreground/30" aria-hidden />
-          <span className="text-sm font-semibold">
-            {selectedShop ? `${selectedShop.name} · ` : ''}매물 {slotCount}개
-          </span>
+          <span className="text-sm font-semibold">{title}</span>
           <span className="sr-only">{sheet === 'half' ? '목록 크게 보기' : '지도 같이 보기'}</span>
         </button>
-        <p className="hidden px-4 py-3 font-semibold md:block">
-          {selectedShop ? `${selectedShop.name} · ` : ''}매물 {slotCount}개
-        </p>
-        <div className="flex-1 overflow-y-auto">
-          <EmptyState
-            title="매물 목록은 준비 중이에요"
-            description="곧 이 동네의 임박 할인 매물을 보여 드릴게요."
+        <div className="hidden items-center justify-between px-4 py-3 md:flex">
+          <p className="font-semibold">{title}</p>
+          {selectedShop ? (
+            <button
+              type="button"
+              className="flex items-center gap-1 text-sm text-muted-foreground"
+              onClick={() => setSelectedShopId(null)}
+            >
+              <X className="size-4" aria-hidden />
+              전체 보기
+            </button>
+          ) : null}
+        </div>
+        <div className="flex-1 overflow-y-auto pb-4">
+          <SlotList
+            items={home.items}
+            serverNow={home.serverNow ?? serverNow}
+            sort={sort}
+            status={home.status}
+            errorMessage={home.errorMessage}
+            onRetry={home.retry}
+            hasMore={home.hasMore}
+            loadingMore={home.loadingMore}
+            onLoadMore={home.loadMore}
+            empty={
+              <EmptyState
+                title="이 지역에 지금 올라온 매물이 없어요"
+                description="지도를 옮기거나 필터를 바꿔 보세요."
+              />
+            }
           />
         </div>
       </section>

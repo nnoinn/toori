@@ -7,18 +7,18 @@ import {
   SERVICE_TYPES_BY_CATEGORY,
   type ServiceType,
   type ShopCategory,
-  SLOT_START_STEP_MINUTES,
+  MENU_DURATION_STEP_MINUTES,
 } from '@/server/policy';
 
 // 정가는 10원 단위로 받는다(정민석 결정 10/28). 할인가 = 정가 × (1 − 할인율)에 원 미만이 생기지 않는다
 export const MENU_PRICE = { min: 1_000, max: 1_000_000, unit: 10 } as const;
 
-// 소요 시간은 매물 시작 시각 간격과 같은 단위로 받는다. 끝 시각(시작 + 소요 시간)이 그 간격에 딱 떨어진다(#108)
-export const MENU_DURATION = { step: SLOT_START_STEP_MINUTES, max: 8 * 60 } as const;
+// 소요 시간은 정책 단위(30분, #108 결정)로 받는다. 시작 시각도 30분 단위라 끝 시각이 그 간격에 딱 떨어진다
+export const MENU_DURATION = { step: MENU_DURATION_STEP_MINUTES, max: 8 * 60 } as const;
 
 export const MENU_LIMITS = { name: 40, description: 500 } as const;
 
-/** 소요 시간 선택지(분). 예: 10분 간격이면 10, 20, …, 480 */
+/** 소요 시간 선택지(분). 예: 30분 간격이면 30, 60, …, 480 */
 export const MENU_DURATION_OPTIONS: readonly number[] = Array.from(
   { length: MENU_DURATION.max / MENU_DURATION.step },
   (_, index) => (index + 1) * MENU_DURATION.step,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { SLOT_START_STEP_MINUTES } from '@/server/policy';
+import { MENU_DURATION_STEP_MINUTES } from '@/server/policy';
 
 import {
   formatMinutes,
@@ -22,11 +22,11 @@ const valid = (overrides: Partial<MenuInput> = {}): MenuInput => ({
 
 describe('MENU_DURATION_OPTIONS', () => {
   it('매물 시작 시각 간격 단위로 8시간까지', () => {
-    expect(MENU_DURATION_OPTIONS[0]).toBe(SLOT_START_STEP_MINUTES);
+    expect(MENU_DURATION_OPTIONS[0]).toBe(MENU_DURATION_STEP_MINUTES);
     expect(MENU_DURATION_OPTIONS.at(-1)).toBe(480);
-    expect(MENU_DURATION_OPTIONS.every((minutes) => minutes % SLOT_START_STEP_MINUTES === 0)).toBe(
-      true,
-    );
+    expect(
+      MENU_DURATION_OPTIONS.every((minutes) => minutes % MENU_DURATION_STEP_MINUTES === 0),
+    ).toBe(true);
   });
 });
 
@@ -88,10 +88,13 @@ describe('validateMenu', () => {
     expect(!result.ok && result.fieldErrors.listPrice).toBe(message);
   });
 
-  it.each([0, SLOT_START_STEP_MINUTES + 5, 490])('소요 시간 %i분은 막는다', (durationMinutes) => {
-    const result = validateMenu('hair', valid({ durationMinutes }));
-    expect(!result.ok && result.fieldErrors.durationMinutes).toBe('소요 시간을 골라 주세요');
-  });
+  it.each([0, MENU_DURATION_STEP_MINUTES + 5, 490])(
+    '소요 시간 %i분은 막는다',
+    (durationMinutes) => {
+      const result = validateMenu('hair', valid({ durationMinutes }));
+      expect(!result.ok && result.fieldErrors.durationMinutes).toBe('소요 시간을 골라 주세요');
+    },
+  );
 
   it('빈 이름, 너무 긴 이름·설명은 칸마다 알려 준다', () => {
     expect(validateMenu('hair', valid({ name: ' ', description: 'a'.repeat(501) }))).toEqual({
