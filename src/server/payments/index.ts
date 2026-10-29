@@ -3,6 +3,7 @@
 // - 홀딩·결제 함수(holdSlot, releaseHold, getMyHold, startPayment, confirmPayment): '@/server/payments/checkout'
 // - 결과·실패 모양(HoldInfo, MyHold, PaymentRequest, ConfirmedReservation, PaymentError): '@/server/payments/types', '@/server/payments/errors'
 
+export { calcPaymentAmount } from './amount';
 export { holdBlockReason } from './checkout-rules';
 export { type CheckoutSlot, readCheckoutSlot, readCustomerPhone } from './checkout-store';
 export {
@@ -12,5 +13,6 @@ export {
   type PaymentErrorCode,
   type PaymentResult,
 } from './errors';
+export { createPendingOrder, type NewPendingOrder, newPaymentId } from './order-store';
 export { newReservationCode, RESERVATION_CODE_PATTERN } from './reservation-code';
 export type { ConfirmedReservation, HoldInfo, MyHold, PaymentRequest } from './types';
