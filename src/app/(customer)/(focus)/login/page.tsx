@@ -24,11 +24,15 @@ export default function LoginPage({ searchParams }: { searchParams: SearchParams
 
 async function LoginContent({ searchParams }: { searchParams: SearchParams }) {
   const [params, account] = await Promise.all([searchParams, getCurrentAccount()]);
+  const mode = parseLoginMode(params.mode);
+  const error = parseLoginError(params.error);
   return (
+    // Next.js는 떠난 화면을 고른 값 그대로 남겨 둔다(Activity). 주소의 모드·실패 이유가 바뀌면 새 화면으로 시작한다
     <LoginForm
-      initialMode={parseLoginMode(params.mode)}
+      key={`${mode}:${error ?? ''}`}
+      initialMode={mode}
       nextParam={readNextParam(params.next)}
-      error={parseLoginError(params.error)}
+      error={error}
       signedInEmail={account?.email ?? null}
     />
   );
