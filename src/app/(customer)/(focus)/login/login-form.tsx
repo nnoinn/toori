@@ -159,7 +159,8 @@ export function LoginForm({ initialMode, nextParam, error, signedInEmail }: Logi
         {signedInEmail ? (
           <div className="flex flex-col gap-2 rounded-xl border p-4">
             <p className="text-sm">
-              <span className="font-semibold">{signedInEmail}</span>로 로그인돼 있어요.
+              {/* 이메일 끝 글자에 따라 "로/으로"가 달라져서 "계정으로"로 맞춘다 */}
+              <span className="font-semibold">{signedInEmail}</span> 계정으로 로그인돼 있어요.
             </p>
             <Button
               type="button"
