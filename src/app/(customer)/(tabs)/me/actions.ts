@@ -11,7 +11,7 @@ import { customers } from '@/db/schema';
 import { fail, ok, type Result } from '@/lib/result';
 import { requireCustomer } from '@/server/auth';
 
-import { profileSchema } from './profile-rules';
+import { customerPhoneSchema, PHONE_FORMAT_MESSAGE, profileSchema } from './profile-rules';
 
 /** 닉네임·연락처를 저장한다. 형식이 틀리면 첫 번째 이유를 돌려준다 */
 export async function updateMyProfile(input: unknown): Promise<Result<null>> {
@@ -33,4 +33,21 @@ export async function updateMyProfile(input: unknown): Promise<Result<null>> {
   }
   refresh();
   return ok(null);
+}
+
+/** 연락처만 저장한다(예약 확인 화면 J10, C-401). 예약하려면 꼭 있어야 해서 비우는 건 받지 않는다 */
+export async function updateMyPhone(input: unknown): Promise<Result<{ phone: string }>> {
+  const auth = await requireCustomer();
+  if (!auth.ok) return auth;
+  const parsed = customerPhoneSchema.safeParse(input);
+  if (!parsed.success) return fail('INVALID_INPUT', PHONE_FORMAT_MESSAGE);
+  if (parsed.data === null) return fail('PHONE_REQUIRED', '휴대폰 번호를 입력해 주세요');
+  const phone = parsed.data;
+  try {
+    await getDb().update(customers).set({ phone }).where(eq(customers.id, auth.data.customerId));
+  } catch (error) {
+    console.error('[updateMyPhone] 저장 실패:', error instanceof Error ? error.name : 'unknown');
+    return fail('SAVE_FAILED', '저장하지 못했어요. 잠시 후 다시 시도해 주세요');
+  }
+  return ok({ phone });
 }

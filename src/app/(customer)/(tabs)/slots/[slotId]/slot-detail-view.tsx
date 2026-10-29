@@ -1,5 +1,4 @@
 import Image from 'next/image';
-import Link from 'next/link';
 import { ChevronDown, Clock, ExternalLink, ImageOff, MapPin, Phone } from 'lucide-react';
 
 import { BackButton } from '@/components/ui/back-button';
@@ -19,32 +18,9 @@ import {
   safeExternalUrl,
   telHref,
 } from './detail-format';
+import { ReserveButton } from './reserve-button';
 import { ShopLocationMap } from './shop-location-map';
-import type { SlotAvailability, SlotDetail } from './types';
-
-const ACTION_LABEL: Record<SlotAvailability, string> = {
-  available: '예약하기',
-  onHold: '다른 고객이 결제 중이에요',
-  mine: '결제 이어서 하기',
-  closed: '예약할 수 없는 매물이에요',
-};
-
-/** 예약하기 버튼. 폰은 아래 고정 바, PC는 오른쪽 상자 안에 같은 버튼을 둔다 */
-function ReserveAction({ availability, href }: { availability: SlotAvailability; href: string }) {
-  const className = buttonVariants({ size: 'lg', className: 'h-12 w-full text-base' });
-  if (availability === 'available' || availability === 'mine') {
-    return (
-      <Link href={href} className={className}>
-        {ACTION_LABEL[availability]}
-      </Link>
-    );
-  }
-  return (
-    <button type="button" disabled className={className}>
-      {ACTION_LABEL[availability]}
-    </button>
-  );
-}
+import type { SlotDetail } from './types';
 
 type SlotDetailViewProps = {
   slot: SlotDetail;
@@ -54,7 +30,7 @@ type SlotDetailViewProps = {
 
 /**
  * 매물 상세 (J7, C-301~C-305, C-308).
- * 폰: 사진 → 정보 → 샵 정보 한 줄, 아래 고정 예약 바.
+ * 폰: 사진 → 정보 → 샵 정보 한 줄, 아래 고정 예약 바. 예약하기는 10분 홀딩을 걸고 예약 확인 화면으로 간다(reserve-button.tsx).
  * PC(md 이상): 가운데 최대 1024px 두 칸. 왼쪽 사진·샵 정보, 오른쪽 정보·가격·예약하기 상자(스크롤해도 따라온다)
  */
 export function SlotDetailView({ slot, serverNow }: SlotDetailViewProps) {
@@ -66,9 +42,6 @@ export function SlotDetailView({ slot, serverNow }: SlotDetailViewProps) {
   ].filter((link): link is { label: string; href: string } => link.href !== null);
   const tel = telHref(shop.phone);
   const nonRefundable = slot.badges.includes('nonRefundable');
-  // TODO(J8·J10): 로그인 확인(#47)과 10분 홀딩(강규민 W10)이 들어오면 예약 확인 화면으로 연결한다.
-  // 지금은 로그인 화면으로 보내고, 로그인 뒤 이 매물로 돌아온다(D1).
-  const reserveHref = `/login?next=${encodeURIComponent(`/slots/${slot.slotId}`)}`;
   const refundNotes = refundPolicyNotes(OWNER_FAULT_COUPON_AMOUNT);
 
   return (
@@ -148,7 +121,7 @@ export function SlotDetailView({ slot, serverNow }: SlotDetailViewProps) {
           </div>
         </details>
         <div className="hidden md:block">
-          <ReserveAction availability={slot.availability} href={reserveHref} />
+          <ReserveButton slotId={slot.slotId} availability={slot.availability} />
         </div>
       </section>
 
@@ -212,7 +185,7 @@ export function SlotDetailView({ slot, serverNow }: SlotDetailViewProps) {
       </section>
 
       <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 mx-auto w-full max-w-[480px] border-t bg-background p-3 md:hidden">
-        <ReserveAction availability={slot.availability} href={reserveHref} />
+        <ReserveButton slotId={slot.slotId} availability={slot.availability} />
       </div>
     </article>
   );
