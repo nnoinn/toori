@@ -7,12 +7,23 @@ export { calcPaymentAmount } from './amount';
 export { holdBlockReason } from './checkout-rules';
 export { type CheckoutSlot, readCheckoutSlot, readCustomerPhone } from './checkout-store';
 export {
+  type ConfirmOutcome,
+  confirmPaidOrder,
+  type MyOrder,
+  type OrderOutcome,
+  readMyOrder,
+  recordOrderOutcome,
+} from './confirm-store';
+export {
   AUTO_CANCEL_ERRORS,
   PAYMENT_ERRORS,
   type PaymentError,
   type PaymentErrorCode,
   type PaymentResult,
+  UNCONFIRMED_ERRORS,
+  type UnconfirmedCode,
 } from './errors';
 export { createPendingOrder, type NewPendingOrder, newPaymentId } from './order-store';
+export { getPortOnePayment, type PortOneLookup, type PortOnePayment } from './portone';
 export { newReservationCode, RESERVATION_CODE_PATTERN } from './reservation-code';
 export type { ConfirmedReservation, HoldInfo, MyHold, PaymentRequest } from './types';
