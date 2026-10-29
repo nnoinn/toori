@@ -14,10 +14,10 @@ import { getRequestNow } from '@/lib/request-time';
 import { fail, ok, type Result } from '@/lib/result';
 import { AUTH_ERRORS, getCurrentAccount, requireShopOwner } from '@/server/auth';
 import {
+  BUSINESS_DOC_ALLOWED_TYPES,
   BUSINESS_DOC_URL_TTL_SECONDS,
   UPLOAD_ALLOWED_TYPES,
   UPLOAD_MAX_BYTES,
-  type UploadContentType,
 } from '@/server/policy';
 import { readShopReviewStatus, SHOP_REVIEW_ERRORS } from '@/server/shops/review-store';
 import { createSupabaseAdminClient } from '@/server/supabase/admin';
@@ -35,9 +35,13 @@ export type SignedUpload = { path: string; token: string; signedUrl: string };
 type FileInput = { contentType: string; size: number };
 
 /** 형식·크기 확인. 화면이 보낸 값이라 믿지 않고, 실제 파일은 버킷 설정이 한 번 더 막는다 */
-function checkFile(input: FileInput): Result<UploadContentType> {
-  const type = z.enum(UPLOAD_ALLOWED_TYPES).safeParse(input?.contentType);
-  if (!type.success) return fail('INVALID_FILE_TYPE', STORAGE_ERRORS.INVALID_FILE_TYPE);
+function checkFile<T extends string>(
+  input: FileInput,
+  types: readonly [T, ...T[]],
+  typeError: string,
+): Result<T> {
+  const type = z.enum(types).safeParse(input?.contentType);
+  if (!type.success) return fail('INVALID_FILE_TYPE', typeError);
   const size = z.number().int().positive().max(UPLOAD_MAX_BYTES).safeParse(input.size);
   if (!size.success) return fail('FILE_TOO_LARGE', STORAGE_ERRORS.FILE_TOO_LARGE);
   return ok(type.data);
@@ -63,13 +67,13 @@ export async function createShopImageUploadUrl(
 ): Promise<Result<SignedUpload>> {
   const auth = await requireShopOwner(input?.shopId);
   if (!auth.ok) return auth;
-  const file = checkFile(input);
+  const file = checkFile(input, UPLOAD_ALLOWED_TYPES, STORAGE_ERRORS.INVALID_FILE_TYPE);
   if (!file.ok) return file;
   return signUpload(STORAGE_BUCKETS.shopImages, newShopImagePath(auth.data.shopId, file.data));
 }
 
 /**
- * 사업자등록증 업로드 주소(O7).
+ * 사업자등록증 업로드 주소(O7). 사진(JPG·PNG·WEBP)이나 PDF.
  * - shopId 없음: 원장님 가입 중(로그인 + 원장님 모드 + 아직 원장님 계정 없음) → business-docs/users/{userId}/…
  * - shopId 있음: 본인 샵이고 승인 전(승인 대기·반려)일 때만 → business-docs/shops/{shopId}/…
  *   승인 뒤 사업자 정보는 운영자만 고친다(#50 4장)
@@ -93,7 +97,7 @@ export async function createBusinessDocUploadUrl(
     }
     owner = { shopId: auth.data.shopId };
   }
-  const file = checkFile(input);
+  const file = checkFile(input, BUSINESS_DOC_ALLOWED_TYPES, STORAGE_ERRORS.INVALID_DOC_FILE_TYPE);
   if (!file.ok) return file;
   return signUpload(STORAGE_BUCKETS.businessDocs, newBusinessDocPath(owner, file.data));
 }
