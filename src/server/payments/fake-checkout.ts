@@ -1,5 +1,5 @@
-// 가짜 결과 버전에서만 쓰는 것. 서버에서만 부른다. W11(포트원 결제)에서 지운다.
-// 홀딩은 W10부터 DB에 진짜로 건다. 여기에는 결제 부분만 남았다.
+// 가짜 결과 버전에서만 쓰는 것. 서버에서만 부른다. W11 ②(결제 확인)에서 지운다.
+// 홀딩은 W10부터, 주문 저장은 W11 ①부터 진짜다. 여기에는 가짜 결제 확인에 필요한 것만 남았다.
 // - 결제 번호·확정 결과를 DB 대신 httpOnly 쿠키 하나에 둔다. 누구의 값인지 사용자 id로 확인한다
 // - 로컬(npm run dev)에서 .env.local에 DEV_FAKE_PAYMENT_FAILURE=<함수>:<코드>를 적으면 그 함수가 그 실패를 돌려준다
 //   예: DEV_FAKE_PAYMENT_FAILURE=confirmPayment:AMOUNT_MISMATCH. 실패 화면 확인용이고 배포 주소에서는 꺼져 있다
@@ -61,10 +61,6 @@ export async function writeFakeCheckout(state: FakeCheckout): Promise<void> {
 
 export async function clearFakeCheckout(): Promise<void> {
   (await cookies()).delete(FAKE_CHECKOUT_COOKIE);
-}
-
-export function newFakePaymentId(): string {
-  return `fake-${crypto.randomUUID()}`;
 }
 
 /** 함수마다 스위치로 흉내 낼 수 있는 실패 코드 */
