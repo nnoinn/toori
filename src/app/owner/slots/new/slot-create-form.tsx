@@ -1,22 +1,24 @@
 'use client';
 
-// 매물 3탭 등록 ① 서비스 ② 시간 (O4). 고를 수 없는 시각(지난 시각·48시간 밖·겹침)은 화면에서 막고,
-// [다음]을 누르면 서버가 다시 확인한다. ③ 할인율·저장은 O5에서 붙인다.
+// 매물 3탭 등록 ① 서비스 ② 시간 (O4) ③ 할인율·확인 (O5). 고를 수 없는 시각(지난 시각·48시간 밖·겹침)은 화면에서 막고,
+// [다음]을 누르면 서버가 다시 확인한다. [등록하기]를 누르면 서버가 ①②③을 다시 검증하고 저장한다.
 
 import { useMemo, useState, useTransition } from 'react';
 import { cn } from 'cn';
-import { Check } from 'lucide-react';
+import { Check, CircleCheck } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Price } from '@/components/ui/price';
 import type { BusinessHours } from '@/db/schema/shops';
 import { formatWon } from '@/lib/format';
 import { formatKst, utcToKst } from '@/lib/time';
-import { PUBLISH_WINDOW_HOURS } from '@/server/policy';
+import { DISCOUNT_RATE_OPTIONS, type DiscountRate, PUBLISH_WINDOW_HOURS } from '@/server/policy';
+import { previewSettlement, type SettlementPreview } from '@/server/settlements';
 
 import { formatMinutes, serviceTypeLabel } from '../../settings/menu/menu';
-import { checkSlotDraft } from './actions';
+import { checkSlotDraft, createSlot } from './actions';
 import {
   checkBusinessHours,
   groupByKstDate,
@@ -66,11 +68,19 @@ export function SlotCreateForm({
       (days.find((item) => !isClosedDay(item.starts[0], businessHours)) ?? days[0])?.dateKey ?? '',
   );
   const [startIso, setStartIso] = useState<string | null>(null);
+  const [discountRate, setDiscountRate] = useState<DiscountRate | null>(null);
+  const [newCustomerOnly, setNewCustomerOnly] = useState(false);
+  // 저장한 매물(완료 카드에 보여준다)
+  const [created, setCreated] = useState<CreatedSummary | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const menu = menus.find((item) => item.id === menuId) ?? null;
   const start = startIso ? new Date(startIso) : null;
+  const preview =
+    menu && discountRate !== null
+      ? previewSettlement({ listPrice: menu.listPrice, discountRate })
+      : null;
   const day = days.find((item) => item.dateKey === dateKey) ?? days[0];
   // 영업시간(입력한 요일만) 안에 끝나는 시작 시각만 보여준다(정민석 결정 10/28)
   const openStarts = menu
@@ -90,8 +100,12 @@ export function SlotCreateForm({
     setMessage(null);
   }
 
-  // 고른 단계(할인율은 O5에서 고른다). 앞 단계를 다 골라야 다음 단계 버튼을 누를 수 있다
-  const stepDone = { 1: menu !== null, 2: menu !== null && start !== null, 3: false } as const;
+  // 고른 단계. 앞 단계를 다 골라야 다음 단계 버튼을 누를 수 있다
+  const stepDone = {
+    1: menu !== null,
+    2: menu !== null && start !== null,
+    3: menu !== null && start !== null && discountRate !== null,
+  } as const;
   const canOpen = (target: 1 | 2 | 3) =>
     target === 1 || (target === 2 && stepDone[1]) || (target === 3 && stepDone[2]);
 
@@ -118,6 +132,44 @@ export function SlotCreateForm({
       setStep(3);
     });
   }
+
+  function submit() {
+    if (!menu || !start || discountRate === null || !preview) return;
+    setMessage(null);
+    startTransition(async () => {
+      const result = await createSlot(shopId, {
+        menuId: menu.id,
+        startAt: start.toISOString(),
+        discountRate,
+        newCustomerOnly,
+      });
+      if (!result.ok) {
+        setMessage(result.error.message);
+        return;
+      }
+      setCreated({
+        menuName: menu.name,
+        start,
+        end: slotEnd(start, menu.durationMinutes),
+        listPrice: menu.listPrice,
+        salePrice: result.data.salePrice,
+        discountRate,
+        newCustomerOnly,
+      });
+    });
+  }
+
+  /** 완료 카드에서 하나 더 올리기. 고른 메뉴는 남기고 시각·할인율부터 다시 고른다 */
+  function startOver() {
+    setCreated(null);
+    setStartIso(null);
+    setDiscountRate(null);
+    setNewCustomerOnly(false);
+    setMessage(null);
+    setStep(2);
+  }
+
+  if (created) return <CreatedCard created={created} onAgain={startOver} />;
 
   return (
     <div className="flex flex-col gap-4">
@@ -249,13 +301,57 @@ export function SlotCreateForm({
       {step === 3 && menu && start ? (
         <Card>
           <CardHeader>
-            <CardTitle>③ 할인율</CardTitle>
-          </CardHeader>
-          <CardContent>
+            <CardTitle>③ 얼마나 할인할까요?</CardTitle>
             <p className="text-sm text-muted-foreground">
-              할인율 선택과 등록은 준비 중이에요. 고른 서비스와 시간은 올릴 수 있는 것으로
-              확인했어요.
+              할인가는 정가에서 할인율만큼 뺀 금액 그대로예요(100원 단위로 올리지 않아요).
             </p>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex gap-2" role="radiogroup" aria-label="할인율">
+              {DISCOUNT_RATE_OPTIONS.map((rate) => (
+                <Button
+                  key={rate}
+                  type="button"
+                  role="radio"
+                  aria-checked={discountRate === rate}
+                  variant={discountRate === rate ? 'default' : 'outline'}
+                  size="lg"
+                  onClick={() => {
+                    setDiscountRate(rate);
+                    setMessage(null);
+                  }}
+                >
+                  {rate}%
+                </Button>
+              ))}
+            </div>
+
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={newCustomerOnly}
+                onChange={(event) => setNewCustomerOnly(event.target.checked)}
+                className="mt-0.5 size-4 accent-primary"
+              />
+              <span className="flex flex-col">
+                <span className="font-medium">신규 고객 전용</span>
+                <span className="text-muted-foreground">
+                  우리 샵에서 결제하거나 이용한 적 없는 고객에게만 보여요
+                </span>
+              </span>
+            </label>
+
+            {preview && discountRate !== null ? (
+              <PricePreview
+                listPrice={menu.listPrice}
+                discountRate={discountRate}
+                preview={preview}
+              />
+            ) : (
+              <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
+                할인율을 고르면 할인가와 정산 예정액을 보여드려요.
+              </p>
+            )}
           </CardContent>
         </Card>
       ) : null}
@@ -303,8 +399,113 @@ export function SlotCreateForm({
             {pending ? '확인 중…' : '다음'}
           </Button>
         ) : null}
+        {step === 3 ? (
+          <Button type="button" size="lg" disabled={!stepDone[3] || pending} onClick={submit}>
+            {pending ? '등록 중…' : '등록하기'}
+          </Button>
+        ) : null}
       </div>
     </div>
+  );
+}
+
+type CreatedSummary = {
+  menuName: string;
+  start: Date;
+  end: Date;
+  listPrice: number;
+  salePrice: number;
+  discountRate: number;
+  newCustomerOnly: boolean;
+};
+
+/** 가격 미리보기(S-203). previewSettlement 결과를 보여주기만 하고 화면에서 계산하지 않는다 */
+function PricePreview({
+  listPrice,
+  discountRate,
+  preview,
+}: {
+  listPrice: number;
+  discountRate: number;
+  preview: SettlementPreview;
+}) {
+  // 결제 수수료율은 PG 계약 뒤 정한다. 그 전에는 결제 수수료와 정산 예정액을 [미정]으로 둔다
+  const unknown = '[미정]';
+  const won = (amount: number | null) => (amount === null ? unknown : formatWon(amount));
+  const rows: [string, string][] = [
+    [`플랫폼 수수료 (판매가의 ${preview.platformFeeRate}%)`, `− ${won(preview.platformFee)}`],
+    ['플랫폼 수수료 VAT', `− ${won(preview.platformFeeVat)}`],
+    [
+      `결제 수수료 (판매가의 ${preview.paymentFeeRate === null ? unknown : `${preview.paymentFeeRate}%`})`,
+      preview.paymentFee === null ? unknown : `− ${won(preview.paymentFee)}`,
+    ],
+    [
+      '결제 수수료 VAT',
+      preview.paymentFeeVat === null ? unknown : `− ${won(preview.paymentFeeVat)}`,
+    ],
+  ];
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border p-4 text-sm">
+      <div className="flex items-baseline justify-between">
+        <span className="font-medium">고객 결제 금액(할인가)</span>
+        <Price listPrice={listPrice} salePrice={preview.salePrice} discountRate={discountRate} />
+      </div>
+      <dl className="flex flex-col gap-1 border-t pt-2 text-muted-foreground">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex justify-between">
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="flex items-baseline justify-between border-t pt-2">
+        <span className="font-semibold">정산 예정액</span>
+        <span className="text-base font-bold">{won(preview.payoutAmount)}</span>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        수수료는 모두 VAT 별도예요. 정산 예정액은 고객이 이용을 마친 뒤 받는 금액이에요.
+        {preview.paymentFeeRate === null ? ' 결제 수수료율은 결제 대행사 계약 뒤 정해져요.' : null}
+      </p>
+    </div>
+  );
+}
+
+/** 저장 완료. 대시보드(O9)가 생기면 그쪽으로 보낸다 */
+function CreatedCard({ created, onAgain }: { created: CreatedSummary; onAgain: () => void }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <CircleCheck className="size-5 text-primary" aria-hidden />
+          매물을 올렸어요
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">지금부터 고객 화면에 게시중으로 보여요.</p>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1 rounded-lg bg-muted p-3 text-sm">
+          <span className="font-semibold">{created.menuName}</span>
+          <span>
+            {formatKst(created.start)} ~ {timeLabel(created.end)}
+          </span>
+          <Price
+            listPrice={created.listPrice}
+            salePrice={created.salePrice}
+            discountRate={created.discountRate}
+            size="sm"
+          />
+          {created.newCustomerOnly ? (
+            <Badge variant="secondary" className="w-fit">
+              신규 고객 전용
+            </Badge>
+          ) : null}
+        </div>
+        <div className="flex justify-end">
+          <Button type="button" size="lg" onClick={onAgain}>
+            매물 하나 더 올리기
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
