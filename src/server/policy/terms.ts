@@ -11,3 +11,12 @@ export const TERMS_VERSIONS = {
   marketing: 'draft-2026-10',
   age14: 'draft-2026-10',
 } as const satisfies Record<TermsType, string>;
+
+/**
+ * 결제 버튼 위 필수 동의 2개의 문구 버전(C-402, 동의 문구 3장·3-1장). 주문(orders)에 버전과 동의 시각을 남긴다.
+ * 동의 문구가 확정되면 nnoinn이 값만 바꾼다
+ */
+export const CHECKOUT_CONSENT_VERSIONS = {
+  refundPolicy: 'draft-2026-10',
+  bookerInfo: 'draft-2026-10',
+} as const;
