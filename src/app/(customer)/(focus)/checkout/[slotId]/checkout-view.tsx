@@ -52,6 +52,12 @@ export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProp
   const router = useRouter();
   const [expired, setExpired] = useState(false);
   const [phone, setPhone] = useState(savedPhone);
+  // 같은 홀딩으로 돌아왔는데 그사이 다른 화면(내 정보)에서 연락처가 바뀌었으면 서버 값으로 맞춘다
+  const [serverPhone, setServerPhone] = useState(savedPhone);
+  if (serverPhone !== savedPhone) {
+    setServerPhone(savedPhone);
+    setPhone(savedPhone);
+  }
   const [refundAgreed, setRefundAgreed] = useState(false);
   const [bookerAgreed, setBookerAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -163,7 +169,8 @@ export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProp
         </div>
       </dl>
 
-      <PhoneField phone={phone} onSaved={setPhone} />
+      {/* 연락처가 바뀌면(저장, 서버 값) 입력칸 상태도 새로 시작한다 */}
+      <PhoneField key={phone ?? ''} phone={phone} onSaved={setPhone} />
 
       <section
         className="flex flex-col gap-2 rounded-xl bg-muted p-4 text-sm"

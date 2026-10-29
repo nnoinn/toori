@@ -46,7 +46,16 @@ async function CheckoutContent({ params }: { params: Params }) {
   ]);
   if (!hold.ok || !hold.data || !slot) return <HoldEnded slotId={slotId} />;
 
-  return <CheckoutView slot={slot} hold={hold.data} phone={customer?.phone ?? null} />;
+  // Next.js는 떠난 화면을 체크·입력 상태 그대로 남겨 둔다(Activity). 새 홀딩이면 새 화면으로 시작한다.
+  // 같은 홀딩으로 돌아오면('결제 이어서 하기') 체크한 동의는 그대로 둔다
+  return (
+    <CheckoutView
+      key={hold.data.holdExpiresAt}
+      slot={slot}
+      hold={hold.data}
+      phone={customer?.phone ?? null}
+    />
+  );
 }
 
 function CheckoutSkeleton() {
