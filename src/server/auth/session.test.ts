@@ -90,11 +90,12 @@ describe('signInWithProvider', () => {
 });
 
 describe('signOut', () => {
-  it('이 브라우저의 로그인만 끝내고 계정 모드 쿠키를 지운다', async () => {
+  it('이 브라우저의 로그인만 끝내고 계정 모드·가입 직후 안내 쿠키를 지운다', async () => {
     state.signOut.mockResolvedValue({ error: null });
     expect(await signOut()).toEqual({ ok: true, data: null });
     expect(state.signOut).toHaveBeenCalledWith({ scope: 'local' });
     expect(state.cookieDelete).toHaveBeenCalledWith('account_mode');
+    expect(state.cookieDelete).toHaveBeenCalledWith('marketing_consent_notice');
   });
 
   it('실패해도 계정 모드 쿠키는 지우고 SIGN_OUT_FAILED를 돌려준다', async () => {
