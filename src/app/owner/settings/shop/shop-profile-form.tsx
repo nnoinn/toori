@@ -93,6 +93,17 @@ export function ShopProfileForm({
       setConfirm(null);
       if (result.ok) {
         setSavedCategory(next.category);
+        // 저장한 모양(전화번호는 하이픈 넣은 모양 등)으로 칸을 맞춘다. 새로고침하지 않아도 저장된 값이 보인다
+        const saved = validateShopProfile(next);
+        if (saved.ok) {
+          setForm((prev) => ({
+            ...prev,
+            name: saved.data.name,
+            phone: saved.data.phone,
+            addressDetail: saved.data.addressDetail ?? '',
+            description: saved.data.description ?? '',
+          }));
+        }
         setStatus({
           kind: 'saved',
           message: confirmCategoryChange
