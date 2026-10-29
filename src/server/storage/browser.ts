@@ -29,7 +29,7 @@ export async function uploadToSignedUrl(input: {
   const { error } = await createBrowserClient(supabaseUrl(), key)
     .storage.from(input.bucket)
     .uploadToSignedUrl(input.path, input.token, input.file, { contentType: input.file.type });
-  if (error) return fail('UPLOAD_FAILED', '사진을 올리지 못했어요. 다시 시도해 주세요');
+  if (error) return fail('UPLOAD_FAILED', '파일을 올리지 못했어요. 다시 시도해 주세요');
   return ok({ path: input.path });
 }
 
