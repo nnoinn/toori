@@ -8,6 +8,7 @@ import { NO_SHOW_PENALTY_RATE, OWNER_FAULT_COUPON_AMOUNT, REFUND_BANDS } from '@
 import {
   formatBusinessHours,
   formatDuration,
+  kakaoMapLink,
   refundPolicyLines,
   refundPolicyNotes,
   safeExternalUrl,
@@ -137,5 +138,13 @@ describe('환불 규정 안내', () => {
       ],
       after: '원장님 사정으로 취소되면 전액 환불하고 3,000원 쿠폰을 드려요.',
     });
+  });
+});
+
+describe('카카오맵 크게 보기 링크', () => {
+  it('샵 이름과 좌표를 넣고, 이름의 쉼표·공백은 주소에 맞게 바꾼다', () => {
+    expect(kakaoMapLink('샘플 헤어, 2층', 37.3, 126.8)).toBe(
+      'https://map.kakao.com/link/map/%EC%83%98%ED%94%8C%20%ED%97%A4%EC%96%B4%2C%202%EC%B8%B5,37.3,126.8',
+    );
   });
 });

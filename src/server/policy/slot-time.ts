@@ -14,8 +14,11 @@ export const NON_REFUNDABLE_WITHIN_HOURS = 6;
 /** '예약하기'를 누르면 그 매물을 10분 동안 홀딩한다(C-404) */
 export const HOLD_MINUTES = 10;
 
-/** 매물 시작 시각을 고르는 간격(3탭 ②, 정민석 #23 D10) */
-export const SLOT_START_STEP_MINUTES = 10;
+/** 매물 시작 시각 단위(3탭 ②). 시작 시각은 :00·:30처럼 이 단위로만 고른다(10/28 #108, #23 D10의 10분을 바꿈) */
+export const SLOT_START_STEP_MINUTES = 30;
+
+/** 메뉴 소요 시간 단위(O3). 40·50분 걸리는 서비스도 이 단위로 정한다(10/28 #108) */
+export const MENU_DURATION_STEP_MINUTES = 30;
 
 /**
  * 카드 배지·상세 강조(C-203, C-308). 서버가 서버 시각(now)으로 정해서 화면에 넘긴다.

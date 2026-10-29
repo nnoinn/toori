@@ -15,6 +15,7 @@ import {
   type SlotStatus,
   slots,
 } from '@/db/schema';
+import { MENU_DURATION_STEP_MINUTES, SLOT_START_STEP_MINUTES } from '@/server/policy';
 
 import type { TestTx } from './test-db';
 
@@ -85,7 +86,10 @@ export async function createTestShop(tx: TestTx, shop: Partial<typeof shops.$inf
 
 export type TestShop = Awaited<ReturnType<typeof createTestShop>>;
 
-/** 매물 한 건의 값(넣지는 않는다). 시각은 'HH:MM'(2026-11-01, 한국 시간). 기본은 게시중·30% 할인 */
+/**
+ * 매물 한 건의 값(넣지는 않는다). 시각은 'HH:MM'(2026-11-01, 한국 시간). 기본은 게시중·30% 할인.
+ * 소요 시간은 끝 − 시작이다(D10). 시작 시각과 소요 시간이 정책 단위(#108, 30분)가 아니면 멈춘다
+ */
 export function testSlot(
   ids: TestShop,
   start: string,
@@ -93,12 +97,25 @@ export function testSlot(
   extra: Partial<typeof slots.$inferInsert> = {},
 ) {
   const at = (hm: string) => new Date(`2026-11-01T${hm}:00+09:00`);
+  const minutesOf = (hm: string) => {
+    const [h, m] = hm.split(':').map(Number);
+    return h * 60 + m;
+  };
+  const durationMinutes = minutesOf(end) - minutesOf(start);
+  if (
+    minutesOf(start) % SLOT_START_STEP_MINUTES !== 0 ||
+    durationMinutes % MENU_DURATION_STEP_MINUTES !== 0
+  ) {
+    throw new Error(
+      `testSlot: 매물 시작 시각은 ${SLOT_START_STEP_MINUTES}분, 소요 시간은 ${MENU_DURATION_STEP_MINUTES}분 단위로 넣어요(#108). 받은 값 ${start}~${end}`,
+    );
+  }
   return {
     ...ids,
     serviceType: 'cut',
     menuName: '커트',
     listPrice: 20000,
-    durationMinutes: 60,
+    durationMinutes,
     discountRate: 30,
     salePrice: 14000,
     startAt: at(start),
