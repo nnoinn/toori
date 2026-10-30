@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 
 export const metadata: Metadata = { title: '매장 설정' };
 
-// 매장 설정 첫 화면. 샵 정보(O2)·메뉴(O3)·사진·링크(O6). 정산 계좌(O7)는 만들 때 href를 채운다
+// 매장 설정 첫 화면. 샵 정보(O2)·메뉴(O3)·사진·링크(O6)·사업자 정보·정산 계좌(O7 ②)
 const SECTIONS: { title: string; description: string; href?: string }[] = [
   {
     title: '샵 정보',
@@ -23,7 +23,17 @@ const SECTIONS: { title: string; description: string; href?: string }[] = [
     description: '대표 사진, 스타일 사진, 인스타그램·네이버 플레이스',
     href: '/owner/settings/images',
   },
-  { title: '정산 계좌', description: '정산금을 받을 계좌' },
+  {
+    title: '사업자 정보',
+    description:
+      '상호, 대표자명, 사업자등록번호, 개업일자, 사업자등록증(승인 전까지 고칠 수 있어요)',
+    href: '/owner/settings/business',
+  },
+  {
+    title: '정산 계좌',
+    description: '정산금을 받을 계좌',
+    href: '/owner/settings/payout',
+  },
 ];
 
 export default function OwnerSettingsPage() {

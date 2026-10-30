@@ -4,10 +4,10 @@ import { redirect } from 'next/navigation';
 
 import { LoadingCards } from '@/components/ui/state';
 import { getRequestNow } from '@/lib/request-time';
-import { utcToKst } from '@/lib/time';
 import { getCurrentAccount } from '@/server/auth';
 import { loginPath, OWNER_JOIN_PATH } from '@/server/auth/paths';
 
+import { kstDateKey } from '../business-fields';
 import { OwnerJoinForm } from './owner-join-form';
 
 export const metadata: Metadata = { title: '원장님 가입' };
@@ -28,7 +28,5 @@ async function OwnerJoinContent() {
   // 이미 가입했으면 원장님 화면으로
   if (account.ownerId) redirect('/owner');
 
-  const { year, month, day } = utcToKst(await getRequestNow());
-  const today = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-  return <OwnerJoinForm today={today} />;
+  return <OwnerJoinForm today={kstDateKey(await getRequestNow())} />;
 }
