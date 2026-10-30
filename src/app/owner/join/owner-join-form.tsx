@@ -2,12 +2,12 @@
 
 // 원장님 가입·입점 신청 입력 (O7 ①, S-101 화면·S-107·S-108, #23 D3·D17). 가입 때는 필수만 받는다(D17).
 // [입점 신청하기]를 누르면 화면에서 한 번 검사하고, 강규민님 createOwnerAccount가 다시 검사한 뒤 샵을 '승인 대기'로 만든다.
+// 성공하면 /owner로 가고 거기서 "입점 신청을 마쳤어요" 안내 상자가 잠깐 뜬다(joined-notice.tsx).
 
 import { useRef, useState, useTransition } from 'react';
-import Link from 'next/link';
 import { unstable_rethrow, useRouter } from 'next/navigation';
 import { cn } from 'cn';
-import { ChevronRight, CircleCheck, FileUp } from 'lucide-react';
+import { ChevronRight, FileUp } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +21,7 @@ import { SHOP_CATEGORIES } from '@/server/policy/catalog';
 
 import { AddressSearchButton } from '../(console)/settings/shop/address-search-button';
 import { BUSINESS_DOC_ACCEPT, uploadBusinessDoc } from './business-doc';
+import { clearJoinPending, markJoinPending } from './joined-notice';
 import {
   EMPTY_OWNER_JOIN_FORM,
   OWNER_AGREEMENT_ITEMS,
@@ -44,7 +45,6 @@ export function OwnerJoinForm({ today }: { today: string }) {
   const [candidates, setCandidates] = useState<GeocodeCandidate[]>([]);
   // 올린 등록증 파일 이름과 올리는 중인지
   const [doc, setDoc] = useState<{ name: string; uploading: boolean } | null>(null);
-  const [done, setDone] = useState(false);
   const [pending, startTransition] = useTransition();
   const docInput = useRef<HTMLInputElement>(null);
 
@@ -72,13 +72,17 @@ export function OwnerJoinForm({ today }: { today: string }) {
       return;
     }
     setErrors({});
+    // 성공하면 저장이 바꾼 쿠키 때문에 이 화면이 다시 그려지면서 바로 /owner로 넘어가서, 여기로 돌아오지 않을 수 있다.
+    // 그래서 부르기 전에 표시를 남기고, /owner가 그 표시로 안내 상자를 띄운다
+    markJoinPending();
     startTransition(async () => {
       try {
         const result = await createOwnerAccount(checked.data);
         if (result.ok) {
-          setDone(true);
+          router.replace('/owner');
           return;
         }
+        clearJoinPending();
         const { code, message } = result.error;
         // 다른 창에서 먼저 가입을 마친 경우
         if (code === 'ALREADY_EXISTS') {
@@ -100,6 +104,7 @@ export function OwnerJoinForm({ today }: { today: string }) {
         focusFirstError(fieldErrors);
       } catch (caught) {
         unstable_rethrow(caught);
+        clearJoinPending();
         setFormError(JOIN_FAILED_MESSAGE);
       }
     });
@@ -137,8 +142,6 @@ export function OwnerJoinForm({ today }: { today: string }) {
     value: form[field],
     onChange: (event: React.ChangeEvent<HTMLInputElement>) => update(field, event.target.value),
   });
-
-  if (done) return <JoinDone />;
 
   const allAgreed = Object.values(form.agreements).every(Boolean);
   const busy = pending || doc?.uploading === true;
@@ -447,29 +450,6 @@ export function OwnerJoinForm({ today }: { today: string }) {
         </p>
       </div>
     </form>
-  );
-}
-
-/** 신청 완료. 승인 대기 상태 화면은 O7 ②에서 만든다 */
-function JoinDone() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-xl">
-          <CircleCheck className="size-6 text-primary" aria-hidden />
-          입점 신청을 마쳤어요
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <p className="text-sm text-muted-foreground">
-          운영팀이 사업자 정보를 확인한 뒤 승인하면 매물을 올릴 수 있어요. 기다리는 동안 영업시간,
-          메뉴, 사진을 먼저 입력해 두면 승인 후 바로 매물을 올릴 수 있어요.
-        </p>
-        <Button asChild size="lg" className="self-end">
-          <Link href="/owner/settings">매장 설정으로</Link>
-        </Button>
-      </CardContent>
-    </Card>
   );
 }
 
