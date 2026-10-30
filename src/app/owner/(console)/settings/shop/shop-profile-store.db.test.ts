@@ -7,13 +7,13 @@ import { afterAll, expect, it } from 'vitest';
 import { shops } from '@/db/schema';
 import type { GeocodeResult } from '@/features/map/geocode';
 
-import { createTestShop, TEST_LOCATION } from '../../../../../tests/db/fixtures';
+import { createTestShop, TEST_LOCATION } from '../../../../../../tests/db/fixtures';
 import {
   closeTestDb,
   describeDb,
   type TestTx,
   withRollback,
-} from '../../../../../tests/db/test-db';
+} from '../../../../../../tests/db/test-db';
 import type { ShopProfileValues } from './shop-profile';
 import { selectShopProfile, updateShopProfile } from './shop-profile-store';
 

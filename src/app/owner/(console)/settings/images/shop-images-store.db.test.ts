@@ -6,8 +6,8 @@ import { afterAll, expect, it } from 'vitest';
 
 import { menus, shopImages } from '@/db/schema';
 
-import { createTestShop } from '../../../../../tests/db/fixtures';
-import { closeTestDb, describeDb, withRollback } from '../../../../../tests/db/test-db';
+import { createTestShop } from '../../../../../../tests/db/fixtures';
+import { closeTestDb, describeDb, withRollback } from '../../../../../../tests/db/test-db';
 import { SHOP_IMAGE_LIMITS } from './shop-images';
 import {
   deleteShopImage,
