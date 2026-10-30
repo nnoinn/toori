@@ -39,6 +39,17 @@ export function PayoutForm({ shopId, account }: { shopId: string; account: Payou
   const [status, setStatus] = useState<{ kind: 'saved' | 'error'; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // 받은 계좌가 바뀌었으면(저장 뒤, 다른 창에서 바꾼 뒤 돌아왔을 때) 입력 중이던 칸을 닫는다(기술 가이드 2장 ②).
+  // key로 새로 시작하면 "정산 계좌를 바꿨어요" 문구까지 사라져서 이 방법을 쓴다
+  const [received, setReceived] = useState(() => JSON.stringify(account));
+  const current = JSON.stringify(account);
+  if (current !== received) {
+    setReceived(current);
+    setEditing(false);
+    setForm(EMPTY);
+    setErrors({});
+  }
+
   function update(field: keyof PayoutInput, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: undefined }));

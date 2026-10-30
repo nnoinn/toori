@@ -33,6 +33,6 @@ async function PayoutContent() {
   const auth = await ensureOwnerPage(PAGE_PATH);
   const account = await selectPayoutAccount(getDb(), auth.shopId);
   if (!account) return <ErrorState description="정산 계좌를 찾을 수 없어요" />;
-  // 저장된 계좌가 바뀌면 폼을 새로 시작한다(기술 가이드 2장 "떠났다 돌아온 화면")
-  return <PayoutForm key={JSON.stringify(account)} shopId={auth.shopId} account={account} />;
+  // 저장된 계좌가 바뀌면 폼이 입력 중이던 칸을 닫는다(payout-form.tsx)
+  return <PayoutForm shopId={auth.shopId} account={account} />;
 }

@@ -43,8 +43,7 @@ async function BusinessInfoContent() {
   if (!info) return <ErrorState description="샵을 찾을 수 없어요" />;
   return (
     <BusinessInfoForm
-      // 저장된 값이나 입점 상태가 바뀌면(다시 신청 등) 폼을 새로 시작한다(기술 가이드 2장 "떠났다 돌아온 화면")
-      key={JSON.stringify(info)}
+      // 저장된 값이 바뀌면 폼이 입력 칸을 그 값으로 맞춘다(business-info-form.tsx)
       shopId={auth.shopId}
       today={kstDateKey(now)}
       initial={info}

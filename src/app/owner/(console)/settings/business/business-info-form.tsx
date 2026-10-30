@@ -2,7 +2,8 @@
 
 // 매장 설정 > 사업자 정보 (O7 ②, S-101·S-102, #23 D3·D19).
 // 승인 대기·반려면 고칠 수 있고, 반려면 [고쳐서 다시 신청하기]로 승인 대기로 돌린다. 승인 뒤에는 읽기 전용이다.
-// 서버 값으로 시작하는 폼이라 page.tsx가 저장된 값이 바뀔 때마다 key를 바꿔 새로 시작한다(기술 가이드 2장).
+// 서버 값으로 시작하는 폼이라, 받은 값이 바뀌면(저장 뒤, 떠났다 돌아왔을 때) 입력 칸도 그 값으로 맞춘다(기술 가이드 2장 ②).
+// key로 새로 시작하면 "저장했어요" 문구까지 사라져서 이 방법을 쓴다.
 
 import { useRef, useState, useTransition } from 'react';
 import { cn } from 'cn';
@@ -50,19 +51,23 @@ function BusinessInfoEditor({
   initial: BusinessInfo;
 }) {
   const rejected = initial.status === 'rejected';
-  const [form, setForm] = useState<BusinessInput>({
-    businessName: initial.businessName,
-    representativeName: initial.representativeName,
-    businessRegistrationNumber: formatBrn(initial.businessRegistrationNumber),
-    openedOn: initial.openedOn,
-    businessDocPath: initial.businessDocPath,
-  });
+  const [form, setForm] = useState<BusinessInput>(() => toInput(initial));
   const [errors, setErrors] = useState<BusinessFieldErrors>({});
   const [status, setStatus] = useState<{ kind: 'saved' | 'error'; text: string } | null>(null);
   // 새로 올린 등록증 파일 이름과 올리는 중인지(올리기 전에는 저장된 파일을 보여준다)
   const [doc, setDoc] = useState<{ name: string; uploading: boolean } | null>(null);
   const [pending, startTransition] = useTransition();
   const docInput = useRef<HTMLInputElement>(null);
+
+  // 받은 값이 바뀌었으면 입력 칸도 맞춘다(그리는 중에 이전 값과 비교, 기술 가이드 2장 ②)
+  const [received, setReceived] = useState(() => JSON.stringify(initial));
+  const current = JSON.stringify(initial);
+  if (current !== received) {
+    setReceived(current);
+    setForm(toInput(initial));
+    setDoc(null);
+    setErrors({});
+  }
 
   function update(field: Field, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -96,8 +101,11 @@ function BusinessInfoEditor({
     startTransition(async () => {
       const result = await saveBusinessInfo(shopId, form, { resubmit: rejected });
       if (result.ok) {
-        // 반려였으면 승인 대기로 바뀌어 화면을 새로 그린다(page.tsx의 key)
-        setStatus({ kind: 'saved', text: '저장했어요' });
+        // 반려였으면 서버 값이 승인 대기로 바뀌어 반려 안내가 사라진다
+        setStatus({
+          kind: 'saved',
+          text: rejected ? '다시 신청했어요. 운영팀이 다시 확인해요' : '저장했어요',
+        });
         return;
       }
       setErrors(result.error.fieldErrors ?? {});
@@ -287,6 +295,17 @@ function ViewDocButton({ shopId }: { shopId: string }) {
       {error ? <span className="text-sm text-destructive">{error}</span> : null}
     </div>
   );
+}
+
+/** 저장된 값 → 입력 칸 값 */
+function toInput(info: BusinessInfo): BusinessInput {
+  return {
+    businessName: info.businessName,
+    representativeName: info.representativeName,
+    businessRegistrationNumber: formatBrn(info.businessRegistrationNumber),
+    openedOn: info.openedOn,
+    businessDocPath: info.businessDocPath,
+  };
 }
 
 /** 숫자 10자리 → 123-45-67890 */
