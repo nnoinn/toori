@@ -14,6 +14,10 @@ export const SHOP_PROFILE_LIMITS = {
   description: 1000,
 } as const;
 
+/** 업종 변경을 막는 매물이 있을 때 문구(10/29 결정, 확인 창과 서버 함수가 같이 쓴다) */
+export const CATEGORY_CHANGE_BLOCKED_MESSAGE =
+  '판매 중이거나 예약된 매물이 있어서 업종을 바꿀 수 없어요. 판매 전 매물은 마감하고, 예약된 매물은 이용이 끝난 뒤 다시 시도해 주세요';
+
 /** 화면 표시 순서(월요일부터). weekday 0=일 ~ 6=토 */
 export const WEEKDAYS_FROM_MONDAY = [1, 2, 3, 4, 5, 6, 0] as const;
 export const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'] as const;
