@@ -22,13 +22,26 @@ async function setup(sql: postgres.TransactionSql) {
   await sql`insert into profiles (id, email) values (${meId}, ${EMAIL})`;
   const run = (command: string, arg?: string) =>
     runScenario(sql, { email: EMAIL, command, arg, now: NOW });
-  return { meId, run };
+  const counts = () => countsOf(sql, [...Object.values(userIds), meId]);
+  return { meId, run, counts };
 }
 
-async function counts(sql: postgres.TransactionSql) {
+/**
+ * 이 테스트가 만든 계정(시드 계정·나)에 딸린 줄만 센다. 시나리오 명령은 이 계정들의 샵·고객에만 쓴다.
+ * DB 전체를 세면, 같은 테스트 DB에서 동시에 도는 다른 테스트(예: 홀딩 동시 테스트, 데이터를 저장했다가 지움)의 줄이
+ * 세는 사이에 생기거나 사라져서 가끔 실패한다(10/29 main 검사)
+ */
+async function countsOf(sql: postgres.TransactionSql, userIds: string[]) {
   const [row] = await sql<{ slots: number; orders: number; shops: number; customers: number }[]>`
-    select (select count(*)::int from slots) as slots, (select count(*)::int from orders) as orders,
-      (select count(*)::int from shops) as shops, (select count(*)::int from customers) as customers`;
+    with test_shops as (
+      select s.id from shops s join owners o on o.id = s.owner_id where o.user_id in ${sql(userIds)}
+    ), test_customers as (
+      select id from customers where user_id in ${sql(userIds)}
+    )
+    select (select count(*)::int from slots where shop_id in (select id from test_shops)) as slots,
+      (select count(*)::int from orders where customer_id in (select id from test_customers)) as orders,
+      (select count(*)::int from test_shops) as shops,
+      (select count(*)::int from test_customers) as customers`;
   return row;
 }
 
@@ -47,8 +60,8 @@ describeDb('시나리오 명령 (실제 DB)', () => {
 
   it('고객 상황을 만들고 reset하면 시나리오 전과 같아진다', async () => {
     await withRollbackSql(async (sql) => {
-      const { meId, run } = await setup(sql);
-      const before = await counts(sql);
+      const { meId, run, counts } = await setup(sql);
+      const before = await counts();
 
       await run('customer-existing', 'a');
       const history = () => sql<{ n: number }[]>`
@@ -82,15 +95,15 @@ describeDb('시나리오 명령 (실제 DB)', () => {
       expect(status.join('\n')).toContain('내 예약 4건');
 
       await run('reset');
-      const after = await counts(sql);
+      const after = await counts();
       expect(after).toEqual(before);
     });
   });
 
   it('원장님 샵을 만들고 입점 상태를 바꾸고, 매물 상태 6가지를 만든 뒤 reset으로 지운다', async () => {
     await withRollbackSql(async (sql) => {
-      const { meId, run } = await setup(sql);
-      const before = await counts(sql);
+      const { meId, run, counts } = await setup(sql);
+      const before = await counts();
 
       await expect(run('owner-slots')).rejects.toThrow('owner-shop approved');
       await run('owner-shop', 'pending');
@@ -118,7 +131,7 @@ describeDb('시나리오 명령 (실제 DB)', () => {
       }
 
       await run('reset');
-      expect(await counts(sql)).toEqual(before);
+      expect(await counts()).toEqual(before);
       const [{ n }] = await sql<
         { n: number }[]
       >`select count(*)::int as n from owners where user_id = ${meId}`;

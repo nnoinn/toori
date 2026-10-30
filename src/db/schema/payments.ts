@@ -58,6 +58,9 @@ export const orders = pgTable(
     // 결제 버튼 위 환불 규정 필수 동의(C-402). 환불 분쟁 때 증거로 쓴다
     refundPolicyVersion: text().notNull(),
     refundPolicyAgreedAt: timestamptz().notNull(),
+    // 결제 버튼 위 예약자 정보 제공 필수 동의(C-402, 동의 문구 3-1장, 10/28 결정). W11 전 주문(시드·테스트)은 비어 있다
+    bookerInfoVersion: text(),
+    bookerInfoAgreedAt: timestamptz(),
     status: text().notNull(),
     // 포트원에서 받은 결제 상태
     pgStatus: text(),
