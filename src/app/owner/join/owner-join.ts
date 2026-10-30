@@ -4,17 +4,17 @@
 
 import { normalizePhone } from '@/lib/phone';
 import { SITE_NAME } from '@/lib/site';
-import { BANK_CODES, type BankCode } from '@/server/policy';
+import type { BankCode } from '@/server/policy';
 import { SHOP_CATEGORY_KEYS, type ShopCategory } from '@/server/policy/catalog';
 import type { CreateOwnerAccountInput } from '@/server/auth/owner-account';
 
 import { SHOP_PROFILE_LIMITS } from '../(console)/settings/shop/shop-profile';
-
-export const OWNER_JOIN_LIMITS = {
-  personName: 20,
-  businessName: 40,
-  accountHolder: 40,
-} as const;
+import {
+  checkRequired,
+  OWNER_FIELD_LIMITS,
+  validateBusinessInput,
+  validatePayoutInput,
+} from '../business-fields';
 
 // ---- 약관 (필수 3개, 원장님은 광고성 정보 동의가 없다) ----
 
@@ -73,56 +73,36 @@ export const EMPTY_OWNER_JOIN_FORM: OwnerJoinForm = {
   agreements: { supplier: false, privacy: false, payoutInfo: false },
 };
 
-/** 하이픈·공백을 뺀 숫자 */
-function onlyDigits(value: string): string {
-  return value.replace(/[-\s]/g, '');
-}
-
 /**
  * 입력값을 검사해서 createOwnerAccount 입력으로 바꾼다. today는 한국 날짜(YYYY-MM-DD)로, 개업일자가 그 뒤면 막는다.
- * 실패하면 칸별 문구
+ * 사업자 정보·정산 계좌 검사는 매장 설정과 같이 쓴다(business-fields.ts). 실패하면 칸별 문구
  */
 export function validateOwnerJoin(
   form: OwnerJoinForm,
   today: string,
 ): { ok: true; data: CreateOwnerAccountInput } | { ok: false; fieldErrors: OwnerJoinFieldErrors } {
   const errors: OwnerJoinFieldErrors = {};
-  const required = (field: OwnerJoinField, value: string, label: string, max?: number) => {
-    const text = value.trim();
-    if (text === '') errors[field] = `${label}을(를) 입력해 주세요`;
-    else if (max !== undefined && text.length > max)
-      errors[field] = `${max}자 이하로 입력해 주세요`;
-    return text;
-  };
 
-  const ownerName = required('ownerName', form.ownerName, '이름', OWNER_JOIN_LIMITS.personName);
+  const ownerName = checkRequired(
+    errors,
+    'ownerName',
+    form.ownerName,
+    '이름',
+    OWNER_FIELD_LIMITS.personName,
+  );
   const ownerPhone = normalizePhone(form.ownerPhone, 'mobile');
   if (!ownerPhone) errors.ownerPhone = '휴대폰 번호를 다시 확인해 주세요(예: 010-1234-5678)';
 
-  const businessName = required(
-    'businessName',
-    form.businessName,
-    '상호',
-    OWNER_JOIN_LIMITS.businessName,
-  );
-  const representativeName = required(
-    'representativeName',
-    form.representativeName,
-    '대표자명',
-    OWNER_JOIN_LIMITS.personName,
-  );
-  const businessRegistrationNumber = onlyDigits(form.businessRegistrationNumber);
-  if (!/^\d{10}$/.test(businessRegistrationNumber)) {
-    errors.businessRegistrationNumber = '사업자등록번호 10자리를 입력해 주세요(예: 123-45-67890)';
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(form.openedOn)) {
-    errors.openedOn = '개업일자를 골라 주세요';
-  } else if (form.openedOn > today) {
-    errors.openedOn = '개업일자는 오늘이나 그 전 날짜여야 해요';
-  }
-  if (form.businessDocPath === '') errors.businessDocPath = '사업자등록증을 올려 주세요';
+  const business = validateBusinessInput(form, today);
+  if (!business.ok) Object.assign(errors, business.fieldErrors);
 
-  const shopName = required('shopName', form.shopName, '샵 이름', SHOP_PROFILE_LIMITS.name);
+  const shopName = checkRequired(
+    errors,
+    'shopName',
+    form.shopName,
+    '샵 이름',
+    SHOP_PROFILE_LIMITS.name,
+  );
   const category = form.category;
   if (!category || !SHOP_CATEGORY_KEYS.includes(category)) errors.category = '업종을 골라 주세요';
   const shopPhone = normalizePhone(form.shopPhone);
@@ -134,24 +114,21 @@ export function validateOwnerJoin(
     errors.addressDetail = `${SHOP_PROFILE_LIMITS.addressDetail}자 이하로 입력해 주세요`;
   }
 
-  const bankCode = form.bankCode;
-  if (!bankCode || !BANK_CODES.includes(bankCode)) errors.bankCode = '은행을 골라 주세요';
-  const accountNumber = onlyDigits(form.accountNumber);
-  if (!/^\d{8,16}$/.test(accountNumber)) {
-    errors.accountNumber = '계좌번호를 숫자로 입력해 주세요(8~16자리)';
-  }
-  const accountHolder = required(
-    'accountHolder',
-    form.accountHolder,
-    '예금주',
-    OWNER_JOIN_LIMITS.accountHolder,
-  );
+  const payout = validatePayoutInput(form);
+  if (!payout.ok) Object.assign(errors, payout.fieldErrors);
 
   if (!Object.values(form.agreements).every(Boolean)) {
     errors.agreements = '필수 항목에 모두 동의해 주세요';
   }
 
-  if (Object.keys(errors).length > 0 || !ownerPhone || !shopPhone || !category || !bankCode) {
+  if (
+    Object.keys(errors).length > 0 ||
+    !ownerPhone ||
+    !shopPhone ||
+    !category ||
+    !business.ok ||
+    !payout.ok
+  ) {
     return { ok: false, fieldErrors: errors };
   }
   return {
@@ -159,18 +136,14 @@ export function validateOwnerJoin(
     data: {
       owner: { name: ownerName, phone: ownerPhone },
       shop: {
-        businessName,
-        representativeName,
-        businessRegistrationNumber,
-        openedOn: form.openedOn,
-        businessDocPath: form.businessDocPath,
+        ...business.data,
         name: shopName,
         category,
         phone: shopPhone,
         roadAddress,
         ...(addressDetail ? { addressDetail } : {}),
       },
-      payout: { bankCode, accountNumber, accountHolder },
+      payout: payout.data,
       agreements: { supplier: true, privacy: true, payoutInfo: true },
     },
   };
