@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { Clock, MapPin, Phone } from 'lucide-react';
+import { Clock, Info, MapPin, Phone } from 'lucide-react';
 
 import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
@@ -135,7 +135,10 @@ async function DetailContent({ params }: { params: Params }) {
             <CancelReservation key={refundPreview.data.serverNow} preview={refundPreview.data} />
           ) : (
             // 시작까지 6시간 미만이면 취소 버튼 대신 안내만(10/29 결정, #128)
-            <p className="text-sm text-muted-foreground">{REFUND_ERRORS.NOT_REFUNDABLE}</p>
+            <p className="flex items-center gap-2 rounded-xl bg-muted/60 p-3 text-sm">
+              <Info className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              {REFUND_ERRORS.NOT_REFUNDABLE}
+            </p>
           )}
         </section>
       ) : null}
