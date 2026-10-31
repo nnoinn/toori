@@ -27,7 +27,7 @@ import {
   PUBLISH_WINDOW_HOURS,
   SLOT_START_STEP_MINUTES,
 } from './slot-time';
-import { TERMS_VERSIONS } from './terms';
+import { CHECKOUT_CONSENT_VERSIONS, TERMS_VERSIONS } from './terms';
 import {
   BUSINESS_DOC_ALLOWED_TYPES,
   BUSINESS_DOC_URL_TTL_SECONDS,
@@ -89,6 +89,11 @@ describe('알림·동의 (#48 6장)', () => {
 
   it('약관 버전은 DB의 약관 종류마다 하나씩 있다', () => {
     expect(Object.keys(TERMS_VERSIONS).sort()).toEqual([...TERMS_TYPES].sort());
+  });
+
+  it('결제 버튼 위 필수 동의 2개(환불 규정·예약자 정보 제공)의 문구 버전이 있다', () => {
+    expect(Object.keys(CHECKOUT_CONSENT_VERSIONS).sort()).toEqual(['bookerInfo', 'refundPolicy']);
+    expect(Object.values(CHECKOUT_CONSENT_VERSIONS).every((v) => v.length > 0)).toBe(true);
   });
 });
 

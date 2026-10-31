@@ -31,6 +31,7 @@ const state = vi.hoisted(() => ({
   /** 정해 두면 acquireHold가 이 결과를 돌려준다(실패 코드 확인용) */
   acquireOverride: null as HoldOutcome | null,
   acquireCalls: [] as { tx: unknown; input: AcquireInput }[],
+  orders: [] as Record<string, unknown>[],
   releaseCalls: [] as { slotId: string; customerId: string }[],
 }));
 
@@ -71,6 +72,13 @@ vi.mock('@/server/customers', () => ({ isNewCustomer: async () => state.isNew })
 vi.mock('./checkout-store', () => ({
   readCheckoutSlot: async (slotId: string) => state.slots.get(slotId) ?? null,
   readCustomerPhone: async () => state.phone,
+}));
+vi.mock('./order-store', async (importOriginal) => ({
+  newPaymentId: (await importOriginal<typeof import('./order-store')>()).newPaymentId,
+  createPendingOrder: async (_db: unknown, order: Record<string, unknown>) => {
+    state.orders.push(order);
+    return `order-${state.orders.length}`;
+  },
 }));
 vi.mock('./hold-store', () => ({
   acquireHold: async (tx: unknown, input: AcquireInput) => {
@@ -123,6 +131,9 @@ beforeEach(() => {
   state.acquireOverride = null;
   state.acquireCalls = [];
   state.releaseCalls = [];
+  state.orders = [];
+  vi.stubEnv('NEXT_PUBLIC_PORTONE_STORE_ID', 'store-test');
+  vi.stubEnv('NEXT_PUBLIC_PORTONE_CHANNEL_KEY', 'channel-test');
 });
 
 afterEach(() => {
@@ -231,37 +242,50 @@ describe('getMyHold', () => {
 });
 
 describe('startPayment', () => {
-  it('결제창에 넣을 값을 돌려준다. 금액은 서버가 정하고 복귀 주소는 /payment/result', async () => {
+  it('결제 대기 주문을 저장하고 결제창에 넣을 값을 돌려준다. 금액은 서버가 정하고 복귀 주소는 /payment/result', async () => {
     await holdSlot(SLOT);
-    expect(await startPayment({ slotId: SLOT, ...AGREED })).toEqual(
+    state.now = at(2);
+    const result = await startPayment({ slotId: SLOT, ...AGREED });
+    expect(result).toEqual(
       ok({
-        storeId: 'fake-store',
-        channelKey: 'fake-channel',
-        paymentId: expect.stringMatching(/^fake-/),
+        storeId: 'store-test',
+        channelKey: 'channel-test',
+        paymentId: expect.stringMatching(/^toori-[0-9a-f-]{36}$/),
         orderName: '샘플 헤어 커트',
         totalAmount: 23_450,
         currency: 'CURRENCY_KRW',
         redirectUrl: 'http://localhost:3000/payment/result',
       }),
     );
+    expect(state.orders).toEqual([
+      {
+        paymentId: result.ok && result.data.paymentId,
+        slotId: SLOT,
+        customerId: ME,
+        salePrice: 23_450,
+        couponAmount: 0,
+        amount: 23_450,
+        agreedAt: at(2),
+      },
+    ]);
   });
 
-  it('포트원 값이 .env.local에 있으면 그 값을 쓴다', async () => {
-    vi.stubEnv('NEXT_PUBLIC_PORTONE_STORE_ID', 'store-test');
-    vi.stubEnv('NEXT_PUBLIC_PORTONE_CHANNEL_KEY', 'channel-test');
+  it('포트원 Store ID·채널 키가 없으면 PAYMENT_UNAVAILABLE이고 주문을 만들지 않는다', async () => {
+    vi.stubEnv('NEXT_PUBLIC_PORTONE_STORE_ID', '');
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     await holdSlot(SLOT);
     const result = await startPayment({ slotId: SLOT, ...AGREED });
-    expect(result.ok && result.data).toMatchObject({
-      storeId: 'store-test',
-      channelKey: 'channel-test',
-    });
+    expect(result.ok === false && result.error.code).toBe('PAYMENT_UNAVAILABLE');
+    expect(state.orders).toEqual([]);
+    expect(error).toHaveBeenCalled();
   });
 
-  it('같은 홀딩 안에서 다시 부르면 새 결제 번호(D12)', async () => {
+  it('같은 홀딩 안에서 다시 부르면 새 결제 번호·새 주문(D12)', async () => {
     await holdSlot(SLOT);
     const first = await startPayment({ slotId: SLOT, ...AGREED });
     const second = await startPayment({ slotId: SLOT, ...AGREED });
     expect(first.ok && second.ok && first.data.paymentId !== second.data.paymentId).toBe(true);
+    expect(state.orders).toHaveLength(2);
   });
 
   it.each([
@@ -285,6 +309,7 @@ describe('startPayment', () => {
     state.now = at(10);
     const expired = await startPayment({ slotId: OTHER_SLOT, ...AGREED });
     expect(expired.ok === false && expired.error.code).toBe('HOLD_EXPIRED');
+    expect(state.orders).toEqual([]);
   });
 
   it('연락처가 없으면 PHONE_REQUIRED', async () => {
@@ -307,6 +332,7 @@ describe('startPayment', () => {
     state.origin = null;
     const result = await startPayment({ slotId: SLOT, ...AGREED });
     expect(result.ok === false && result.error.code).toBe('PAYMENT_UNAVAILABLE');
+    expect(state.orders).toEqual([]);
   });
 });
 

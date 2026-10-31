@@ -16,7 +16,7 @@ DB 구조 설계안이다. 설계와 변경 승인은 현동훈, 구현(Drizzle 
 | 금액 | 원 단위 `integer`. 비율은 정수 퍼센트 `integer`(예: 30 = 30%) |
 | 상태 값 | 영어 소문자 문자열로 저장하고 화면에서 한국어로 바꿔 보여준다. 값 목록은 DB `check` 제약으로 막는다 |
 | 지우지 않기 | 매물·메뉴·예약·결제·환불·정산은 실제로 지우지 않는다. 숨김·마감·취소 같은 상태와 시각으로 남긴다 |
-| 보관 기간 | 탈퇴해도 주문·예약·결제·환불 기록은 5년, 이의제기 기록은 3년 보관한다(전자상거래법). 탈퇴하면 닉네임·연락처 같은 개인 식별 정보는 지우거나 가린다 |
+| 보관 기간 | 탈퇴해도 주문·예약·결제·환불 기록은 5년, 이의제기 기록은 3년 보관한다(전자상거래법). 탈퇴 뒤 30일(되살리기 기간)이 지나면 닉네임·연락처 같은 개인 식별 정보는 지우거나 가린다(10/29, 10장 메모) |
 | 당시 값 저장 | 정가·할인율·수수료율·위약금 비율처럼 나중에 바뀔 수 있는 값은 계산한 그 시점의 값을 행에 같이 저장한다. 정책이 바뀌어도 지난 기록은 그대로 남는다 |
 | 접근 | 브라우저는 DB에 직접 접근하지 않는다. 모든 테이블에 RLS를 켜고 정책은 만들지 않는다(기본 거부). 서버 코드(Drizzle, `DATABASE_URL`)만 읽고 쓴다 |
 | 확장 | `postgis`(위치), `btree_gist`(매물 시간 겹침 제약) |
@@ -549,6 +549,12 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 - 계좌번호 암호화 키는 서버 환경변수 `PAYOUT_ACCOUNT_ENCRYPTION_KEY`다(AES-256-GCM, 32바이트 base64). `.env.example`에 이름을 넣었고 개발용 값은 nnoinn이 만들었다(10/13). 다른 암호화 방식을 쓰려면 먼저 nnoinn에게 알린다
 - 정책 숫자(할인율 선택지, 위약금 구간, 수수료율, 쿠폰·패널티 금액, 홀딩 10분)는 DB가 아니라 `src/server/policy/`에 둔다. DB에는 계산한 당시 값만 저장한다
 - 마이그레이션은 이 문서가 승인된 뒤 PR로 올리고, nnoinn이 머지하면 강규민만 개발 DB에 적용한다
+- **회원 탈퇴(P1)에서 바꿀 것(10/29 방향 승인, 규칙은 기술 가이드 7장 "회원 탈퇴").** P1을 시작할 때 강규민이 schema Issue로 자세한 모양을 올리고 nnoinn이 승인한다
+  - `shops.status`에 `withdrawn`(탈퇴)을 더한다. 고객 화면·매물 등록이 모두 `approved`만 보므로 탈퇴한 샵이 저절로 빠진다. 30일 안에 되살리면 `approved`로 돌린다
+  - `slots.close_reason`에 `account_withdrawal`(계정 탈퇴로 일괄 마감)을 더한다. 탈퇴 처리만 쓰고 원장님이 고르는 목록에는 넣지 않는다
+  - `customers.user_id`·`owners.user_id`의 unique를 "탈퇴하지 않은 계정 하나"로 바꾼다(30일이 지나 새 계정을 만들 수 있게)
+  - 같은 사람 표시: 30일 뒤 개인정보를 지울 때 로그인을 알아볼 수 있는 되돌릴 수 없는 값(해시)을 남겨, 신규 고객 판별(#49)이 탈퇴 전 이용 이력을 같은 사람으로 보게 한다. 보관은 거래 기록과 같은 5년
+- 예약자 정보 제공 동의 칸(`orders.booker_info_version`·`booker_info_agreed_at`)은 빈 값을 허용한다. W11 전에 만든 주문(시드·테스트)만 비어 있고, 새 주문은 결제 시작이 늘 채운다(#153). 주문을 만드는 다른 길이 생기면 빈 값을 막을지 다시 본다
 
 ## 11. 결정 기록
 
@@ -564,3 +570,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 2026-10-22 | W1a 구현(#63)에 맞춰 기본값 4개를 적었다(`shops.business_hours` `[]`, `shops.status` `pending`, `payout_accounts.pg_seller_status` `not_registered`, `slots.new_customer_only` false). W1b 전 확인(#64): `refunds.reservation_id` null 가능, `settlements` unique(`shop_id`, `period_start`, `period_end`) |
 | 2026-10-25 | `terms_agreements.terms_type`에 `age14`(만 14세 이상 확인)를 더한다. 만 14세 미만은 가입을 받지 않으므로 고객 가입 때 확인을 받았다는 기록을 남긴다(#88 질문, #47 결정). 마이그레이션 0004 |
 | 2026-10-28 | `orders`에 예약자 정보 제공 동의 기록(`booker_info_version`·`booker_info_agreed_at`)을 더한다(#121). 강규민이 결제 함수(W9~)와 같이 마이그레이션한다. 전화번호(`customers`·`owners`·`shops`의 `phone`)는 모두 하이픈 넣은 모양으로 저장한다(`src/lib/phone.ts`) |
+| 2026-10-29 | 회원 탈퇴(P1) 방향: 샵 상태 `withdrawn`, 마감 사유 `account_withdrawal`, 고객·원장님 계정 unique를 탈퇴하지 않은 계정 기준으로, 같은 사람 표시(해시) 5년. 탈퇴 뒤 30일 되살리기 기간에는 정보를 그대로 두고 30일 뒤 지운다(10장 메모, #148). 예약자 정보 제공 동의 칸은 빈 값 허용(#153) |
