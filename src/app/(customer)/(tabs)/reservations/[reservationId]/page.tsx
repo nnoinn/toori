@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { Clock, MapPin, Phone } from 'lucide-react';
+import { Clock, Info, MapPin, Phone } from 'lucide-react';
 
 import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
@@ -10,10 +10,13 @@ import { formatWon } from '@/lib/format';
 import { getRequestNow } from '@/lib/request-time';
 import { formatKst } from '@/lib/time';
 import { ensureCustomerPage } from '@/server/auth';
+import { previewRefund } from '@/server/refunds/cancel';
+import { REFUND_ERRORS } from '@/server/refunds/errors';
 
 import { formatDuration } from '../../slots/[slotId]/detail-format';
 import { getMyReservationDetail } from '../queries';
-import { isVisitPending } from '../reservation-tabs';
+import { isVisitPending, showsCancelSection } from '../reservation-tabs';
+import { CancelReservation } from './cancel-reservation';
 
 export const metadata: Metadata = { title: '예약 상세' };
 
@@ -21,7 +24,7 @@ type Params = Promise<{ reservationId: string }>;
 
 const STATUS_LABEL = { confirmed: '예정', completed: '이용 완료', cancelled: '취소' } as const;
 
-// 예약 상세 (J12, C-502). 본인 예약만 열린다. 예약 취소(C-503)는 J13에서 붙인다
+// 예약 상세 (J12, C-502). 본인 예약만 열린다. 시작 전 예정 예약은 맨 아래에서 취소할 수 있다(J13, C-503)
 export default function ReservationDetailPage({ params }: { params: Params }) {
   return (
     <main className="flex flex-1 flex-col md:mx-auto md:w-full md:max-w-3xl md:px-6 md:py-6">
@@ -51,6 +54,9 @@ async function DetailContent({ params }: { params: Params }) {
   }
   const r = result.data;
   const tel = r.shop.phone.replace(/[^\d+]/g, '');
+  const refundPreview = showsCancelSection(r.status, r.startAt, now)
+    ? await previewRefund(r.reservationId)
+    : null;
 
   return (
     <article className="flex flex-col gap-4 pb-6">
@@ -117,6 +123,23 @@ async function DetailContent({ params }: { params: Params }) {
             />
             <Row label="환불 처리" value={formatKst(new Date(r.refund.processedAt))} />
           </dl>
+        </section>
+      ) : null}
+
+      {refundPreview ? (
+        <section className="flex flex-col gap-2 border-t px-4 pt-4" aria-label="예약 취소">
+          {!refundPreview.ok ? (
+            <p className="text-sm text-muted-foreground">{refundPreview.error.message}</p>
+          ) : refundPreview.data.refundable ? (
+            // 다시 읽을 때마다(서버 시각이 바뀌면) 새로 시작한다. 창을 닫은 뒤 새 금액·상태로 맞추려고
+            <CancelReservation key={refundPreview.data.serverNow} preview={refundPreview.data} />
+          ) : (
+            // 시작까지 6시간 미만이면 취소 버튼 대신 안내만(10/29 결정, #128)
+            <p className="flex items-center gap-2 rounded-xl border bg-card p-3 text-sm">
+              <Info className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              {REFUND_ERRORS.NOT_REFUNDABLE}
+            </p>
+          )}
         </section>
       ) : null}
     </article>

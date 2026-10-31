@@ -5,6 +5,7 @@ import {
   isVisitPending,
   parseTab,
   RESERVATION_TABS,
+  showsCancelSection,
   statusOfTab,
   tabHref,
 } from './reservation-tabs';
@@ -49,5 +50,24 @@ describe('방문 확인 중', () => {
   it('이용 완료·취소 예약은 시간이 지나도 아니다', () => {
     expect(isVisitPending('completed', '2026-10-27T09:00:00+09:00', now)).toBe(false);
     expect(isVisitPending('cancelled', '2026-10-27T09:00:00+09:00', now)).toBe(false);
+  });
+});
+
+describe('예약 취소 영역 (J13)', () => {
+  const now = new Date('2026-10-27T10:00:00+09:00');
+
+  it('시작 전 예정 예약에만 둔다', () => {
+    expect(showsCancelSection('confirmed', '2026-10-27T10:00:01+09:00', now)).toBe(true);
+    expect(showsCancelSection('confirmed', '2026-11-04T16:00:00+09:00', now)).toBe(true);
+  });
+
+  it('시작 시각이 되면(방문 확인 중) 두지 않는다', () => {
+    expect(showsCancelSection('confirmed', '2026-10-27T10:00:00+09:00', now)).toBe(false);
+    expect(showsCancelSection('confirmed', '2026-10-27T09:00:00+09:00', now)).toBe(false);
+  });
+
+  it('이용 완료·취소 예약에는 두지 않는다', () => {
+    expect(showsCancelSection('completed', '2026-11-04T16:00:00+09:00', now)).toBe(false);
+    expect(showsCancelSection('cancelled', '2026-11-04T16:00:00+09:00', now)).toBe(false);
   });
 });
