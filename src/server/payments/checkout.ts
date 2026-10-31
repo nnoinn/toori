@@ -4,8 +4,9 @@
 // 결제 뒤 돌아오는 화면(/payment/result)에서 부른다(정찬형 J10·J11). 화면에서는 '@/server/payments/checkout'에서 가져온다.
 //
 // 모양(입력·결과·실패 코드)은 그대로 두고 속을 단계별로 바꾼다.
-// - 진짜: 로그인·고객 모드, 10분 홀딩(W10, DB), 매물(게시중, 남의 홀딩, 신규 고객 전용, 판매가), 연락처, 입력 확인
-// - 아직 가짜(W11에서 진짜): 결제는 포트원을 부르지 않고 성공으로 보고, 주문·예약을 만들지 않는다
+// - 진짜: 로그인·고객 모드, 10분 홀딩(W10, DB), 매물(게시중, 남의 홀딩, 신규 고객 전용, 판매가), 연락처, 입력 확인,
+//   결제 시작의 주문 저장(W11 ①, 결제 대기 주문과 동의 2개의 버전·시각)
+// - 아직 가짜(W11 ②에서 진짜): 결제 확인은 포트원에 묻지 않고 성공으로 보고, 예약을 만들지 않는다
 //   (예약 id로 /reservations/…를 열면 없다). 실패 화면은 로컬에서 DEV_FAKE_PAYMENT_FAILURE로 흉내 낸다
 
 import { headers } from 'next/headers';
@@ -17,17 +18,18 @@ import { ok } from '@/lib/result';
 import { requireCustomer } from '@/server/auth';
 import { isNewCustomer } from '@/server/customers';
 
+import { calcPaymentAmount } from './amount';
 import { isMyActiveHold } from './checkout-rules';
 import { readCheckoutSlot, readCustomerPhone } from './checkout-store';
 import { autoCancelFail, type PaymentResult, paymentFail } from './errors';
 import {
   clearFakeCheckout,
   devFakeFailure,
-  newFakePaymentId,
   readFakeCheckout,
   writeFakeCheckout,
 } from './fake-checkout';
 import { acquireHold, releaseMyHold } from './hold-store';
+import { createPendingOrder, newPaymentId } from './order-store';
 import { newReservationCode } from './reservation-code';
 import type { ConfirmedReservation, HoldInfo, MyHold, PaymentRequest } from './types';
 
@@ -87,13 +89,10 @@ export async function getMyHold(slotId: string): Promise<PaymentResult<MyHold | 
   const now = await getRequestNow();
   const slot = await readCheckoutSlot(id.data);
   if (!slot?.holdExpiresAt || !isMyActiveHold(slot, auth.data.customerId, now)) return ok(null);
-  // 쿠폰은 3단계(C-407). 결제 금액 계산은 W11에서 함수 하나로 모은다
-  const couponAmount = 0;
+  // 쿠폰은 3단계(C-407). 결제 시작과 같은 함수로 계산한다
   return ok({
     ...holdInfo(slot.slotId, slot.holdExpiresAt, now),
-    salePrice: slot.salePrice,
-    couponAmount,
-    amount: slot.salePrice - couponAmount,
+    ...calcPaymentAmount({ salePrice: slot.salePrice }),
   });
 }
 
@@ -104,8 +103,8 @@ const startSchema = z.object({
 });
 
 /**
- * '결제하기'(C-402·C-403). 결제 버튼 위 필수 동의 2개를 받고, PortOne.requestPayment에 넣을 값을 돌려준다.
- * 같은 홀딩 안에서 다시 불러도 되고(결제창을 닫은 뒤, D12), 부를 때마다 새 결제 번호를 만든다
+ * '결제하기'(C-402·C-403). 결제 버튼 위 필수 동의 2개를 받고, 결제 대기 주문을 저장한 뒤 PortOne.requestPayment에 넣을 값을 돌려준다.
+ * 같은 홀딩 안에서 다시 불러도 되고(결제창을 닫은 뒤, D12), 부를 때마다 새 결제 번호·새 주문을 만든다
  */
 export async function startPayment(input: {
   slotId: string;
@@ -133,9 +132,19 @@ export async function startPayment(input: {
     return paymentFail('NEW_CUSTOMER_ONLY');
   }
   const origin = (await headers()).get('origin');
-  if (!origin) return paymentFail('PAYMENT_UNAVAILABLE');
+  const storeId = process.env.NEXT_PUBLIC_PORTONE_STORE_ID;
+  const channelKey = process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY;
+  if (!origin || !storeId || !channelKey) {
+    if (!storeId || !channelKey)
+      console.error('[payments] 포트원 Store ID·채널 키가 없어요(.env.local)');
+    return paymentFail('PAYMENT_UNAVAILABLE');
+  }
 
-  const paymentId = newFakePaymentId();
+  const amount = calcPaymentAmount({ salePrice: slot.salePrice });
+  const paymentId = newPaymentId();
+  await createPendingOrder(getDb(), { paymentId, slotId, customerId, ...amount, agreedAt: now });
+
+  // 결제 확인은 ②까지 가짜라, 확인할 결제 번호를 쿠키에도 남긴다(②에서 지운다)
   const fake = await readFakeCheckout(userId);
   const sameSlot = fake && fake.slotId === slotId && fake.confirmed === null;
   await writeFakeCheckout({
@@ -145,11 +154,11 @@ export async function startPayment(input: {
     confirmed: null,
   });
   return ok({
-    storeId: process.env.NEXT_PUBLIC_PORTONE_STORE_ID || 'fake-store',
-    channelKey: process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY || 'fake-channel',
+    storeId,
+    channelKey,
     paymentId,
     orderName: `${slot.shopName} ${slot.menuName}`,
-    totalAmount: slot.salePrice,
+    totalAmount: amount.amount,
     currency: 'CURRENCY_KRW',
     redirectUrl: `${origin}/payment/result`,
   });

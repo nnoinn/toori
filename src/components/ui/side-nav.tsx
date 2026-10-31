@@ -7,6 +7,7 @@ import { cn } from 'cn';
 import { Lock, Menu, type LucideIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/ui/logo';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
 export type SideNavItem = {
@@ -95,6 +96,18 @@ function NavLinksWithPath(props: NavLinksProps) {
   );
 }
 
+// 메뉴 머리: 로고(누르면 가장 바깥 주소로) + 메뉴 제목
+function NavHeading({ title, rootHref }: Pick<SideNavProps, 'title' | 'rootHref'>) {
+  return (
+    <div className="flex items-center gap-2">
+      <Link href={rootHref} className="flex items-center">
+        <Logo className="h-5" />
+      </Link>
+      <span className="font-bold">{title}</span>
+    </div>
+  );
+}
+
 /** 원장님·운영자 화면 메뉴. PC는 왼쪽 고정 메뉴, 폰은 위쪽 막대의 메뉴 버튼으로 연다 */
 export function SideNav({ title, items, rootHref }: SideNavProps) {
   const [open, setOpen] = useState(false);
@@ -102,7 +115,9 @@ export function SideNav({ title, items, rootHref }: SideNavProps) {
   return (
     <>
       <aside className="hidden w-56 shrink-0 border-r p-4 md:block" aria-label={`${title} 메뉴`}>
-        <p className="mb-4 px-3 font-bold">{title}</p>
+        <div className="mb-4 px-3">
+          <NavHeading title={title} rootHref={rootHref} />
+        </div>
         <NavLinksWithPath items={items} rootHref={rootHref} />
       </aside>
 
@@ -120,7 +135,7 @@ export function SideNav({ title, items, rootHref }: SideNavProps) {
             <NavLinksWithPath items={items} rootHref={rootHref} onNavigate={() => setOpen(false)} />
           </SheetContent>
         </Sheet>
-        <p className="font-bold">{title}</p>
+        <NavHeading title={title} rootHref={rootHref} />
       </div>
     </>
   );
