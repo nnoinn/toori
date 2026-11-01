@@ -57,6 +57,7 @@ describe('getPortOnePayment', () => {
         paidAt: new Date('2026-11-01T03:05:00.000Z'),
         method: 'PaymentMethodCard',
         failureReason: null,
+        failureCode: null,
       },
     });
   });
@@ -70,7 +71,23 @@ describe('getPortOnePayment', () => {
         amountTotal: null,
         paidAt: null,
         failureReason: '카드 한도 초과',
+        failureCode: 'X',
       },
+    });
+  });
+
+  it('고객이 결제창을 닫으면 FAILED와 결제사 코드 PAY_PROCESS_CANCELED(11/1 실제 응답 모양)', async () => {
+    respond(200, {
+      status: 'FAILED',
+      failure: {
+        reason: '[PAY_PROCESS_CANCELED] 사용자가 결제를 취소하였습니다',
+        pgCode: 'PAY_PROCESS_CANCELED',
+        pgMessage: '사용자가 결제를 취소하였습니다',
+      },
+    });
+    expect(await getPortOnePayment('toori-1')).toMatchObject({
+      ok: true,
+      payment: { status: 'FAILED', failureCode: 'PAY_PROCESS_CANCELED' },
     });
   });
 

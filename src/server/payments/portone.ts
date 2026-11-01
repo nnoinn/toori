@@ -32,6 +32,8 @@ export type PortOnePayment = {
   method: string | null;
   /** 실패했을 때 결제사가 알려준 이유(로그·주문 기록용, 화면에 그대로 보여주지 않는다) */
   failureReason: string | null;
+  /** 실패했을 때 결제사 코드(failure.pgCode). 예: 고객이 결제창을 닫으면 PAY_PROCESS_CANCELED(토스페이먼츠) */
+  failureCode: string | null;
 };
 
 export type PortOneLookup =
@@ -84,6 +86,7 @@ export async function getPortOnePayment(paymentId: string): Promise<PortOneLooku
       paidAt: paidAt && !Number.isNaN(paidAt.getTime()) ? paidAt : null,
       method: payment.method?.type ?? null,
       failureReason: payment.failure?.reason ?? payment.failure?.pgMessage ?? null,
+      failureCode: payment.failure?.pgCode ?? null,
     },
   };
 }

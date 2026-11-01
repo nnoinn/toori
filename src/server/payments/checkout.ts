@@ -185,8 +185,10 @@ export async function confirmPayment(input: {
 
   // 이미 결과가 정해진 주문(새로고침, 웹훅이 먼저 처리)
   const settled = settledResult(order);
-  if (settled === 'not_paid')
-    return notPaid(order.pgStatus === 'FAILED' ? 'PAYMENT_FAILED' : 'PAYMENT_CANCELLED');
+  if (settled === 'not_paid') {
+    const failed = order.pgStatus === 'FAILED' && !isCustomerCancel(order.failureCode);
+    return notPaid(failed ? 'PAYMENT_FAILED' : 'PAYMENT_CANCELLED');
+  }
   if (settled) return settled;
 
   const lookup = await getPortOnePayment(paymentId);
@@ -208,14 +210,17 @@ export async function confirmPayment(input: {
       return paymentFail('PAYMENT_PENDING');
     case 'FAILED':
     case 'CANCELLED':
-    case 'PARTIAL_CANCELLED':
+    case 'PARTIAL_CANCELLED': {
       await recordOrderOutcome(db, order.orderId, {
         status: 'failed',
         pgStatus: payment.status,
-        failureCode: payment.status,
+        failureCode: payment.failureCode ?? payment.status,
         failureMessage: payment.failureReason,
       });
-      return notPaid(payment.status === 'FAILED' ? 'PAYMENT_FAILED' : 'PAYMENT_CANCELLED');
+      // 고객이 결제창을 닫아도 포트원은 FAILED로 둔다(11/1 실제 테스트 결제에서 확인). 그때는 '취소'로 알린다
+      const failed = payment.status === 'FAILED' && !isCustomerCancel(payment.failureCode);
+      return notPaid(failed ? 'PAYMENT_FAILED' : 'PAYMENT_CANCELLED');
+    }
     default:
       console.error('[payments] 알 수 없는 포트원 결제 상태:', payment.status);
       return paymentFail('PAYMENT_CHECK_UNAVAILABLE');
@@ -244,6 +249,13 @@ export async function confirmPayment(input: {
   );
   if (!confirmed.ok) return unconfirmedFail(confirmed.code);
   return ok({ reservationId: confirmed.reservationId, reservationCode: confirmed.reservationCode });
+}
+
+/** 고객이 결제창에서 직접 취소·닫음을 뜻하는 결제사 코드(토스페이먼츠) */
+const CUSTOMER_CANCEL_CODES: readonly string[] = ['PAY_PROCESS_CANCELED'];
+
+function isCustomerCancel(code: string | null): boolean {
+  return code !== null && CUSTOMER_CANCEL_CODES.includes(code);
 }
 
 /** 결과가 이미 정해진 주문의 답. 결제 대기면 null(포트원에 물어본다) */

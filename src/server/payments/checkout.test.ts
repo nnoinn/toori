@@ -166,6 +166,7 @@ vi.mock('./portone', () => ({
         paidAt: state.now,
         method: 'PaymentMethodCard',
         failureReason: null,
+        failureCode: null,
       },
     };
   },
@@ -439,7 +440,10 @@ describe('confirmPayment', () => {
     if (!result.ok) throw new Error('startPayment 실패');
     return result.data.paymentId;
   }
-  const paidAs = (status: string, extra: Partial<{ amountTotal: number; paidAt: Date }> = {}) => {
+  const paidAs = (
+    status: string,
+    extra: Partial<{ amountTotal: number; paidAt: Date; failureCode: string }> = {},
+  ) => {
     state.portone = {
       ok: true,
       payment: {
@@ -449,6 +453,7 @@ describe('confirmPayment', () => {
         paidAt: extra.paidAt ?? null,
         method: 'PaymentMethodCard',
         failureReason: status === 'FAILED' ? '카드 한도 초과' : null,
+        failureCode: extra.failureCode ?? null,
       },
     };
   };
@@ -557,6 +562,25 @@ describe('confirmPayment', () => {
     ]);
     const again = await confirmPayment({ paymentId });
     expect(again.ok === false && again.error.code).toBe('PAYMENT_FAILED');
+    expect(state.portoneCalls).toHaveLength(1);
+  });
+
+  it('고객이 결제창을 닫아 FAILED·PAY_PROCESS_CANCELED면 PAYMENT_CANCELLED, 주문에 결제사 코드를 남기고 새로고침해도 같은 답', async () => {
+    const paymentId = await started();
+    paidAs('FAILED', { failureCode: 'PAY_PROCESS_CANCELED' });
+    const result = await confirmPayment({ paymentId, code: 'FAILURE_TYPE_PG' });
+    expect(result.ok === false && result.error).toMatchObject({
+      code: 'PAYMENT_CANCELLED',
+      slotId: SLOT,
+      holdActive: true,
+    });
+    expect(state.outcomes[0].outcome).toMatchObject({
+      status: 'failed',
+      pgStatus: 'FAILED',
+      failureCode: 'PAY_PROCESS_CANCELED',
+    });
+    const again = await confirmPayment({ paymentId });
+    expect(again.ok === false && again.error.code).toBe('PAYMENT_CANCELLED');
     expect(state.portoneCalls).toHaveLength(1);
   });
 
