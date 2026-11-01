@@ -2,6 +2,7 @@
 
 // 원장님 가입·입점 신청 입력 (O7 ①, S-101 화면·S-107·S-108, #23 D3·D17). 가입 때는 필수만 받는다(D17).
 // [입점 신청하기]를 누르면 화면에서 한 번 검사하고, 강규민님 createOwnerAccount가 다시 검사한 뒤 샵을 '승인 대기'로 만든다.
+// 검사를 통과하면 정산 계좌 확인 창(#163)에서 계좌번호 전체를 한 번 더 확인받고 신청한다.
 // 성공하면 /owner로 가고 거기서 "입점 신청을 마쳤어요" 안내 상자가 잠깐 뜬다(joined-notice.tsx).
 
 import { useRef, useState, useTransition } from 'react';
@@ -15,11 +16,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { GeocodeCandidate } from '@/features/map/geocode';
 import { SITE_NAME } from '@/lib/site';
-import { createOwnerAccount } from '@/server/auth/owner-account';
+import { createOwnerAccount, type CreateOwnerAccountInput } from '@/server/auth/owner-account';
 import { BANKS } from '@/server/policy';
 import { SHOP_CATEGORIES } from '@/server/policy/catalog';
 
 import { AddressSearchButton } from '../(console)/settings/shop/address-search-button';
+import { PayoutConfirmDialog, payoutKey } from '../payout-confirm-dialog';
 import { BUSINESS_DOC_ACCEPT, uploadBusinessDoc } from './business-doc';
 import { clearJoinPending, markJoinPending } from './joined-notice';
 import {
@@ -47,6 +49,10 @@ export function OwnerJoinForm({ today }: { today: string }) {
   const [doc, setDoc] = useState<{ name: string; uploading: boolean } | null>(null);
   const [pending, startTransition] = useTransition();
   const docInput = useRef<HTMLInputElement>(null);
+  // 정산 계좌 확인 창에 띄운 신청 값(#163)
+  const [confirming, setConfirming] = useState<CreateOwnerAccountInput | null>(null);
+  // 확인받은 계좌. 서버 오류(주소 다시 고르기 등) 뒤 다시 신청할 때 계좌가 그대로면 다시 묻지 않는다
+  const confirmedPayout = useRef<string | null>(null);
 
   function update<K extends keyof OwnerJoinFormValues>(key: K, value: OwnerJoinFormValues[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -72,12 +78,28 @@ export function OwnerJoinForm({ today }: { today: string }) {
       return;
     }
     setErrors({});
+    if (confirmedPayout.current === payoutKey(checked.data.payout)) {
+      save(checked.data);
+      return;
+    }
+    setConfirming(checked.data);
+  }
+
+  /** 확인 창 [맞아요, 신청하기] */
+  function confirmPayout() {
+    if (!confirming) return;
+    confirmedPayout.current = payoutKey(confirming.payout);
+    save(confirming);
+  }
+
+  function save(input: CreateOwnerAccountInput) {
     // 성공하면 저장이 바꾼 쿠키 때문에 이 화면이 다시 그려지면서 바로 /owner로 넘어가서, 여기로 돌아오지 않을 수 있다.
     // 그래서 부르기 전에 표시를 남기고, /owner가 그 표시로 안내 상자를 띄운다
     markJoinPending();
     startTransition(async () => {
       try {
-        const result = await createOwnerAccount(checked.data);
+        const result = await createOwnerAccount(input);
+        setConfirming(null);
         if (result.ok) {
           router.replace('/owner');
           return;
@@ -104,6 +126,7 @@ export function OwnerJoinForm({ today }: { today: string }) {
         focusFirstError(fieldErrors);
       } catch (caught) {
         unstable_rethrow(caught);
+        setConfirming(null);
         clearJoinPending();
         setFormError(JOIN_FAILED_MESSAGE);
       }
@@ -449,6 +472,16 @@ export function OwnerJoinForm({ today }: { today: string }) {
           {SITE_NAME} 운영팀이 확인한 뒤 승인되면 매물을 올릴 수 있어요.
         </p>
       </div>
+
+      <PayoutConfirmDialog
+        account={confirming?.payout ?? null}
+        description="입점 신청을 하면 이 계좌로 정산금을 받아요."
+        confirmLabel="맞아요, 신청하기"
+        pendingLabel="신청하는 중…"
+        pending={pending}
+        onConfirm={confirmPayout}
+        onCancel={() => setConfirming(null)}
+      />
     </form>
   );
 }

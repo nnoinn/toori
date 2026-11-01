@@ -1,25 +1,19 @@
 'use client';
 
 // 매장 설정 > 정산 계좌 (O7 ②, S-107). 은행·예금주·계좌번호 뒷자리만 보여주고, [계좌 바꾸기]로 새로 입력한다.
-// 바꾸기 전에 확인 창을 한 번 띄운다. 전체 계좌번호는 화면에 다시 보여주지 않는다.
+// 저장 전 확인 창에 입력한 계좌번호 전체를 보여주고 확인받는다(#163). 저장한 뒤에는 뒷자리만 보여준다.
 
 import { useState, useTransition } from 'react';
 import { cn } from 'cn';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BANKS } from '@/server/policy';
 
-import { type PayoutInput, validatePayoutInput } from '../../../business-fields';
+import { type PayoutInput, type PayoutValues, validatePayoutInput } from '../../../business-fields';
+import { bankName, PayoutConfirmDialog } from '../../../payout-confirm-dialog';
 import { type PayoutFieldErrors, savePayoutAccount } from './actions';
 import type { PayoutAccountView } from './payout-store';
 
@@ -27,15 +21,12 @@ const EMPTY: PayoutInput = { bankCode: '', accountNumber: '', accountHolder: '' 
 const SELECT_CLASS =
   'h-9 rounded-lg border bg-card px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive';
 
-export function bankName(code: string): string {
-  return BANKS.find((bank) => bank.code === code)?.name ?? code;
-}
-
 export function PayoutForm({ shopId, account }: { shopId: string; account: PayoutAccountView }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<PayoutInput>(EMPTY);
   const [errors, setErrors] = useState<PayoutFieldErrors>({});
-  const [confirming, setConfirming] = useState(false);
+  // 확인 창에 보여줄 계좌(검사를 통과한 값)
+  const [confirming, setConfirming] = useState<PayoutValues | null>(null);
   const [status, setStatus] = useState<{ kind: 'saved' | 'error'; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -69,13 +60,13 @@ export function PayoutForm({ shopId, account }: { shopId: string; account: Payou
       setErrors(checked.fieldErrors);
       return;
     }
-    setConfirming(true);
+    setConfirming(checked.data);
   }
 
   function save() {
     startTransition(async () => {
       const result = await savePayoutAccount(shopId, form);
-      setConfirming(false);
+      setConfirming(null);
       if (result.ok) {
         setEditing(false);
         setForm(EMPTY);
@@ -209,31 +200,15 @@ export function PayoutForm({ shopId, account }: { shopId: string; account: Payou
         </form>
       ) : null}
 
-      <Dialog open={confirming} onOpenChange={(open) => !open && !pending && setConfirming(false)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>정산 계좌를 바꿀까요?</DialogTitle>
-            <DialogDescription>
-              {bankName(form.bankCode)} ****{form.accountNumber.replace(/\D/g, '').slice(-4)} (
-              {form.accountHolder.trim()})으로 바꿔요. 다음 정산부터 새 계좌로 보내요.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              disabled={pending}
-              onClick={() => setConfirming(false)}
-            >
-              취소
-            </Button>
-            <Button type="button" size="lg" disabled={pending} onClick={save}>
-              {pending ? '바꾸는 중…' : '바꾸기'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <PayoutConfirmDialog
+        account={confirming}
+        description="다음 정산부터 이 계좌로 보내요."
+        confirmLabel="맞아요, 바꾸기"
+        pendingLabel="바꾸는 중…"
+        pending={pending}
+        onConfirm={save}
+        onCancel={() => setConfirming(null)}
+      />
     </div>
   );
 }
