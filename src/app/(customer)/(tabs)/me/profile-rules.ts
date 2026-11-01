@@ -11,6 +11,25 @@ import { utcToKst } from '@/lib/time';
 /** 닉네임 최대 글자 수 */
 export const NICKNAME_MAX_LENGTH = 20;
 
+export const PHONE_FORMAT_MESSAGE = '휴대폰 번호를 확인해 주세요. 예: 010-1234-5678';
+
+/**
+ * 고객 연락처. 비우면 null(지운다). 휴대폰만 받고(#19 D31) 저장 모양은 고객·원장님·샵 공통(010-1234-5678, 10/28 결정).
+ * 내 정보(J9)와 예약 확인 화면(J10, C-401)이 같이 쓴다
+ */
+export const customerPhoneSchema = z
+  .string()
+  .trim()
+  .transform((value, ctx) => {
+    if (value === '') return null;
+    const phone = normalizePhone(value, 'mobile');
+    if (!phone) {
+      ctx.addIssue({ code: 'custom', message: PHONE_FORMAT_MESSAGE });
+      return z.NEVER;
+    }
+    return phone;
+  });
+
 export const profileSchema = z.object({
   nickname: z
     .string()
@@ -18,19 +37,7 @@ export const profileSchema = z.object({
     .min(1, '닉네임을 입력해 주세요')
     .max(NICKNAME_MAX_LENGTH, `닉네임은 ${NICKNAME_MAX_LENGTH}자까지 쓸 수 있어요`),
   // 비우면 연락처를 지운다(예약 전에 다시 받는다)
-  phone: z
-    .string()
-    .trim()
-    .transform((value, ctx) => {
-      if (value === '') return null;
-      // 고객 연락처는 휴대폰만(#19 D31). 저장 모양은 고객·원장님·샵 공통(010-1234-5678, 10/28 결정)
-      const phone = normalizePhone(value, 'mobile');
-      if (!phone) {
-        ctx.addIssue({ code: 'custom', message: '휴대폰 번호를 확인해 주세요. 예: 010-1234-5678' });
-        return z.NEVER;
-      }
-      return phone;
-    }),
+  phone: customerPhoneSchema,
 });
 
 export type ProfileInput = z.input<typeof profileSchema>;

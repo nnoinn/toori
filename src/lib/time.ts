@@ -53,6 +53,12 @@ export function hoursUntil(target: Date, now: Date): number {
   return msUntil(target, now) / HOUR_MS;
 }
 
+/** 한국 날짜를 'YYYY-MM-DD' 모양으로. 날짜 칸(date)과 비교하거나 날짜별로 묶을 때 쓴다 */
+export function kstDateKey(date: Date): string {
+  const { year, month, day } = utcToKst(date);
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+}
+
 /** target까지 남은 시간(분 단위, 소수 포함). 리마인드·홀딩 타이머에 쓴다 */
 export function minutesUntil(target: Date, now: Date): number {
   return msUntil(target, now) / MINUTE_MS;
