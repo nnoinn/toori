@@ -10,10 +10,10 @@ import { getDb } from '@/db';
 import { formatKst } from '@/lib/time';
 import { ensureAdminPage } from '@/server/auth';
 import { getBusinessDocUrl } from '@/server/storage/upload';
+import { bankName } from '@/server/policy';
 
 import {
   formatBusinessNumber,
-  labelBank,
   labelCategory,
   labelPgSellerStatus,
   labelReviewAction,
@@ -157,7 +157,7 @@ function PayoutFields({ payout }: { payout: ShopReviewDetail['payout'] }) {
   return (
     <Fields
       rows={[
-        ['은행', labelBank(payout.bankCode)],
+        ['은행', bankName(payout.bankCode)],
         ['계좌번호', `뒷자리 ${payout.accountLast4}`],
         ['예금주', payout.accountHolder],
         ['PG 셀러', labelPgSellerStatus(payout.pgSellerStatus)],

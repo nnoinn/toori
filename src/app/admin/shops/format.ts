@@ -10,10 +10,6 @@ export function formatBusinessNumber(digits: string): string {
     : digits;
 }
 
-export function labelBank(code: string): string {
-  return BANKS.find((bank) => bank.code === code)?.name ?? code;
-}
-
 export function labelCategory(key: string): string {
   return SHOP_CATEGORIES.find((category) => category.key === key)?.label ?? key;
 }

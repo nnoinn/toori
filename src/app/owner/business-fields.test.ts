@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { kstDateKey, validateBusinessInput, validatePayoutInput } from './business-fields';
+import { validateBusinessInput, validatePayoutInput } from './business-fields';
 
 const TODAY = '2026-10-30';
 const business = {
@@ -56,12 +56,5 @@ describe('정산 계좌 검사 (S-107)', () => {
       'accountNumber',
       'bankCode',
     ]);
-  });
-});
-
-describe('kstDateKey', () => {
-  it('한국 날짜로 바꾼다(UTC 15시 = 한국 다음 날 0시)', () => {
-    expect(kstDateKey(new Date('2026-10-30T14:59:00Z'))).toBe('2026-10-30');
-    expect(kstDateKey(new Date('2026-10-30T15:00:00Z'))).toBe('2026-10-31');
   });
 });

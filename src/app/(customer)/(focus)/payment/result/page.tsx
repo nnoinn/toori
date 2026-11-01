@@ -3,17 +3,13 @@ import type { Metadata } from 'next';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { ensureCustomerPage } from '@/server/auth';
+import { firstParam } from '@/lib/search-params';
 
 import { PaymentResultView } from './payment-result-view';
 
 export const metadata: Metadata = { title: '결제 결과' };
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-
-function first(value: string | string[] | undefined): string | null {
-  const raw = Array.isArray(value) ? value[0] : value;
-  return raw && raw.length > 0 ? raw : null;
-}
 
 // 결제 뒤 돌아오는 화면 (J11, C-403·C-405·C-406). 주소: /payment/result?paymentId=…(&code=…&message=…) (#121)
 // 포트원이 붙여 준 값을 그대로 강규민 confirmPayment에 넘겨야 예약이 확정된다. 확정은 화면이 열린 뒤
@@ -28,9 +24,9 @@ export default function PaymentResultPage({ searchParams }: { searchParams: Sear
 
 async function ResultContent({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
-  const paymentId = first(params.paymentId);
-  const code = first(params.code);
-  const message = first(params.message);
+  const paymentId = firstParam(params.paymentId) || null;
+  const code = firstParam(params.code) || null;
+  const message = firstParam(params.message) || null;
 
   // 로그인이 풀렸으면 다시 로그인하고 같은 결과 화면으로 돌아온다
   const back = new URLSearchParams();
