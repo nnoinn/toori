@@ -67,7 +67,7 @@ erDiagram
 | id | uuid PK | |
 | user_id | uuid, unique → profiles | 한 사람당 고객 계정 하나 |
 | nickname | text | |
-| phone | text, null 가능 | 예약 확인·노쇼 연락용. 인증 없이 형식만 검사. 예약 전에 꼭 입력. 휴대폰만, 하이픈 넣은 모양(`010-1234-5678`, `normalizePhone(…, 'mobile')`) |
+| phone | text, null 가능 | 예약 확인·노쇼 연락용. 인증 없이 형식만 검사. 고객 계정을 만들 때 받는다(11/2, #183). 그 전에 만든 계정은 비어 있을 수 있어 예약 전에 꼭 입력. 휴대폰만, 하이픈 넣은 모양(`010-1234-5678`, `normalizePhone(…, 'mobile')`) |
 | last_interest_push_at | timestamptz, null | 관심 지역 알림을 마지막으로 보낸 시각. 하루 1번(13시) 묶음 발송에서 "그 뒤에 새로 올라온 매물"을 고르는 기준 |
 | withdrawn_at | timestamptz, null | 탈퇴 시각(C-106, P1) |
 | created_at | timestamptz | |
