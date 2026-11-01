@@ -101,7 +101,7 @@
 | ✅ | 정찬형의 `@portone/browser-sdk` 설치 승인(#16, #168) | 현동훈 |
 | ✅ | 웹 푸시 VAPID 키 (K6). `.env.local` 공유, Vercel Production·Preview 등록(11/1). 값이 맞는지는 W16 첫 발송 때 확인한다 | 현동훈 |
 | ⬜ | 다른 계정 알림용 흑백 아이콘을 W16 전에 `public/brand/`에 넣기(#131) | 현동훈 |
-| ⬜ | `pg_cron`·`pg_net` 켜기 (K7), `CRON_SECRET` (K8) | 현동훈 |
+| ✅ | `pg_cron`·`pg_net` 켜기 (K7), `CRON_SECRET` (K8). 개발 DB에서 켜고, Vercel Production·Preview에 등록(11/2). `.env.local` 새 공유본은 단톡방으로 전달 | 현동훈 |
 | ⬜ | 정산 주기·이의제기 처리 방식 결정 | 현동훈 |
 | ⬜ | 2단계 중: 네이버 개발자 앱 등록과 로그인 검수 신청 (K9, 검수에 시간이 걸림) | 현동훈 |
 
