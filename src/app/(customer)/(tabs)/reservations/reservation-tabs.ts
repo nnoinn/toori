@@ -38,3 +38,11 @@ export function tabHref(tab: ReservationTab): string {
 export function isVisitPending(status: ReservationStatus, startAt: string, now: Date): boolean {
   return status === 'confirmed' && new Date(startAt).getTime() <= now.getTime();
 }
+
+/**
+ * 예약 상세에 '예약 취소' 영역을 둘 예약: 시작 전 예정 예약(J13, C-503). 시작이 지난 예약(방문 확인 중)은 취소할 것이 없다.
+ * 버튼을 보여줄지, 6시간 미만이라 안내만 보여줄지는 서버 미리보기(previewRefund)의 refundable이 정한다
+ */
+export function showsCancelSection(status: ReservationStatus, startAt: string, now: Date): boolean {
+  return status === 'confirmed' && !isVisitPending(status, startAt, now);
+}
