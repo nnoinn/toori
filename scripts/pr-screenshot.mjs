@@ -1,14 +1,14 @@
 // PR 스크린샷: Claude가 화면을 찍어 PR 댓글로 올린다. 내 컴퓨터의 개발 서버(localhost)에서만 쓴다.
 //   찍기:   npm run screenshot -- capture --as owner-a /owner /owner/slots/new
 //           npm run screenshot -- capture --email <내 로그인 이메일> --mode owner /owner
-//   올리기: npm run screenshot -- upload --pr 185 <찍은 파일>...
+//   올리기: npm run screenshot -- upload --pr 185 <사진 파일>...  (찍은 파일, 사용자가 대화창에 붙여 넣은 사진)
 // --as는 시드 계정(가짜 데이터)이라 레포에 올려도 안전하다. 레포가 공개라서 올리기 전에 Claude가 사진을 직접 열어
 // 진짜 이메일·전화번호·계좌번호가 없는지 확인한다. 있으면 올리지 않는다(CLAUDE.md "PR 작성 규칙").
 
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { basename, extname, join } from 'node:path';
 
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
@@ -21,6 +21,8 @@ const RELEASE_URL = `https://github.com/nnoinn/toori/releases/download/${RELEASE
 const OUT_DIR = join(tmpdir(), 'toori-screenshots');
 const VIEWPORT = { width: 1280, height: 800 };
 const LOAD_TIMEOUT_MS = 15000;
+// 공개 저장소에 올라가므로 사진만 받는다(다른 파일을 잘못 넘겨도 올라가지 않게)
+const IMAGE_FILE = /.(png|jpe?g|webp)$/i;
 
 function flag(args, name) {
   const at = args.indexOf(name);
@@ -120,12 +122,19 @@ function upload(args) {
   const pr = flag(args, '--pr');
   const files = positional(args);
   if (!/^\d+$/.test(pr ?? '') || files.length === 0) {
-    throw new Error('예: npm run screenshot -- upload --pr 185 <찍은 파일>...');
+    throw new Error('예: npm run screenshot -- upload --pr 185 <사진 파일>...');
   }
-  const images = files.map((file) => {
-    const name = `pr${pr}-${basename(file)}`;
+  const notImage = files.find((file) => !IMAGE_FILE.test(file));
+  if (notImage) throw new Error(`사진 파일만 올려요: ${basename(notImage)}`);
+  mkdirSync(OUT_DIR, { recursive: true });
+  const stamp = Date.now().toString(36);
+  const images = files.map((file, index) => {
+    // 붙여 넣은 사진은 파일 이름이 한글일 수 있다. GitHub가 바꾸지 않게 영문·숫자로만 짓고, 지난 사진을 덮어쓰지 않는다
+    const ext = extname(file);
+    const slug = basename(file, ext).replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const name = `pr${pr}-${stamp}-${index + 1}${slug ? `-${slug}` : ''}${ext}`;
     const named = join(OUT_DIR, name);
-    if (file !== named) copyFileSync(file, named);
+    copyFileSync(file, named);
     execFileSync('gh', ['release', 'upload', RELEASE_TAG, named, '--clobber'], { stdio: 'pipe' });
     return `![${name}](${RELEASE_URL}/${name})`;
   });
