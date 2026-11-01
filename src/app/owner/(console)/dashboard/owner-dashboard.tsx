@@ -2,7 +2,7 @@
 
 // 원장님 대시보드 (O9, S-401, #21 Q12). 맨 위 "처리 필요", 오늘/예정 탭, 상태 필터, 매물 목록. PC 기준.
 // 판매 전 매물은 목록에서 [수정]·[마감](O10, S-206). 결제 중(홀딩)이면 버튼을 잠근다("다른 고객이 결제 중" 배지가 같이 보인다).
-// 버튼 모양은 메뉴·가격표 목록과 같게 글자만 쓴다(수정은 테두리, 마감은 글자 버튼).
+// 버튼은 글자만 쓰고 [수정]·[마감] 둘 다 테두리 버튼이다.
 // 예약 상세(O11), 재등록(O13)은 만들 때 목록에서 연결한다.
 
 import { useMemo, useState } from 'react';
@@ -203,7 +203,7 @@ function SlotRow({
                 <Link href={`/owner/slots/${slot.id}/edit`}>수정</Link>
               </Button>
             )}
-            <Button type="button" variant="ghost" disabled={held} onClick={() => onClose(slot)}>
+            <Button type="button" variant="outline" disabled={held} onClick={() => onClose(slot)}>
               마감
             </Button>
           </>
