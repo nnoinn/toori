@@ -7,7 +7,7 @@ import { and, asc, eq, gte, isNull, lte } from 'drizzle-orm';
 
 import { getDb } from '@/db';
 import { reservations, slots } from '@/db/schema';
-import type { SlotStatus } from '@/db/schema/slots';
+import type { SlotCloseReason, SlotStatus } from '@/db/schema/slots';
 
 import type { DashboardSlot } from './dashboard';
 
@@ -26,6 +26,7 @@ const slotColumns = {
   newCustomerOnly: slots.newCustomerOnly,
   holdCustomerId: slots.holdCustomerId,
   holdExpiresAt: slots.holdExpiresAt,
+  closeReason: slots.closeReason,
   reservationCode: reservations.code,
 };
 
@@ -40,6 +41,8 @@ function toDashboardSlot(row: SlotRow): DashboardSlot {
     ...row,
     // status는 DB 제약(slots_status_check)으로 여섯 값만 들어간다
     status: row.status as SlotStatus,
+    // 마감 사유는 DB 제약(slots_close_reason_check)으로 세 값만 들어간다
+    closeReason: row.closeReason as SlotCloseReason | null,
     startAt: row.startAt.toISOString(),
     endAt: row.endAt.toISOString(),
     publishAt: row.publishAt.toISOString(),

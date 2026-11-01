@@ -1,7 +1,9 @@
 'use client';
 
 // 원장님 대시보드 (O9, S-401, #21 Q12). 맨 위 "처리 필요", 오늘/예정 탭, 상태 필터, 매물 목록. PC 기준.
-// 수정·마감(O10), 예약 상세(O11), 재등록(O13)은 만들 때 목록에서 연결한다.
+// 판매 전 매물은 목록에서 [수정]·[마감](O10, S-206). 결제 중(홀딩)이면 버튼을 잠근다("다른 고객이 결제 중" 배지가 같이 보인다).
+// 버튼은 글자만 쓰고 [수정]·[마감] 둘 다 테두리 버튼이다.
+// 예약 상세(O11), 재등록(O13)은 만들 때 목록에서 연결한다.
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -28,6 +30,9 @@ import {
 } from './dashboard';
 import type { SlotStatus } from '@/features/slot-status/slot-status';
 
+import { SLOT_CLOSE_REASON_LABELS } from '../slots/slot-edit';
+import { CloseSlotDialog } from './close-slot-dialog';
+
 const TAB_LABELS: Record<DashboardTab, string> = { today: '오늘', upcoming: '예정' };
 
 /** 상태 배지 색. 판매 중·예약은 눈에 띄게, 끝난 것은 흐리게 */
@@ -41,10 +46,12 @@ const STATUS_STYLE: Record<SlotStatus, string> = {
 };
 
 export function OwnerDashboard({
+  shopId,
   nowIso,
   slots,
   needsVisit,
 }: {
+  shopId: string;
   nowIso: string;
   /** 오늘 0시 이후에 시작하는 매물 */
   slots: DashboardSlot[];
@@ -55,6 +62,8 @@ export function OwnerDashboard({
   const byDay = useMemo(() => splitByDay(slots, now), [slots, now]);
   const [tab, setTab] = useState<DashboardTab>('today');
   const [status, setStatus] = useState<SlotStatus | 'all'>('all');
+  // [마감]을 누른 매물(확인 창)
+  const [closing, setClosing] = useState<DashboardSlot | null>(null);
 
   const inTab = byDay[tab];
   const counts = useMemo(() => countByStatus(inTab, now), [inTab, now]);
@@ -126,20 +135,33 @@ export function OwnerDashboard({
         <Card className="gap-0 py-0">
           <ul className="divide-y">
             {shown.map((slot) => (
-              <SlotRow key={slot.id} slot={slot} now={now} />
+              <SlotRow key={slot.id} slot={slot} now={now} onClose={setClosing} />
             ))}
           </ul>
         </Card>
       )}
+
+      <CloseSlotDialog shopId={shopId} slot={closing} onDone={() => setClosing(null)} />
     </div>
   );
 }
 
-function SlotRow({ slot, now }: { slot: DashboardSlot; now: Date }) {
+function SlotRow({
+  slot,
+  now,
+  onClose,
+}: {
+  slot: DashboardSlot;
+  now: Date;
+  onClose: (slot: DashboardSlot) => void;
+}) {
   const status = viewStatus(slot, now);
+  // 판매 전(예약대기·게시중)만 고치거나 마감할 수 있고, 결제 중이면 잠근다(O1 canEditSlot과 같은 기준)
+  const beforeSale = status === 'scheduled' || status === 'published';
+  const held = beforeSale && onHold(slot, now);
   const badges: SlotBadgeKind[] = [];
   if (slot.newCustomerOnly) badges.push('newCustomerOnly');
-  if (status === 'published' && onHold(slot, now)) badges.push('onHold');
+  if (held) badges.push('onHold');
 
   return (
     <li className="flex items-center gap-4 px-4 py-3">
@@ -161,6 +183,30 @@ function SlotRow({ slot, now }: { slot: DashboardSlot; now: Date }) {
         <StatusBadge status={status} />
         {slot.reservationCode ? (
           <span className="text-xs text-muted-foreground">예약번호 {slot.reservationCode}</span>
+        ) : null}
+        {status === 'closed' && slot.closeReason ? (
+          <span className="text-xs text-muted-foreground">
+            {SLOT_CLOSE_REASON_LABELS[slot.closeReason]}
+          </span>
+        ) : null}
+      </div>
+      {/* 버튼이 없는 줄도 같은 폭을 비워 상태 배지 줄을 맞춘다 */}
+      <div className="flex w-28 shrink-0 justify-end gap-1">
+        {beforeSale ? (
+          <>
+            {held ? (
+              <Button type="button" variant="outline" disabled>
+                수정
+              </Button>
+            ) : (
+              <Button asChild variant="outline">
+                <Link href={`/owner/slots/${slot.id}/edit`}>수정</Link>
+              </Button>
+            )}
+            <Button type="button" variant="outline" disabled={held} onClick={() => onClose(slot)}>
+              마감
+            </Button>
+          </>
         ) : null}
       </div>
     </li>

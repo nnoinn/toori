@@ -69,7 +69,7 @@ export async function createSlotInDb(
 }
 
 /** 쿼리가 어긴 DB 제약 이름 */
-function violated(error: unknown): string | undefined {
+export function violated(error: unknown): string | undefined {
   const cause = error instanceof DrizzleQueryError ? error.cause : error;
   return (cause as { constraint_name?: string } | undefined)?.constraint_name;
 }

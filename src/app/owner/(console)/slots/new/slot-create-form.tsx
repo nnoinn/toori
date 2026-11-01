@@ -2,8 +2,10 @@
 
 // 매물 3탭 등록 ① 서비스 ② 시간 (O4) ③ 할인율·확인 (O5). 고를 수 없는 시각(지난 시각·48시간 밖·겹침)은 화면에서 막고,
 // [다음]을 누르면 서버가 다시 확인한다. [등록하기]를 누르면 서버가 ①②③을 다시 검증하고 저장한다.
+// 매물 수정(O10, S-206)도 이 화면을 쓴다(edit). 지금 값을 채워서 열고, 고치는 매물 자신은 겹침으로 보지 않는다.
 
 import { useMemo, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { cn } from 'cn';
 import { Check, CircleCheck } from 'lucide-react';
 
@@ -13,11 +15,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Price } from '@/components/ui/price';
 import type { BusinessHours } from '@/db/schema/shops';
 import { formatWon } from '@/lib/format';
-import { formatKst, utcToKst } from '@/lib/time';
+import { formatKst, kstDateKey, utcToKst } from '@/lib/time';
 import { DISCOUNT_RATE_OPTIONS, type DiscountRate, PUBLISH_WINDOW_HOURS } from '@/server/policy';
 import { previewSettlement, type SettlementPreview } from '@/server/settlements';
 
 import { formatMinutes, serviceTypeLabel } from '../../settings/menu/menu';
+import { checkSlotEdit, updateSlot } from '../actions';
 import { checkSlotDraft, createSlot } from './actions';
 import {
   checkBusinessHours,
@@ -27,12 +30,22 @@ import {
   startCandidates,
 } from './slot-time';
 
-type MenuOption = {
+export type SlotMenuOption = {
   id: string;
   serviceType: string;
   name: string;
   listPrice: number;
   durationMinutes: number;
+};
+
+/** 매물 수정(O10)이면 고치는 매물과 지금 값. 없으면 새로 등록한다 */
+export type SlotEditTarget = {
+  slotId: string;
+  /** 매물의 메뉴. 숨겼거나 지금 업종에 없는 메뉴면 null(다시 고른다) */
+  menuId: string | null;
+  startAt: string;
+  discountRate: DiscountRate;
+  newCustomerOnly: boolean;
 };
 
 const STEPS = ['서비스', '시간', '할인율'] as const;
@@ -44,14 +57,16 @@ export function SlotCreateForm({
   businessHours,
   menus,
   busy,
+  edit,
 }: {
   shopId: string;
   nowIso: string;
   /** 샵 영업시간(O2). 입력하지 않은 요일은 24시간 다 보여준다 */
   businessHours: BusinessHours;
-  menus: MenuOption[];
-  /** 같은 샵의 예약대기·게시중·예약됨 매물 시간(ISO) */
+  menus: SlotMenuOption[];
+  /** 같은 샵의 예약대기·게시중·예약됨 매물 시간(ISO). 수정이면 고치는 매물은 뺀다 */
   busy: { start: string; end: string }[];
+  edit?: SlotEditTarget;
 }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const busyRanges = useMemo(
@@ -61,15 +76,23 @@ export function SlotCreateForm({
   const days = useMemo(() => groupByKstDate(startCandidates(now)), [now]);
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [menuId, setMenuId] = useState<string | null>(null);
-  // 처음에는 쉬는 날이 아닌 첫 날을 보여준다
+  const [menuId, setMenuId] = useState<string | null>(edit?.menuId ?? null);
+  // 처음에는 쉬는 날이 아닌 첫 날을 보여준다. 수정이면 매물 날짜
   const [dateKey, setDateKey] = useState(
     () =>
-      (days.find((item) => !isClosedDay(item.starts[0], businessHours)) ?? days[0])?.dateKey ?? '',
+      (edit && days.find((item) => item.dateKey === kstDateKey(new Date(edit.startAt))))?.dateKey ??
+      (days.find((item) => !isClosedDay(item.starts[0], businessHours)) ?? days[0])?.dateKey ??
+      '',
   );
-  const [startIso, setStartIso] = useState<string | null>(null);
-  const [discountRate, setDiscountRate] = useState<DiscountRate | null>(null);
-  const [newCustomerOnly, setNewCustomerOnly] = useState(false);
+  // 메뉴를 다시 골라야 하면 소요 시간이 달라지므로 시각도 다시 고른다. 지금 고를 수 없는 시각(48시간 밖)이어도 다시 고른다
+  const [startIso, setStartIso] = useState<string | null>(() =>
+    edit?.menuId &&
+    days.some((item) => item.starts.some((candidate) => candidate.toISOString() === edit.startAt))
+      ? edit.startAt
+      : null,
+  );
+  const [discountRate, setDiscountRate] = useState<DiscountRate | null>(edit?.discountRate ?? null);
+  const [newCustomerOnly, setNewCustomerOnly] = useState(edit?.newCustomerOnly ?? false);
   // 저장한 매물(완료 카드에 보여준다)
   const [created, setCreated] = useState<CreatedSummary | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -121,10 +144,10 @@ export function SlotCreateForm({
     if (!menu || !start) return;
     setMessage(null);
     startTransition(async () => {
-      const result = await checkSlotDraft(shopId, {
-        menuId: menu.id,
-        startAt: start.toISOString(),
-      });
+      const draft = { menuId: menu.id, startAt: start.toISOString() };
+      const result = edit
+        ? await checkSlotEdit(shopId, edit.slotId, draft)
+        : await checkSlotDraft(shopId, draft);
       if (!result.ok) {
         setMessage(result.error.message);
         return;
@@ -137,12 +160,15 @@ export function SlotCreateForm({
     if (!menu || !start || discountRate === null || !preview) return;
     setMessage(null);
     startTransition(async () => {
-      const result = await createSlot(shopId, {
+      const input = {
         menuId: menu.id,
         startAt: start.toISOString(),
         discountRate,
         newCustomerOnly,
-      });
+      };
+      const result = edit
+        ? await updateSlot(shopId, edit.slotId, input)
+        : await createSlot(shopId, input);
       if (!result.ok) {
         setMessage(result.error.message);
         return;
@@ -169,7 +195,10 @@ export function SlotCreateForm({
     setStep(2);
   }
 
-  if (created) return <CreatedCard created={created} onAgain={startOver} />;
+  const saveLabel = edit ? '저장' : '등록';
+  if (created) {
+    return <CreatedCard created={created} edited={edit !== undefined} onAgain={startOver} />;
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -403,7 +432,7 @@ export function SlotCreateForm({
         ) : null}
         {step === 3 ? (
           <Button type="button" size="lg" disabled={!stepDone[3] || pending} onClick={submit}>
-            {pending ? '등록 중…' : '등록하기'}
+            {pending ? `${saveLabel} 중…` : `${saveLabel}하기`}
           </Button>
         ) : null}
       </div>
@@ -472,16 +501,28 @@ function PricePreview({
   );
 }
 
-/** 저장 완료. 대시보드(O9)가 생기면 그쪽으로 보낸다 */
-function CreatedCard({ created, onAgain }: { created: CreatedSummary; onAgain: () => void }) {
+/** 저장 완료. 수정이면 대시보드로 돌아가고, 등록이면 하나 더 올리거나 대시보드로 간다 */
+function CreatedCard({
+  created,
+  edited,
+  onAgain,
+}: {
+  created: CreatedSummary;
+  edited: boolean;
+  onAgain: () => void;
+}) {
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <CircleCheck className="size-5 text-primary" aria-hidden />
-          매물을 올렸어요
+          {edited ? '매물을 고쳤어요' : '매물을 올렸어요'}
         </CardTitle>
-        <p className="text-sm text-muted-foreground">지금부터 고객 화면에 게시중으로 보여요.</p>
+        <p className="text-sm text-muted-foreground">
+          {edited
+            ? '고친 내용이 바로 고객 화면에 보여요.'
+            : '지금부터 고객 화면에 게시중으로 보여요.'}
+        </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-col gap-1 rounded-lg bg-muted p-3 text-sm">
@@ -501,10 +542,15 @@ function CreatedCard({ created, onAgain }: { created: CreatedSummary; onAgain: (
             </Badge>
           ) : null}
         </div>
-        <div className="flex justify-end">
-          <Button type="button" size="lg" onClick={onAgain}>
-            매물 하나 더 올리기
+        <div className="flex justify-end gap-2">
+          <Button asChild variant={edited ? 'default' : 'outline'} size="lg">
+            <Link href="/owner">대시보드로</Link>
           </Button>
+          {edited ? null : (
+            <Button type="button" size="lg" onClick={onAgain}>
+              매물 하나 더 올리기
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

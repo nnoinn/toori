@@ -43,5 +43,12 @@ async function OwnerHomeContent() {
     selectDashboardSlots(db, auth.shopId, startOfKstDay(now)),
     selectNeedsVisitRecord(db, auth.shopId, now),
   ]);
-  return <OwnerDashboard nowIso={now.toISOString()} slots={slots} needsVisit={needsVisit} />;
+  return (
+    <OwnerDashboard
+      shopId={auth.shopId}
+      nowIso={now.toISOString()}
+      slots={slots}
+      needsVisit={needsVisit}
+    />
+  );
 }

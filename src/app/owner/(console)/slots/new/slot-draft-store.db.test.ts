@@ -70,6 +70,29 @@ describeDb('매물 등록 ①② 검증 (실제 DB)', () => {
     });
   });
 
+  it('매물 수정(O10)에서는 고치는 매물 자신과 겹쳐도 된다', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx);
+      const [mine, next] = await tx
+        .insert(slots)
+        .values([testSlot(shop, '10:00', '11:00'), testSlot(shop, '12:00', '13:00')])
+        .returning();
+      const draft = (startAt: string) =>
+        validateSlotDraft(tx, shop.shopId, { menuId: shop.menuId, startAt }, now, {
+          excludeSlotId: mine.id,
+        });
+
+      expect((await draft(at('10:30'))).ok).toBe(true);
+      // 다른 매물과는 여전히 겹치면 안 된다
+      expect(await draft(at('11:30'))).toMatchObject({ error: { code: 'SLOT_OVERLAP' } });
+      expect(
+        await selectBusyRanges(tx, shop.shopId, new Date(at('09:00')), new Date(at('18:00')), {
+          excludeSlotId: mine.id,
+        }),
+      ).toEqual([{ start: next.startAt, end: next.endAt }]);
+    });
+  });
+
   it('다른 샵 매물과는 겹쳐도 된다', async () => {
     await withRollback(async (tx) => {
       const mine = await createTestShop(tx);
