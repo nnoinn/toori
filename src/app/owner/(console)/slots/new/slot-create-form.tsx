@@ -28,6 +28,7 @@ import {
   rangesOverlap,
   slotEnd,
   startCandidates,
+  timeLabel,
 } from './slot-time';
 
 export type SlotMenuOption = {
@@ -569,10 +570,4 @@ function dayLabel(date: Date, index: number): string {
   const t = utcToKst(date);
   const suffix = ['오늘', '내일', '모레'][index] ?? '';
   return `${t.month}/${t.day}(${WEEKDAYS[t.weekday]}) ${suffix}`.trim();
-}
-
-/** 시각. 예: "14:00" */
-function timeLabel(date: Date): string {
-  const t = utcToKst(date);
-  return `${String(t.hour).padStart(2, '0')}:${String(t.minute).padStart(2, '0')}`;
 }

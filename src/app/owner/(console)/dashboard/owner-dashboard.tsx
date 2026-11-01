@@ -3,7 +3,7 @@
 // 원장님 대시보드 (O9, S-401, #21 Q12). 맨 위 "처리 필요", 오늘/예정 탭, 상태 필터, 매물 목록. PC 기준.
 // 판매 전 매물은 목록에서 [수정]·[마감](O10, S-206). 결제 중(홀딩)이면 버튼을 잠근다("다른 고객이 결제 중" 배지가 같이 보인다).
 // 버튼은 글자만 쓰고 [수정]·[마감] 둘 다 테두리 버튼이다.
-// 예약 상세(O11), 재등록(O13)은 만들 때 목록에서 연결한다.
+// 예약이 있는 매물(예약됨·완료·취소)과 "처리 필요" 줄은 [상세]로 예약 상세(O11)에 간다. 재등록(O13)은 만들 때 연결한다.
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Price } from '@/components/ui/price';
 import { SlotBadges, type SlotBadgeKind } from '@/components/ui/slot-badge';
 import { EmptyState } from '@/components/ui/state';
-import { formatKst, utcToKst } from '@/lib/time';
+import { formatKst } from '@/lib/time';
 
 import {
   countByStatus,
@@ -30,6 +30,7 @@ import {
 } from './dashboard';
 import type { SlotStatus } from '@/features/slot-status/slot-status';
 
+import { timeLabel } from '../slots/new/slot-time';
 import { SLOT_CLOSE_REASON_LABELS } from '../slots/slot-edit';
 import { CloseSlotDialog } from './close-slot-dialog';
 
@@ -208,6 +209,7 @@ function SlotRow({
             </Button>
           </>
         ) : null}
+        {slot.reservationId ? <DetailButton reservationId={slot.reservationId} /> : null}
       </div>
     </li>
   );
@@ -224,7 +226,7 @@ function NeedsVisitCard({ slots }: { slots: DashboardSlot[] }) {
         </CardTitle>
         <p className="text-sm text-muted-foreground">
           서비스 시작이 지났는데 방문 완료·노쇼를 아직 처리하지 않은 예약이에요. 처리해야 정산이
-          진행돼요. 처리는 예약 상세에서 할 수 있어요(준비 중).
+          진행돼요. 처리는 예약 상세에서 할 수 있어요(처리 버튼은 준비 중).
         </p>
       </CardHeader>
       <CardContent className="py-0">
@@ -236,11 +238,21 @@ function NeedsVisitCard({ slots }: { slots: DashboardSlot[] }) {
               {slot.reservationCode ? (
                 <span className="text-muted-foreground">예약번호 {slot.reservationCode}</span>
               ) : null}
+              {slot.reservationId ? <DetailButton reservationId={slot.reservationId} /> : null}
             </li>
           ))}
         </ul>
       </CardContent>
     </Card>
+  );
+}
+
+/** 예약이 있는 매물(예약됨·완료·취소)에서 예약 상세(O11)로 간다 */
+function DetailButton({ reservationId }: { reservationId: string }) {
+  return (
+    <Button asChild variant="outline">
+      <Link href={`/owner/reservations/${reservationId}`}>상세</Link>
+    </Button>
   );
 }
 
@@ -275,10 +287,4 @@ function FilterChip({
       {children}
     </button>
   );
-}
-
-/** 시각. 예: "14:00" */
-function timeLabel(date: Date): string {
-  const t = utcToKst(date);
-  return `${String(t.hour).padStart(2, '0')}:${String(t.minute).padStart(2, '0')}`;
 }

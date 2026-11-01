@@ -27,7 +27,9 @@ export type DashboardSlot = {
   holdExpiresAt: string | null;
   /** 원장님이 직접 마감했으면 사유(S-206) */
   closeReason: SlotCloseReason | null;
-  /** 예약된 매물이면 예약번호 */
+  /** 예약이 있는 매물(예약됨·완료·취소)이면 예약 id. 예약 상세(O11)로 간다 */
+  reservationId: string | null;
+  /** 예약이 있는 매물이면 예약번호 */
   reservationCode: string | null;
 };
 

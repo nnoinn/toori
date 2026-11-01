@@ -1,5 +1,5 @@
 // 원장님 대시보드 조회 (DB, O9, S-401, #21 Q12). 이 화면에서만 쓰는 서버 코드라 화면 폴더에 둔다.
-// 모든 조회는 shopId로 그 샵 매물만 본다. 예약자 정보(이름·연락처)는 여기서 읽지 않는다(예약 상세 O11).
+// 모든 조회는 shopId로 그 샵 매물만 본다. 예약자 정보(닉네임·연락처)는 여기서 읽지 않는다(예약 상세 O11).
 
 import 'server-only';
 
@@ -27,13 +27,16 @@ const slotColumns = {
   holdCustomerId: slots.holdCustomerId,
   holdExpiresAt: slots.holdExpiresAt,
   closeReason: slots.closeReason,
+  reservationId: reservations.id,
   reservationCode: reservations.code,
 };
 
+type ReservationKey = 'reservationId' | 'reservationCode';
+
 type SlotRow = {
-  [K in keyof typeof slotColumns]: K extends 'reservationCode'
+  [K in keyof typeof slotColumns]: K extends ReservationKey
     ? string | null
-    : (typeof slots.$inferSelect)[Exclude<K, 'reservationCode'>];
+    : (typeof slots.$inferSelect)[Exclude<K, ReservationKey>];
 };
 
 function toDashboardSlot(row: SlotRow): DashboardSlot {
