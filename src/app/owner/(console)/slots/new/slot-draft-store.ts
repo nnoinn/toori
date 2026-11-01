@@ -1,9 +1,10 @@
 // 매물 등록 ①② 서버 검증 (DB, O4, S-201·S-204·S-209). 서버에서만 부른다.
 // O5에서 저장할 때도 같은 검증을 트랜잭션 안에서 다시 부른다(tx를 넘긴다). 겹침은 DB 제약(slots_no_overlap)이 마지막으로 막는다.
+// 매물 수정(O10)도 같은 검증을 쓰고, 고치는 매물 자신은 겹침에서 뺀다(excludeSlotId).
 
 import 'server-only';
 
-import { and, eq, gt, inArray, isNull, lt } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull, lt, ne } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
@@ -44,6 +45,9 @@ export type DraftMenu = {
 
 export type SlotDraft = { menu: DraftMenu; start: Date; end: Date };
 
+/** 매물 수정(O10)에서 고치는 매물 자신을 겹침에서 뺀다 */
+export type DraftOptions = { excludeSlotId?: string };
+
 const draftSchema = z.object({ menuId: z.uuid(), startAt: z.iso.datetime({ offset: true }) });
 
 /** 매물 등록에 필요한 샵 값(업종, 영업시간). 샵이 없으면 null */
@@ -64,6 +68,7 @@ export async function selectBusyRanges(
   shopId: string,
   from: Date,
   to: Date,
+  { excludeSlotId }: DraftOptions = {},
 ): Promise<TimeRange[]> {
   const rows = await db
     .select({ start: slots.startAt, end: slots.endAt })
@@ -74,6 +79,7 @@ export async function selectBusyRanges(
         inArray(slots.status, BLOCKING_STATUSES),
         lt(slots.startAt, to),
         gt(slots.endAt, from),
+        excludeSlotId ? ne(slots.id, excludeSlotId) : undefined,
       ),
     )
     .orderBy(slots.startAt);
@@ -90,6 +96,7 @@ export async function validateSlotDraft(
   shopId: string,
   input: unknown,
   now: Date,
+  options: DraftOptions = {},
 ): Promise<Result<SlotDraft>> {
   const parsed = draftSchema.safeParse(input);
   if (!parsed.success) return fail('INVALID_INPUT', '메뉴와 시작 시각을 골라 주세요');
@@ -122,7 +129,7 @@ export async function validateSlotDraft(
   const hoursProblem = checkBusinessHours({ start, end }, shop.businessHours);
   if (hoursProblem) return fail(hoursProblem, HOURS_PROBLEM_MESSAGES[hoursProblem]);
 
-  if ((await selectBusyRanges(db, shopId, start, end)).length > 0) {
+  if ((await selectBusyRanges(db, shopId, start, end, options)).length > 0) {
     return fail('SLOT_OVERLAP', SLOT_DRAFT_ERRORS.SLOT_OVERLAP);
   }
   return ok({ menu, start, end });

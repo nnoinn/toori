@@ -1,6 +1,7 @@
 // 원장님 대시보드 매물 나누기 (O9, S-401). 화면('use client')과 서버가 같이 쓴다.
 // 상태는 O1의 getSlotStatus로 계산한다(시간이 지나서 바뀌는 상태). "지금"은 서버 시각을 받는다.
 
+import type { SlotCloseReason } from '@/db/schema/slots';
 import { kstToUtc, utcToKst } from '@/lib/time';
 import {
   getSlotStatus,
@@ -24,6 +25,8 @@ export type DashboardSlot = {
   newCustomerOnly: boolean;
   holdCustomerId: string | null;
   holdExpiresAt: string | null;
+  /** 원장님이 직접 마감했으면 사유(S-206) */
+  closeReason: SlotCloseReason | null;
   /** 예약된 매물이면 예약번호 */
   reservationCode: string | null;
 };
