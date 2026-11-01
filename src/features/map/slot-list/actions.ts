@@ -7,6 +7,7 @@
 import { z } from 'zod';
 
 import { getDb } from '@/db';
+import { getRequestNow } from '@/lib/request-time';
 import { fail, ok, type Result } from '@/lib/result';
 import { getCurrentAccount } from '@/server/auth';
 
@@ -58,7 +59,7 @@ async function baseQuery(bounds: MapBounds, search: string): Promise<HomeSlotQue
     bounds,
     filters: parseFilters(searchToParams(search)),
     customerId: await currentCustomerId(),
-    now: new Date(),
+    now: await getRequestNow(),
   };
 }
 
