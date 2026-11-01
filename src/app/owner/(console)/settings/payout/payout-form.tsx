@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { bankName, BANKS } from '@/server/policy';
 
 import { type PayoutInput, type PayoutValues, validatePayoutInput } from '../../../business-fields';
-import { bankName, PayoutConfirmDialog } from '../../../payout-confirm-dialog';
+import { PayoutConfirmDialog } from '../../../payout-confirm-dialog';
 import { type PayoutFieldErrors, savePayoutAccount } from './actions';
 import type { PayoutAccountView } from './payout-store';
 

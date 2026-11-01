@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { BANKS } from '@/server/policy';
+import { bankName } from '@/server/policy';
 
 /** 확인 창에 보여줄 계좌(검사를 통과한 값). 가입은 createOwnerAccount 입력, 계좌 바꾸기는 validatePayoutInput 결과를 넘긴다 */
 export type PayoutConfirmAccount = {
@@ -22,10 +22,6 @@ export type PayoutConfirmAccount = {
   accountNumber: string;
   accountHolder: string;
 };
-
-export function bankName(code: string): string {
-  return BANKS.find((bank) => bank.code === code)?.name ?? code;
-}
 
 /** 확인 창에서 같은 계좌인지 비교하는 값(검사를 통과한 값으로 만든다) */
 export function payoutKey(values: PayoutConfirmAccount): string {
