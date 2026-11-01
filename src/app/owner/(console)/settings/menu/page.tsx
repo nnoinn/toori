@@ -6,6 +6,7 @@ import { ErrorState, LoadingCards } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { ensureOwnerPage } from '@/server/auth';
 
+import { isServiceTypeOf } from './menu';
 import { MenuManager } from './menu-manager';
 import { selectMenus, selectShopCategory } from './menu-store';
 
@@ -41,5 +42,12 @@ async function MenuContent() {
     selectMenus(db, auth.shopId),
   ]);
   if (!category) return <ErrorState description="샵을 찾을 수 없어요" />;
-  return <MenuManager shopId={auth.shopId} category={category} menus={menus} />;
+  // 업종을 바꾸면 메뉴를 초기화한다(10/29 결정). 예전 업종의 메뉴는 숨겨 둔 채 목록과 '숨긴 메뉴'에서 뺀다
+  return (
+    <MenuManager
+      shopId={auth.shopId}
+      category={category}
+      menus={menus.filter((menu) => isServiceTypeOf(category, menu.serviceType))}
+    />
+  );
 }

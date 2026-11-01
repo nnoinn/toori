@@ -25,6 +25,7 @@ import { getCategoryChangeImpact, saveShopProfile } from './actions';
 import { AddressSearchButton } from './address-search-button';
 import type { CategoryChangeImpact } from './category-change-store';
 import {
+  CATEGORY_CHANGE_BLOCKED_MESSAGE,
   type HoursRow,
   SHOP_PROFILE_LIMITS,
   type ShopProfileField,
@@ -39,8 +40,15 @@ type Status =
   | { kind: 'saved'; message: string; showMenuLink?: boolean }
   | { kind: 'error'; message: string };
 
-/** 업종 변경 확인 창. 1단계 "정말 바꿀까요?" → 2단계 "매물·메뉴가 내려가요" */
-type ConfirmState = { step: 1 } | { step: 2; impact: CategoryChangeImpact } | null;
+/**
+ * 업종 변경 확인 창(10/29 결정). 1단계 "정말 변경할까요?" → 2단계 "메뉴 N개가 초기화돼요".
+ * 판매 전·예약된 매물이 있으면 1단계 다음에 바꿀 수 없다는 안내(blocked)를 보여준다
+ */
+type ConfirmState =
+  | { step: 1 }
+  | { step: 'blocked'; activeSlots: number }
+  | { step: 2; impact: CategoryChangeImpact }
+  | null;
 
 export function ShopProfileForm({
   shopId,
@@ -107,7 +115,7 @@ export function ShopProfileForm({
         setStatus({
           kind: 'saved',
           message: confirmCategoryChange
-            ? `업종을 바꿨어요. 매물 ${result.data.closedSlots}개를 마감하고 메뉴 ${result.data.hiddenMenus}개를 숨겼어요. 새 업종에 맞는 메뉴를 등록해 주세요`
+            ? `업종을 바꿨어요.${result.data.resetMenus > 0 ? ` 메뉴 ${result.data.resetMenus}개를 초기화했어요.` : ''} 새 업종에 맞는 메뉴를 등록해 주세요`
             : '저장했어요',
           showMenuLink: confirmCategoryChange,
         });
@@ -119,7 +127,10 @@ export function ShopProfileForm({
     });
   }
 
-  /** 1단계 "변경하기": 마감될 매물·숨겨질 메뉴 수를 받아 2단계를 띄운다. 없으면 바로 저장한다 */
+  /**
+   * 1단계 "변경하기": 막는 매물·초기화될 메뉴 수를 받는다. 막는 매물이 있으면 안내를 보여주고,
+   * 메뉴가 있으면 2단계를 띄우고, 둘 다 없으면 바로 저장한다
+   */
   function confirmStep1() {
     startTransition(async () => {
       const impact = await getCategoryChangeImpact(shopId);
@@ -128,15 +139,11 @@ export function ShopProfileForm({
         setStatus({ kind: 'error', message: impact.error.message });
         return;
       }
-      if (impact.data.heldSlots > 0) {
-        setConfirm(null);
-        setStatus({
-          kind: 'error',
-          message: '다른 고객이 결제 중인 매물이 있어요. 10분 뒤에 다시 시도해 주세요',
-        });
+      if (impact.data.activeSlots > 0) {
+        setConfirm({ step: 'blocked', activeSlots: impact.data.activeSlots });
         return;
       }
-      if (impact.data.openSlots === 0 && impact.data.visibleMenus === 0) {
+      if (impact.data.menus === 0) {
         submit(form, true);
         return;
       }
@@ -390,7 +397,7 @@ export function ShopProfileForm({
   );
 }
 
-/** 업종 변경 2단계 확인 창 (정민석 결정 10/28) */
+/** 업종 변경 2단계 확인 창 (10/29 nnoinn 결정, 기술 가이드 7장) */
 export function CategoryChangeDialog({
   state,
   nextCategoryLabel,
@@ -409,25 +416,22 @@ export function CategoryChangeDialog({
   return (
     <Dialog open={state !== null} onOpenChange={(open) => !open && !pending && onCancel()}>
       <DialogContent>
-        {state?.step === 2 ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>지금 올린 매물과 메뉴가 모두 내려가요</DialogTitle>
-              <DialogDescription>
-                업종을 바꾸면 아래 내용이 바로 적용되고 되돌릴 수 없어요.
-              </DialogDescription>
-            </DialogHeader>
-            <ul className="flex list-disc flex-col gap-1 pl-5">
-              <li>
-                예약대기·게시중 매물 <strong>{state.impact.openSlots}개</strong>가 모두 마감돼요
-              </li>
-              <li>
-                메뉴 <strong>{state.impact.visibleMenus}개</strong>가 모두 숨겨져요. 새 업종에 맞게
-                메뉴를 다시 등록해 주세요
-              </li>
-              <li>이미 예약된 매물은 그대로 진행돼요</li>
-            </ul>
-          </>
+        {state?.step === 'blocked' ? (
+          <DialogHeader>
+            <DialogTitle>지금은 업종을 바꿀 수 없어요</DialogTitle>
+            <DialogDescription>{CATEGORY_CHANGE_BLOCKED_MESSAGE}</DialogDescription>
+            <p className="pt-2 text-sm">
+              판매 중이거나 예약된 매물 <strong>{state.activeSlots}개</strong>
+            </p>
+          </DialogHeader>
+        ) : state?.step === 2 ? (
+          <DialogHeader>
+            <DialogTitle>메뉴 {state.impact.menus}개가 초기화돼요</DialogTitle>
+            <DialogDescription>
+              지금 등록한 메뉴(숨긴 메뉴 포함)가 모두 메뉴 목록에서 빠지고 되돌릴 수 없어요. 새
+              업종에 맞게 메뉴를 다시 등록해 주세요.
+            </DialogDescription>
+          </DialogHeader>
         ) : (
           <DialogHeader>
             <DialogTitle>업종을 정말 변경할까요?</DialogTitle>
@@ -438,9 +442,9 @@ export function CategoryChangeDialog({
         )}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" size="lg" onClick={onCancel} disabled={pending}>
-            취소
+            {state?.step === 'blocked' ? '닫기' : '취소'}
           </Button>
-          {state?.step === 2 ? (
+          {state?.step === 'blocked' ? null : state?.step === 2 ? (
             <Button
               type="button"
               variant="destructive"
@@ -448,7 +452,7 @@ export function CategoryChangeDialog({
               onClick={onConfirmStep2}
               disabled={pending}
             >
-              {pending ? '바꾸는 중…' : '마감하고 변경하기'}
+              {pending ? '바꾸는 중…' : '초기화하고 변경하기'}
             </Button>
           ) : (
             <Button type="button" size="lg" onClick={onConfirmStep1} disabled={pending}>
