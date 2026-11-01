@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useId, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { unstable_rethrow, useRouter } from 'next/navigation';
+import PortOne, { type PaymentResponse } from '@portone/browser-sdk/v2';
 import { ChevronDown, Clock, MapPin } from 'lucide-react';
 
 import { BackButton } from '@/components/ui/back-button';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Countdown } from '@/components/ui/countdown';
+import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/state';
 import { updateMyPhone } from '@/app/(customer)/(tabs)/me/actions';
 import { customerPhoneSchema } from '@/app/(customer)/(tabs)/me/profile-rules';
@@ -32,8 +34,11 @@ import {
   intermediaryNotice,
   REFUND_CONSENT_LABEL,
 } from './checkout-texts';
+import { paymentResultPath, toPortOneRequest } from './payment-window';
 
 const START_FAILED_MESSAGE = '결제를 시작하지 못했어요. 잠시 후 다시 시도해 주세요';
+// 포트원 결제창 스크립트를 못 받았거나 결제창이 요청값을 거절했을 때. 홀딩은 그대로라 다시 누를 수 있다(누를 때마다 새 결제 번호)
+const PAYMENT_WINDOW_FAILED_MESSAGE = '결제창을 열지 못했어요. 잠시 후 다시 시도해 주세요';
 
 type CheckoutViewProps = {
   slot: SlotDetail;
@@ -78,12 +83,25 @@ export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProp
           bookerInfoAgreed: true,
         });
         if (result.ok) {
-          // TODO(J11): 포트원 브라우저 SDK(설치 전 확인, #19)를 붙이면 PortOne.requestPayment(result.data)로 결제창을 연다.
-          // 지금은 결제가 가짜(#127)라 결제창 없이 복귀 화면으로 바로 간다(#121 강규민 안내)
+          // 토스페이먼츠 결제창(C-403). 폰은 결제 페이지로 이동했다가 포트원이 결과 화면(redirectUrl)으로 보내서 여기 오지 않는다.
+          // PC는 화면 위 결제창이 닫히면 결과를 받아 같은 결과 화면으로 간다. 결과 확인은 그 화면이 서버로 한다
           const { redirectUrl, paymentId } = result.data;
-          const back = new URL(redirectUrl);
-          back.searchParams.set('paymentId', paymentId);
-          router.push(`${back.pathname}${back.search}`);
+          let response: PaymentResponse | undefined;
+          try {
+            response = await PortOne.requestPayment(toPortOneRequest(result.data));
+          } catch {
+            setError(PAYMENT_WINDOW_FAILED_MESSAGE);
+            return;
+          }
+          if (response) {
+            router.push(
+              paymentResultPath(redirectUrl, {
+                paymentId,
+                code: response.code,
+                message: response.message,
+              }),
+            );
+          }
           return;
         }
         switch (result.error.code) {
@@ -248,9 +266,12 @@ function PhoneField({
   phone: string | null;
   onSaved: (phone: string) => void;
 }) {
+  const helpId = useId();
   const [editing, setEditing] = useState(phone === null);
   const [value, setValue] = useState(phone ?? '');
   const [error, setError] = useState<string | null>(null);
+  // 화면 확인에서 틀린 번호면 입력칸에 빨간 테두리. 다시 고치기 시작하면 지운다
+  const [invalid, setInvalid] = useState(false);
   const [saving, startSaving] = useTransition();
   const showInput = editing || phone === null;
 
@@ -258,9 +279,11 @@ function PhoneField({
     const parsed = customerPhoneSchema.safeParse(value);
     if (!parsed.success || parsed.data === null) {
       setError(parsed.success ? '휴대폰 번호를 입력해 주세요' : parsed.error.issues[0]?.message);
+      setInvalid(true);
       return;
     }
     setError(null);
+    setInvalid(false);
     startSaving(async () => {
       try {
         const result = await updateMyPhone(value);
@@ -283,15 +306,21 @@ function PhoneField({
       <h2 className="text-sm font-semibold">연락처</h2>
       {showInput ? (
         <div className="flex gap-2">
-          <input
-            className="h-11 min-w-0 flex-1 rounded-lg border bg-background px-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          <Input
+            // 공통 Input은 h-9·text-sm이다. 내 정보 화면과 같게 조금 크게 쓴다
+            className="h-11 flex-1 text-base"
             value={value}
             type="tel"
             inputMode="tel"
             autoComplete="tel"
             placeholder="010-1234-5678"
             aria-label="휴대폰 번호"
-            onChange={(e) => setValue(e.target.value)}
+            aria-describedby={helpId}
+            aria-invalid={invalid || undefined}
+            onChange={(e) => {
+              setValue(e.target.value);
+              setInvalid(false);
+            }}
           />
           <Button type="button" variant="outline" className="h-11" disabled={saving} onClick={save}>
             {saving ? '저장 중…' : '저장'}
@@ -306,11 +335,13 @@ function PhoneField({
         </div>
       )}
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p id={helpId} role="alert" className="text-sm text-destructive">
           {error}
         </p>
       ) : (
-        <p className="text-xs text-muted-foreground">예약 확인과 노쇼 연락에만 써요.</p>
+        <p id={helpId} className="text-xs text-muted-foreground">
+          예약 확인과 노쇼 연락에만 써요.
+        </p>
       )}
     </section>
   );

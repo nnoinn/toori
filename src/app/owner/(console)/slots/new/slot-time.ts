@@ -4,6 +4,7 @@
 import type { BusinessHours } from '@/db/schema/shops';
 import { addMinutes, kstToUtc, utcToKst } from '@/lib/time';
 import { PUBLISH_WINDOW_HOURS, SLOT_START_STEP_MINUTES } from '@/server/policy';
+import { kstDateKey } from '@/lib/time';
 
 const MINUTE_MS = 60 * 1000;
 
@@ -96,12 +97,6 @@ export function checkBusinessHours(range: TimeRange, hours: BusinessHours): Hour
     return 'OUTSIDE_HOURS';
   }
   return null;
-}
-
-/** 한국 날짜 key. 예: "2026-11-01" */
-export function kstDateKey(date: Date): string {
-  const t = utcToKst(date);
-  return `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`;
 }
 
 /** 시작 시각 후보를 한국 날짜별로 묶는다(날짜 순서 유지) */

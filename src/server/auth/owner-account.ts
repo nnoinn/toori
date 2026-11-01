@@ -13,7 +13,7 @@ import { geocodeAddress, type GeocodeError } from '@/features/map/geocode';
 import { normalizePhone } from '@/lib/phone';
 import { getRequestNow } from '@/lib/request-time';
 import { fail, ok } from '@/lib/result';
-import { utcToKst } from '@/lib/time';
+import { kstDateKey } from '@/lib/time';
 import { encryptAccountNumber } from '@/server/payouts/account-crypto';
 import { BANK_CODES, SHOP_CATEGORIES, type ShopCategory } from '@/server/policy';
 import { assertBusinessDocPath } from '@/server/storage';
@@ -106,7 +106,7 @@ export async function createOwnerAccount(
   if (Object.values(agreements).includes(false)) {
     return fail('REQUIRED_TERMS_MISSING', '필수 항목에 모두 동의해 주세요');
   }
-  if (shop.openedOn > (await kstToday())) {
+  if (shop.openedOn > kstDateKey(await getRequestNow())) {
     return fail('INVALID_INPUT', '개업일자를 다시 확인해 주세요');
   }
 
@@ -164,10 +164,4 @@ async function hasOwnerAccount(userId: string): Promise<boolean> {
     .from(owners)
     .where(eq(owners.userId, userId));
   return Boolean(row);
-}
-
-/** 오늘 날짜(한국 시간) YYYY-MM-DD */
-async function kstToday(): Promise<string> {
-  const { year, month, day } = utcToKst(await getRequestNow());
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
