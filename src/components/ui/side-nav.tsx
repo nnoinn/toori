@@ -26,9 +26,11 @@ type SideNavProps = {
   items: SideNavItem[];
   /** 가장 바깥 주소. 이 주소는 정확히 같을 때만 선택 표시한다. 예: '/owner' */
   rootHref: string;
+  /** 메뉴 맨 아래(왼쪽 아래)에 둘 것. 예: 로그아웃 버튼. 없으면 비워 둔다 */
+  footer?: React.ReactNode;
 };
 
-type NavLinksProps = Omit<SideNavProps, 'title'> & { onNavigate?: () => void };
+type NavLinksProps = Omit<SideNavProps, 'title' | 'footer'> & { onNavigate?: () => void };
 
 function NavLinks({
   items,
@@ -109,16 +111,20 @@ function NavHeading({ title, rootHref }: Pick<SideNavProps, 'title' | 'rootHref'
 }
 
 /** 원장님·운영자 화면 메뉴. PC는 왼쪽 고정 메뉴, 폰은 위쪽 막대의 메뉴 버튼으로 연다 */
-export function SideNav({ title, items, rootHref }: SideNavProps) {
+export function SideNav({ title, items, rootHref, footer }: SideNavProps) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <aside className="hidden w-56 shrink-0 border-r p-4 md:block" aria-label={`${title} 메뉴`}>
-        <div className="mb-4 px-3">
-          <NavHeading title={title} rootHref={rootHref} />
+      <aside className="hidden w-56 shrink-0 border-r md:block" aria-label={`${title} 메뉴`}>
+        {/* 화면을 내려도 메뉴가 따라오고, footer는 화면 맨 아래(왼쪽 아래)에 붙는다 */}
+        <div className="sticky top-0 flex h-dvh flex-col p-4">
+          <div className="mb-4 px-3">
+            <NavHeading title={title} rootHref={rootHref} />
+          </div>
+          <NavLinksWithPath items={items} rootHref={rootHref} />
+          {footer ? <div className="mt-auto pt-4">{footer}</div> : null}
         </div>
-        <NavLinksWithPath items={items} rootHref={rootHref} />
       </aside>
 
       <div className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background px-4 md:hidden">
@@ -133,6 +139,7 @@ export function SideNav({ title, items, rootHref }: SideNavProps) {
               <SheetTitle className="px-3">{title}</SheetTitle>
             </SheetHeader>
             <NavLinksWithPath items={items} rootHref={rootHref} onNavigate={() => setOpen(false)} />
+            {footer ? <div className="mt-auto">{footer}</div> : null}
           </SheetContent>
         </Sheet>
         <NavHeading title={title} rootHref={rootHref} />
