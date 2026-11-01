@@ -4,7 +4,7 @@
 
 import 'server-only';
 
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
@@ -33,7 +33,16 @@ export type MyReservationItem = {
 
 export type MyReservationDetail = MyReservationItem & {
   status: 'confirmed' | 'completed' | 'cancelled';
-  shop: { name: string; roadAddress: string; addressDetail: string | null; phone: string };
+  shop: {
+    shopId: string;
+    name: string;
+    roadAddress: string;
+    addressDetail: string | null;
+    phone: string;
+    /** 샵 위치(작은 지도, 예약 완료 화면 C-405) */
+    lat: number;
+    lng: number;
+  };
   durationMinutes: number;
   payment: {
     salePrice: number;
@@ -109,10 +118,13 @@ export async function selectMyReservationDetail(
       status: reservations.status,
       visitResult: reservations.visitResult,
       cancelledAt: reservations.cancelledAt,
+      shopId: shops.id,
       shopName: shops.name,
       roadAddress: shops.roadAddress,
       addressDetail: shops.addressDetail,
       phone: shops.phone,
+      lat: sql<number>`ST_Y(${shops.location}::geometry)`.mapWith(Number),
+      lng: sql<number>`ST_X(${shops.location}::geometry)`.mapWith(Number),
       menuName: slots.menuName,
       startAt: slots.startAt,
       durationMinutes: slots.durationMinutes,
@@ -153,10 +165,13 @@ export async function selectMyReservationDetail(
     noShow: row.visitResult === 'no_show',
     cancelledAt: iso(row.cancelledAt),
     shop: {
+      shopId: row.shopId,
       name: row.shopName,
       roadAddress: row.roadAddress,
       addressDetail: row.addressDetail,
       phone: row.phone,
+      lat: row.lat,
+      lng: row.lng,
     },
     durationMinutes: row.durationMinutes,
     payment: {

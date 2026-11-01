@@ -9,6 +9,7 @@ import {
   createTestCustomer,
   createTestReservation,
   createTestShop,
+  TEST_LOCATION,
 } from '../../../../../tests/db/fixtures';
 import { closeTestDb, describeDb, withRollback } from '../../../../../tests/db/test-db';
 import { selectMyReservationDetail, selectMyReservations } from './queries';
@@ -75,6 +76,10 @@ describeDb('내 예약 조회', () => {
         penaltyRate: 30,
       });
       expect(mine?.payment.amount).toBe(14000);
+      // 예약 완료 화면(C-405)의 작은 지도에 쓰는 샵 위치
+      expect(mine?.shop.shopId).toBe(shop.shopId);
+      expect(mine?.shop.lat).toBeCloseTo(TEST_LOCATION.lat, 6);
+      expect(mine?.shop.lng).toBeCloseTo(TEST_LOCATION.lng, 6);
 
       expect(await selectMyReservationDetail(tx, other.customerId, reservation.id)).toBeNull();
     });

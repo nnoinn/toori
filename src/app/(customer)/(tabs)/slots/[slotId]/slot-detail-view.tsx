@@ -6,6 +6,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { Countdown } from '@/components/ui/countdown';
 import { Price } from '@/components/ui/price';
 import { SlotBadges } from '@/components/ui/slot-badge';
+import { ShopLocationMap } from '@/features/map/shop-location-map';
 import { formatKst } from '@/lib/time';
 import { NO_SHOW_PENALTY_RATE, OWNER_FAULT_COUPON_AMOUNT, REFUND_BANDS } from '@/server/policy';
 
@@ -19,7 +20,6 @@ import {
   telHref,
 } from './detail-format';
 import { ReserveButton } from './reserve-button';
-import { ShopLocationMap } from './shop-location-map';
 import type { SlotDetail } from './types';
 
 type SlotDetailViewProps = {

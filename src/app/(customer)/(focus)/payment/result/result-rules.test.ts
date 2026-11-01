@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { AUTO_CANCEL_ERRORS, PAYMENT_ERRORS } from '@/server/payments/errors';
+import { AUTO_CANCEL_ERRORS, PAYMENT_ERRORS, UNCONFIRMED_ERRORS } from '@/server/payments/errors';
 
-import { failureAction } from './result-rules';
+import { canRecheck, CONFIRM_FAILED, failureAction } from './result-rules';
 
 const SLOT = '11111111-1111-4111-8111-111111111111';
 
@@ -40,5 +40,41 @@ describe('결제 실패 뒤 다음 행동 (C-406, D12)', () => {
     expect(
       failureAction({ code: 'PAYMENT_NOT_FOUND', message: PAYMENT_ERRORS.PAYMENT_NOT_FOUND }).href,
     ).toBe('/');
+  });
+});
+
+describe("결제 결과를 아직 모를 때 '다시 확인' (#155)", () => {
+  it('결제사가 처리 중이거나 포트원에 묻지 못했거나 요청이 닿지 않았으면 다시 확인한다', () => {
+    expect(canRecheck({ code: 'PAYMENT_PENDING', message: PAYMENT_ERRORS.PAYMENT_PENDING })).toBe(
+      true,
+    );
+    expect(
+      canRecheck({
+        code: 'PAYMENT_CHECK_UNAVAILABLE',
+        message: PAYMENT_ERRORS.PAYMENT_CHECK_UNAVAILABLE,
+      }),
+    ).toBe(true);
+    expect(canRecheck(CONFIRM_FAILED)).toBe(true);
+  });
+
+  it('결과가 정해진 실패는 다시 확인하지 않는다', () => {
+    expect(
+      canRecheck({
+        code: 'PAYMENT_CANCELLED',
+        message: PAYMENT_ERRORS.PAYMENT_CANCELLED,
+        slotId: SLOT,
+        holdActive: true,
+      }),
+    ).toBe(false);
+    expect(
+      canRecheck({ code: 'PAYMENT_NOT_FOUND', message: PAYMENT_ERRORS.PAYMENT_NOT_FOUND }),
+    ).toBe(false);
+    expect(
+      canRecheck({
+        code: 'HOLD_EXPIRED',
+        message: UNCONFIRMED_ERRORS.HOLD_EXPIRED,
+        autoCancelled: false,
+      }),
+    ).toBe(false);
   });
 });
