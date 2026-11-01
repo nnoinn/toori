@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Price } from '@/components/ui/price';
 import type { BusinessHours } from '@/db/schema/shops';
 import { formatWon } from '@/lib/format';
-import { formatKst, utcToKst } from '@/lib/time';
+import { formatKst, kstDateKey, utcToKst } from '@/lib/time';
 import { DISCOUNT_RATE_OPTIONS, type DiscountRate, PUBLISH_WINDOW_HOURS } from '@/server/policy';
 import { previewSettlement, type SettlementPreview } from '@/server/settlements';
 
@@ -25,13 +25,12 @@ import { checkSlotDraft, createSlot } from './actions';
 import {
   checkBusinessHours,
   groupByKstDate,
-  kstDateKey,
   rangesOverlap,
   slotEnd,
   startCandidates,
 } from './slot-time';
 
-type MenuOption = {
+export type SlotMenuOption = {
   id: string;
   serviceType: string;
   name: string;
@@ -64,7 +63,7 @@ export function SlotCreateForm({
   nowIso: string;
   /** 샵 영업시간(O2). 입력하지 않은 요일은 24시간 다 보여준다 */
   businessHours: BusinessHours;
-  menus: MenuOption[];
+  menus: SlotMenuOption[];
   /** 같은 샵의 예약대기·게시중·예약됨 매물 시간(ISO). 수정이면 고치는 매물은 뺀다 */
   busy: { start: string; end: string }[];
   edit?: SlotEditTarget;

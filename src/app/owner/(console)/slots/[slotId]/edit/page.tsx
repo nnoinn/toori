@@ -8,15 +8,11 @@ import { Card } from '@/components/ui/card';
 import { EmptyState, ErrorState, LoadingCards } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
-import { addMinutes } from '@/lib/time';
 import { ensureOwnerPage } from '@/server/auth';
 import { readShopReviewStatus } from '@/server/shops/review-store';
 
-import { isServiceTypeOf, MENU_DURATION } from '../../../settings/menu/menu';
-import { selectMenus } from '../../../settings/menu/menu-store';
 import { SlotCreateForm } from '../../new/slot-create-form';
-import { selectBusyRanges, selectSlotShop } from '../../new/slot-draft-store';
-import { latestStart } from '../../new/slot-time';
+import { selectSlotFormData } from '../../new/slot-form-data';
 import { SLOT_EDIT_MESSAGES, slotEditProblem } from '../../slot-edit';
 import { selectSlotForEdit } from '../../slot-edit-store';
 
@@ -62,20 +58,10 @@ async function SlotEditContent({ params }: { params: Params }) {
     );
   }
 
-  const [shop, menus, busy] = await Promise.all([
-    selectSlotShop(db, auth.shopId),
-    selectMenus(db, auth.shopId),
-    // 등록 화면과 같은 범위. 고치는 매물 자신은 겹침으로 보지 않는다
-    selectBusyRanges(db, auth.shopId, now, addMinutes(latestStart(now), MENU_DURATION.max), {
-      excludeSlotId: slot.id,
-    }),
-  ]);
-  if (!shop) return <ErrorState description="샵을 찾을 수 없어요" />;
-
-  const usable = menus.filter(
-    (menu) => !menu.hidden && isServiceTypeOf(shop.category, menu.serviceType),
-  );
-  if (usable.length === 0) {
+  // 등록 화면과 같은 값. 고치는 매물 자신은 겹치는 시간으로 보지 않는다
+  const data = await selectSlotFormData(db, auth.shopId, now, { excludeSlotId: slot.id });
+  if (!data) return <ErrorState description="샵을 찾을 수 없어요" />;
+  if (data.menus.length === 0) {
     return <CannotEdit message="고를 수 있는 메뉴가 없어요. 메뉴를 먼저 등록해 주세요" />;
   }
 
@@ -83,22 +69,11 @@ async function SlotEditContent({ params }: { params: Params }) {
     <SlotCreateForm
       shopId={auth.shopId}
       nowIso={now.toISOString()}
-      businessHours={shop.businessHours}
-      menus={usable.map((menu) => ({
-        id: menu.id,
-        serviceType: menu.serviceType,
-        name: menu.name,
-        listPrice: menu.listPrice,
-        durationMinutes: menu.durationMinutes,
-      }))}
-      busy={busy.map((range) => ({
-        start: range.start.toISOString(),
-        end: range.end.toISOString(),
-      }))}
+      {...data}
       edit={{
         slotId: slot.id,
         // 매물 메뉴를 숨겼거나 업종을 바꿨으면 메뉴부터 다시 고른다
-        menuId: usable.some((menu) => menu.id === slot.menuId) ? slot.menuId : null,
+        menuId: data.menus.some((menu) => menu.id === slot.menuId) ? slot.menuId : null,
         startAt: slot.startAt.toISOString(),
         discountRate: slot.discountRate,
         newCustomerOnly: slot.newCustomerOnly,

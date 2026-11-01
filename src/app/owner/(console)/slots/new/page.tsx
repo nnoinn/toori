@@ -7,16 +7,12 @@ import { Card } from '@/components/ui/card';
 import { EmptyState, ErrorState, LoadingCards } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
-import { addMinutes } from '@/lib/time';
 import { ensureOwnerPage } from '@/server/auth';
 import { SHOP_STATUS_LABELS } from '@/server/shops/status';
 import { getShopReviewStatus } from '@/server/shops/review';
 
-import { isServiceTypeOf, MENU_DURATION } from '../../settings/menu/menu';
-import { selectMenus } from '../../settings/menu/menu-store';
 import { SlotCreateForm } from './slot-create-form';
-import { selectBusyRanges, selectSlotShop } from './slot-draft-store';
-import { latestStart } from './slot-time';
+import { selectSlotFormData } from './slot-form-data';
 
 export const metadata: Metadata = { title: '매물 등록' };
 
@@ -61,20 +57,10 @@ async function SlotCreateContent() {
     );
   }
 
-  const db = getDb();
   const now = await getRequestNow();
-  const [shop, menus, busy] = await Promise.all([
-    selectSlotShop(db, auth.shopId),
-    selectMenus(db, auth.shopId),
-    // 고를 수 있는 마지막 시작 시각 + 가장 긴 소요 시간까지 본다
-    selectBusyRanges(db, auth.shopId, now, addMinutes(latestStart(now), MENU_DURATION.max)),
-  ]);
-  if (!shop) return <ErrorState description="샵을 찾을 수 없어요" />;
-
-  const usable = menus.filter(
-    (menu) => !menu.hidden && isServiceTypeOf(shop.category, menu.serviceType),
-  );
-  if (usable.length === 0) {
+  const data = await selectSlotFormData(getDb(), auth.shopId, now);
+  if (!data) return <ErrorState description="샵을 찾을 수 없어요" />;
+  if (data.menus.length === 0) {
     return (
       <Card>
         <EmptyState
@@ -90,22 +76,5 @@ async function SlotCreateContent() {
     );
   }
 
-  return (
-    <SlotCreateForm
-      shopId={auth.shopId}
-      nowIso={now.toISOString()}
-      businessHours={shop.businessHours}
-      menus={usable.map((menu) => ({
-        id: menu.id,
-        serviceType: menu.serviceType,
-        name: menu.name,
-        listPrice: menu.listPrice,
-        durationMinutes: menu.durationMinutes,
-      }))}
-      busy={busy.map((range) => ({
-        start: range.start.toISOString(),
-        end: range.end.toISOString(),
-      }))}
-    />
-  );
+  return <SlotCreateForm shopId={auth.shopId} nowIso={now.toISOString()} {...data} />;
 }

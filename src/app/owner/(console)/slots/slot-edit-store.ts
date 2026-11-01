@@ -9,6 +9,7 @@ import { z } from 'zod';
 
 import { getDb } from '@/db';
 import { slots, type SlotStatus } from '@/db/schema';
+import { getSlotStatus } from '@/features/slot-status/slot-status';
 import { slotIsOnHold, slotStatusIs } from '@/features/slot-status/slot-status-sql';
 import { fail, ok, type Result } from '@/lib/result';
 import { calcSalePrice, type DiscountRate } from '@/server/policy';
@@ -128,7 +129,9 @@ export async function closeSlotInDb(
 
 /**
  * 판매 전 매물을 ①②③ 고른 값으로 고친다. 등록(createSlotInDb)과 같은 검증을 하고, 겹침에서는 자기 자신을 뺀다.
- * 메뉴 값은 고칠 때의 값을 다시 복사하고 할인가는 서버가 다시 계산한다. 등록처럼 지금 게시중으로 저장한다
+ * 메뉴 값은 고칠 때의 값을 다시 복사하고 할인가는 서버가 다시 계산한다.
+ * 게시 시각: 이미 게시중인 매물은 그대로 둔다. 관심 지역 새 매물 알림(C-601)이 publish_at으로 "그날 새로 올라온 매물"을
+ * 모으므로, 고칠 때마다 바꾸면 며칠 전 매물이 새 매물로 다시 알려진다(#169 리뷰). 예약대기 매물은 등록처럼 지금 게시한다
  */
 export async function updateSlotInDb(
   db: Pick<Db, 'transaction'>,
@@ -149,6 +152,8 @@ export async function updateSlotInDb(
       const draft = await validateSlotDraft(tx, shopId, input, now, { excludeSlotId: slotId });
       if (!draft.ok) return draft;
       const { menu, start, end } = draft.data;
+      // 예약대기 매물만 지금 게시한다(미리 게시 S-205는 P1에서 다시 본다)
+      const publishNow = getSlotStatus(editable.data, now) === 'scheduled';
       const salePrice = calcSalePrice(menu.listPrice, pricing.discountRate);
       const [row] = await tx
         .update(slots)
@@ -164,7 +169,7 @@ export async function updateSlotInDb(
           newCustomerOnly: pricing.newCustomerOnly,
           startAt: start,
           endAt: end,
-          publishAt: now,
+          ...(publishNow ? { publishAt: now } : {}),
           status: 'published',
         })
         .where(and(eq(slots.id, slotId), eq(slots.shopId, shopId), editableNow(now)))

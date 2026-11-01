@@ -164,8 +164,43 @@ describeDb('매물 수정 (실제 DB)', () => {
         discountRate: 30,
         salePrice: 23450,
         newCustomerOnly: true,
+        // 이미 게시중인 매물은 게시 시각을 그대로 둔다(관심 지역 새 매물 알림에 다시 나가지 않게)
+        publishAt: slot.publishAt,
+        status: 'published',
+      });
+    });
+  });
+
+  it('예약대기 매물을 고치면 지금 게시중으로 바뀐다', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx);
+      const [slot] = await tx
+        .insert(slots)
+        .values(
+          testSlot(shop, '14:00', '15:00', {
+            status: 'scheduled',
+            publishAt: new Date('2026-11-01T00:00:00+09:00'),
+          }),
+        )
+        .returning();
+
+      const result = await updateSlotInDb(
+        tx,
+        shop.shopId,
+        slot.id,
+        {
+          menuId: shop.menuId,
+          startAt: at('14:00').toISOString(),
+          discountRate: 20,
+          newCustomerOnly: false,
+        },
+        now,
+      );
+      expect(result.ok).toBe(true);
+      expect(await slotRow(tx, slot.id)).toMatchObject({
         publishAt: now,
         status: 'published',
+        discountRate: 20,
       });
     });
   });

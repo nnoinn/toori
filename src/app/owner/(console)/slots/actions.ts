@@ -6,6 +6,7 @@
 import { refresh } from 'next/cache';
 
 import { getDb } from '@/db';
+import { getRequestNow } from '@/lib/request-time';
 import { ok, type Result } from '@/lib/result';
 import { requireShopOwner } from '@/server/auth';
 import { assertShopApproved } from '@/server/shops';
@@ -31,7 +32,7 @@ export async function closeSlot(
   const check = await allowed(shopId);
   if (!check.ok) return check;
 
-  const closed = await closeSlotInDb(getDb(), shopId, slotId, reason, new Date());
+  const closed = await closeSlotInDb(getDb(), shopId, slotId, reason, await getRequestNow());
   // 대시보드 목록에 마감 상태가 바로 보이게 화면 값을 다시 받는다
   if (closed.ok) refresh();
   return closed;
@@ -47,7 +48,7 @@ export async function checkSlotEdit(
   if (!check.ok) return check;
 
   const db = getDb();
-  const now = new Date();
+  const now = await getRequestNow();
   const editable = await checkEditable(db, shopId, slotId, now);
   if (!editable.ok) return editable;
   const draft = await validateSlotDraft(db, shopId, input, now, { excludeSlotId: slotId });
@@ -64,7 +65,7 @@ export async function updateSlot(
   const check = await allowed(shopId);
   if (!check.ok) return check;
 
-  const updated = await updateSlotInDb(getDb(), shopId, slotId, input, new Date());
+  const updated = await updateSlotInDb(getDb(), shopId, slotId, input, await getRequestNow());
   if (updated.ok) refresh();
   return updated;
 }
