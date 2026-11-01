@@ -27,6 +27,7 @@ const slot = (start: string, extra: Partial<DashboardSlot> = {}): DashboardSlot 
   holdCustomerId: null,
   holdExpiresAt: null,
   closeReason: null,
+  reservationId: null,
   reservationCode: null,
   ...extra,
 });

@@ -20,7 +20,7 @@ afterAll(closeTestDb);
 const from = new Date('2026-11-01T00:00:00+09:00');
 
 describeDb('원장님 대시보드 조회 (실제 DB)', () => {
-  it('그 샵의 from 이후 매물을 시작 순서로, 예약된 매물은 예약번호와 같이', async () => {
+  it('그 샵의 from 이후 매물을 시작 순서로, 예약된 매물은 예약 id·예약번호와 같이', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
       const other = await createTestShop(tx);
@@ -45,10 +45,17 @@ describeDb('원장님 대시보드 조회 (실제 DB)', () => {
       );
 
       const rows = await selectDashboardSlots(tx, shop.shopId, from);
-      expect(rows.map((row) => [row.startAt, row.status, row.reservationCode])).toEqual([
-        [new Date('2026-11-01T09:00:00+09:00').toISOString(), 'closed', null],
-        [new Date('2026-11-01T11:00:00+09:00').toISOString(), 'reserved', reservation.code],
-        [new Date('2026-11-01T15:00:00+09:00').toISOString(), 'published', null],
+      expect(
+        rows.map((row) => [row.startAt, row.status, row.reservationId, row.reservationCode]),
+      ).toEqual([
+        [new Date('2026-11-01T09:00:00+09:00').toISOString(), 'closed', null, null],
+        [
+          new Date('2026-11-01T11:00:00+09:00').toISOString(),
+          'reserved',
+          reservation.id,
+          reservation.code,
+        ],
+        [new Date('2026-11-01T15:00:00+09:00').toISOString(), 'published', null, null],
       ]);
     });
   });
