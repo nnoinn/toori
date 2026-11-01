@@ -10,6 +10,7 @@ import { refresh } from 'next/cache';
 
 import { getDb } from '@/db';
 import { type GeocodeCandidate, geocodeAddress } from '@/features/map/geocode';
+import { getRequestNow } from '@/lib/request-time';
 import { fail, ok, type Result, type ResultError } from '@/lib/result';
 import { requireShopOwner } from '@/server/auth';
 
@@ -47,7 +48,7 @@ export async function getCategoryChangeImpact(
   const db = getDb();
   const current = await selectShopProfile(db, shopId);
   if (!current) return { ok: false, error: SHOP_NOT_FOUND };
-  return ok(await selectCategoryChangeImpact(db, shopId, current.category, new Date()));
+  return ok(await selectCategoryChangeImpact(db, shopId, current.category, await getRequestNow()));
 }
 
 /**
@@ -98,7 +99,7 @@ export async function saveShopProfile(
     location = geocoded.data;
   }
 
-  const now = new Date();
+  const now = await getRequestNow();
   // 실패하면 tx.rollback()으로 메뉴 초기화까지 모두 되돌리고, 이유는 failure에 남긴다
   let failure = null as SaveShopProfileError | null;
   let changed = { resetMenus: 0 };

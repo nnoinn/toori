@@ -6,6 +6,7 @@
 import { refresh } from 'next/cache';
 
 import { getDb } from '@/db';
+import { getRequestNow } from '@/lib/request-time';
 import { ok, type Result } from '@/lib/result';
 import { requireShopOwner } from '@/server/auth';
 import { assertShopApproved } from '@/server/shops';
@@ -23,7 +24,7 @@ export async function checkSlotDraft(
   const approved = await assertShopApproved(shopId);
   if (!approved.ok) return approved;
 
-  const draft = await validateSlotDraft(getDb(), shopId, input, new Date());
+  const draft = await validateSlotDraft(getDb(), shopId, input, await getRequestNow());
   if (!draft.ok) return draft;
   return ok({ endAt: draft.data.end.toISOString() });
 }
@@ -35,7 +36,13 @@ export async function createSlot(shopId: string, input: unknown): Promise<Result
   const approved = await assertShopApproved(shopId);
   if (!approved.ok) return approved;
 
-  const created = await createSlotInDb(getDb(), shopId, auth.data.userId, input, new Date());
+  const created = await createSlotInDb(
+    getDb(),
+    shopId,
+    auth.data.userId,
+    input,
+    await getRequestNow(),
+  );
   // 다음 매물을 올릴 때 방금 올린 시간이 겹침으로 보이게 화면 값을 다시 받는다
   if (created.ok) refresh();
   return created;

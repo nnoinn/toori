@@ -7,6 +7,7 @@ import { TransactionRollbackError } from 'drizzle-orm';
 import { refresh } from 'next/cache';
 
 import { getDb } from '@/db';
+import { getRequestNow } from '@/lib/request-time';
 import { fail, ok, type Result, type ResultError } from '@/lib/result';
 import { requireShopOwner } from '@/server/auth';
 
@@ -81,7 +82,7 @@ export async function setMenuHidden(
     );
   }
 
-  await setMenuHiddenInDb(db, shopId, menuId, hidden, new Date());
+  await setMenuHiddenInDb(db, shopId, menuId, hidden, await getRequestNow());
   refresh();
   return ok(null);
 }
