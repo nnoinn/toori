@@ -7,7 +7,6 @@ import {
   checkStart,
   groupByKstDate,
   isOnStep,
-  kstDateKey,
   latestStart,
   rangesOverlap,
   slotEnd,
@@ -154,6 +153,5 @@ describe('groupByKstDate', () => {
       ['2026-10-31', 1],
       ['2026-11-01', 2],
     ]);
-    expect(kstDateKey(at('2026-11-01T08:30:00'))).toBe('2026-11-01');
   });
 });

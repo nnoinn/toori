@@ -6,8 +6,8 @@ import { LoadingCards } from '@/components/ui/state';
 import { getRequestNow } from '@/lib/request-time';
 import { getCurrentAccount } from '@/server/auth';
 import { loginPath, OWNER_JOIN_PATH } from '@/server/auth/paths';
+import { kstDateKey } from '@/lib/time';
 
-import { kstDateKey } from '../business-fields';
 import { OwnerJoinForm } from './owner-join-form';
 
 export const metadata: Metadata = { title: '원장님 가입' };

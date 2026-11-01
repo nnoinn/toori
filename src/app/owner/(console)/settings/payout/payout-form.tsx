@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { BANKS } from '@/server/policy';
+import { bankName, BANKS } from '@/server/policy';
 
 import { type PayoutInput, validatePayoutInput } from '../../../business-fields';
 import { type PayoutFieldErrors, savePayoutAccount } from './actions';
@@ -26,10 +26,6 @@ import type { PayoutAccountView } from './payout-store';
 const EMPTY: PayoutInput = { bankCode: '', accountNumber: '', accountHolder: '' };
 const SELECT_CLASS =
   'h-9 rounded-lg border bg-card px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive';
-
-export function bankName(code: string): string {
-  return BANKS.find((bank) => bank.code === code)?.name ?? code;
-}
 
 export function PayoutForm({ shopId, account }: { shopId: string; account: PayoutAccountView }) {
   const [editing, setEditing] = useState(false);

@@ -13,6 +13,11 @@ nnoinn이 팀원에게 알릴 내용을 PR과 함께 이 파일에 추가한다.
 
 ---
 
+## 2026-11-01 · 전원 (공통 함수 모으기, 새 함수 전에 찾아보기)
+- **새 함수를 만들기 전에 이미 있는지 찾는다(conventions, nnoinn 요청).** 날짜·시간은 `src/lib/time.ts`, 금액 표시는 `src/lib/format.ts`, 주소 값은 `src/lib/search-params.ts`, 전화번호는 `src/lib/phone.ts`, 은행·정책 값은 `src/server/policy/`. 리뷰 때 중복 구현도 확인한다
+- 같은 함수가 여러 곳에 있던 것을 모았다: `kstDateKey`(`@/lib/time`), `bankName`(`@/server/policy`), `firstParam`(`@/lib/search-params`). `labelBank`와 `business-fields`·`slot-time`의 `kstDateKey`는 없어졌다
+- 할 일: 정찬형은 결제창 작업 때 예약 확인 화면 연락처 칸을 공통 `Input`으로 바꾼다. 정민석·정찬형은 서버 함수의 `new Date()`를 `getRequestNow()`로 바꾼다(정민석 메뉴·샵 정보·매물 등록, 정찬형 목록). main을 합칠 때 위 함수가 없다고 나오면 새 위치에서 가져오면 된다
+
 ## 2026-11-01 · 전원 (정산 계좌 확인, 시나리오 처리 필요 예약)
 - **정산 계좌는 저장 직전에 전체 번호를 보여주고 확인받는다(nnoinn 결정).** 계좌가 바뀌면 원장님에게 알림을 보내고 기록을 남긴다. 1원 인증은 실제 PG 계약 때 넣는다. 운영자 첫 지급 확인과 통장 사본은 두지 않는다. 규칙은 기술 가이드 7장
 - `npm run scenario owner-slots`가 시작이 지나 처리가 필요한 예약도 만든다(대시보드 "처리 필요" 확인용)

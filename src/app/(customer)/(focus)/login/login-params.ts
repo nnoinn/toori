@@ -2,6 +2,7 @@
 // next가 우리 사이트 안 주소인지는 공통 함수 safeNextPath(src/lib/safe-next.ts)로만 확인한다.
 
 import { safeNextPath } from '@/lib/safe-next';
+import { firstParam, type SearchValue } from '@/lib/search-params';
 
 /** 로그인 화면 토글 값 */
 export type LoginMode = 'customer' | 'owner';
@@ -12,15 +13,9 @@ export const DEFAULT_NEXT: Record<LoginMode, string> = {
   owner: '/owner',
 };
 
-type SearchValue = string | string[] | undefined;
-
-function first(value: SearchValue): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
 /** mode 값. owner가 아니면 모두 customer */
 export function parseLoginMode(value: SearchValue): LoginMode {
-  return first(value) === 'owner' ? 'owner' : 'customer';
+  return firstParam(value) === 'owner' ? 'owner' : 'customer';
 }
 
 /**
@@ -28,7 +23,7 @@ export function parseLoginMode(value: SearchValue): LoginMode {
  * 빈 문자열은 안전한 주소가 될 수 없어서 "통과하지 못함" 표시로 쓴다.
  */
 export function readNextParam(value: SearchValue): string | null {
-  return safeNextPath(first(value), '') || null;
+  return safeNextPath(firstParam(value), '') || null;
 }
 
 /** 로그인 콜백이 돌려보내는 실패 이유(#47 3장, src/server/auth/paths.ts LoginError)와 화면 문구 */
@@ -42,6 +37,6 @@ export type LoginErrorCode = keyof typeof LOGIN_ERROR_MESSAGES;
 
 /** 주소의 error 값. 모르는 값이면 null(문구를 보여주지 않음) */
 export function parseLoginError(value: SearchValue): LoginErrorCode | null {
-  const raw = first(value);
+  const raw = firstParam(value);
   return raw && Object.hasOwn(LOGIN_ERROR_MESSAGES, raw) ? (raw as LoginErrorCode) : null;
 }
