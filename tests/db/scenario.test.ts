@@ -125,7 +125,7 @@ describeDb('시나리오 명령 (실제 DB)', () => {
       expect(new Set(slots.map((s) => s.status))).toEqual(
         new Set(['scheduled', 'published', 'closed', 'reserved', 'cancelled', 'completed']),
       );
-      expect(slots).toHaveLength(7);
+      expect(slots).toHaveLength(8);
       for (const s of slots) {
         expect(s.booked).toBe(['reserved', 'cancelled', 'completed'].includes(s.status) ? 1 : 0);
       }
