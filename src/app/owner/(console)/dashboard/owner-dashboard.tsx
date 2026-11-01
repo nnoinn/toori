@@ -1,13 +1,14 @@
 'use client';
 
 // 원장님 대시보드 (O9, S-401, #21 Q12). 맨 위 "처리 필요", 오늘/예정 탭, 상태 필터, 매물 목록. PC 기준.
-// 판매 전 매물은 목록에서 [수정]·[마감](O10, S-206). 결제 중(홀딩)이면 버튼을 잠근다.
+// 판매 전 매물은 목록에서 [수정]·[마감](O10, S-206). 결제 중(홀딩)이면 버튼을 잠근다("다른 고객이 결제 중" 배지가 같이 보인다).
+// 버튼 모양은 메뉴·가격표 목록과 같게 글자만 쓴다(수정은 테두리, 마감은 글자 버튼).
 // 예약 상세(O11), 재등록(O13)은 만들 때 목록에서 연결한다.
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { cn } from 'cn';
-import { ClipboardCheck, Pencil, SquarePlus, SquareX } from 'lucide-react';
+import { ClipboardCheck, SquarePlus } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -189,34 +190,25 @@ function SlotRow({
           </span>
         ) : null}
       </div>
-      {beforeSale ? (
-        <div className="flex w-40 shrink-0 flex-col items-end gap-1">
-          <div className="flex gap-2">
+      {/* 버튼이 없는 줄도 같은 폭을 비워 상태 배지 줄을 맞춘다 */}
+      <div className="flex w-28 shrink-0 justify-end gap-1">
+        {beforeSale ? (
+          <>
             {held ? (
               <Button type="button" variant="outline" disabled>
-                <Pencil aria-hidden />
                 수정
               </Button>
             ) : (
               <Button asChild variant="outline">
-                <Link href={`/owner/slots/${slot.id}/edit`}>
-                  <Pencil aria-hidden />
-                  수정
-                </Link>
+                <Link href={`/owner/slots/${slot.id}/edit`}>수정</Link>
               </Button>
             )}
-            <Button type="button" variant="outline" disabled={held} onClick={() => onClose(slot)}>
-              <SquareX aria-hidden />
+            <Button type="button" variant="ghost" disabled={held} onClick={() => onClose(slot)}>
               마감
             </Button>
-          </div>
-          {held ? (
-            <span className="text-xs text-muted-foreground">결제가 끝나면 고칠 수 있어요</span>
-          ) : null}
-        </div>
-      ) : (
-        <div className="w-40 shrink-0" />
-      )}
+          </>
+        ) : null}
+      </div>
     </li>
   );
 }
