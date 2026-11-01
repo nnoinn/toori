@@ -11,8 +11,8 @@ import {
   createTestReservation,
   createTestShop,
   testSlot,
-} from '../../../../../tests/db/fixtures';
-import { closeTestDb, describeDb, withRollback } from '../../../../../tests/db/test-db';
+} from '../../../../../../tests/db/fixtures';
+import { closeTestDb, describeDb, withRollback } from '../../../../../../tests/db/test-db';
 import { resetMenusForCategoryChange, selectCategoryChangeImpact } from './category-change-store';
 
 afterAll(closeTestDb);

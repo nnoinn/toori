@@ -6,8 +6,8 @@ import { afterAll, expect, it } from 'vitest';
 
 import { menus, shops, slots } from '@/db/schema';
 
-import { createTestShop, testSlot } from '../../../../../tests/db/fixtures';
-import { closeTestDb, describeDb, withRollback } from '../../../../../tests/db/test-db';
+import { createTestShop, testSlot } from '../../../../../../tests/db/fixtures';
+import { closeTestDb, describeDb, withRollback } from '../../../../../../tests/db/test-db';
 import { selectBusyRanges, validateSlotDraft } from './slot-draft-store';
 
 afterAll(closeTestDb);

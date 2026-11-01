@@ -29,7 +29,7 @@ export const COMMANDS = {
   'my-reservations': '내 예약 탭용 예약 만들기: 예정·지난(이용 완료)·취소·노쇼 하나씩',
   'hold-by-other': '원장님 A 샵 게시중 매물 하나를 다른 고객이 결제 중으로(10분 뒤 풀림)',
   'owner-shop': '<pending|approved|rejected> 내 원장님 샵 만들기와 입점 상태 바꾸기',
-  'owner-slots': '내 샵에 매물 상태 6가지와 예약된 매물 만들기',
+  'owner-slots': '내 샵에 매물 상태 6가지와 예약된 매물(시작 전, 시작 지나 처리 필요) 만들기',
   reset: '이 명령이 내 계정에 만든 것 모두 지우기',
 };
 
@@ -343,6 +343,7 @@ async function ownerSlots(sql, me, now) {
     { label: '마감(팔리지 않고 시작 지남)', status: 'published', at: base - 3 * HOUR },
     { label: '마감(직접 마감)', status: 'closed', at: base + 10 * HOUR, closeReason: 'other_channel' },
     { label: '예약됨', status: 'reserved', at: base + 8 * HOUR, customer: c },
+    { label: '예약됨(시작 지남, 처리 필요)', status: 'reserved', at: base - 12 * HOUR, customer: c },
     { label: '취소(고객 취소)', status: 'cancelled', at: base + 26 * HOUR, customer: b },
     { label: '완료', status: 'completed', at: base - 26 * HOUR, customer: b },
   ];
