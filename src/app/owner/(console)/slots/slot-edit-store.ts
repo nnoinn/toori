@@ -8,7 +8,7 @@ import { and, eq, not, or, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
-import { SLOT_CLOSE_REASONS, slots, type SlotStatus } from '@/db/schema';
+import { slots, type SlotStatus } from '@/db/schema';
 import { slotIsOnHold, slotStatusIs } from '@/features/slot-status/slot-status-sql';
 import { fail, ok, type Result } from '@/lib/result';
 import { calcSalePrice, type DiscountRate } from '@/server/policy';
@@ -16,7 +16,7 @@ import { calcSalePrice, type DiscountRate } from '@/server/policy';
 import { type CreatedSlot, violated } from './new/slot-create-store';
 import { SLOT_DRAFT_ERRORS, validateSlotDraft } from './new/slot-draft-store';
 import { parseSlotPricing, SLOT_PRICING_ERROR } from './new/slot-pricing';
-import { SLOT_EDIT_MESSAGES, slotEditProblem } from './slot-edit';
+import { SLOT_CLOSE_REASON_OPTIONS, SLOT_EDIT_MESSAGES, slotEditProblem } from './slot-edit';
 
 type Db = ReturnType<typeof getDb>;
 
@@ -36,7 +36,7 @@ export type SlotForEdit = {
 };
 
 const slotIdSchema = z.uuid();
-const closeReasonSchema = z.enum(SLOT_CLOSE_REASONS);
+const closeReasonSchema = z.enum(SLOT_CLOSE_REASON_OPTIONS);
 
 /** 지금 판매 전(예약대기·게시중)이고 홀딩 중이 아닌 매물만. slot-edit.ts slotEditProblem과 같은 답 */
 function editableNow(now: Date): SQL {

@@ -10,14 +10,22 @@ import {
   type SlotStatusInput,
 } from '@/features/slot-status/slot-status';
 
-/** 원장님 직접 마감 사유(S-206) */
+/** 마감 사유 이름(목록에 보여준다) */
 export const SLOT_CLOSE_REASON_LABELS: Record<SlotCloseReason, string> = {
   other_channel: '다른 곳 예약',
   mistake: '잘못 올림',
   other: '기타',
 };
 
-export const SLOT_CLOSE_REASON_OPTIONS = Object.keys(SLOT_CLOSE_REASON_LABELS) as SlotCloseReason[];
+/**
+ * 원장님이 [마감]에서 고르는 사유(S-206). 서버도 이 셋만 받는다.
+ * 원장님 탈퇴 때 일괄 마감 사유(기술 가이드 7장, P1)처럼 원장님이 고르지 않는 사유는 넣지 않는다
+ */
+export const SLOT_CLOSE_REASON_OPTIONS = [
+  'other_channel',
+  'mistake',
+  'other',
+] as const satisfies readonly SlotCloseReason[];
 
 export type SlotEditProblem =
   | 'SLOT_NOT_FOUND'
