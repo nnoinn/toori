@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { unstable_rethrow, useRouter } from 'next/navigation';
+import PortOne, { type PaymentResponse } from '@portone/browser-sdk/v2';
 import { ChevronDown, Clock, MapPin } from 'lucide-react';
 
 import { BackButton } from '@/components/ui/back-button';
@@ -32,8 +33,11 @@ import {
   intermediaryNotice,
   REFUND_CONSENT_LABEL,
 } from './checkout-texts';
+import { paymentResultPath, toPortOneRequest } from './payment-window';
 
 const START_FAILED_MESSAGE = '결제를 시작하지 못했어요. 잠시 후 다시 시도해 주세요';
+// 포트원 결제창 스크립트를 못 받았거나 결제창이 요청값을 거절했을 때. 홀딩은 그대로라 다시 누를 수 있다(누를 때마다 새 결제 번호)
+const PAYMENT_WINDOW_FAILED_MESSAGE = '결제창을 열지 못했어요. 잠시 후 다시 시도해 주세요';
 
 type CheckoutViewProps = {
   slot: SlotDetail;
@@ -78,12 +82,25 @@ export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProp
           bookerInfoAgreed: true,
         });
         if (result.ok) {
-          // TODO(J11): 포트원 브라우저 SDK(설치 전 확인, #19)를 붙이면 PortOne.requestPayment(result.data)로 결제창을 연다.
-          // 지금은 결제가 가짜(#127)라 결제창 없이 복귀 화면으로 바로 간다(#121 강규민 안내)
+          // 토스페이먼츠 결제창(C-403). 폰은 결제 페이지로 이동했다가 포트원이 결과 화면(redirectUrl)으로 보내서 여기 오지 않는다.
+          // PC는 화면 위 결제창이 닫히면 결과를 받아 같은 결과 화면으로 간다. 결과 확인은 그 화면이 서버로 한다
           const { redirectUrl, paymentId } = result.data;
-          const back = new URL(redirectUrl);
-          back.searchParams.set('paymentId', paymentId);
-          router.push(`${back.pathname}${back.search}`);
+          let response: PaymentResponse | undefined;
+          try {
+            response = await PortOne.requestPayment(toPortOneRequest(result.data));
+          } catch {
+            setError(PAYMENT_WINDOW_FAILED_MESSAGE);
+            return;
+          }
+          if (response) {
+            router.push(
+              paymentResultPath(redirectUrl, {
+                paymentId,
+                code: response.code,
+                message: response.message,
+              }),
+            );
+          }
           return;
         }
         switch (result.error.code) {
