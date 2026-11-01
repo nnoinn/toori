@@ -13,8 +13,9 @@ import { requireShopOwner } from '@/server/auth';
 import { SHOP_REVIEW_ERRORS } from '@/server/shops';
 import { resubmitShop } from '@/server/shops/review-store';
 import { assertBusinessDocPath } from '@/server/storage';
+import { kstDateKey } from '@/lib/time';
 
-import { type BusinessInput, kstDateKey, validateBusinessInput } from '../../../business-fields';
+import { type BusinessInput, validateBusinessInput } from '../../../business-fields';
 import { selectBusinessInfo, updateBusinessInfo } from './business-info-store';
 
 export type BusinessFieldErrors = Partial<Record<keyof BusinessInput, string>>;

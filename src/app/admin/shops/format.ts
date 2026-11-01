@@ -1,17 +1,13 @@
 // 입점 심사 화면 표시 모양 (A-101). 화면 코드에서만 쓰는 이름 바꾸기라 이 폴더에 둔다.
 
 import type { PgSellerStatus } from '@/db/schema/shops';
-import { BANKS, SHOP_CATEGORIES } from '@/server/policy';
+import { SHOP_CATEGORIES } from '@/server/policy';
 
 /** 사업자등록번호 10자리 → 000-00-00000. 저장은 숫자 10자리(#117) */
 export function formatBusinessNumber(digits: string): string {
   return /^\d{10}$/.test(digits)
     ? `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`
     : digits;
-}
-
-export function labelBank(code: string): string {
-  return BANKS.find((bank) => bank.code === code)?.name ?? code;
 }
 
 export function labelCategory(key: string): string {

@@ -1,14 +1,7 @@
 // 원장님 사업자 정보·정산 계좌 입력 검사 (S-101·S-107, #23 D3). 화면('use client')과 서버 함수가 같이 쓴다.
 // 가입(join/owner-join.ts), 매장 설정 > 사업자 정보, 정산 계좌(O7 ②)가 같은 규칙을 쓴다. 강규민님 createOwnerAccount의 서버 검사와 같은 규칙이다.
 
-import { utcToKst } from '@/lib/time';
 import { BANK_CODES, type BankCode } from '@/server/policy';
-
-/** 한국 날짜 YYYY-MM-DD. 개업일자 검사의 '오늘'로 쓴다 */
-export function kstDateKey(date: Date): string {
-  const { year, month, day } = utcToKst(date);
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
 
 export const OWNER_FIELD_LIMITS = {
   personName: 20,

@@ -5,6 +5,7 @@ import type { ResultError } from '@/lib/result';
 import { HOLD_MINUTES } from '@/server/policy/slot-time';
 
 const REFUNDED = '결제한 금액은 모두 환불돼요';
+const WILL_REFUND = '결제는 곧 취소되고 모두 환불돼요';
 
 export const PAYMENT_ERRORS = {
   INVALID_INPUT: '입력한 내용을 다시 확인해 주세요',
@@ -23,6 +24,20 @@ export const PAYMENT_ERRORS = {
   PAYMENT_CANCELLED: '결제가 취소됐어요',
   PAYMENT_FAILED: '결제하지 못했어요. 다시 시도해 주세요',
   PAYMENT_NOT_FOUND: '결제 정보를 찾을 수 없어요',
+  /** 결제사가 아직 처리 중(W11 ②에서 더함). 잠시 뒤 다시 부르면 된다 */
+  PAYMENT_PENDING: '결제를 확인하고 있어요. 잠시 후 다시 확인해 주세요',
+  /** 포트원에 결제 결과를 물어보지 못함(W11 ②에서 더함). 새로고침하면 다시 확인한다 */
+  PAYMENT_CHECK_UNAVAILABLE: '결제 결과를 확인하지 못했어요. 잠시 후 새로고침해 주세요',
+} as const;
+
+/**
+ * 결제는 됐지만 예약을 확정할 수 없을 때(C-406). confirmPayment만 돌려준다(autoCancelled: false).
+ * W11에서는 주문에 이유를 기록만 하고, 포트원 자동 취소는 W12에서 붙인다(그 뒤로는 AUTO_CANCEL_ERRORS)
+ */
+export const UNCONFIRMED_ERRORS = {
+  HOLD_EXPIRED: `결제 가능 시간(${HOLD_MINUTES}분)이 지나서 예약을 확정하지 못했어요. ${WILL_REFUND}`,
+  AMOUNT_MISMATCH: `결제 금액이 달라서 예약을 확정하지 못했어요. ${WILL_REFUND}`,
+  SLOT_SOLD: `그 사이 매물이 판매되어 예약을 확정하지 못했어요. ${WILL_REFUND}`,
 } as const;
 
 /** 결제는 됐지만 확정할 수 없어서 자동 취소했을 때(C-406). confirmPayment만 돌려준다 */
@@ -33,6 +48,7 @@ export const AUTO_CANCEL_ERRORS = {
 } as const;
 
 export type PaymentErrorCode = keyof typeof PAYMENT_ERRORS | keyof typeof AUTO_CANCEL_ERRORS;
+export type UnconfirmedCode = keyof typeof UNCONFIRMED_ERRORS;
 
 /** 실패에 더 붙는 값. 해당 코드에서만 온다 */
 export type PaymentError = ResultError & {
@@ -42,7 +58,7 @@ export type PaymentError = ResultError & {
   slotId?: string;
   /** PAYMENT_CANCELLED·PAYMENT_FAILED: 홀딩이 남았으면 예약 확인 화면으로 돌아가 다시 결제(D12) */
   holdActive?: boolean;
-  /** confirmPayment의 HOLD_EXPIRED·AMOUNT_MISMATCH·SLOT_SOLD: 결제를 자동 취소했으면 true */
+  /** confirmPayment의 HOLD_EXPIRED·AMOUNT_MISMATCH·SLOT_SOLD: 결제를 자동 취소했으면 true(W11은 기록만 해서 false, W12부터 true) */
   autoCancelled?: boolean;
 };
 
@@ -60,4 +76,8 @@ export function autoCancelFail(code: keyof typeof AUTO_CANCEL_ERRORS): {
   error: PaymentError;
 } {
   return { ok: false, error: { code, message: AUTO_CANCEL_ERRORS[code], autoCancelled: true } };
+}
+
+export function unconfirmedFail(code: UnconfirmedCode): { ok: false; error: PaymentError } {
+  return { ok: false, error: { code, message: UNCONFIRMED_ERRORS[code], autoCancelled: false } };
 }

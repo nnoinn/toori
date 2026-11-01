@@ -33,3 +33,8 @@ export const BANKS = [
 export type BankCode = (typeof BANKS)[number]['code'];
 
 export const BANK_CODES = BANKS.map((bank) => bank.code) as [BankCode, ...BankCode[]];
+
+/** 은행 코드의 이름. 목록에 없는 코드면 코드를 그대로 돌려준다 */
+export function bankName(code: string): string {
+  return BANKS.find((bank) => bank.code === code)?.name ?? code;
+}

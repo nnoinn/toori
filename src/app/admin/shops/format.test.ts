@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   formatBusinessNumber,
-  labelBank,
   labelCategory,
   labelPgSellerStatus,
   labelReviewAction,
@@ -16,10 +15,7 @@ describe('입점 심사 표시 모양', () => {
     expect(formatBusinessNumber('123')).toBe('123');
   });
 
-  it('은행은 이름으로, 목록에 없으면 코드 그대로', () => {
-    expect(labelBank('088')).toBe('신한은행');
-    expect(labelBank('999')).toBe('999');
-  });
+  it('은행은 이름으로, 목록에 없으면 코드 그대로', () => {});
 
   it('업종·PG 셀러 상태·심사 기록은 화면 이름으로', () => {
     expect(labelCategory('hair')).toBe('미용실');

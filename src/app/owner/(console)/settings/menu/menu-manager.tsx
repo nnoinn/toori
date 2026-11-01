@@ -26,7 +26,6 @@ import type { ShopCategory } from '@/server/policy';
 import { moveMenu, saveMenu, setMenuHidden } from './actions';
 import {
   formatMinutes,
-  isServiceTypeOf,
   MENU_DURATION_OPTIONS,
   MENU_LIMITS,
   type MenuField,
@@ -170,27 +169,18 @@ export function MenuManager({
           </p>
           <Card className="gap-0 py-0">
             <ul className="divide-y">
-              {hidden.map((menu) => {
-                const mismatch = !isServiceTypeOf(category, menu.serviceType);
-                return (
-                  <li key={menu.id} className="flex items-center gap-3 px-4 py-3 opacity-70">
-                    <MenuSummary menu={menu} />
-                    {mismatch ? (
-                      <span className="max-w-40 text-right text-xs text-muted-foreground">
-                        지금 업종에 없는 서비스 종류예요
-                      </span>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        onClick={() => run(() => setMenuHidden(shopId, menu.id, false))}
-                        disabled={pending}
-                      >
-                        다시 보이기
-                      </Button>
-                    )}
-                  </li>
-                );
-              })}
+              {hidden.map((menu) => (
+                <li key={menu.id} className="flex items-center gap-3 px-4 py-3 opacity-70">
+                  <MenuSummary menu={menu} />
+                  <Button
+                    variant="outline"
+                    onClick={() => run(() => setMenuHidden(shopId, menu.id, false))}
+                    disabled={pending}
+                  >
+                    다시 보이기
+                  </Button>
+                </li>
+              ))}
             </ul>
           </Card>
         </section>

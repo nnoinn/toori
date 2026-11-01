@@ -8,6 +8,7 @@ import {
   kstToUtc,
   minutesUntil,
   utcToKst,
+  kstDateKey,
 } from './time';
 
 describe('kstToUtc', () => {
@@ -33,6 +34,13 @@ describe('utcToKst', () => {
     const { weekday, ...back } = utcToKst(kstToUtc(original));
     expect(back).toEqual(original);
     expect(weekday).toBe(4);
+  });
+});
+
+describe('kstDateKey', () => {
+  it('한국 날짜로 바꾼다(UTC 15시 = 한국 다음 날 0시)', () => {
+    expect(kstDateKey(new Date('2026-10-30T14:59:00Z'))).toBe('2026-10-30');
+    expect(kstDateKey(new Date('2026-10-30T15:00:00Z'))).toBe('2026-10-31');
   });
 });
 

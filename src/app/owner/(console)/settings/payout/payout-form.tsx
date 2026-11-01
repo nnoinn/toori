@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { BANKS } from '@/server/policy';
+import { bankName, BANKS } from '@/server/policy';
 
 import { type PayoutInput, type PayoutValues, validatePayoutInput } from '../../../business-fields';
 import { bankName, PayoutConfirmDialog } from '../../../payout-confirm-dialog';
