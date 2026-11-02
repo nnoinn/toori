@@ -86,9 +86,9 @@ import { Logo } from '@/components/ui/logo';
 ## 다른 계정 알림 아이콘(회색)
 
 - 한 기기에서 고객·원장님 알림을 모두 받을 때, 지금 들어와 있지 않은 계정의 알림에 써요(11/1 결정, #131).
-- 꺼진 느낌이 나게 흐린 회색으로 만들었어요(11/2).
+- 꺼진 느낌이 나는 회색으로 만들었어요(11/2, 후보 4가지 중 G3).
   - 모양과 크기는 흰 앱 아이콘(`-light`)과 같고 색만 달라요.
-  - 칸 `#F5F5F5`, 글자 `#A3A3A3`, i 점 `#D4D4D4`예요. 앱의 회색(`muted`)과 같은 줄이에요.
+  - 칸 `#F5F5F5`, 글자 `#737373`, i 점 `#A3A3A3`예요. 앱의 회색(`muted`, `muted-foreground`)과 같은 줄이에요.
 - 지금 계정 알림의 아이콘과 같은 모양끼리 짝을 맞춰 써요.
   - 둥근 모서리: `app-icon/toori-app-icon-light-192.png` ↔ `app-icon/toori-app-icon-gray-192.png`
   - 정사각형: `web/pwa-icon-light-192.png` ↔ `app-icon/toori-app-icon-gray-square-192.png`
