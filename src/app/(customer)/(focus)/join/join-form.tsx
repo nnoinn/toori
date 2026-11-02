@@ -65,8 +65,8 @@ export function JoinForm({ next }: JoinFormProps) {
     startTransition(async () => {
       try {
         // 성공하면 서버가 next로 보내서 돌아오지 않는다(#47 4장)
-        // TODO(#183): 강규민 createCustomerAccount가 휴대폰 번호를 받으면 { phone: phoneToSave }도 같이 넘긴다
-        const result = await createCustomerAccount({ agreements, next });
+        // 휴대폰 번호는 가입과 함께 저장한다(#183, 강규민 #192). 서버도 같은 규칙으로 다시 확인한다
+        const result = await createCustomerAccount({ agreements, phone: phoneToSave, next });
         if (result.ok) return;
         // 다른 창에서 먼저 가입을 마친 경우. 이미 계정이 있으니 보던 화면으로 보낸다
         if (result.error.code === 'ALREADY_EXISTS') {
