@@ -43,7 +43,7 @@ function input(change: (value: CreateOwnerAccountInput) => void = () => {}) {
     shop: {
       businessName: '투리헤어',
       representativeName: '김원장',
-      businessRegistrationNumber: '123-45-67890',
+      businessRegistrationNumber: '123-45-67891',
       openedOn: '2025-03-01',
       businessDocPath: DOC,
       name: '투리헤어 중앙점',
@@ -95,7 +95,7 @@ describe('createOwnerAccount', () => {
         location: { lat: 37.3, lng: 126.8 },
         businessName: '투리헤어',
         representativeName: '김원장',
-        businessRegistrationNumber: '1234567890',
+        businessRegistrationNumber: '1234567891',
         openedOn: '2025-03-01',
         businessDocPath: DOC,
       },
@@ -166,6 +166,17 @@ describe('createOwnerAccount', () => {
         input((v) => void ((v.agreements as Record<string, boolean>)[key] = false)),
       );
       expect(result).toEqual(fail('REQUIRED_TERMS_MISSING', '필수 항목에 모두 동의해 주세요'));
+    },
+  );
+
+  it.each(['123-45-67890', '1234567890', '111-11-11111'])(
+    '검증번호가 맞지 않는 사업자등록번호 %s는 저장하지 않는다(화면을 거치지 않은 요청, #205)',
+    async (number) => {
+      const result = await createOwnerAccount(
+        input((v) => void (v.shop.businessRegistrationNumber = number)),
+      );
+      expect(result).toEqual(fail('INVALID_INPUT', '사업자등록번호를 다시 확인해 주세요'));
+      expect(state.saveOwnerAccount).not.toHaveBeenCalled();
     },
   );
 
