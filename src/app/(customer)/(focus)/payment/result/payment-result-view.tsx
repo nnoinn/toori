@@ -7,7 +7,7 @@ import { CircleAlert, CircleCheck, Clock } from 'lucide-react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { LoadingCards } from '@/components/ui/state';
-import { loginPath } from '@/server/auth/paths';
+import { CUSTOMER_HOME, loginPath } from '@/server/auth/paths';
 import { confirmPayment } from '@/server/payments/checkout';
 import { PAYMENT_ERRORS, type PaymentError } from '@/server/payments/errors';
 import type { ConfirmedReservation } from '@/server/payments/types';
@@ -115,7 +115,7 @@ export function PaymentResultView({
           >
             예약 상세 보기
           </Link>
-          <Link href="/" className={buttonVariants({ variant: 'ghost' })}>
+          <Link href={CUSTOMER_HOME} className={buttonVariants({ variant: 'ghost' })}>
             홈으로
           </Link>
         </div>
@@ -164,8 +164,8 @@ export function PaymentResultView({
         >
           {action.label}
         </Link>
-        {action.href !== '/' ? (
-          <Link href="/" className={buttonVariants({ variant: 'ghost' })}>
+        {action.href !== CUSTOMER_HOME ? (
+          <Link href={CUSTOMER_HOME} className={buttonVariants({ variant: 'ghost' })}>
             홈으로
           </Link>
         ) : null}

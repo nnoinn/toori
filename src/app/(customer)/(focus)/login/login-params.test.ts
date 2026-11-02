@@ -63,10 +63,10 @@ describe('로그인하고 갈 곳: 고른 모드와 next가 맞지 않으면 그
     expect(nextForMode('owner', '/')).toBe('/owner');
   });
 
-  it('원장님·운영자 화면에서 넘어와 고객을 고르면 /', () => {
-    expect(nextForMode('customer', '/owner')).toBe('/');
-    expect(nextForMode('customer', '/owner/slots/new')).toBe('/');
-    expect(nextForMode('customer', '/admin/shops')).toBe('/');
+  it('원장님·운영자 화면에서 넘어와 고객을 고르면 고객 홈', () => {
+    expect(nextForMode('customer', '/owner')).toBe('/home');
+    expect(nextForMode('customer', '/owner/slots/new')).toBe('/home');
+    expect(nextForMode('customer', '/admin/shops')).toBe('/home');
   });
 
   it('맞으면 보던 화면 그대로', () => {
@@ -77,7 +77,7 @@ describe('로그인하고 갈 곳: 고른 모드와 next가 맞지 않으면 그
   });
 
   it('next가 없으면 그 모드의 기본 주소', () => {
-    expect(nextForMode('customer', null)).toBe('/');
+    expect(nextForMode('customer', null)).toBe('/home');
     expect(nextForMode('owner', null)).toBe('/owner');
   });
 

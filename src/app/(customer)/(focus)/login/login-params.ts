@@ -3,15 +3,12 @@
 
 import { safeNextPath } from '@/lib/safe-next';
 import { firstParam, type SearchValue } from '@/lib/search-params';
+import { DEFAULT_NEXT } from '@/server/auth/paths';
+
+export { DEFAULT_NEXT };
 
 /** 로그인 화면 토글 값 */
 export type LoginMode = 'customer' | 'owner';
-
-/** next가 없거나 안전하지 않을 때 돌아갈 곳 */
-export const DEFAULT_NEXT: Record<LoginMode, string> = {
-  customer: '/',
-  owner: '/owner',
-};
 
 const OWNER_PATH = /^\/owner(?:[/?#]|$)/;
 const ADMIN_PATH = /^\/admin(?:[/?#]|$)/;

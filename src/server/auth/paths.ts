@@ -5,9 +5,12 @@ import { safeNextPath } from '@/lib/safe-next';
 import { type AccountMode, hasAccountFor } from './account-mode';
 import type { CurrentAccount } from './current-account';
 
-/** next가 없거나 안전하지 않을 때 돌아갈 곳(로그인 화면 login-params.ts와 같은 값) */
+/** 고객 홈(#215). 첫 화면(/)은 로그인(계정 고르기)이고, 고객 화면의 "홈"은 여기다 */
+export const CUSTOMER_HOME = '/home';
+
+/** next가 없거나 안전하지 않을 때 돌아갈 곳. 로그인 화면(login-params.ts)도 이 값을 쓴다 */
 export const DEFAULT_NEXT: Record<AccountMode, string> = {
-  customer: '/',
+  customer: CUSTOMER_HOME,
   owner: '/owner',
 };
 
