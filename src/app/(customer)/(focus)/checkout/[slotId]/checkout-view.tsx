@@ -29,6 +29,7 @@ import {
   BOOKER_INFO_REFUSAL_NOTE,
   bookerInfoConsentLabel,
   bookerInfoRows,
+  HOLD_ENDED_HINT,
   intermediaryNotice,
   REFUND_CONSENT_LABEL,
 } from './checkout-texts';
@@ -349,7 +350,7 @@ export function HoldEnded({ slotId }: { slotId: string }) {
       <BackButton className="-ml-2 self-start" />
       <EmptyState
         title="결제할 수 있는 상태가 아니에요"
-        description={PAYMENT_ERRORS.NOT_HOLDER}
+        description={HOLD_ENDED_HINT}
         action={
           <Link href={`/slots/${slotId}`} className={buttonVariants({ variant: 'outline' })}>
             매물 다시 보기
