@@ -372,7 +372,7 @@
   - **브랜치 고정 주소:** `https://toori-git-<브랜치>-nnoinns-projects.vercel.app`(브랜치 이름의 `/`는 `-`). 예: `feat/owner-slot-register` → `toori-git-feat-owner-slot-register-nnoinns-projects.vercel.app`. 같은 브랜치에 다시 푸시하면 같은 주소가 최신 내용으로 바뀐다. 브랜치 이름이 30자를 넘으면 Vercel이 주소를 줄여 이 공식이 안 맞을 수 있으니 브랜치 이름은 짧게 짓는다
   - **주소 찾는 법(Claude가 한다):** ① PR이 있으면 PR의 Vercel 봇 코멘트(빌드가 끝나면 주소가 생긴다) ② PR이 없으면 위 공식으로 주소를 만들고 `curl -s -o /dev/null -w "%{http_code}" <주소>`로 200인지 본다. 페이지 제목이 "Deployment is building"이면 빌드 중이니 1~2분 뒤 다시 본다 ③ 404면 아직 푸시하지 않았거나 주소가 줄어든 것이니 그 브랜치의 마지막 커밋으로 배포를 찾는다: `gh api repos/nnoinn/toori/commits/<브랜치> --jq .sha`로 커밋을 알아낸 뒤 `gh api "repos/nnoinn/toori/deployments?sha=<커밋>"`의 배포 상태에서 `environment_url`을 읽는다(배포 기록의 ref는 브랜치 이름이 아니라 커밋이라서 `ref=<브랜치>`로는 안 나온다) ④ 배포가 아예 없거나 Vercel이 "배포가 막혔다"는 코멘트를 달면 nnoinn에게 알린다
   - **다른 팀원 작업 보기:** "정찬형 작업 미리보기 보여줘"라고 하면 Claude가 그 사람의 열린 PR(`gh pr list --author <GitHub 아이디>`)과 최근 푸시한 브랜치를 찾아 미리보기 주소를 알려준다. GitHub 아이디: 정찬형 `chosanai`, 정민석 `alstjr62`, 강규민 `poiuyst282-ui`, 현동훈 `nnoinn`
-  - **합쳐진 결과:** main에 머지된 것은 운영 주소 `https://toori-ruby.vercel.app`에서 본다. 여러 사람 작업이 같이 잘 돌아가는지는 여기서 확인한다
+  - **합쳐진 결과:** main에 머지된 것은 운영 주소 `https://toori.kr`에서 본다(옛 주소 `https://toori-ruby.vercel.app`은 여기로 이동한다). 여러 사람 작업이 같이 잘 돌아가는지는 여기서 확인한다
   - **미리보기도 개발용 DB를 같이 쓴다.** 미리보기에서 만든 테스트 데이터는 모두에게 보이니 이름에 자기 이름을 넣는다
   - 확인하고 싶을 때는 하루 끝이 아니어도 자기 브랜치에 언제든 푸시해도 된다
 - **미리보기에서 되는 것과 안 되는 것:** 로그인은 된다(Supabase 복귀 주소에 미리보기 주소 전체를 등록함). **카카오 지도는 안 된다.** 카카오는 주소를 하나씩 등록해야 해서 로컬(`http://localhost:3000`)과 운영 주소만 등록했다. 지도는 로컬이나 머지 후 운영 주소에서 확인한다
@@ -385,7 +385,7 @@
 - **미리보기 보호(Vercel Authentication)는 nnoinn이 꺼 둔다.** 켜져 있으면 Vercel 계정이 없는 팀원은 미리보기를 볼 수 없다. 미리보기에는 테스트 데이터와 테스트 결제만 쓴다.
 - **Supabase는 개발용·운영용 프로젝트를 따로 둔다.** 로컬과 미리보기는 개발용을 쓴다. 개발 DB는 4명이 같이 쓰므로 남이 만든 데이터를 지우지 않는다. 테이블 구조는 nnoinn이 승인한 마이그레이션으로만 바꾼다.
 - **환경변수:** 로컬은 각자 `.env.local`(nnoinn이 팀원 4명만 있는 단톡방으로 전달, 개발용 키만), Vercel 환경변수는 nnoinn이 관리한다. 운영용 키는 단톡방으로 보내지 않는다. 포트원 API 시크릿, Supabase 서비스 키 같은 비밀 값은 `NEXT_PUBLIC_`을 붙이지 않는다.
-- **외부 서비스의 도메인 등록(10/13 완료):** Supabase 로그인 복귀 주소에 `http://localhost:3000/**`, `https://toori-ruby.vercel.app/**`, `https://toori-*-nnoinns-projects.vercel.app/**`(모든 미리보기). 카카오 JavaScript SDK 도메인에 `http://localhost:3000`, `https://toori-ruby.vercel.app`. 새 주소(도메인 구매 등)가 생기면 nnoinn이 두 곳에 추가한다
+- **외부 서비스의 도메인 등록(10/13 완료, 11/2 `toori.kr` 추가):** Supabase 로그인 복귀 주소에 `http://localhost:3000/**`, `https://toori.kr/**`, `https://toori-ruby.vercel.app/**`, `https://toori-*-nnoinns-projects.vercel.app/**`(모든 미리보기). 카카오 JavaScript SDK 도메인에 `http://localhost:3000`, `https://toori.kr`, `https://toori-ruby.vercel.app`. 새 주소(도메인 구매 등)가 생기면 nnoinn이 두 곳에 추가한다
 
 ### PR 스크린샷
 
@@ -406,9 +406,9 @@
 | --- | --- | --- |
 | GitHub | `nnoinn/toori` 비공개 개인 레포(10/12에 `jupjup`에서 이름 변경, 예전 주소는 자동으로 넘어간다)(nnoinn GitHub Pro, 학생 혜택), 팀원 3명 협업자. main 보호 규칙: PR 필수, nnoinn 승인 필요(`.github/CODEOWNERS`로 자동 리뷰 요청), 머지는 nnoinn만, 강제 푸시·삭제 금지, 스쿼시 머지만, 머지된 브랜치 자동 삭제 | 없음 (이미 초대됨) |
 | Supabase | 개발용 프로젝트(서울, 10/12에 이름을 투리로 바꿈. 주소·키는 그대로). 무료 플랜이라 **7일 동안 사용이 없으면 자동으로 일시 정지된다**(10/20 안내 메일). 정지되면 대시보드에서 프로젝트를 열고 Restore를 누르면 몇 분 뒤 그대로 돌아온다(90일 안, 데이터 유지). 이메일 로그인 끔, 카카오·구글 로그인 켬. 로그인 복귀 주소는 로컬·운영·모든 미리보기 주소 등록(위 "외부 서비스의 도메인 등록"). 운영용 프로젝트는 출시 직전에 생성. 멤버: 강규민(Developer) | `.env.local`. 강규민은 대시보드 조회 가능(초대 메일 수락 필요) |
-| 카카오 개발자 | 앱 "투리"(개인 개발자 비즈 앱, 10/12 이름 변경. 아이콘은 임시 글자 아이콘, 로고가 정해지면 교체). 카카오맵 사용 ON(무료 사용량 있는 앱), JavaScript SDK 도메인 `http://localhost:3000`·`https://toori-ruby.vercel.app`, 로그인 동의항목: 닉네임 필수·프로필 사진 선택·이메일 필수. 멤버: 강규민·정찬형·정민석(Viewer) | `.env.local` (카카오 로그인 키는 Supabase에 들어 있어서 필요 없음). 초대 메일 수락 필요 |
+| 카카오 개발자 | 앱 "투리"(개인 개발자 비즈 앱, 10/12 이름 변경. 아이콘은 임시 글자 아이콘, 로고가 정해지면 교체). 카카오맵 사용 ON(무료 사용량 있는 앱), JavaScript SDK 도메인 `http://localhost:3000`·`https://toori.kr`·`https://toori-ruby.vercel.app`, 로그인 동의항목: 닉네임 필수·프로필 사진 선택·이메일 필수. 멤버: 강규민·정찬형·정민석(Viewer) | `.env.local` (카카오 로그인 키는 Supabase에 들어 있어서 필요 없음). 초대 메일 수락 필요 |
 | 구글 클라우드 | OAuth 동의 화면 **테스트 상태**, 앱 이름 "투리"(10/12 변경), 테스트 사용자 = 팀원 4명 Gmail | 등록된 Gmail로만 구글 로그인 가능 |
-| Vercel | nnoinn 계정(Hobby, GitHub로 가입), 팀 "nnoinn's projects", 프로젝트 `toori`(10/13 연결). 운영 주소 `https://toori-ruby.vercel.app`(main). 레포 공개(10/13, 무료 플랜에서 팀원 커밋을 배포하려고). 서버 함수 지역 서울(icn1, 10/27, 무료 플랜은 한 곳만). 환경변수는 개발용 키(Production·Preview), 미리보기 보호 꺼짐. 출시 전 Pro 전환 | 미리보기 주소 (계정 불필요) |
+| Vercel | nnoinn 계정(Hobby, GitHub로 가입), 팀 "nnoinn's projects", 프로젝트 `toori`(10/13 연결). 운영 주소 `https://toori.kr`(main, 11/2 연결. 도메인은 가비아, DNS도 가비아에서 A·CNAME으로 연결. `www`와 옛 주소 `https://toori-ruby.vercel.app`은 `toori.kr`로 이동). 레포 공개(10/13, 무료 플랜에서 팀원 커밋을 배포하려고). 서버 함수 지역 서울(icn1, 10/27, 무료 플랜은 한 곳만). 환경변수는 개발용 키(Production·Preview), 미리보기 보호 꺼짐. 출시 전 Pro 전환 | 미리보기 주소 (계정 불필요) |
 | Supabase Storage | 버킷 `shop-images`(공개)·`business-docs`(비공개), 파일당 5MB(10/13 생성). 업로드 권한 정책은 강규민 W3 | 없음 |
 | 네이버 로그인 | 아직 없음 (카카오·구글 다음) | — |
 | 포트원 | 아직 없음 (결제 작업 시작 전에 nnoinn이 설정) | — |
