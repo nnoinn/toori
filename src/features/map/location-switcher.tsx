@@ -39,7 +39,8 @@ export function LocationSwitcher({ label, selectedCode }: LocationSwitcherProps)
       </SheetTrigger>
       <SheetContent
         side="bottom"
-        className="mx-auto max-w-[480px] rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
+        // 전국 시·군·구라 목록이 길다(#200). 화면 높이를 넘으면 시트 안에서 내린다
+        className="mx-auto max-h-[85dvh] max-w-[480px] overflow-y-auto rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
       >
         <SheetHeader>
           <SheetTitle>동네 바꾸기</SheetTitle>
