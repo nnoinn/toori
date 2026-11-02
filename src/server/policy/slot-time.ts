@@ -14,6 +14,12 @@ export const NON_REFUNDABLE_WITHIN_HOURS = 6;
 /** '예약하기'를 누르면 그 매물을 10분 동안 홀딩한다(C-404) */
 export const HOLD_MINUTES = 10;
 
+/** 결제 대기 주문을 포트원에 다시 물어 정리하기까지 기다리는 시간(C-406, W12 ②). 홀딩과 결제창 시간을 넉넉히 넘긴다 */
+export const STALE_ORDER_MINUTES = 30;
+
+/** 주문 정리 작업이 한 번에 처리하는 주문 수(W12 ②). 남은 주문은 다음 실행이 처리한다 */
+export const ORDER_SWEEP_BATCH = 20;
+
 /** 매물 시작 시각 단위(3탭 ②). 시작 시각은 :00·:30처럼 이 단위로만 고른다(10/28 #108, #23 D10의 10분을 바꿈) */
 export const SLOT_START_STEP_MINUTES = 30;
 

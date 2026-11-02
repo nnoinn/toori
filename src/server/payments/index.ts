@@ -16,6 +16,7 @@ export {
   recordOrderOutcome,
 } from './confirm-store';
 export {
+  ABANDONED_ORDER_CODE,
   AUTO_CANCEL_ERRORS,
   PAYMENT_ERRORS,
   type PaymentError,
@@ -24,7 +25,13 @@ export {
   UNCONFIRMED_ERRORS,
   type UnconfirmedCode,
 } from './errors';
-export { createPendingOrder, type NewPendingOrder, newPaymentId } from './order-store';
+export {
+  createPendingOrder,
+  type NewPendingOrder,
+  newPaymentId,
+  readStaleOrders,
+  type StaleOrder,
+} from './order-store';
 export {
   cancelPortOnePayment,
   getPortOnePayment,
@@ -33,5 +40,11 @@ export {
   type PortOnePayment,
 } from './portone';
 export { newReservationCode, RESERVATION_CODE_PATTERN } from './reservation-code';
-export { autoCancelOrder, type SettleOutcome, settlePaidOrder } from './settle-order';
+export {
+  autoCancelOrder,
+  recordFailedPayment,
+  type SettleOutcome,
+  settlePaidOrder,
+} from './settle-order';
+export { type SweepSummary, sweepStaleOrders } from './sweep-orders';
 export type { ConfirmedReservation, HoldInfo, MyHold, PaymentRequest } from './types';

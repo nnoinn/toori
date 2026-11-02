@@ -4,12 +4,12 @@
 
 import 'server-only';
 
-import { and, DrizzleQueryError, eq } from 'drizzle-orm';
+import { and, DrizzleQueryError, eq, or } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { type OrderStatus, orders, refunds, reservations, slots } from '@/db/schema';
 
-import { toUnconfirmedCode, type UnconfirmedCode } from './errors';
+import { ABANDONED_ORDER_CODE, toUnconfirmedCode, type UnconfirmedCode } from './errors';
 import { newReservationCode } from './reservation-code';
 
 type Db = ReturnType<typeof getDb>;
@@ -75,7 +75,9 @@ export type OrderOutcome = {
   failureMessage?: string | null;
 };
 
-/** 결제 대기 주문에만 결과를 기록한다(이미 확정·기록된 주문은 건드리지 않는다). 기록했으면 true */
+/**
+ * 결제 대기 주문과 정리 작업이 결제 안 함으로 둔 주문에만 결과를 기록한다(이미 확정·기록된 주문은 건드리지 않는다). 기록했으면 true
+ */
 export async function recordOrderOutcome(
   db: Pick<Db, 'update'>,
   orderId: string,
@@ -91,7 +93,15 @@ export async function recordOrderOutcome(
       failureCode: outcome.failureCode,
       failureMessage: outcome.failureMessage ?? null,
     })
-    .where(and(eq(orders.id, orderId), eq(orders.status, 'pending')))
+    .where(
+      and(
+        eq(orders.id, orderId),
+        or(
+          eq(orders.status, 'pending'),
+          and(eq(orders.status, 'failed'), eq(orders.failureCode, ABANDONED_ORDER_CODE)),
+        ),
+      ),
+    )
     .returning({ id: orders.id });
   return updated.length > 0;
 }
@@ -107,7 +117,7 @@ const RESERVATION_CODE_TRIES = 5;
  * 홀딩한 사람이 이 고객이고, 결제 시각이 홀딩 만료 전이고, 매물이 아직 안 팔렸을 때만
  * 예약 만들기 + 주문 확정 + 매물 '예약됨' + 홀딩 비우기를 한 번에 한다.
  * 확정할 수 없으면 주문을 '결제 확인'(paid)으로 두고 이유를 기록한다(이어서 autoCancelOrder가 취소한다).
- * 이미 확정된 주문이면 그 예약을 그대로 돌려준다
+ * 이미 확정된 주문이면 그 예약을 그대로 돌려준다. 정리 작업이 결제 안 함으로 둔 주문은 결제 대기처럼 처리한다
  */
 export async function confirmPaidOrder(
   tx: Tx,
@@ -133,7 +143,8 @@ export async function confirmPaidOrder(
     if (!existing) throw new Error(`확정된 주문에 예약이 없어요: ${input.orderId}`);
     return { ok: true, ...existing };
   }
-  if (order.status !== 'pending') {
+  const abandoned = order.status === 'failed' && order.failureCode === ABANDONED_ORDER_CODE;
+  if (order.status !== 'pending' && !abandoned) {
     // 다른 요청이 먼저 '확정 못 함'으로 기록했다
     return { ok: false, code: toUnconfirmedCode(order.failureCode) };
   }
