@@ -26,6 +26,27 @@ declare namespace kakao.maps {
     relayout(): void;
     /** 휠·두 손가락 확대·축소를 켜고 끈다 */
     setZoomable(zoomable: boolean): void;
+    /** 확대 정도를 바꾼다. anchor를 주면 그 자리를 기준으로 확대한다 */
+    setLevel(level: number, options?: { anchor?: LatLng; animate?: boolean }): void;
+  }
+
+  type CustomOverlayOptions = {
+    position: LatLng;
+    /** 지도 위에 그릴 요소 */
+    content: HTMLElement;
+    map?: Map;
+    /** 요소의 어느 점을 position에 맞출지(0~1). 0.5면 가운데 */
+    xAnchor?: number;
+    yAnchor?: number;
+    zIndex?: number;
+    /** true여야 요소 클릭이 지도 클릭으로 넘어가지 않는다 */
+    clickable?: boolean;
+  };
+
+  /** 마커 대신 HTML 요소를 지도 위 좌표에 띄운다(구 묶음 표시, #204) */
+  class CustomOverlay {
+    constructor(options: CustomOverlayOptions);
+    setMap(map: Map | null): void;
   }
 
   type MarkerOptions = {
@@ -61,6 +82,8 @@ declare namespace kakao.maps {
     averageCenter?: boolean;
     minLevel?: number;
     disableClickZoom?: boolean;
+    /** 묶을 거리(화면 픽셀). 기본 60 */
+    gridSize?: number;
   };
 
   class MarkerClusterer {
