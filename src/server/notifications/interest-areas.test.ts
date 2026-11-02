@@ -55,7 +55,8 @@ describe('관심 동네', () => {
   });
 
   it('목록에 없는 동네가 하나라도 있으면 INVALID_REGION이고 바꾸지 않는다', async () => {
-    expect(await setInterestAreas([SANGNOK, '11110'])).toEqual(
+    // 동네 목록이 전국 시·군·구라(#200) 목록에 없는 코드로 본다
+    expect(await setInterestAreas([SANGNOK, '99999'])).toEqual(
       fail('INVALID_REGION', '고를 수 없는 동네예요'),
     );
     expect(state.replaced).toEqual([]);
