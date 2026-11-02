@@ -8,10 +8,11 @@ import { setMarketingConsent } from '@/server/auth/customer-account';
 import { marketingResultMessage } from './profile-rules';
 
 /**
- * 광고성 정보 수신(관심 동네 새 매물 알림) 켜기·끄기 (C-103, C-601, D15).
+ * 광고성 정보 수신(관심 동네 새 매물 알림) 동의 상태와 켜기·끄기 (C-103, C-601, D15).
+ * 내 정보의 스위치와 관심 동네의 "동의하고 알림 받기"(J14)가 같이 쓴다.
  * 저장되면 처리 결과("{날짜}에 … 동의/거부 처리가 끝났어요")를 바로 보여준다(동의 문구 6-1). 끄면 철회 기록이 남는다(강규민 함수)
  */
-export function MarketingSwitch({ initialAgreed }: { initialAgreed: boolean }) {
+export function useMarketingConsent(initialAgreed: boolean) {
   const [agreed, setAgreed] = useState(initialAgreed);
   const [message, setMessage] = useState<{ kind: 'error' | 'done'; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
@@ -22,8 +23,7 @@ export function MarketingSwitch({ initialAgreed }: { initialAgreed: boolean }) {
     setAgreed(initialAgreed);
   }
 
-  function toggle() {
-    const next = !agreed;
+  function change(next: boolean) {
     setMessage(null);
     startTransition(async () => {
       const result = await setMarketingConsent(next);
@@ -38,9 +38,16 @@ export function MarketingSwitch({ initialAgreed }: { initialAgreed: boolean }) {
     });
   }
 
+  return { agreed, message, pending, change };
+}
+
+export type MarketingConsent = ReturnType<typeof useMarketingConsent>;
+
+/** 관심 동네 새 매물 알림(광고성 정보 수신) 스위치와 처리 결과 */
+export function MarketingSwitch({ consent }: { consent: MarketingConsent }) {
+  const { agreed, message, pending, change } = consent;
   return (
-    <section className="flex flex-col gap-3 border-t pt-6" aria-label="알림 설정">
-      <h2 className="font-semibold">알림</h2>
+    <div className="flex flex-col gap-3">
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <span id="marketing-label" className="text-sm font-medium">
@@ -56,7 +63,7 @@ export function MarketingSwitch({ initialAgreed }: { initialAgreed: boolean }) {
           aria-checked={agreed}
           aria-labelledby="marketing-label"
           disabled={pending}
-          onClick={toggle}
+          onClick={() => change(!agreed)}
           className={cn(
             'relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-60',
             agreed ? 'bg-primary' : 'bg-muted-foreground/30',
@@ -79,6 +86,6 @@ export function MarketingSwitch({ initialAgreed }: { initialAgreed: boolean }) {
           {message.text}
         </p>
       ) : null}
-    </section>
+    </div>
   );
 }

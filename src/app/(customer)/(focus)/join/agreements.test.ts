@@ -4,7 +4,6 @@ import {
   AGREEMENT_ITEMS,
   allRequiredChecked,
   EMPTY_AGREEMENTS,
-  formatHourLabel,
   formatMonthsLabel,
   toAgreementsInput,
   toggleAll,
@@ -67,14 +66,6 @@ describe('고객 약관 동의', () => {
 });
 
 describe('문구 안의 시각·기간', () => {
-  it('시각', () => {
-    expect(formatHourLabel(13)).toBe('오후 1시');
-    expect(formatHourLabel(21)).toBe('밤 9시');
-    expect(formatHourLabel(8)).toBe('아침 8시');
-    expect(formatHourLabel(12)).toBe('오후 12시');
-    expect(formatHourLabel(0)).toBe('밤 12시');
-  });
-
   it('기간', () => {
     expect(formatMonthsLabel(24)).toBe('2년');
     expect(formatMonthsLabel(6)).toBe('6개월');

@@ -7,14 +7,15 @@ import { getDb } from '@/db';
 import { customers } from '@/db/schema';
 import { ensureCustomerPage, getCurrentAccount } from '@/server/auth';
 import { getMarketingConsent } from '@/server/auth/customer-account';
+import { getInterestAreas } from '@/server/notifications/interest-areas';
 
 import { AccountActions } from './account-actions';
-import { MarketingSwitch } from './marketing-switch';
+import { NotificationSettings } from './notification-settings';
 import { ProfileForm } from './profile-form';
 
 export const metadata: Metadata = { title: '내 정보' };
 
-// 내 정보 (J9, C-103). 주소: /me
+// 내 정보 (J9, C-103)와 알림 설정(관심 동네·광고성 알림, J14 C-601). 주소: /me
 // 로그인하지 않았으면 로그인 화면으로, 고객 계정이 없으면 약관 동의(/join)로 보낸다(ensureCustomerPage).
 export default function MyInfoPage() {
   return (
@@ -26,7 +27,7 @@ export default function MyInfoPage() {
 
 async function MyInfoContent() {
   const { customerId } = await ensureCustomerPage('/me');
-  const [account, [customer], consent] = await Promise.all([
+  const [account, [customer], consent, interest] = await Promise.all([
     getCurrentAccount(),
     getDb()
       .select({ nickname: customers.nickname, phone: customers.phone })
@@ -34,6 +35,7 @@ async function MyInfoContent() {
       .where(eq(customers.id, customerId))
       .limit(1),
     getMarketingConsent(),
+    getInterestAreas(),
   ]);
 
   return (
@@ -45,7 +47,10 @@ async function MyInfoContent() {
 
       <ProfileForm nickname={customer?.nickname ?? ''} phone={customer?.phone ?? ''} />
 
-      <MarketingSwitch initialAgreed={consent.ok ? consent.data.agreed : false} />
+      <NotificationSettings
+        marketingAgreed={consent.ok ? consent.data.agreed : false}
+        interestCodes={interest.ok ? interest.data.sigunguCodes : null}
+      />
 
       <AccountActions hasOwnerAccount={Boolean(account?.ownerId)} />
     </section>
