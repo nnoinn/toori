@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { unstable_rethrow, useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
+import { CUSTOMER_HOME } from '@/server/auth/paths';
 import { signOut, switchAccountMode } from '@/server/auth/session';
 
 const FAILED_MESSAGE = '처리하지 못했어요. 잠시 후 다시 시도해 주세요';
@@ -47,7 +48,7 @@ export function AccountActions({ hasOwnerAccount }: { hasOwnerAccount: boolean }
         setError(result.error.message);
         return;
       }
-      router.replace('/');
+      router.replace(CUSTOMER_HOME);
       router.refresh();
     });
   }

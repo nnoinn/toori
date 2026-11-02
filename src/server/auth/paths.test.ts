@@ -48,8 +48,8 @@ describe('loginPath·customerJoinPath', () => {
 
   it('다른 사이트 주소나 빈 값은 모드의 기본 주소로 바꾼다', () => {
     expect(loginPath('owner', '//evil.example')).toBe('/login?mode=owner&next=%2Fowner');
-    expect(loginPath('customer', undefined)).toBe('/login?mode=customer&next=%2F');
-    expect(customerJoinPath('https://evil.example')).toBe('/join?next=%2F');
+    expect(loginPath('customer', undefined)).toBe('/login?mode=customer&next=%2Fhome');
+    expect(customerJoinPath('https://evil.example')).toBe('/join?next=%2Fhome');
   });
 });
 

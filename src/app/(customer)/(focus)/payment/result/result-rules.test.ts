@@ -29,17 +29,17 @@ describe('결제 실패 뒤 다음 행동 (C-406, D12)', () => {
     ).toBe(`/slots/${SLOT}`);
   });
 
-  it('자동 취소(환불)했거나 결제 정보를 못 찾으면 홈', () => {
+  it('자동 취소(환불)했거나 결제 정보를 못 찾으면 고객 홈', () => {
     expect(
       failureAction({
         code: 'SLOT_SOLD',
         message: AUTO_CANCEL_ERRORS.SLOT_SOLD,
         autoCancelled: true,
       }).href,
-    ).toBe('/');
+    ).toBe('/home');
     expect(
       failureAction({ code: 'PAYMENT_NOT_FOUND', message: PAYMENT_ERRORS.PAYMENT_NOT_FOUND }).href,
-    ).toBe('/');
+    ).toBe('/home');
   });
 });
 

@@ -52,7 +52,7 @@ describe('GET /api/auth/callback', () => {
     state.exchange.mockResolvedValue({ data: { user: null }, error: new Error('bad code') });
     const res = await callback('code=abc&mode=customer');
     expect(res.headers.get('location')).toBe(
-      'http://localhost:3000/login?mode=customer&next=%2F&error=login_failed',
+      'http://localhost:3000/login?mode=customer&next=%2Fhome&error=login_failed',
     );
     expect(state.ensureProfile).not.toHaveBeenCalled();
   });
