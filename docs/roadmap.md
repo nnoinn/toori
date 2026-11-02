@@ -101,7 +101,7 @@
 | ✅ | 정찬형의 `@portone/browser-sdk` 설치 승인(#16, #168) | 현동훈 |
 | ✅ | 웹 푸시 VAPID 키 (K6). `.env.local` 공유, Vercel Production·Preview 등록(11/1). 값이 맞는지는 W16 첫 발송 때 확인한다 | 현동훈 |
 | ⬜ | 시드 다시 넣기(`npm run db:seed -- --yes`). 11/2에 넣은 3주 시험 매물이 끝나기 전, 11/20쯤 | 현동훈 |
-| ✅ | 다른 계정 알림용 회색 아이콘을 `public/brand/app-icon/toori-app-icon-gray-*`에 넣기(11/2, #131). 꺼진 느낌이 나게 흐린 회색이고, 쓰는 법은 `docs/brand.md` "다른 계정 알림 아이콘" | 현동훈 |
+| ✅ | 다른 계정 알림용 회색 아이콘을 `public/brand/app-icon/toori-app-icon-gray-*`에 넣기(11/2, #131). 꺼진 느낌이 나는 회색(G3)이고, 쓰는 법은 `docs/brand.md` "다른 계정 알림 아이콘" | 현동훈 |
 | ✅ | `pg_cron`·`pg_net` 켜기 (K7), `CRON_SECRET` (K8). 개발 DB에서 켜고, Vercel Production·Preview에 등록(11/2). `.env.local` 새 공유본은 11/2 단톡방으로 전달함 | 현동훈 |
 | ⬜ | 정산 주기·이의제기 처리 방식 결정 | 현동훈 |
 | ⬜ | 2단계 중: 네이버 개발자 앱 등록과 로그인 검수 신청 (K9, 검수에 시간이 걸림) | 현동훈 |

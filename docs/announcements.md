@@ -19,7 +19,7 @@ nnoinn이 팀원에게 알릴 내용을 PR과 함께 이 파일에 추가한다.
 - 할 일: 정찬형은 #199 다음 #200. 강규민·정민석은 없음
 
 ## 2026-11-02 · 강규민 (다른 계정 알림 아이콘)
-- **다른 계정 알림용 회색 아이콘을 넣었다(#131).** `public/brand/app-icon/toori-app-icon-gray-192.png` 등. 흰 앱 아이콘과 모양은 같고, 꺼진 느낌이 나게 흐린 회색이다
+- **다른 계정 알림용 회색 아이콘을 넣었다(#131).** `public/brand/app-icon/toori-app-icon-gray-192.png` 등. 흰 앱 아이콘과 모양은 같고, 꺼진 느낌이 나는 회색이다
 - 지금 계정 알림의 아이콘과 같은 모양끼리 짝을 맞춰 쓴다. 둥근 모서리는 `toori-app-icon-light-192.png` ↔ `toori-app-icon-gray-192.png`, 정사각형은 `web/pwa-icon-light-192.png` ↔ `toori-app-icon-gray-square-192.png`. 자세한 것은 `docs/brand.md` "다른 계정 알림 아이콘"
 - 할 일: 강규민은 W16 `public/sw.js`에서 다른 계정 알림의 `icon`에 이 파일을 쓴다. 정찬형·정민석은 없음
 
