@@ -188,6 +188,12 @@ export async function seedDevData(sql, { now, userIds }) {
       end_at: new Date(startAt.getTime() + menu.duration_minutes * 60 * 1000),
       publish_at: new Date(startAt.getTime() - PUBLISH_BEFORE_HOURS * HOUR),
       status,
+      // 여러 줄을 한 번에 넣을 때 모든 줄의 칸이 같아야 해서 빈 값도 적는다
+      hold_customer_id: null,
+      hold_expires_at: null,
+      closed_at: null,
+      close_reason: null,
+      relisted_from_slot_id: null,
       created_by: ownerUserId,
     });
 
