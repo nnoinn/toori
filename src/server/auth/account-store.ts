@@ -31,11 +31,11 @@ export const DEFAULT_CUSTOMER_NICKNAME = '고객';
  */
 export async function saveCustomerAccount(
   tx: Db,
-  input: { userId: string; nickname: string; marketing: boolean },
+  input: { userId: string; nickname: string; phone: string | null; marketing: boolean },
 ): Promise<{ customerId: string; marketingAgreedAt: Date | null } | null> {
   const [customer] = await tx
     .insert(customers)
-    .values({ userId: input.userId, nickname: input.nickname })
+    .values({ userId: input.userId, nickname: input.nickname, phone: input.phone })
     .onConflictDoNothing({ target: customers.userId })
     .returning({ id: customers.id });
   if (!customer) return null;
