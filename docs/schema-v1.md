@@ -449,7 +449,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | id | uuid PK | |
 | user_id | uuid → profiles | |
 | account_type | text | `customer` / `owner`. 어느 계정의 알림을 받는지 |
-| endpoint | text, unique | |
+| endpoint | text | 브라우저가 기기마다 주는 구독 주소. unique(`endpoint`, `account_type`): 한 기기에 고객·원장님 구독이 하나씩 있을 수 있다(11/1 결정, #131) |
 | p256dh | text | |
 | auth | text | |
 | user_agent | text, null | 기기 정보 |
@@ -571,3 +571,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 2026-10-25 | `terms_agreements.terms_type`에 `age14`(만 14세 이상 확인)를 더한다. 만 14세 미만은 가입을 받지 않으므로 고객 가입 때 확인을 받았다는 기록을 남긴다(#88 질문, #47 결정). 마이그레이션 0004 |
 | 2026-10-28 | `orders`에 예약자 정보 제공 동의 기록(`booker_info_version`·`booker_info_agreed_at`)을 더한다(#121). 강규민이 결제 함수(W9~)와 같이 마이그레이션한다. 전화번호(`customers`·`owners`·`shops`의 `phone`)는 모두 하이픈 넣은 모양으로 저장한다(`src/lib/phone.ts`) |
 | 2026-10-29 | 회원 탈퇴(P1) 방향: 샵 상태 `withdrawn`, 마감 사유 `account_withdrawal`, 고객·원장님 계정 unique를 탈퇴하지 않은 계정 기준으로, 같은 사람 표시(해시) 5년. 탈퇴 뒤 30일 되살리기 기간에는 정보를 그대로 두고 30일 뒤 지운다(10장 메모, #148). 예약자 정보 제공 동의 칸은 빈 값 허용(#153) |
+| 2026-11-02 | `push_subscriptions`의 unique를 `endpoint`에서 (`endpoint`, `account_type`)으로 바꾼다(#193). 한 기기에서 켜 둔 계정의 알림을 모두 받는다(11/1 결정, #131). 마이그레이션 0006 |
