@@ -100,6 +100,7 @@
 | ⬜ | 포트원 콘솔 ②(강규민이 웹훅 W13 주소를 정하면): [결제알림(Webhook) 관리]에서 웹훅 버전 결제모듈 V2, 테스트 모드에 배포 주소 + 웹훅 경로 등록, 웹훅 시크릿 발급 → `PORTONE_WEBHOOK_SECRET`을 같은 곳에 넣는다 | 현동훈 |
 | ✅ | 정찬형의 `@portone/browser-sdk` 설치 승인(#16, #168) | 현동훈 |
 | ✅ | 웹 푸시 VAPID 키 (K6). `.env.local` 공유, Vercel Production·Preview 등록(11/1). 값이 맞는지는 W16 첫 발송 때 확인한다 | 현동훈 |
+| ⬜ | 시드 다시 넣기(`npm run db:seed -- --yes`). 11/2에 넣은 3주 시험 매물이 끝나기 전, 11/20쯤 | 현동훈 |
 | ⬜ | 다른 계정 알림용 흑백 아이콘을 W16 전에 `public/brand/`에 넣기(#131) | 현동훈 |
 | ✅ | `pg_cron`·`pg_net` 켜기 (K7), `CRON_SECRET` (K8). 개발 DB에서 켜고, Vercel Production·Preview에 등록(11/2). `.env.local` 새 공유본은 단톡방으로 전달 | 현동훈 |
 | ⬜ | 정산 주기·이의제기 처리 방식 결정 | 현동훈 |
