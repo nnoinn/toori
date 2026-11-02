@@ -1,11 +1,15 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useId, useState, useTransition } from 'react';
 import { unstable_rethrow, useRouter } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 
+import { PHONE_FORMAT_MESSAGE } from '@/app/(customer)/(tabs)/me/profile-rules';
 import { BackButton } from '@/components/ui/back-button';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { isPhoneInputFull, normalizePhone } from '@/lib/phone';
 import { SITE_NAME } from '@/lib/site';
 import { createCustomerAccount } from '@/server/auth/customer-account';
 
@@ -26,23 +30,42 @@ type JoinFormProps = {
   next: string;
 };
 
-/** 첫 로그인 고객의 약관 동의 화면 (C-104, J8). 주소: /join?next=... (D16) */
+/**
+ * 첫 로그인 고객의 약관 동의와 휴대폰 번호 (C-104, J8). 주소: /join?next=... (D16)
+ * 휴대폰 번호는 필수이고 문자 인증은 하지 않는다(11/2 결정, #183). 저장은 '시작하기'를 누를 때 가입과 함께 한다
+ */
 export function JoinForm({ next }: JoinFormProps) {
+  const phoneId = useId();
   const [state, setState] = useState<AgreementState>(EMPTY_AGREEMENTS);
+  const [phone, setPhone] = useState('');
+  // 끝까지 쳤거나 칸을 벗어났는데 틀린 번호면 빨간 테두리. 다시 고치기 시작하면 지운다
+  const [phoneInvalid, setPhoneInvalid] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
-  const canSubmit = allRequiredChecked(state) && !pending;
+  const phoneToSave = normalizePhone(phone, 'mobile');
+  const canSubmit = allRequiredChecked(state) && phoneToSave !== null && !pending;
+
+  function checkPhone(value: string) {
+    if (value !== '' && !normalizePhone(value, 'mobile')) setPhoneInvalid(true);
+  }
+
+  function changePhone(value: string) {
+    setPhone(value);
+    setPhoneInvalid(false);
+    if (isPhoneInputFull(value)) checkPhone(value);
+  }
 
   function handleSubmit() {
     const agreements = toAgreementsInput(state);
-    if (!agreements) return;
+    if (!agreements || !phoneToSave) return;
     setNotice(null);
     setError(null);
     startTransition(async () => {
       try {
         // 성공하면 서버가 next로 보내서 돌아오지 않는다(#47 4장)
+        // TODO(#183): 강규민 createCustomerAccount가 휴대폰 번호를 받으면 { phone: phoneToSave }도 같이 넘긴다
         const result = await createCustomerAccount({ agreements, next });
         if (result.ok) return;
         // 다른 창에서 먼저 가입을 마친 경우. 이미 계정이 있으니 보던 화면으로 보낸다
@@ -64,8 +87,34 @@ export function JoinForm({ next }: JoinFormProps) {
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold">{SITE_NAME} 이용을 위해 동의해 주세요</h1>
         <p className="text-sm text-muted-foreground">
-          필수 항목에 모두 동의하면 시작할 수 있어요. 선택 항목은 동의하지 않아도 돼요.
+          휴대폰 번호를 입력하고 필수 항목에 모두 동의하면 시작할 수 있어요. 선택 항목은 동의하지
+          않아도 돼요.
         </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor={phoneId}>
+          <span className="text-primary">[필수]</span> 휴대폰 번호
+        </Label>
+        <PhoneInput
+          id={phoneId}
+          // 공통 Input은 h-9·text-sm이다. 예약 확인·내 정보 화면과 같게 조금 크게 쓴다
+          className="h-11 text-base"
+          value={phone}
+          aria-describedby={`${phoneId}-help`}
+          aria-invalid={phoneInvalid || undefined}
+          onValueChange={changePhone}
+          onBlur={() => checkPhone(phone)}
+        />
+        {phoneInvalid ? (
+          <p id={`${phoneId}-help`} role="alert" className="text-sm text-destructive">
+            {PHONE_FORMAT_MESSAGE}
+          </p>
+        ) : (
+          <p id={`${phoneId}-help`} className="text-xs text-muted-foreground">
+            예약 확인과 노쇼 연락에만 써요.
+          </p>
+        )}
       </div>
 
       <label className="flex items-center gap-3 rounded-xl border p-4 font-semibold">
