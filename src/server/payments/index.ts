@@ -12,6 +12,7 @@ export {
   type MyOrder,
   type OrderOutcome,
   readMyOrder,
+  recordAutoCancel,
   recordOrderOutcome,
 } from './confirm-store';
 export {
@@ -24,6 +25,13 @@ export {
   type UnconfirmedCode,
 } from './errors';
 export { createPendingOrder, type NewPendingOrder, newPaymentId } from './order-store';
-export { getPortOnePayment, type PortOneLookup, type PortOnePayment } from './portone';
+export {
+  cancelPortOnePayment,
+  getPortOnePayment,
+  type PortOneCancel,
+  type PortOneLookup,
+  type PortOnePayment,
+} from './portone';
 export { newReservationCode, RESERVATION_CODE_PATTERN } from './reservation-code';
+export { autoCancelOrder, type SettleOutcome, settlePaidOrder } from './settle-order';
 export type { ConfirmedReservation, HoldInfo, MyHold, PaymentRequest } from './types';
