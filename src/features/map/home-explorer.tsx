@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { X } from 'lucide-react';
+import { LoaderCircle, X } from 'lucide-react';
 import { cn } from 'cn';
 
+import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/state';
 
 import { KakaoMap } from './kakao-map';
@@ -37,6 +38,7 @@ type HomeExplorerProps = {
  * 폰: 아래 목록 시트. 반(지도·목록 반반, 기본) / 전체(목록만) 2단계이고, 매물 개수는 손잡이에 보여준다(D13).
  * PC(md 이상): 지도는 왼쪽 전체, 목록은 오른쪽 고정 패널(폭 400px). 시트 크기 바꾸기는 쓰지 않는다(10/25 결정).
  * 지도를 움직이면 보이는 영역 안의 매물을 다시 불러온다(D4). 마커를 누르면 그 샵 매물만 보고, 지도를 움직이면 다시 전체다.
+ * 다시 불러오는 동안 이전 핀·목록은 그대로 두고 제목 옆에 작은 표시만 한다. 실패하면 목록 위에 안내와 '다시 시도'(#199).
  */
 export function HomeExplorer({ center, myLocation, header, sort, serverNow }: HomeExplorerProps) {
   const [sheet, setSheet] = useState<SheetSize>('half');
@@ -50,7 +52,16 @@ export function HomeExplorer({ center, myLocation, header, sort, serverNow }: Ho
   const slotCount = selectedShop
     ? selectedShop.slotCount
     : home.shops.reduce((sum, shop) => sum + shop.slotCount, 0);
-  const title = `${selectedShop ? `${selectedShop.name} · ` : ''}${home.shopsReady ? `매물 ${slotCount}개` : '매물 불러오는 중'}`;
+  const title = `${selectedShop ? `${selectedShop.name} · ` : ''}${home.shopsReady ? `매물 ${slotCount}개` : home.status === 'loading' ? '매물 불러오는 중' : '매물'}`;
+  const refreshing = home.refreshing ? (
+    <span
+      role="status"
+      className="flex items-center gap-1 text-xs font-normal text-muted-foreground"
+    >
+      <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
+      불러오는 중…
+    </span>
+  ) : null;
 
   return (
     <main className="flex h-[calc(100dvh-3.5rem-env(safe-area-inset-bottom))] flex-col overflow-hidden md:h-[calc(100dvh-4rem)] md:flex-row">
@@ -100,11 +111,17 @@ export function HomeExplorer({ center, myLocation, header, sort, serverNow }: Ho
           onClick={() => setSheet(sheet === 'half' ? 'full' : 'half')}
         >
           <span className="h-1 w-10 rounded-full bg-muted-foreground/30" aria-hidden />
-          <span className="text-sm font-semibold">{title}</span>
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            {title}
+            {refreshing}
+          </span>
           <span className="sr-only">{sheet === 'half' ? '목록 크게 보기' : '지도 같이 보기'}</span>
         </button>
         <div className="hidden items-center justify-between px-4 py-3 md:flex">
-          <p className="font-semibold">{title}</p>
+          <div className="flex items-center gap-2">
+            <p className="font-semibold">{title}</p>
+            {refreshing}
+          </div>
           {selectedShop ? (
             <button
               type="button"
@@ -119,6 +136,17 @@ export function HomeExplorer({ center, myLocation, header, sort, serverNow }: Ho
         {/* relative: 카드 안의 화면 낭독용 글자(sr-only, 위치 absolute)가 목록 밖 페이지 높이를 늘리지 않게 한다.
             없으면 목록이 차면 페이지 스크롤바가 생겨 지도 폭이 바뀌고, 다시 불러오는 동안 사라지기를 끝없이 되풀이한다(#199) */}
         <div className="relative flex-1 overflow-y-auto pb-4">
+          {home.refreshError ? (
+            <div
+              role="alert"
+              className="mx-4 mb-2 flex items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2 text-sm"
+            >
+              <span>{home.refreshError}</span>
+              <Button type="button" variant="outline" size="sm" onClick={home.retry}>
+                다시 시도
+              </Button>
+            </div>
+          ) : null}
           <SlotList
             items={home.items}
             serverNow={home.serverNow ?? serverNow}
