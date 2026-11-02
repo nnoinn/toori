@@ -67,7 +67,7 @@
 | ✅ | 배포 주소를 카카오 JavaScript SDK 도메인과 Supabase 로그인 복귀 주소(미리보기 포함)에 등록 (10/13) | 현동훈 |
 | ✅ | 팀원 커밋 Vercel 배포 확인: 비공개 레포에서 막혀서(10/13 정찬형 테스트) 레포를 공개로 바꿈. 출시 전 Pro 전환 | 현동훈 |
 | ✅ | Supabase Storage 버킷 `shop-images`(공개)·`business-docs`(비공개), 파일 5MB 제한 (10/13). 업로드 권한 정책은 강규민 W3 | 현동훈 |
-| ⏳ | 뼈대 머지 공지 + `.env.local` 팀 단톡방 전달 (모두 저장하면 메시지 삭제). 강규민은 10/12에 받음(10/13 추가한 정산 계좌 암호화 키 한 줄은 따로 전달), 정찬형·정민석은 10/22 | 현동훈 |
+| ⏳ | 뼈대 머지 공지 + `.env.local` 팀 단톡방 전달 (모두 저장하면 메시지 삭제). 강규민은 10/12에 받음(10/13 추가한 정산 계좌 암호화 키 한 줄은 따로 전달), 정찬형·정민석은 10/22. 11/2에 `CRON_SECRET`을 더한 새 공유본을 전원에게 전달 | 현동훈 |
 | ✅ | Vercel 환경변수에 `PAYOUT_ACCOUNT_ENCRYPTION_KEY` 추가(10/14 Production, 10/28 Preview. `.env.local`과 같은 값). 10/28까지 Preview에 빠져 있었다 | 현동훈 |
 | ✅ | Supabase Storage 두 버킷에 허용 형식 넣기(10/28): `shop-images`는 `image/jpeg, image/png, image/webp`, `business-docs`는 여기에 `application/pdf`까지(#116). 파일 크기 제한은 대시보드 저장 때 5,242,880바이트(5MiB)로 바뀌었고, 앱 제한(5,000,000바이트)이 더 엄격해서 괜찮다. 운영 프로젝트를 만들 때도 같게 | 현동훈 |
 | ✅ | W1a 스키마 구현: 계정·샵·매물 (#63, 10/22 머지). 개발 DB 적용은 강규민 | 강규민 |
@@ -101,8 +101,8 @@
 | ✅ | 정찬형의 `@portone/browser-sdk` 설치 승인(#16, #168) | 현동훈 |
 | ✅ | 웹 푸시 VAPID 키 (K6). `.env.local` 공유, Vercel Production·Preview 등록(11/1). 값이 맞는지는 W16 첫 발송 때 확인한다 | 현동훈 |
 | ⬜ | 시드 다시 넣기(`npm run db:seed -- --yes`). 11/2에 넣은 3주 시험 매물이 끝나기 전, 11/20쯤 | 현동훈 |
-| ⬜ | 다른 계정 알림용 흑백 아이콘을 W16 전에 `public/brand/`에 넣기(#131) | 현동훈 |
-| ✅ | `pg_cron`·`pg_net` 켜기 (K7), `CRON_SECRET` (K8). 개발 DB에서 켜고, Vercel Production·Preview에 등록(11/2). `.env.local` 새 공유본은 단톡방으로 전달 | 현동훈 |
+| ✅ | 다른 계정 알림용 회색 아이콘을 `public/brand/app-icon/toori-app-icon-gray-*`에 넣기(11/2, #131). 꺼진 느낌이 나게 흐린 회색이고, 쓰는 법은 `docs/brand.md` "다른 계정 알림 아이콘" | 현동훈 |
+| ✅ | `pg_cron`·`pg_net` 켜기 (K7), `CRON_SECRET` (K8). 개발 DB에서 켜고, Vercel Production·Preview에 등록(11/2). `.env.local` 새 공유본은 11/2 단톡방으로 전달함 | 현동훈 |
 | ⬜ | 정산 주기·이의제기 처리 방식 결정 | 현동훈 |
 | ⬜ | 2단계 중: 네이버 개발자 앱 등록과 로그인 검수 신청 (K9, 검수에 시간이 걸림) | 현동훈 |
 
