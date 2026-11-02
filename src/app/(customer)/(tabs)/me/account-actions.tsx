@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { unstable_rethrow, useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
+import { clearDevicePushSubscriptions } from '@/features/push/subscribe-push';
 import { signOut, switchAccountMode } from '@/server/auth/session';
 
 const FAILED_MESSAGE = '처리하지 못했어요. 잠시 후 다시 시도해 주세요';
@@ -42,6 +43,8 @@ export function AccountActions({ hasOwnerAccount }: { hasOwnerAccount: boolean }
 
   function logOut() {
     run(async () => {
+      // 로그아웃 전에 이 기기의 내 알림 구독(고객·원장님 모두)을 지운다(#131). 로그인이 풀리면 지울 수 없다
+      await clearDevicePushSubscriptions();
       const result = await signOut();
       if (!result.ok) {
         setError(result.error.message);

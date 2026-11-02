@@ -1,4 +1,9 @@
-import { savePushSubscription } from '@/server/notifications/subscriptions';
+import {
+  getPushSubscriptionStatus,
+  removeDevicePushSubscriptions,
+  removePushSubscription,
+  savePushSubscription,
+} from '@/server/notifications/subscriptions';
 
 import { urlBase64ToUint8Array } from './push-support';
 
@@ -11,6 +16,15 @@ export type SubscribePushResult =
   | { status: 'failed'; message: string };
 
 const SUBSCRIBE_FAILED = '알림을 켜지 못했어요. 잠시 후 다시 시도해 주세요';
+const UNSUBSCRIBE_FAILED = '알림을 끄지 못했어요. 잠시 후 다시 시도해 주세요';
+
+/** 이 기기의 브라우저 구독 주소. 서비스 워커를 등록한 적이 없거나 구독이 없으면 null(등록하지 않고 보기만 한다) */
+async function deviceEndpoint(): Promise<string | null> {
+  if (!('serviceWorker' in navigator)) return null;
+  const registration = await navigator.serviceWorker.getRegistration('/');
+  const subscription = await registration?.pushManager.getSubscription();
+  return subscription?.endpoint ?? null;
+}
 
 /**
  * 이 기기에서 지금 계정(고객/원장님 모드)의 웹 푸시를 켠다 (J14, X-505-1, #131).
@@ -47,5 +61,44 @@ export async function subscribePush(): Promise<SubscribePushResult> {
       : { status: 'failed', message: result.error.message };
   } catch {
     return { status: 'failed', message: SUBSCRIBE_FAILED };
+  }
+}
+
+/**
+ * 이 기기에서 지금 계정의 알림이 켜져 있는지(#131). 서버의 구독 기록으로 본다.
+ * 브라우저 구독은 한 기기에 하나라서, 그것만 보면 다른 계정이 켠 알림을 내가 켠 것으로 보여주게 된다
+ */
+export async function readPushStatus(): Promise<boolean> {
+  const endpoint = await deviceEndpoint();
+  if (!endpoint) return false;
+  const result = await getPushSubscriptionStatus(endpoint);
+  return result.ok && result.data.subscribed;
+}
+
+/**
+ * 이 기기에서 지금 계정의 알림을 끈다(#131). 서버의 구독 기록만 지우고 브라우저 구독은 풀지 않는다.
+ * 풀면 이 기기에서 켜 둔 다른 계정의 알림까지 끊긴다
+ */
+export async function unsubscribePush(): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const endpoint = await deviceEndpoint();
+    if (!endpoint) return { ok: true };
+    const result = await removePushSubscription(endpoint);
+    return result.ok ? { ok: true } : { ok: false, message: result.error.message };
+  } catch {
+    return { ok: false, message: UNSUBSCRIBE_FAILED };
+  }
+}
+
+/**
+ * 로그아웃 직전에 부른다(#131). 이 기기의 내 구독을 두 계정 모두 지운다. 공용 기기에서 로그아웃한 뒤에도
+ * 내 알림이 오지 않게 한다. 실패해도 로그아웃은 막지 않는다
+ */
+export async function clearDevicePushSubscriptions(): Promise<void> {
+  try {
+    const endpoint = await deviceEndpoint();
+    if (endpoint) await removeDevicePushSubscriptions(endpoint);
+  } catch {
+    // 구독을 지우지 못해도 로그아웃은 한다. 다른 로그인이 이 기기에서 알림을 켜면 서버가 지운다(#131)
   }
 }

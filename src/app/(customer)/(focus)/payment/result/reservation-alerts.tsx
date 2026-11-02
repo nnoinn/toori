@@ -1,66 +1,38 @@
 'use client';
 
-import { useState, useSyncExternalStore, useTransition } from 'react';
 import { Bell, Check } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { formatReminderTimes, pushSupport } from '@/features/push/push-support';
+import { formatReminderTimes } from '@/features/push/push-support';
 import {
   IOS_INSTALL_NOTE,
   IOS_INSTALL_STEPS,
   PUSH_BLOCKED,
-  PUSH_DISMISSED,
   PUSH_UNSUPPORTED,
 } from '@/features/push/push-texts';
-import { subscribePush, type SubscribePushResult } from '@/features/push/subscribe-push';
+import { usePushAlerts } from '@/features/push/use-push-alerts';
 import { REMINDER_MINUTES_BEFORE } from '@/server/policy';
-
-type DeviceState = 'checking' | 'supported' | 'blocked' | 'ios-install' | 'unsupported';
-
-const noSubscribe = () => () => {};
-
-/** 이 기기에서 푸시를 받을 수 있는지. 서버에서 그릴 때는 알 수 없어서 checking */
-function readDeviceState(): DeviceState {
-  const support = pushSupport({
-    userAgent: navigator.userAgent,
-    maxTouchPoints: navigator.maxTouchPoints,
-    standalone:
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (navigator as Navigator & { standalone?: boolean }).standalone === true,
-    hasServiceWorker: 'serviceWorker' in navigator,
-    hasPushManager: 'PushManager' in window,
-    hasNotification: 'Notification' in window,
-  });
-  return support === 'supported' && Notification.permission === 'denied' ? 'blocked' : support;
-}
 
 /**
  * 예약 완료 화면의 "예약 알림 받기" (J14, C-602). 푸시 권한은 여기서 처음 묻는다(처음 들어오자마자 묻지 않는다).
- * 아이폰은 홈 화면에 추가하는 방법을, 알림을 막아 뒀으면 브라우저 설정 안내를 보여준다.
- * TODO(#131): 강규민님 조회 함수가 들어오면 이 기기에서 이미 켠 고객 알림이면 "켜져 있어요"로 보여준다
+ * 이 기기에서 이미 켠 고객 알림이면 "켜져 있어요"로 보여준다(서버 기록, #131).
+ * 아이폰은 홈 화면에 추가하는 방법을, 알림을 막아 뒀으면 브라우저 설정 안내를 보여준다
  */
 export function ReservationAlerts() {
-  const device = useSyncExternalStore(noSubscribe, readDeviceState, () => 'checking' as const);
-  const [result, setResult] = useState<SubscribePushResult | null>(null);
-  const [pending, startTransition] = useTransition();
+  const push = usePushAlerts();
 
-  if (device === 'checking') return null;
-
-  function turnOn() {
-    startTransition(async () => {
-      setResult(await subscribePush());
-    });
-  }
+  // 켜져 있는지 확인하는 동안은 버튼이 잠깐 보였다 사라지지 않게 칸을 그리지 않는다
+  if (push.state === 'checking') return null;
 
   let body: React.ReactNode;
-  if (result?.status === 'subscribed') {
+  if (push.state === 'on') {
     body = (
       <p role="status" className="flex items-center gap-1.5 text-sm font-medium text-primary">
         <Check className="size-4" aria-hidden />
-        예약 알림을 켰어요
+        예약 알림이 켜져 있어요
       </p>
     );
-  } else if (device === 'ios-install') {
+  } else if (push.state === 'ios-install') {
     body = (
       <div className="flex flex-col gap-1.5 text-sm">
         <p>{IOS_INSTALL_NOTE}</p>
@@ -71,21 +43,26 @@ export function ReservationAlerts() {
         </ol>
       </div>
     );
-  } else if (device === 'unsupported') {
+  } else if (push.state === 'unsupported') {
     body = <p className="text-sm text-muted-foreground">{PUSH_UNSUPPORTED}</p>;
-  } else if (device === 'blocked' || result?.status === 'denied') {
+  } else if (push.state === 'blocked') {
     body = <p className="text-sm text-muted-foreground">{PUSH_BLOCKED}</p>;
   } else {
     body = (
       <div className="flex flex-col gap-2">
-        <Button type="button" className="self-start" disabled={pending} onClick={turnOn}>
-          {pending ? '알림을 켜는 중…' : '알림 받기'}
+        <Button type="button" className="self-start" disabled={push.pending} onClick={push.turnOn}>
+          {push.pending ? '알림을 켜는 중…' : '알림 받기'}
         </Button>
-        {result?.status === 'dismissed' ? (
-          <p className="text-sm text-muted-foreground">{PUSH_DISMISSED}</p>
-        ) : result?.status === 'failed' ? (
-          <p role="alert" className="text-sm text-destructive">
-            {result.message}
+        {push.message ? (
+          <p
+            role={push.message.kind === 'error' ? 'alert' : undefined}
+            className={
+              push.message.kind === 'error'
+                ? 'text-sm text-destructive'
+                : 'text-sm text-muted-foreground'
+            }
+          >
+            {push.message.text}
           </p>
         ) : null}
       </div>

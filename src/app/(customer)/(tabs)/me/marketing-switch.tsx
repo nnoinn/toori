@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { cn } from 'cn';
 
+import { Switch } from '@/components/ui/switch';
 import { setMarketingConsent } from '@/server/auth/customer-account';
 
 import { marketingResultMessage } from './profile-rules';
@@ -57,26 +57,12 @@ export function MarketingSwitch({ consent }: { consent: MarketingConsent }) {
             광고성 정보 수신 동의예요. 끄면 관심 동네 새 매물 알림을 보내지 않아요.
           </span>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={agreed}
+        <Switch
+          checked={agreed}
+          onCheckedChange={change}
           aria-labelledby="marketing-label"
           disabled={pending}
-          onClick={() => change(!agreed)}
-          className={cn(
-            'relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-60',
-            agreed ? 'bg-primary' : 'bg-muted-foreground/30',
-          )}
-        >
-          <span
-            className={cn(
-              'absolute top-1 left-1 size-5 rounded-full bg-background shadow-sm transition-transform',
-              agreed && 'translate-x-5',
-            )}
-            aria-hidden
-          />
-        </button>
+        />
       </div>
       {message ? (
         <p
