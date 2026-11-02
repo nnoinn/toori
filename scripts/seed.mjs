@@ -105,10 +105,12 @@ export async function seedDevData(sql, { now, userIds }) {
   const profiles = SEED_ACCOUNTS.map((account) => ({ id: userIds[account.key], email: account.email }));
   await sql`insert into profiles ${sql(profiles)} on conflict (id) do nothing`;
 
-  const customers = SEED_CUSTOMERS.map((c) => ({
+  const customers = SEED_CUSTOMERS.map((c, i) => ({
     id: crypto.randomUUID(),
     user_id: userIds[`customer-${c.key}`],
     nickname: c.nickname,
+    // 가입 때 휴대폰 번호를 받는다(11/2, #183). 원장님 예약 상세에 연락처가 보이게
+    phone: `010-0001-${pad(i + 1, 4)}`,
   }));
   await sql`insert into customers ${sql(customers)}`;
   const holdCustomerId = customers[0].id;
