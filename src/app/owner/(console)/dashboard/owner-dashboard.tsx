@@ -30,6 +30,7 @@ import {
   viewStatus,
 } from './dashboard';
 import type { SlotStatus } from '@/features/slot-status/slot-status';
+import { PUBLISH_WINDOW_HOURS } from '@/server/policy';
 
 import { timeLabel } from '../slots/new/slot-time';
 import { SLOT_CLOSE_REASON_LABELS } from '../slots/slot-edit';
@@ -125,7 +126,7 @@ export function OwnerDashboard({
                 ? `${TAB_LABELS[tab]} 시작하는 매물이 없어요`
                 : `${SLOT_STATUS_LABELS[status as SlotStatus]} 매물이 없어요`
             }
-            description="매물은 서비스 시작 48시간 전부터 올릴 수 있어요"
+            description={`매물은 서비스 시작 ${PUBLISH_WINDOW_HOURS}시간 전부터 올릴 수 있어요`}
             action={
               <Button asChild variant="outline">
                 <Link href="/owner/slots/new">매물 등록하기</Link>

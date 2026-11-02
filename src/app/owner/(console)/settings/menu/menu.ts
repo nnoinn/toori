@@ -3,6 +3,7 @@
 
 import { z } from 'zod';
 
+import { formatWon } from '@/lib/format';
 import {
   SERVICE_TYPES_BY_CATEGORY,
   type ServiceType,
@@ -98,9 +99,11 @@ export function validateMenu(
     errors.name = `서비스 이름은 ${MENU_LIMITS.name}자까지 쓸 수 있어요`;
 
   const price = /^\d+$/.test(value.listPrice) ? Number(value.listPrice) : NaN;
+  // 문구의 숫자도 MENU_PRICE에서 만든다(값을 바꾸면 문구도 같이 바뀌게, #213)
   if (!Number.isSafeInteger(price) || price < MENU_PRICE.min || price > MENU_PRICE.max)
-    errors.listPrice = '정가는 1,000원부터 1,000,000원까지 입력해 주세요';
-  else if (price % MENU_PRICE.unit !== 0) errors.listPrice = '정가는 10원 단위로 입력해 주세요';
+    errors.listPrice = `정가는 ${formatWon(MENU_PRICE.min)}부터 ${formatWon(MENU_PRICE.max)}까지 입력해 주세요`;
+  else if (price % MENU_PRICE.unit !== 0)
+    errors.listPrice = `정가는 ${formatWon(MENU_PRICE.unit)} 단위로 입력해 주세요`;
 
   if (!MENU_DURATION_OPTIONS.includes(value.durationMinutes))
     errors.durationMinutes = '소요 시간을 골라 주세요';
