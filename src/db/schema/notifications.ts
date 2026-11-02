@@ -15,7 +15,7 @@ export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
 export const NOTIFICATION_STATUSES = ['sent', 'failed'] as const;
 export type NotificationStatus = (typeof NOTIFICATION_STATUSES)[number];
 
-/** 웹 푸시 구독. 어느 계정(고객/원장님)의 알림을 받는지 같이 저장한다 */
+/** 웹 푸시 구독. 기기(endpoint)+계정 종류(고객/원장님)마다 하나다. 한 기기에서 켜 둔 계정의 알림을 모두 받는다(#131) */
 export const pushSubscriptions = pgTable(
   'push_subscriptions',
   {
@@ -24,14 +24,17 @@ export const pushSubscriptions = pgTable(
       .notNull()
       .references(() => profiles.id),
     accountType: text().notNull(),
-    endpoint: text().notNull().unique('push_subscriptions_endpoint_unique'),
+    endpoint: text().notNull(),
     p256dh: text().notNull(),
     auth: text().notNull(),
     // 기기 정보
     userAgent: text(),
     createdAt: createdAt(),
   },
-  (t) => [check('push_subscriptions_account_type_check', inValues(t.accountType, ACCOUNT_TYPES))],
+  (t) => [
+    unique('push_subscriptions_endpoint_account_type_unique').on(t.endpoint, t.accountType),
+    check('push_subscriptions_account_type_check', inValues(t.accountType, ACCOUNT_TYPES)),
+  ],
 ).enableRLS();
 
 /** 알림 발송 기록. dedupe_key로 같은 알림을 두 번 보내지 않는다 */

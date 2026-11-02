@@ -11,8 +11,10 @@ import { ExternalLink, FileUp } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DigitInput } from '@/components/ui/digit-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { BUSINESS_NUMBER_INPUT, formatBusinessNumber } from '@/lib/business-number';
 import { getBusinessDocUrl } from '@/server/storage/upload';
 
 import { type BusinessInput, validateBusinessInput } from '../../../business-fields';
@@ -155,12 +157,22 @@ function BusinessInfoEditor({
         <CardContent className="grid grid-cols-2 gap-4">
           {FIELDS.map(({ field, label }) => (
             <FieldBox key={field} label={label} field={field} error={errors[field]}>
-              <Input
-                {...fieldProps(field)}
-                value={form[field]}
-                inputMode={field === 'businessRegistrationNumber' ? 'numeric' : undefined}
-                onChange={(event) => update(field, event.target.value)}
-              />
+              {/* 사업자등록번호는 숫자만 쳐도 123-45-67890 모양으로(#205) */}
+              {field === 'businessRegistrationNumber' ? (
+                <DigitInput
+                  {...fieldProps(field)}
+                  rule={BUSINESS_NUMBER_INPUT}
+                  placeholder="123-45-67890"
+                  value={form[field]}
+                  onValueChange={(value) => update(field, value)}
+                />
+              ) : (
+                <Input
+                  {...fieldProps(field)}
+                  value={form[field]}
+                  onChange={(event) => update(field, event.target.value)}
+                />
+              )}
             </FieldBox>
           ))}
           <FieldBox label="개업일자" field="openedOn" error={errors.openedOn}>
@@ -234,7 +246,7 @@ function BusinessInfoReadOnly({ shopId, info }: { shopId: string; info: Business
   const rows: [string, string][] = [
     ['상호', info.businessName],
     ['대표자명', info.representativeName],
-    ['사업자등록번호', formatBrn(info.businessRegistrationNumber)],
+    ['사업자등록번호', formatBusinessNumber(info.businessRegistrationNumber)],
     ['개업일자', info.openedOn],
   ];
   return (
@@ -302,17 +314,10 @@ function toInput(info: BusinessInfo): BusinessInput {
   return {
     businessName: info.businessName,
     representativeName: info.representativeName,
-    businessRegistrationNumber: formatBrn(info.businessRegistrationNumber),
+    businessRegistrationNumber: formatBusinessNumber(info.businessRegistrationNumber),
     openedOn: info.openedOn,
     businessDocPath: info.businessDocPath,
   };
-}
-
-/** 숫자 10자리 → 123-45-67890 */
-function formatBrn(digits: string): string {
-  return /^\d{10}$/.test(digits)
-    ? `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`
-    : digits;
 }
 
 function FieldBox({

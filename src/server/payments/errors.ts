@@ -31,8 +31,8 @@ export const PAYMENT_ERRORS = {
 } as const;
 
 /**
- * 결제는 됐지만 예약을 확정할 수 없을 때(C-406). confirmPayment만 돌려준다(autoCancelled: false).
- * W11에서는 주문에 이유를 기록만 하고, 포트원 자동 취소는 W12에서 붙인다(그 뒤로는 AUTO_CANCEL_ERRORS)
+ * 결제는 됐지만 예약을 확정할 수 없는데 포트원 취소를 아직 끝내지 못했을 때(C-406, autoCancelled: false).
+ * 주문은 결제 확인(paid)으로 남고 다시 시도한다. confirmPayment만 돌려준다. 취소가 끝나면 AUTO_CANCEL_ERRORS
  */
 export const UNCONFIRMED_ERRORS = {
   HOLD_EXPIRED: `결제 가능 시간(${HOLD_MINUTES}분)이 지나서 예약을 확정하지 못했어요. ${WILL_REFUND}`,
@@ -50,6 +50,13 @@ export const AUTO_CANCEL_ERRORS = {
 export type PaymentErrorCode = keyof typeof PAYMENT_ERRORS | keyof typeof AUTO_CANCEL_ERRORS;
 export type UnconfirmedCode = keyof typeof UNCONFIRMED_ERRORS;
 
+/** 주문에 기록된 실패 코드를 확정 못 한 이유로 읽는다. 다른 값이면 SLOT_SOLD */
+export function toUnconfirmedCode(failureCode: string | null): UnconfirmedCode {
+  return failureCode && failureCode in UNCONFIRMED_ERRORS
+    ? (failureCode as UnconfirmedCode)
+    : 'SLOT_SOLD';
+}
+
 /** 실패에 더 붙는 값. 해당 코드에서만 온다 */
 export type PaymentError = ResultError & {
   /** ALREADY_HOLDING: 지금 홀딩 중인 매물("그 매물로 가기") */
@@ -58,7 +65,7 @@ export type PaymentError = ResultError & {
   slotId?: string;
   /** PAYMENT_CANCELLED·PAYMENT_FAILED: 홀딩이 남았으면 예약 확인 화면으로 돌아가 다시 결제(D12) */
   holdActive?: boolean;
-  /** confirmPayment의 HOLD_EXPIRED·AMOUNT_MISMATCH·SLOT_SOLD: 결제를 자동 취소했으면 true(W11은 기록만 해서 false, W12부터 true) */
+  /** confirmPayment의 HOLD_EXPIRED·AMOUNT_MISMATCH·SLOT_SOLD: 결제를 자동 취소했으면 true, 아직 취소하지 못했으면 false */
   autoCancelled?: boolean;
 };
 

@@ -1,14 +1,19 @@
-// 결제 확인 저장(confirmPaidOrder, readMyOrder, recordOrderOutcome, W11 ②)을 실제 DB(TEST_DATABASE_URL이 있을 때만)로 확인한다.
+// 결제 확인 저장(confirmPaidOrder, readMyOrder, recordOrderOutcome, recordAutoCancel, W11 ②·W12)을 실제 DB(TEST_DATABASE_URL이 있을 때만)로 확인한다.
 // 동시에 두 번 확인하는 경우는 confirm-concurrency.db.test.ts가 본다.
 
 import { eq } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
-import { orders, reservations, slots } from '@/db/schema';
+import { orders, refunds, reservations, slots } from '@/db/schema';
 
 import { createTestCustomer, createTestShop, testSlot } from '../../../tests/db/fixtures';
 import { closeTestDb, describeDb, type TestTx, withRollback } from '../../../tests/db/test-db';
-import { confirmPaidOrder, readMyOrder, recordOrderOutcome } from './confirm-store';
+import {
+  confirmPaidOrder,
+  readMyOrder,
+  recordAutoCancel,
+  recordOrderOutcome,
+} from './confirm-store';
 import { createPendingOrder, newPaymentId } from './order-store';
 import { RESERVATION_CODE_PATTERN } from './reservation-code';
 
@@ -183,6 +188,100 @@ describeDb('결제 확인 저장 (실제 DB)', () => {
         }),
       ).toBe(false);
       const [still] = await tx.select().from(orders).where(eq(orders.id, second.orderId));
+      expect(still.status).toBe('confirmed');
+    });
+  });
+
+  /** 홀딩이 끝난 뒤 결제되어 결제 확인(paid)·HOLD_EXPIRED로 남은 주문 */
+  async function paidButExpired(tx: TestTx) {
+    const held = await heldAndOrdered(tx);
+    await confirmPaidOrder(tx, { orderId: held.orderId, ...paidAt(11) });
+    return held;
+  }
+  const refundsOf = (tx: TestTx, orderId: string) =>
+    tx.select().from(refunds).where(eq(refunds.orderId, orderId));
+
+  it('recordAutoCancel은 주문을 자동 취소로 바꾸고 환불 기록을 남긴다. 예약은 없고 전액 환불·위약금 0', async () => {
+    await withRollback(async (tx) => {
+      const { orderId, slotId } = await paidButExpired(tx);
+      expect(
+        await recordAutoCancel(tx, {
+          orderId,
+          refundAmount: 14_000,
+          pgCancellationId: 'cancellation-1',
+          now: at(12),
+        }),
+      ).toBe(true);
+
+      const [order] = await tx.select().from(orders).where(eq(orders.id, orderId));
+      expect(order).toMatchObject({
+        status: 'auto_cancelled',
+        pgStatus: 'CANCELLED',
+        failureCode: 'HOLD_EXPIRED',
+        paidAt: at(11),
+      });
+      expect(await refundsOf(tx, orderId)).toMatchObject([
+        {
+          reservationId: null,
+          reason: 'auto_cancel',
+          band: null,
+          penaltyRate: 0,
+          refundAmount: 14_000,
+          penaltyAmount: 0,
+          pgCancellationId: 'cancellation-1',
+          processedAt: at(12),
+          processedBy: null,
+        },
+      ]);
+      expect(await tx.select().from(reservations).where(eq(reservations.slotId, slotId))).toEqual(
+        [],
+      );
+    });
+  });
+
+  it('환불액을 모르면 주문의 결제액으로, 금액이 달랐으면 포트원이 알려 준 금액으로 기록한다', async () => {
+    await withRollback(async (tx) => {
+      const unknown = await paidButExpired(tx);
+      await recordAutoCancel(tx, {
+        orderId: unknown.orderId,
+        refundAmount: null,
+        pgCancellationId: null,
+        now: at(12),
+      });
+      expect(await refundsOf(tx, unknown.orderId)).toMatchObject([
+        { refundAmount: 14_000, pgCancellationId: null },
+      ]);
+    });
+    await withRollback(async (tx) => {
+      const mismatch = await paidButExpired(tx);
+      await recordAutoCancel(tx, {
+        orderId: mismatch.orderId,
+        refundAmount: 100,
+        pgCancellationId: 'cancellation-2',
+        now: at(12),
+      });
+      expect(await refundsOf(tx, mismatch.orderId)).toMatchObject([{ refundAmount: 100 }]);
+    });
+  });
+
+  it('recordAutoCancel은 결제 확인(paid) 주문에만 기록한다. 두 번 불러도 환불 기록은 한 줄', async () => {
+    await withRollback(async (tx) => {
+      const input = { refundAmount: 14_000, pgCancellationId: 'c', now: at(12) };
+
+      const paid = await paidButExpired(tx);
+      expect(await recordAutoCancel(tx, { orderId: paid.orderId, ...input })).toBe(true);
+      expect(await recordAutoCancel(tx, { orderId: paid.orderId, ...input })).toBe(false);
+      expect(await refundsOf(tx, paid.orderId)).toHaveLength(1);
+
+      const pending = await heldAndOrdered(tx);
+      expect(await recordAutoCancel(tx, { orderId: pending.orderId, ...input })).toBe(false);
+      expect(await refundsOf(tx, pending.orderId)).toEqual([]);
+
+      const confirmed = await heldAndOrdered(tx);
+      await confirmPaidOrder(tx, { orderId: confirmed.orderId, ...paidAt(3) });
+      expect(await recordAutoCancel(tx, { orderId: confirmed.orderId, ...input })).toBe(false);
+      expect(await refundsOf(tx, confirmed.orderId)).toEqual([]);
+      const [still] = await tx.select().from(orders).where(eq(orders.id, confirmed.orderId));
       expect(still.status).toBe('confirmed');
     });
   });

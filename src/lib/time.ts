@@ -72,6 +72,18 @@ export function addHours(date: Date, hours: number): Date {
   return new Date(date.getTime() + hours * HOUR_MS);
 }
 
+/**
+ * 하루 중 시각(0~23시)을 문구로. 예: 13 → "오후 1시", 21 → "밤 9시", 8 → "아침 8시".
+ * 정책값 시각(관심 동네 알림 시각, 야간 미발송 시간)을 화면 문구에 넣을 때 쓴다(가입 약관, 내 정보 알림)
+ */
+export function formatHourLabel(hour: number): string {
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  if (hour >= 5 && hour < 12) return `아침 ${h12}시`;
+  if (hour >= 12 && hour < 18) return `오후 ${h12}시`;
+  if (hour >= 18 && hour < 21) return `저녁 ${h12}시`;
+  return `밤 ${h12}시`;
+}
+
 function pad2(value: number): string {
   return String(value).padStart(2, '0');
 }

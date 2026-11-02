@@ -3,6 +3,7 @@
 // 저장은 강규민님 createCustomerAccount({ agreements, next })(#47 1장)가 한다.
 
 import { SITE_NAME } from '@/lib/site';
+import { formatHourLabel } from '@/lib/time';
 import {
   INTEREST_DIGEST_HOUR,
   MARKETING_CONSENT_RECHECK_MONTHS,
@@ -20,15 +21,6 @@ export type AgreementItem = {
   /** 항목 아래 짧은 설명(줄마다 하나) */
   description?: string[];
 };
-
-/** 시각을 문구로. 예: 13 → "오후 1시", 21 → "밤 9시", 8 → "아침 8시" */
-export function formatHourLabel(hour: number): string {
-  const h12 = hour % 12 === 0 ? 12 : hour % 12;
-  if (hour >= 5 && hour < 12) return `아침 ${h12}시`;
-  if (hour >= 12 && hour < 18) return `오후 ${h12}시`;
-  if (hour >= 18 && hour < 21) return `저녁 ${h12}시`;
-  return `밤 ${h12}시`;
-}
 
 /** 개월을 문구로. 예: 24 → "2년", 6 → "6개월" */
 export function formatMonthsLabel(months: number): string {

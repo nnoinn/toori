@@ -8,11 +8,17 @@ import { cn } from 'cn';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DigitInput } from '@/components/ui/digit-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { bankName, BANKS } from '@/server/policy';
 
-import { type PayoutInput, type PayoutValues, validatePayoutInput } from '../../../business-fields';
+import {
+  ACCOUNT_NUMBER_INPUT,
+  type PayoutInput,
+  type PayoutValues,
+  validatePayoutInput,
+} from '../../../business-fields';
 import { PayoutConfirmDialog } from '../../../payout-confirm-dialog';
 import { type PayoutFieldErrors, savePayoutAccount } from './actions';
 import type { PayoutAccountView } from './payout-store';
@@ -167,13 +173,13 @@ export function PayoutForm({ shopId, account }: { shopId: string; account: Payou
                 error={errors.accountNumber}
                 className="col-span-2"
               >
-                <Input
+                {/* 숫자만 16자리까지(#205) */}
+                <DigitInput
                   {...fieldProps('accountNumber')}
-                  inputMode="numeric"
-                  autoComplete="off"
+                  rule={ACCOUNT_NUMBER_INPUT}
                   placeholder="숫자만 입력해 주세요"
                   value={form.accountNumber}
-                  onChange={(event) => update('accountNumber', event.target.value)}
+                  onValueChange={(value) => update('accountNumber', value)}
                 />
               </FieldBox>
               <div className="col-span-2 flex items-center justify-end gap-2">

@@ -31,7 +31,14 @@ export function OwnerNav({ canCreateSlot = true }: OwnerNavProps) {
           lockedReason: '입점 승인 후에 등록할 수 있어요',
         },
         { href: '/owner/settings', label: '매장 설정', icon: Store },
-        { href: '/owner/settlements', label: '정산', icon: Wallet },
+        // 정산 내역(O15)을 만들면 locked를 지운다
+        {
+          href: '/owner/settlements',
+          label: '정산',
+          icon: Wallet,
+          locked: true,
+          lockedReason: '준비 중이에요',
+        },
       ]}
       footer={<SignOutButton />}
     />

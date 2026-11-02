@@ -4,8 +4,8 @@
 // 결제 뒤 돌아오는 화면(/payment/result)에서 부른다(정찬형 J10·J11). 화면에서는 '@/server/payments/checkout'에서 가져온다.
 //
 // 모두 진짜다: 10분 홀딩(W10), 결제 대기 주문(W11 ①), 포트원 결제 조회와 예약 확정(W11 ②).
-// 결제는 됐는데 확정할 수 없는 경우(홀딩 시간이 지난 뒤 결제, 금액 다름, 팔림)는 주문에 기록만 하고(autoCancelled: false),
-// 포트원 자동 취소는 W12에서 붙인다. 진짜 결제로 만들기 어려운 실패 화면은 로컬에서 DEV_FAKE_PAYMENT_FAILURE로 흉내 낸다
+// 결제는 됐는데 확정할 수 없는 경우(홀딩 시간이 지난 뒤 결제, 금액 다름, 팔림)는 포트원에서 자동 취소한다(W12, autoCancelled: true).
+// 진짜 결제로 만들기 어려운 실패 화면은 로컬에서 DEV_FAKE_PAYMENT_FAILURE로 흉내 낸다
 
 import { headers } from 'next/headers';
 import { z } from 'zod';
@@ -19,12 +19,19 @@ import { isNewCustomer } from '@/server/customers';
 import { calcPaymentAmount } from './amount';
 import { isMyActiveHold } from './checkout-rules';
 import { readCheckoutSlot, readCustomerPhone } from './checkout-store';
-import { confirmPaidOrder, type MyOrder, readMyOrder, recordOrderOutcome } from './confirm-store';
+import { type MyOrder, readMyOrder, recordOrderOutcome } from './confirm-store';
 import { devFakeFailure } from './dev-fake-failure';
-import { type PaymentResult, paymentFail, unconfirmedFail } from './errors';
+import {
+  autoCancelFail,
+  type PaymentResult,
+  paymentFail,
+  toUnconfirmedCode,
+  unconfirmedFail,
+} from './errors';
 import { acquireHold, releaseMyHold } from './hold-store';
 import { createPendingOrder, newPaymentId } from './order-store';
 import { getPortOnePayment } from './portone';
+import { autoCancelOrder, settlePaidOrder } from './settle-order';
 import type { ConfirmedReservation, HoldInfo, MyHold, PaymentRequest } from './types';
 
 const slotIdSchema = z.uuid();
@@ -183,6 +190,14 @@ export async function confirmPayment(input: {
   if (switched) return switched;
   if (!order) return paymentFail('PAYMENT_NOT_FOUND');
 
+  // 확정하지 못했는데 취소를 끝내지 못한 주문은 여기서 다시 취소한다(새로고침)
+  if (order.status === 'paid') {
+    const code = toUnconfirmedCode(order.failureCode);
+    return (await autoCancelOrder(db, { orderId: order.orderId, paymentId }, now))
+      ? autoCancelFail(code)
+      : unconfirmedFail(code);
+  }
+
   // 이미 결과가 정해진 주문(새로고침, 웹훅이 먼저 처리)
   const settled = settledResult(order);
   if (settled === 'not_paid') {
@@ -226,29 +241,21 @@ export async function confirmPayment(input: {
       return paymentFail('PAYMENT_CHECK_UNAVAILABLE');
   }
 
-  if (payment.amountTotal !== order.amount || (payment.currency && payment.currency !== 'KRW')) {
-    console.error('[payments] 결제 금액이 주문과 달라요:', order.orderId);
-    await recordOrderOutcome(db, order.orderId, {
-      status: 'paid',
-      pgStatus: payment.status,
-      payMethod: payment.method,
-      paidAt: payment.paidAt,
-      failureCode: 'AMOUNT_MISMATCH',
-    });
-    return unconfirmedFail('AMOUNT_MISMATCH');
-  }
-
-  const confirmed = await db.transaction((tx) =>
-    confirmPaidOrder(tx, {
-      orderId: order.orderId,
-      pgStatus: payment.status,
-      payMethod: payment.method,
-      // 결제 시각이 없으면(포트원 응답 모양이 다를 때) 지금으로 본다
-      paidAt: payment.paidAt ?? now,
-    }),
+  const settledNow = await settlePaidOrder(
+    db,
+    { orderId: order.orderId, paymentId, amount: order.amount },
+    payment,
+    now,
   );
-  if (!confirmed.ok) return unconfirmedFail(confirmed.code);
-  return ok({ reservationId: confirmed.reservationId, reservationCode: confirmed.reservationCode });
+  if (!settledNow.ok) {
+    return settledNow.autoCancelled
+      ? autoCancelFail(settledNow.code)
+      : unconfirmedFail(settledNow.code);
+  }
+  return ok({
+    reservationId: settledNow.reservationId,
+    reservationCode: settledNow.reservationCode,
+  });
 }
 
 /** 고객이 결제창에서 직접 취소·닫음을 뜻하는 결제사 코드(토스페이먼츠) */
@@ -263,13 +270,8 @@ function settledResult(order: MyOrder): PaymentResult<ConfirmedReservation> | 'n
   switch (order.status) {
     case 'confirmed':
       return order.reservation ? ok(order.reservation) : null;
-    case 'paid':
-    case 'auto_cancelled': {
-      const code = order.failureCode;
-      return code === 'HOLD_EXPIRED' || code === 'AMOUNT_MISMATCH' || code === 'SLOT_SOLD'
-        ? unconfirmedFail(code)
-        : unconfirmedFail('SLOT_SOLD');
-    }
+    case 'auto_cancelled':
+      return autoCancelFail(toUnconfirmedCode(order.failureCode));
     case 'failed':
       return 'not_paid';
     default:

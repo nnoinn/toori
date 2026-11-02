@@ -1,6 +1,9 @@
 // 원장님 사업자 정보·정산 계좌 입력 검사 (S-101·S-107, #23 D3). 화면('use client')과 서버 함수가 같이 쓴다.
 // 가입(join/owner-join.ts), 매장 설정 > 사업자 정보, 정산 계좌(O7 ②)가 같은 규칙을 쓴다. 강규민님 createOwnerAccount의 서버 검사와 같은 규칙이다.
+// 사업자등록번호는 검증번호(마지막 자리)까지 본다(#205). 가입 서버 검사에는 강규민님이 같은 함수를 붙인다.
 
+import { isValidBusinessNumber } from '@/lib/business-number';
+import type { DigitInputRule } from '@/lib/digit-input';
 import { BANK_CODES, type BankCode } from '@/server/policy';
 
 export const OWNER_FIELD_LIMITS = {
@@ -8,6 +11,15 @@ export const OWNER_FIELD_LIMITS = {
   businessName: 40,
   accountHolder: 40,
 } as const;
+
+/** 정산 계좌번호 자릿수. 은행마다 달라서 하이픈 없이 숫자만 받는다 */
+const ACCOUNT_NUMBER_DIGITS = { min: 8, max: 16 } as const;
+
+/** 정산 계좌번호 입력칸 규칙(공통 UI DigitInput, #205). 숫자만 16자리까지 */
+export const ACCOUNT_NUMBER_INPUT: DigitInputRule = {
+  format: (digits) => digits,
+  maxDigits: () => ACCOUNT_NUMBER_DIGITS.max,
+};
 
 export type BusinessInput = {
   businessName: string;
@@ -75,6 +87,9 @@ export function validateBusinessInput(
   const businessRegistrationNumber = onlyDigits(input.businessRegistrationNumber);
   if (!/^\d{10}$/.test(businessRegistrationNumber)) {
     errors.businessRegistrationNumber = '사업자등록번호 10자리를 입력해 주세요(예: 123-45-67890)';
+  } else if (!isValidBusinessNumber(businessRegistrationNumber)) {
+    // 10자리지만 검증번호가 맞지 않는다(아무 숫자나 넣은 번호)
+    errors.businessRegistrationNumber = '사업자등록번호를 다시 확인해 주세요';
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.openedOn)) {
     errors.openedOn = '개업일자를 골라 주세요';
@@ -102,8 +117,9 @@ export function validatePayoutInput(input: PayoutInput): Checked<PayoutValues, k
   const bankCode = input.bankCode;
   if (!bankCode || !BANK_CODES.includes(bankCode)) errors.bankCode = '은행을 골라 주세요';
   const accountNumber = onlyDigits(input.accountNumber);
-  if (!/^\d{8,16}$/.test(accountNumber)) {
-    errors.accountNumber = '계좌번호를 숫자로 입력해 주세요(8~16자리)';
+  const { min, max } = ACCOUNT_NUMBER_DIGITS;
+  if (!new RegExp(`^\\d{${min},${max}}$`).test(accountNumber)) {
+    errors.accountNumber = `계좌번호를 숫자로 입력해 주세요(${min}~${max}자리)`;
   }
   const accountHolder = checkRequired(
     errors,

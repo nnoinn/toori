@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { SLOT_STATUSES } from '@/db/schema';
 
 import { SLOT_TIME_STEP_MINUTES } from '../../scripts/dev-db.mjs';
-import { SEED_ACCOUNTS, SEED_SHOPS } from '../../scripts/seed-data.mjs';
-import { salePrice, seedDevData } from '../../scripts/seed.mjs';
+import { ROLLING_SLOTS, SEED_ACCOUNTS, SEED_SHOPS } from '../../scripts/seed-data.mjs';
+import { rollingStarts, salePrice, seedDevData } from '../../scripts/seed.mjs';
 
 import { describeDb, withRollbackSql } from './test-db';
 
@@ -77,6 +77,29 @@ describe('시간 단위 (#108)', () => {
       for (const slot of shop.slots ?? [])
         expect(Math.abs((slot.at * 60) % SLOT_TIME_STEP_MINUTES)).toBe(0);
     }
+  });
+});
+
+describe('계속 쓰는 시험 매물 시각 (11/2)', () => {
+  // NOW는 한국 시간 11/1(일) 14:03. 4일째는 11/5(목)
+  const kstHour = (d: Date) => (d.getUTCHours() + 9) % 24;
+
+  it('넣은 날로부터 4~21일째의 11시·15시(한국 시간)이고, 쉬는 요일은 뺀다', () => {
+    const base = NOW.getTime();
+    const all = rollingStarts(base, []);
+    const days = ROLLING_SLOTS.toDay - ROLLING_SLOTS.fromDay + 1;
+    expect(all).toHaveLength(days * ROLLING_SLOTS.times.length);
+    expect(all[0].toISOString()).toBe('2026-11-05T02:00:00.000Z');
+    expect(new Set(all.map(kstHour))).toEqual(new Set(ROLLING_SLOTS.times));
+    // 위 매물(최대 72시간 뒤)과 겹치지 않는다
+    for (const start of all) expect(start.getTime() - base).toBeGreaterThan(72 * HOUR);
+
+    // 월요일(1)에 쉬는 샵은 월요일이 빠진다
+    const closedMonday = rollingStarts(base, [{ weekday: 1, closed: true }]);
+    expect(closedMonday.some((d) => new Date(d.getTime() + 9 * HOUR).getUTCDay() === 1)).toBe(
+      false,
+    );
+    expect(closedMonday.length).toBeLessThan(all.length);
   });
 });
 
