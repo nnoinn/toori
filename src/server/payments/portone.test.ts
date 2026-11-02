@@ -149,6 +149,74 @@ describe('cancelPortOnePayment', () => {
     expect(JSON.parse(init.body)).toEqual({ storeId: 'store-test', reason: '자동 취소' });
   });
 
+  it('부분 취소: 돌려줄 금액과 지금 남아 있어야 할 잔액을 같이 보낸다', async () => {
+    respond(200, { cancellation: { status: 'SUCCEEDED', id: 'c-1', totalAmount: 31_500 } });
+    expect(
+      await cancelPortOnePayment('toori-1', '고객 예약 취소', {
+        amount: 31_500,
+        currentCancellableAmount: 45_000,
+      }),
+    ).toEqual({ ok: true, cancellationId: 'c-1', amount: 31_500 });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      storeId: 'store-test',
+      reason: '고객 예약 취소',
+      amount: 31_500,
+      currentCancellableAmount: 45_000,
+    });
+  });
+
+  describe('부분 취소인데 잔액이 달라졌을 때(앞선 요청이 이미 돌려줌)', () => {
+    const broken = () =>
+      new Response(JSON.stringify({ type: 'CANCELLABLE_AMOUNT_CONSISTENCY_BROKEN' }), {
+        status: 409,
+      });
+    const partial = { amount: 31_500, currentCancellableAmount: 45_000 };
+
+    it('끝난 취소가 있으면 그 내역을 끝난 것으로 돌려준다(두 번 환불하지 않는다)', async () => {
+      fetchMock.mockResolvedValueOnce(broken()).mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: 'PARTIAL_CANCELLED',
+            cancellations: [{ status: 'SUCCEEDED', id: 'c-1', totalAmount: 31_500 }],
+          }),
+          { status: 200 },
+        ),
+      );
+      expect(await cancelPortOnePayment('toori-1', '고객 예약 취소', partial)).toEqual({
+        ok: true,
+        cancellationId: 'c-1',
+        amount: 31_500,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('끝난 취소가 없으면 결제사가 처리 중인 것으로 본다', async () => {
+      fetchMock.mockResolvedValueOnce(broken()).mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: 'PAID',
+            cancellations: [{ status: 'REQUESTED', id: 'c-1', totalAmount: 31_500 }],
+          }),
+          { status: 200 },
+        ),
+      );
+      expect(await cancelPortOnePayment('toori-1', '고객 예약 취소', partial)).toEqual({
+        ok: false,
+        reason: 'pending',
+      });
+    });
+
+    it('내역을 읽지 못하면 unavailable', async () => {
+      fetchMock
+        .mockResolvedValueOnce(broken())
+        .mockRejectedValueOnce(new TypeError('fetch failed'));
+      expect(await cancelPortOnePayment('toori-1', '고객 예약 취소', partial)).toEqual({
+        ok: false,
+        reason: 'unavailable',
+      });
+    });
+  });
+
   it('취소 성공(SUCCEEDED): 취소 번호와 실제 돌려준 금액을 읽는다', async () => {
     respond(200, {
       cancellation: {

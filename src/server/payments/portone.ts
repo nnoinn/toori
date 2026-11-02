@@ -1,4 +1,4 @@
-// 포트원 V2 결제 조회·취소 (X-201, C-406, W11 ②·W12). 서버에서만 부른다. API 시크릿(PORTONE_API_SECRET)은 서버 환경변수에만 있고 로그에 남기지 않는다.
+// 포트원 V2 결제 조회·취소 (X-201, X-203, C-406, W11 ②·W12·W14). 서버에서만 부른다. API 시크릿(PORTONE_API_SECRET)은 서버 환경변수에만 있고 로그에 남기지 않는다.
 // 브라우저가 보낸 결과(복귀 주소의 code 등)는 믿지 않고, 결제 확인(confirmPayment)과 웹훅(W13)이 늘 이 조회로 상태와 금액을 본다.
 // 문서: https://developers.portone.io (GET /payments/{paymentId}, POST /payments/{paymentId}/cancel, Authorization: PortOne {API 시크릿})
 
@@ -120,11 +120,13 @@ export type PortOneCancel =
   | { ok: false; reason: 'pending' | 'unavailable' };
 
 /**
- * 결제 전액을 취소한다. 이미 취소된 결제면 포트원의 취소 내역을 읽어 끝난 것으로 돌려줘서, 같은 결제로 여러 번 불러도 된다
+ * 결제를 취소한다. partial이 없으면 전액, 있으면 그 금액만 돌려준다. 이미 취소된 결제면 포트원의 취소 내역을 읽어 끝난 것으로 돌려줘서, 같은 결제로 여러 번 불러도 된다.
+ * 부분 취소의 currentCancellableAmount는 지금 남아 있어야 할 취소 가능 잔액이다. 앞선 요청이 이미 돌려줘서 잔액이 다르면 포트원이 거절하므로 두 번 환불되지 않는다
  */
 export async function cancelPortOnePayment(
   paymentId: string,
   reason: string,
+  partial?: { amount: number; currentCancellableAmount: number },
 ): Promise<PortOneCancel> {
   const keys = portOneKeys();
   if (!keys) return { ok: false, reason: 'unavailable' };
@@ -135,7 +137,7 @@ export async function cancelPortOnePayment(
     response = await fetch(`${PORTONE_API}/payments/${encodeURIComponent(paymentId)}/cancel`, {
       method: 'POST',
       headers: { Authorization: `PortOne ${secret}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ storeId, reason }),
+      body: JSON.stringify({ storeId, reason, ...partial }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
       cache: 'no-store',
     });
@@ -147,6 +149,13 @@ export async function cancelPortOnePayment(
   const body: unknown = await response.json().catch(() => null);
   const type = (body as { type?: unknown } | null)?.type;
   if (type === 'PAYMENT_ALREADY_CANCELLED') return readFinishedCancel(paymentId);
+  if (type === 'CANCELLABLE_AMOUNT_CONSISTENCY_BROKEN') {
+    // 잔액이 달라졌다. 앞선 요청이 돌려준 내역을 읽고, 끝난 취소가 없으면 결제사가 아직 처리 중인 것으로 본다
+    const finished = await readFinishedCancel(paymentId);
+    return finished.ok && finished.cancellationId === null && finished.amount === null
+      ? { ok: false, reason: 'pending' }
+      : finished;
+  }
 
   const parsed = z.object({ cancellation: cancellationSchema }).safeParse(body);
   if (!response.ok || !parsed.success) {
@@ -175,7 +184,7 @@ export async function cancelPortOnePayment(
 async function readFinishedCancel(paymentId: string): Promise<PortOneCancel> {
   const lookup = await getPortOnePayment(paymentId);
   if (!lookup.ok) return { ok: false, reason: 'unavailable' };
-  // 전액 취소라 끝난 취소는 한 건이다
+  // 결제 한 건을 한 번만 취소하므로 끝난 취소는 한 건이다
   const finished = lookup.payment.cancellations.at(-1);
   return { ok: true, cancellationId: finished?.id ?? null, amount: finished?.amount ?? null };
 }

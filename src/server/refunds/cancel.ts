@@ -4,20 +4,21 @@
 // 화면에서는 '@/server/refunds/cancel'에서 가져온다. 환불액은 화면에서 계산하지 않고 이 결과를 그대로 보여준다.
 //
 // - previewRefund: 진짜(읽기만 한다). 금액은 calcRefund(#125)와 같은 계산이다
-// - cancelReservation: **가짜 결과 버전**. 확인(내 예약, 이미 취소, 6시간 미만, 금액이 바뀜)은 진짜로 하고, 성공하면 결과만 돌려준다.
-//   예약·매물·환불 기록·포트원은 그대로다. W14에서 진짜로 바꾸고 모양은 그대로 둔다.
-//   실패 화면은 로컬에서 DEV_FAKE_PAYMENT_FAILURE=cancelReservation:<코드>로 흉내 낸다
+// - cancelReservation: 포트원에서 환불액만 돌려준 뒤, 예약·매물을 '취소'로 바꾸고 환불 기록을 남긴다(W14).
+//   포트원을 부르는 동안 DB를 잠그지 않는다. 환불 뒤 저장하지 못하고 멈춰도 다시 누르면 포트원이 앞선 환불을 알려줘서 두 번 환불되지 않는다
 
 import { z } from 'zod';
 
+import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { ok } from '@/lib/result';
+import { hoursUntil } from '@/lib/time';
 import { requireCustomer } from '@/server/auth';
 
 import { calcRefund } from './calc-refund';
 import { refundFail, type RefundResult } from './errors';
-import { devFakeCancelFailure } from './fake-cancel';
-import { readRefundTarget, type RefundTarget } from './refund-store';
+import { refundPayment } from './refund-payment';
+import { readRefundTarget, recordCustomerCancel, type RefundTarget } from './refund-store';
 import type { CancelledReservation, RefundPreview } from './types';
 
 const reservationIdSchema = z.uuid();
@@ -82,15 +83,51 @@ export async function cancelReservation(input: {
   if (target.status === 'cancelled') return refundFail('ALREADY_CANCELLED');
   const now = await getRequestNow();
   const preview = toPreview(target, now);
-  const switched = devFakeCancelFailure(preview);
-  if (switched) return switched;
 
   if (!preview.refundable) return refundFail('NOT_REFUNDABLE');
   if (preview.refundAmount !== expectedRefundAmount) {
     return refundFail('REFUND_CHANGED', { preview });
   }
 
-  // 가짜 결과 버전: 예약·매물·환불 기록·포트원을 바꾸지 않고 결과만 돌려준다(W14에서 진짜로)
+  const refund = await refundPayment({
+    paymentId: target.paymentId,
+    paidAmount: target.paidAmount,
+    refundAmount: preview.refundAmount,
+  });
+  if (!refund.ok) return refundFail('REFUND_FAILED');
+  // 앞선 요청이 돌려준 금액이 지금 계산과 다르면(그 사이 구간이 바뀜, 콘솔에서 직접 취소) 위약금 기록이 틀려져서 자동으로 기록하지 않는다
+  if (refund.amount !== null && refund.amount !== preview.refundAmount) {
+    console.error('[cancel] 돌려준 금액이 계산과 달라 운영자 확인이 필요해요:', reservationId);
+    return refundFail('REFUND_FAILED');
+  }
+
+  let recorded: boolean;
+  try {
+    recorded = await getDb().transaction((tx) =>
+      recordCustomerCancel(tx, {
+        reservationId,
+        orderId: target.orderId,
+        slotId: target.slotId,
+        band: preview.band,
+        penaltyRate: preview.penaltyRate,
+        refundAmount: preview.refundAmount,
+        penaltyAmount: preview.penaltyAmount,
+        pgCancellationId: refund.cancellationId,
+        hoursBeforeStart: hoursUntil(target.startAt, now),
+        now,
+      }),
+    );
+  } catch (error) {
+    // 환불은 끝났을 수 있다. 다시 누르면 앞선 환불을 읽어 기록한다
+    console.error(
+      '[cancel] 환불 뒤 저장 실패:',
+      reservationId,
+      error instanceof Error ? error.name : error,
+    );
+    return refundFail('REFUND_FAILED');
+  }
+  if (!recorded) return refundFail('ALREADY_CANCELLED');
+
   return ok({
     reservationId,
     refundAmount: preview.refundAmount,
