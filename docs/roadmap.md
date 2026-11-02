@@ -101,7 +101,6 @@
 | ✅ | 정찬형의 `@portone/browser-sdk` 설치 승인(#16, #168) | 현동훈 |
 | ✅ | 웹 푸시 VAPID 키 (K6). `.env.local` 공유, Vercel Production·Preview 등록(11/1). 값이 맞는지는 W16 첫 발송 때 확인한다 | 현동훈 |
 | ⬜ | 공통 함수 모으기 2차(업종·서비스 이름, 서비스 종류 목록, 소요 시간·시각 표시, 환불 규정 블록, 번호 오류 문구, 운영자 `format.ts`). 열린 팀원 PR이 머지된 뒤 한 번에(#212) | 현동훈 |
-| ⬜ | 결정: 첫 화면을 로그인으로 바꾸면서 로그인 없이 둘러보기를 남길지(#215) | 현동훈 |
 | ⬜ | 시드 다시 넣기(`npm run db:seed -- --yes`). 11/2에 넣은 3주 시험 매물이 끝나기 전, 11/20쯤 | 현동훈 |
 | ✅ | 다른 계정 알림용 회색 아이콘을 `public/brand/app-icon/toori-app-icon-gray-*`에 넣기(11/2, #131). 꺼진 느낌이 나는 회색(G3)이고, 쓰는 법은 `docs/brand.md` "다른 계정 알림 아이콘" | 현동훈 |
 | ✅ | `pg_cron`·`pg_net` 켜기 (K7), `CRON_SECRET` (K8). 개발 DB에서 켜고, Vercel Production·Preview에 등록(11/2). `.env.local` 새 공유본은 11/2 단톡방으로 전달함 | 현동훈 |
