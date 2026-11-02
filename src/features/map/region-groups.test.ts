@@ -38,10 +38,10 @@ describe('구 단위 묶음 (#204)', () => {
     expect(groupShopsByRegion(shops).reduce((sum, g) => sum + g.count, 0)).toBe(total);
   });
 
-  it('동네 목록에 없는 구는 이름 없이 그 구 샵들의 가운데에', () => {
+  it('동네 목록에 없는 구는 이름 없이 그 구 샵들의 가운데에(목록에 없는 코드)', () => {
     const [group] = groupShopsByRegion([
-      shop('a', '11680', 1, 37.5, 127.0),
-      shop('b', '11680', 1, 37.6, 127.2),
+      shop('a', '99999', 1, 37.5, 127.0),
+      shop('b', '99999', 1, 37.6, 127.2),
     ]);
     expect(group.name).toBeNull();
     expect(group.center.lat).toBeCloseTo(37.55, 6);
