@@ -14,4 +14,8 @@ export type MapShop = {
   lng: number;
   /** 이 샵의 게시중 매물 수 */
   slotCount: number;
+  /** 업종(업종별 핀 모양, #204). 매물 상세의 작은 지도처럼 없으면 기본 핀 */
+  category?: 'hair' | 'nail_lash';
+  /** 시·군·구 코드(멀리서 볼 때 구 단위 묶음, #204) */
+  sigunguCode?: string;
 };
