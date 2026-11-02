@@ -4,15 +4,13 @@ import { useId, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { unstable_rethrow, useRouter } from 'next/navigation';
 import PortOne, { type PaymentResponse } from '@portone/browser-sdk/v2';
-import { ChevronDown, Clock, MapPin } from 'lucide-react';
+import { Check, ChevronDown, Clock, MapPin } from 'lucide-react';
 
 import { BackButton } from '@/components/ui/back-button';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Countdown } from '@/components/ui/countdown';
-import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { EmptyState } from '@/components/ui/state';
-import { updateMyPhone } from '@/app/(customer)/(tabs)/me/actions';
-import { customerPhoneSchema } from '@/app/(customer)/(tabs)/me/profile-rules';
 import {
   formatDuration,
   refundPolicyLines,
@@ -35,6 +33,7 @@ import {
   REFUND_CONSENT_LABEL,
 } from './checkout-texts';
 import { paymentResultPath, toPortOneRequest } from './payment-window';
+import { type PhoneAutoSave, usePhoneAutoSave } from './use-phone-auto-save';
 
 const START_FAILED_MESSAGE = '결제를 시작하지 못했어요. 잠시 후 다시 시도해 주세요';
 // 포트원 결제창 스크립트를 못 받았거나 결제창이 요청값을 거절했을 때. 홀딩은 그대로라 다시 누를 수 있다(누를 때마다 새 결제 번호)
@@ -56,13 +55,7 @@ type CheckoutViewProps = {
 export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProps) {
   const router = useRouter();
   const [expired, setExpired] = useState(false);
-  const [phone, setPhone] = useState(savedPhone);
-  // 같은 홀딩으로 돌아왔는데 그사이 다른 화면(내 정보)에서 연락처가 바뀌었으면 서버 값으로 맞춘다
-  const [serverPhone, setServerPhone] = useState(savedPhone);
-  if (serverPhone !== savedPhone) {
-    setServerPhone(savedPhone);
-    setPhone(savedPhone);
-  }
+  const phone = usePhoneAutoSave(savedPhone);
   const [refundAgreed, setRefundAgreed] = useState(false);
   const [bookerAgreed, setBookerAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +64,8 @@ export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProp
   const { shop, menu } = slot;
   const detailPath = `/slots/${slot.slotId}`;
   const refundNotes = refundPolicyNotes(OWNER_FAULT_COUPON_AMOUNT);
-  const canPay = refundAgreed && bookerAgreed && phone !== null && !expired && !paying;
+  // 주문은 저장된 연락처를 읽어서, 칸의 번호가 저장된 번호와 같고 저장이 끝났을 때만 결제한다(#183)
+  const canPay = refundAgreed && bookerAgreed && phone.ready && !expired && !paying;
 
   function pay() {
     setError(null);
@@ -114,7 +108,7 @@ export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProp
             setExpired(true);
             return;
           case 'PHONE_REQUIRED':
-            setPhone(null);
+            phone.markMissing();
             break;
         }
         setError(result.error.message);
@@ -187,8 +181,7 @@ export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProp
         </div>
       </dl>
 
-      {/* 연락처가 바뀌면(저장, 서버 값) 입력칸 상태도 새로 시작한다 */}
-      <PhoneField key={phone ?? ''} phone={phone} onSaved={setPhone} />
+      <PhoneField phone={phone} />
 
       <section
         className="flex flex-col gap-2 rounded-xl bg-muted p-4 text-sm"
@@ -244,9 +237,9 @@ export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProp
           >
             {paying ? '결제 준비 중…' : `${formatWon(hold.amount)} 결제하기`}
           </Button>
-          {phone === null ? (
+          {!phone.ready ? (
             <p className="text-center text-xs text-muted-foreground">
-              휴대폰 번호를 저장하면 결제할 수 있어요.
+              휴대폰 번호가 저장되면 결제할 수 있어요.
             </p>
           ) : null}
           <Button type="button" variant="ghost" disabled={cancelling || paying} onClick={cancel}>
@@ -258,89 +251,41 @@ export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProp
   );
 }
 
-/** 연락처 확인·입력(C-401). 저장된 번호가 있으면 보여 주고 바꿀 수 있다. 내 정보(J9)와 같은 규칙으로 저장한다 */
-function PhoneField({
-  phone,
-  onSaved,
-}: {
-  phone: string | null;
-  onSaved: (phone: string) => void;
-}) {
+/**
+ * 연락처(C-401, #183). 저장된 번호가 미리 채워져 있고 그 칸을 바로 고친다. 번호를 끝까지 치면 저장된다(usePhoneAutoSave).
+ * 내 정보(J9)와 같은 규칙으로 저장한다
+ */
+function PhoneField({ phone }: { phone: PhoneAutoSave }) {
   const helpId = useId();
-  const [editing, setEditing] = useState(phone === null);
-  const [value, setValue] = useState(phone ?? '');
-  const [error, setError] = useState<string | null>(null);
-  // 화면 확인에서 틀린 번호면 입력칸에 빨간 테두리. 다시 고치기 시작하면 지운다
-  const [invalid, setInvalid] = useState(false);
-  const [saving, startSaving] = useTransition();
-  const showInput = editing || phone === null;
-
-  function save() {
-    const parsed = customerPhoneSchema.safeParse(value);
-    if (!parsed.success || parsed.data === null) {
-      setError(parsed.success ? '휴대폰 번호를 입력해 주세요' : parsed.error.issues[0]?.message);
-      setInvalid(true);
-      return;
-    }
-    setError(null);
-    setInvalid(false);
-    startSaving(async () => {
-      try {
-        const result = await updateMyPhone(value);
-        if (!result.ok) {
-          setError(result.error.message);
-          return;
-        }
-        setValue(result.data.phone);
-        setEditing(false);
-        onSaved(result.data.phone);
-      } catch (caught) {
-        unstable_rethrow(caught);
-        setError('저장하지 못했어요. 잠시 후 다시 시도해 주세요');
-      }
-    });
-  }
-
   return (
     <section className="flex flex-col gap-1.5" aria-label="연락처">
       <h2 className="text-sm font-semibold">연락처</h2>
-      {showInput ? (
-        <div className="flex gap-2">
-          <Input
-            // 공통 Input은 h-9·text-sm이다. 내 정보 화면과 같게 조금 크게 쓴다
-            className="h-11 flex-1 text-base"
-            value={value}
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            placeholder="010-1234-5678"
-            aria-label="휴대폰 번호"
-            aria-describedby={helpId}
-            aria-invalid={invalid || undefined}
-            onChange={(e) => {
-              setValue(e.target.value);
-              setInvalid(false);
-            }}
-          />
-          <Button type="button" variant="outline" className="h-11" disabled={saving} onClick={save}>
-            {saving ? '저장 중…' : '저장'}
-          </Button>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between">
-          <p>{phone}</p>
-          <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)}>
-            바꾸기
-          </Button>
-        </div>
-      )}
-      {error ? (
+      <PhoneInput
+        // 공통 Input은 h-9·text-sm이다. 내 정보 화면과 같게 조금 크게 쓴다
+        className="h-11 text-base"
+        value={phone.value}
+        aria-label="휴대폰 번호"
+        aria-describedby={helpId}
+        aria-invalid={phone.invalid || undefined}
+        onValueChange={phone.change}
+        onBlur={phone.blur}
+      />
+      {phone.error ? (
         <p id={helpId} role="alert" className="text-sm text-destructive">
-          {error}
+          {phone.error}
         </p>
       ) : (
-        <p id={helpId} className="text-xs text-muted-foreground">
-          예약 확인과 노쇼 연락에만 써요.
+        <p id={helpId} aria-live="polite" className="flex items-center gap-1 text-xs">
+          {phone.saving ? (
+            <span className="text-muted-foreground">저장하는 중…</span>
+          ) : phone.justSaved ? (
+            <span className="flex items-center gap-1 text-primary">
+              <Check className="size-3.5" aria-hidden />
+              저장했어요
+            </span>
+          ) : (
+            <span className="text-muted-foreground">예약 확인과 노쇼 연락에만 써요.</span>
+          )}
         </p>
       )}
     </section>
