@@ -74,5 +74,18 @@ describe('정산 계좌 검사 (S-107)', () => {
       'accountNumber',
       'bankCode',
     ]);
+    // 빈 칸 문구의 조사는 받침에 맞춘다("예금주을(를)"이 아니라)
+    expect(result.ok === false && result.fieldErrors.accountHolder).toBe('예금주를 입력해 주세요');
+  });
+
+  it('빈 상호·대표자명 문구도 받침에 맞춘 조사', () => {
+    const result = validateBusinessInput(
+      { ...business, businessName: ' ', representativeName: '' },
+      TODAY,
+    );
+    expect(result.ok === false && result.fieldErrors).toMatchObject({
+      businessName: '상호를 입력해 주세요',
+      representativeName: '대표자명을 입력해 주세요',
+    });
   });
 });

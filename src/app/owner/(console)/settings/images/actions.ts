@@ -4,6 +4,7 @@
 // 사진은 화면이 강규민님 업로드 주소(createShopImageUploadUrl)로 Storage에 직접 올린 뒤 saveShopImage로 정보를 저장한다(#47, D6).
 // 승인 전에도 사진·링크를 입력할 수 있다(#23 D11).
 
+import { TransactionRollbackError } from 'drizzle-orm';
 import { refresh } from 'next/cache';
 import { z } from 'zod';
 
@@ -73,9 +74,18 @@ export async function moveShopImage(
   if (!isUuid(imageId) || (direction !== 'up' && direction !== 'down')) {
     return fail('IMAGE_NOT_FOUND', SHOP_IMAGE_ERRORS.NOT_FOUND);
   }
-  if (!(await moveStyleImage(getDb(), shopId, imageId, direction))) {
-    return fail('IMAGE_NOT_FOUND', SHOP_IMAGE_ERRORS.NOT_FOUND);
+  // 순서를 0부터 다시 매기는 여러 줄을 한 트랜잭션으로 고친다(메뉴 순서 바꾸기와 같게).
+  // 빠르게 두 번 누르거나 중간에 실패해도 순서가 겹치거나 반만 바뀌지 않는다
+  let moved = false;
+  try {
+    await getDb().transaction(async (tx) => {
+      moved = await moveStyleImage(tx, shopId, imageId, direction);
+      if (!moved) tx.rollback();
+    });
+  } catch (error) {
+    if (!(error instanceof TransactionRollbackError)) throw error;
   }
+  if (!moved) return fail('IMAGE_NOT_FOUND', SHOP_IMAGE_ERRORS.NOT_FOUND);
   refresh();
   return ok(null);
 }

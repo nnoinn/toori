@@ -19,6 +19,7 @@ import { formatKst, kstDateKey, utcToKst } from '@/lib/time';
 import { DISCOUNT_RATE_OPTIONS, type DiscountRate, PUBLISH_WINDOW_HOURS } from '@/server/policy';
 import { previewSettlement, type SettlementPreview } from '@/server/settlements';
 
+import { withObjectParticle } from '../../../korean';
 import { formatMinutes, serviceTypeLabel } from '../../settings/menu/menu';
 import { checkSlotEdit, updateSlot } from '../actions';
 import { checkSlotDraft, createSlot } from './actions';
@@ -295,8 +296,8 @@ export function SlotCreateForm({
             </div>
             {openStarts.length === 0 ? (
               <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
-                이 날은 영업시간 안에 {menu.name}을(를) 끝낼 수 있는 시각이 없어요. 다른 날을 골라
-                주세요.
+                이 날은 영업시간 안에 {withObjectParticle(menu.name)} 끝낼 수 있는 시각이 없어요.
+                다른 날을 골라 주세요.
               </p>
             ) : null}
             <div className="grid grid-cols-6 gap-2">
