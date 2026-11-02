@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Textarea } from '@/components/ui/textarea';
 import type { GeocodeCandidate } from '@/features/map/geocode';
 import { SHOP_CATEGORIES } from '@/server/policy/catalog';
@@ -213,13 +214,13 @@ export function ShopProfileForm({
           </fieldset>
 
           <Field label="전화번호" field="phone" error={errors.phone}>
-            <Input
+            {/* 숫자만 쳐도 앞자리(02·031·0507 등)에 맞춰 하이픈을 넣는다(#205) */}
+            <PhoneInput
               {...fieldProps('phone')}
-              type="tel"
-              inputMode="tel"
-              placeholder="031-123-4567"
+              kind="any"
+              autoComplete="off"
               value={form.phone}
-              onChange={(event) => update('phone', event.target.value)}
+              onValueChange={(value) => update('phone', value)}
               className="max-w-60"
             />
           </Field>

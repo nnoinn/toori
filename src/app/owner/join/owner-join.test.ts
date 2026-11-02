@@ -10,7 +10,8 @@ const filled: OwnerJoinForm = {
   ownerPhone: '01012345678',
   businessName: '테스트 미용실',
   representativeName: '테스트 원장',
-  businessRegistrationNumber: '123-45-67890',
+  // 검증번호가 맞는 가짜 번호(#205, 만드는 법은 src/lib/business-number.test.ts)
+  businessRegistrationNumber: '123-45-67891',
   openedOn: '2026-01-01',
   businessDocPath: 'users/user-1/doc.jpg',
   shopName: '테스트 미용실 안산점',
@@ -38,7 +39,7 @@ describe('원장님 가입 입력 검사 (S-101·S-107)', () => {
         shop: {
           businessName: '테스트 미용실',
           representativeName: '테스트 원장',
-          businessRegistrationNumber: '1234567890',
+          businessRegistrationNumber: '1234567891',
           openedOn: '2026-01-01',
           businessDocPath: 'users/user-1/doc.jpg',
           name: '테스트 미용실 안산점',
