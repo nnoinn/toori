@@ -116,7 +116,9 @@ export function HomeExplorer({ center, myLocation, header, sort, serverNow }: Ho
             </button>
           ) : null}
         </div>
-        <div className="flex-1 overflow-y-auto pb-4">
+        {/* relative: 카드 안의 화면 낭독용 글자(sr-only, 위치 absolute)가 목록 밖 페이지 높이를 늘리지 않게 한다.
+            없으면 목록이 차면 페이지 스크롤바가 생겨 지도 폭이 바뀌고, 다시 불러오는 동안 사라지기를 끝없이 되풀이한다(#199) */}
+        <div className="relative flex-1 overflow-y-auto pb-4">
           <SlotList
             items={home.items}
             serverNow={home.serverNow ?? serverNow}

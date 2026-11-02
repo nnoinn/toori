@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addHours,
   addMinutes,
+  formatHourLabel,
   formatKst,
   hoursUntil,
   kstToUtc,
@@ -62,5 +63,15 @@ describe('남은 시간 계산', () => {
 
   it('이미 지났으면 음수다', () => {
     expect(hoursUntil(addHours(now, -2), now)).toBe(-2);
+  });
+});
+
+describe('formatHourLabel', () => {
+  it('하루 중 시각을 문구로', () => {
+    expect(formatHourLabel(13)).toBe('오후 1시');
+    expect(formatHourLabel(21)).toBe('밤 9시');
+    expect(formatHourLabel(8)).toBe('아침 8시');
+    expect(formatHourLabel(12)).toBe('오후 12시');
+    expect(formatHourLabel(0)).toBe('밤 12시');
   });
 });

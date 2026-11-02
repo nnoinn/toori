@@ -59,6 +59,7 @@ vi.mock('./account-store', async (importOriginal) => {
 });
 
 const ALL_REQUIRED = { age14: true, service: true, privacy: true, location: true } as const;
+const PHONE = '010-1234-5678';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -75,12 +76,14 @@ describe('createCustomerAccount', () => {
     await expect(
       createCustomerAccount({
         agreements: { ...ALL_REQUIRED, marketing: true },
+        phone: PHONE,
         next: '/slots/a',
       }),
     ).rejects.toThrow('redirect:/slots/a');
     expect(state.saveCustomerAccount).toHaveBeenCalledWith('tx', {
       userId: 'user-1',
       nickname: '김투리',
+      phone: PHONE,
       marketing: true,
     });
     expect(state.cookieSet).toHaveBeenCalledWith(
@@ -93,11 +96,12 @@ describe('createCustomerAccount', () => {
   it('프로필 이름이 없으면 기본 닉네임, 돌아갈 주소가 없거나 다른 사이트면 홈으로', async () => {
     state.user = { userId: 'user-1', name: null };
     await expect(
-      createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: false } }),
+      createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: false }, phone: PHONE }),
     ).rejects.toThrow('redirect:/');
     expect(state.saveCustomerAccount).toHaveBeenCalledWith('tx', {
       userId: 'user-1',
       nickname: '고객',
+      phone: PHONE,
       marketing: false,
     });
 
@@ -119,6 +123,52 @@ describe('createCustomerAccount', () => {
       expect(state.saveCustomerAccount).not.toHaveBeenCalled();
     },
   );
+
+  it.each(['01012345678', ' 010 1234 5678 ', '010-1234-5678'])(
+    '번호(%s)를 저장 모양으로 맞춰 저장한다',
+    async (phone) => {
+      await expect(
+        createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: false }, phone }),
+      ).rejects.toThrow('redirect:/');
+      expect(state.saveCustomerAccount).toHaveBeenCalledWith(
+        'tx',
+        expect.objectContaining({ phone: PHONE }),
+      );
+    },
+  );
+
+  it.each(['', '   '])('번호가 비었으면(%j) PHONE_REQUIRED이고 저장하지 않는다', async (phone) => {
+    const result = await createCustomerAccount({
+      agreements: { ...ALL_REQUIRED, marketing: false },
+      phone,
+    });
+    expect(result).toEqual(fail('PHONE_REQUIRED', '휴대폰 번호를 입력해 주세요'));
+    expect(state.saveCustomerAccount).not.toHaveBeenCalled();
+  });
+
+  it.each(['010-1234', '010-1234-56789', '031-123-4567', '010-abcd-5678'])(
+    '휴대폰 번호 모양이 아니면(%s) INVALID_INPUT이고 저장하지 않는다',
+    async (phone) => {
+      const result = await createCustomerAccount({
+        agreements: { ...ALL_REQUIRED, marketing: false },
+        phone,
+      });
+      expect(result).toEqual(
+        fail('INVALID_INPUT', '휴대폰 번호를 확인해 주세요. 예: 010-1234-5678'),
+      );
+      expect(state.saveCustomerAccount).not.toHaveBeenCalled();
+    },
+  );
+
+  it('번호 칸이 생기기 전 화면처럼 번호를 보내지 않으면 번호 없이 저장한다(#183, 임시)', async () => {
+    await expect(
+      createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: false } }),
+    ).rejects.toThrow('redirect:/');
+    expect(state.saveCustomerAccount).toHaveBeenCalledWith(
+      'tx',
+      expect.objectContaining({ phone: null }),
+    );
+  });
 
   it('입력 모양이 틀리면 INVALID_INPUT', async () => {
     const result = await createCustomerAccount({ agreements: { service: true } } as never);

@@ -1,4 +1,4 @@
-// 결제 확인 저장 (X-201, C-406, W11 ②). 서버에서만 부른다. 결제 확인(confirmPayment)과 웹훅(W13)이 같이 쓴다.
+// 결제 확인 저장 (X-201, C-406, W11 ②·W12). 서버에서만 부른다. settlePaidOrder(결제 확인, 웹훅 W13)가 쓴다.
 // 포트원에서 결제 완료(PAID)와 금액을 확인한 뒤, 주문·매물 줄을 잠그고 한 트랜잭션으로 예약을 확정한다.
 // 같은 주문을 동시에 두 번 확인해도(새로고침, 웹훅) 주문 줄 잠금 때문에 예약은 하나만 생긴다.
 
@@ -7,9 +7,9 @@ import 'server-only';
 import { and, DrizzleQueryError, eq } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
-import { type OrderStatus, orders, reservations, slots } from '@/db/schema';
+import { type OrderStatus, orders, refunds, reservations, slots } from '@/db/schema';
 
-import type { UnconfirmedCode } from './errors';
+import { toUnconfirmedCode, type UnconfirmedCode } from './errors';
 import { newReservationCode } from './reservation-code';
 
 type Db = ReturnType<typeof getDb>;
@@ -66,7 +66,7 @@ export async function readMyOrder(
 }
 
 export type OrderOutcome = {
-  /** failed: 결제가 안 됨(실패·취소). paid: 결제는 됐지만 확정하지 못함(W12에서 자동 취소) */
+  /** failed: 결제가 안 됨(실패·취소). paid: 결제는 됐지만 확정하지 못함(이어서 자동 취소) */
   status: Extract<OrderStatus, 'failed' | 'paid'>;
   pgStatus: string;
   payMethod?: string | null;
@@ -100,14 +100,13 @@ export type ConfirmOutcome =
   | { ok: true; reservationId: string; reservationCode: string }
   | { ok: false; code: UnconfirmedCode };
 
-const UNCONFIRMED_CODES: readonly string[] = ['HOLD_EXPIRED', 'AMOUNT_MISMATCH', 'SLOT_SOLD'];
 const RESERVATION_CODE_TRIES = 5;
 
 /**
  * 결제 완료(PAID)·금액이 확인된 주문을 예약으로 확정한다. 트랜잭션 안에서 부른다.
  * 홀딩한 사람이 이 고객이고, 결제 시각이 홀딩 만료 전이고, 매물이 아직 안 팔렸을 때만
  * 예약 만들기 + 주문 확정 + 매물 '예약됨' + 홀딩 비우기를 한 번에 한다.
- * 확정할 수 없으면 주문을 '결제 확인'(paid)으로 두고 이유를 기록한다(W12에서 포트원 자동 취소).
+ * 확정할 수 없으면 주문을 '결제 확인'(paid)으로 두고 이유를 기록한다(이어서 autoCancelOrder가 취소한다).
  * 이미 확정된 주문이면 그 예약을 그대로 돌려준다
  */
 export async function confirmPaidOrder(
@@ -136,10 +135,7 @@ export async function confirmPaidOrder(
   }
   if (order.status !== 'pending') {
     // 다른 요청이 먼저 '확정 못 함'으로 기록했다
-    const code = UNCONFIRMED_CODES.includes(order.failureCode ?? '')
-      ? (order.failureCode as UnconfirmedCode)
-      : 'SLOT_SOLD';
-    return { ok: false, code };
+    return { ok: false, code: toUnconfirmedCode(order.failureCode) };
   }
 
   const [slot] = await tx
@@ -184,6 +180,40 @@ export async function confirmPaidOrder(
     .set({ status: 'reserved', holdCustomerId: null, holdExpiresAt: null })
     .where(eq(slots.id, order.slotId));
   return { ok: true, ...reservation };
+}
+
+/**
+ * 포트원 취소가 끝난 결제 확인(paid) 주문을 자동 취소로 기록하고 환불 기록을 남긴다(C-406). 트랜잭션 안에서 부른다.
+ * 예약을 만들기 전의 취소라 예약 칸은 비어 있고, 전액 환불·위약금 0이다. 실패 코드는 화면이 이유를 보여 주도록 그대로 둔다.
+ * 주문 줄을 조건부로 바꾸므로 동시에 두 번 불러도 환불 기록은 한 줄이다. 기록했으면 true.
+ * TODO(#15 쿠폰 C-407): 쿠폰을 쓴 주문의 자동 취소 때 쿠폰을 돌려줄지 3단계에서 정한다
+ */
+export async function recordAutoCancel(
+  tx: Tx,
+  input: {
+    orderId: string;
+    /** 포트원이 알려 준 실제 환불액. 모르면 주문의 결제액 */
+    refundAmount: number | null;
+    pgCancellationId: string | null;
+    now: Date;
+  },
+): Promise<boolean> {
+  const [order] = await tx
+    .update(orders)
+    .set({ status: 'auto_cancelled', pgStatus: 'CANCELLED' })
+    .where(and(eq(orders.id, input.orderId), eq(orders.status, 'paid')))
+    .returning({ amount: orders.amount });
+  if (!order) return false;
+  await tx.insert(refunds).values({
+    orderId: input.orderId,
+    reason: 'auto_cancel',
+    penaltyRate: 0,
+    refundAmount: input.refundAmount ?? order.amount,
+    penaltyAmount: 0,
+    pgCancellationId: input.pgCancellationId,
+    processedAt: input.now,
+  });
+  return true;
 }
 
 /** 예약번호가 우연히 겹치면(reservations_code_unique) 새 번호로 다시 넣는다. savepoint라 바깥 트랜잭션은 그대로다 */

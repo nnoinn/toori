@@ -5,6 +5,7 @@ import { useId, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PhoneInput } from '@/components/ui/phone-input';
 
 import { updateMyProfile } from './actions';
 import { NICKNAME_MAX_LENGTH, profileSchema } from './profile-rules';
@@ -76,17 +77,14 @@ export function ProfileForm({ nickname, phone }: { nickname: string; phone: stri
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor={`${id}-phone`}>연락처</Label>
-        <Input
+        {/* 숫자만 쳐도 하이픈이 붙는다(#183). 닉네임과 같이 저장하는 화면이라 저장은 [저장]으로 */}
+        <PhoneInput
           id={`${id}-phone`}
           className={FIELD_SIZE}
           value={values.phone}
-          type="tel"
-          inputMode="tel"
-          autoComplete="tel"
-          placeholder="010-1234-5678"
           aria-describedby={`${id}-phone-help`}
           aria-invalid={invalidField === 'phone' || undefined}
-          onChange={(e) => change('phone', e.target.value)}
+          onValueChange={(value) => change('phone', value)}
         />
         <p id={`${id}-phone-help`} className="text-xs text-muted-foreground">
           예약 확인과 노쇼 연락에만 써요. 예약하기 전에 꼭 입력해 주세요.

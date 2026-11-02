@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { CalendarX2, ClipboardCheck } from 'lucide-react';
+import { CalendarX2, ClipboardCheck, Lock } from 'lucide-react';
 import { z } from 'zod';
 
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import { formatWon } from '@/lib/format';
 import { getRequestNow } from '@/lib/request-time';
 import { formatKst } from '@/lib/time';
 import { ensureOwnerPage } from '@/server/auth';
+import { canRecordVisit } from '@/server/visits/rules';
 
 import { formatMinutes, serviceTypeLabel } from '../../settings/menu/menu';
 import { timeLabel } from '../../slots/new/slot-time';
@@ -27,6 +28,7 @@ import {
   showsFullPhone,
 } from '../reservation-detail';
 import { type OwnerReservation, selectOwnerReservation } from '../reservation-detail-store';
+import { VisitActions } from './visit-actions';
 
 export const metadata: Metadata = { title: '예약 상세' };
 
@@ -43,7 +45,7 @@ const VIEW_STYLE: Record<ReservationView, string> = {
 
 // 원장님 예약 상세 (O11, S-403). 주소: /owner/reservations/[reservationId]
 // 예약번호·예약자(닉네임·휴대폰)·서비스·시간·결제 금액(판매가). 그 샵 원장님만 본다. PC 기준
-// 방문 완료·노쇼 버튼은 O14, 원장님 사정으로 취소는 O18(P1)에서 넣는다.
+// 시작이 지났고 처리하지 않은 예약은 [방문 완료]·[노쇼](O14, S-405). 원장님 사정으로 취소는 O18(P1)에서 넣는다.
 export default function OwnerReservationPage({ params }: { params: Params }) {
   return (
     <main className="flex w-full max-w-4xl flex-1 flex-col gap-4 p-6">
@@ -79,11 +81,16 @@ async function ReservationContent({ params }: { params: Params }) {
           </div>
           <Badge className={VIEW_STYLE[view]}>{RESERVATION_VIEW_LABELS[view]}</Badge>
         </CardHeader>
-        {view === 'upcoming' || view === 'needsVisit' ? (
+        {view === 'cancelled' ? null : (
           <CardContent>
             <ViewNotice view={view} />
           </CardContent>
-        ) : null}
+        )}
+        <VisitActions
+          reservationId={reservation.id}
+          canRecord={canRecordVisit(reservation, now)}
+          summary={`${formatKst(reservation.startAt)} ${reservation.menuName} · 예약번호 ${reservation.code}`}
+        />
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -102,8 +109,20 @@ async function ReservationContent({ params }: { params: Params }) {
   );
 }
 
-/** 시작 전에는 다른 채널에서 시간 막기(D16), 시작이 지났으면 방문·노쇼 처리 안내 */
-function ViewNotice({ view }: { view: 'upcoming' | 'needsVisit' }) {
+/** 시작 전에는 다른 채널에서 시간 막기(D16), 시작이 지났으면 방문·노쇼 처리 안내, 처리한 뒤에는 바꿀 수 없다는 안내 */
+function ViewNotice({ view }: { view: Exclude<ReservationView, 'cancelled'> }) {
+  if (view === 'visited' || view === 'noShow') {
+    // 처리한 뒤 원장님은 바꿀 수 없고 운영자가 고친다(A-104, #130)
+    return (
+      <div className="flex gap-2 rounded-lg bg-muted p-3 text-sm">
+        <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
+        <div className="flex flex-col gap-0.5">
+          <p className="font-semibold">처리한 예약은 바꿀 수 없어요</p>
+          <p className="text-muted-foreground">잘못 처리했으면 운영자에게 문의해 주세요.</p>
+        </div>
+      </div>
+    );
+  }
   if (view === 'upcoming') {
     return (
       <div className="flex gap-2 rounded-lg bg-muted p-3 text-sm">
@@ -123,7 +142,7 @@ function ViewNotice({ view }: { view: 'upcoming' | 'needsVisit' }) {
       <div className="flex flex-col gap-0.5">
         <p className="font-semibold">서비스 시작이 지났어요</p>
         <p className="text-muted-foreground">
-          방문 완료·노쇼를 처리해야 정산이 진행돼요. 처리 버튼은 준비 중이에요.
+          고객이 왔으면 방문 완료, 오지 않았으면 노쇼로 처리해 주세요. 처리해야 정산이 진행돼요.
         </p>
       </div>
     </div>
