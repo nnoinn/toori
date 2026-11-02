@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { MENU_DURATION_STEP_MINUTES } from '@/server/policy';
 
 import {
-  formatMinutes,
   isServiceTypeOf,
   MENU_DURATION_OPTIONS,
   type MenuInput,
@@ -27,17 +26,6 @@ describe('MENU_DURATION_OPTIONS', () => {
     expect(
       MENU_DURATION_OPTIONS.every((minutes) => minutes % MENU_DURATION_STEP_MINUTES === 0),
     ).toBe(true);
-  });
-});
-
-describe('formatMinutes', () => {
-  it.each([
-    [40, '40분'],
-    [60, '1시간'],
-    [90, '1시간 30분'],
-    [480, '8시간'],
-  ])('%i분 → %s', (minutes, text) => {
-    expect(formatMinutes(minutes)).toBe(text);
   });
 });
 

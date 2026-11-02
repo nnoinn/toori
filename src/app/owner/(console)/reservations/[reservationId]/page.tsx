@@ -11,14 +11,13 @@ import { Price } from '@/components/ui/price';
 import { SlotBadges } from '@/components/ui/slot-badge';
 import { EmptyState, LoadingCards } from '@/components/ui/state';
 import { getDb } from '@/db';
-import { formatWon } from '@/lib/format';
+import { formatDuration, formatWon } from '@/lib/format';
 import { getRequestNow } from '@/lib/request-time';
-import { formatKst } from '@/lib/time';
+import { formatKst, formatKstTime } from '@/lib/time';
 import { ensureOwnerPage } from '@/server/auth';
 import { canRecordVisit } from '@/server/visits/rules';
 
-import { formatMinutes, serviceTypeLabel } from '../../settings/menu/menu';
-import { timeLabel } from '../../slots/new/slot-time';
+import { serviceTypeLabel } from '../../settings/menu/menu';
 import {
   CANCEL_ACTOR_LABELS,
   maskPhone,
@@ -76,7 +75,7 @@ async function ReservationContent({ params }: { params: Params }) {
             <p className="text-sm text-muted-foreground">예약번호</p>
             <p className="text-2xl font-bold tracking-wider tabular-nums">{reservation.code}</p>
             <p className="text-sm">
-              {formatKst(reservation.startAt)} ~ {timeLabel(reservation.endAt)}
+              {formatKst(reservation.startAt)} ~ {formatKstTime(reservation.endAt)}
             </p>
           </div>
           <Badge className={VIEW_STYLE[view]}>{RESERVATION_VIEW_LABELS[view]}</Badge>
@@ -196,7 +195,7 @@ function ServiceCard({ reservation }: { reservation: OwnerReservation }) {
         <div className="flex flex-col gap-1">
           <span className="text-muted-foreground">
             {serviceTypeLabel(reservation.serviceType)} ·{' '}
-            {formatMinutes(reservation.durationMinutes)}
+            {formatDuration(reservation.durationMinutes)}
           </span>
           <span className="font-medium">{reservation.menuName}</span>
           <SlotBadges kinds={reservation.newCustomerOnly ? ['newCustomerOnly'] : []} />
@@ -214,7 +213,7 @@ function ServiceCard({ reservation }: { reservation: OwnerReservation }) {
           </span>
         </div>
         <p className="text-xs text-muted-foreground">
-          판매가 기준이에요. 고객이 쿠폰을 써도 정산은 이 금액으로 해요.
+          판매가 기준이에요. 고객이 쿠폰을 써도 정산은 이 금액을 기준으로 계산해요.
         </p>
       </CardContent>
     </Card>

@@ -25,14 +25,6 @@ export const MENU_DURATION_OPTIONS: readonly number[] = Array.from(
   (_, index) => (index + 1) * MENU_DURATION.step,
 );
 
-/** 소요 시간을 화면용으로. 예: 60 → "1시간", 90 → "1시간 30분", 40 → "40분" */
-export function formatMinutes(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  if (hours === 0) return `${rest}분`;
-  return rest === 0 ? `${hours}시간` : `${hours}시간 ${rest}분`;
-}
-
 /** 그 업종에서 고를 수 있는 서비스 종류 */
 export function serviceTypesOf(category: ShopCategory) {
   return SERVICE_TYPES_BY_CATEGORY[category];

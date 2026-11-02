@@ -18,9 +18,13 @@ type Db = Pick<ReturnType<typeof getDb>, 'transaction'>;
 
 export type CreatedSlot = { slotId: string; salePrice: number };
 
+/** 재등록(O13, S-408)으로 만드는 매물이면 원래(취소된) 매물 */
+export type CreateSlotOptions = { relistedFromSlotId?: string };
+
 /**
  * ①②③ 고른 값으로 매물을 저장한다. 지금은 48시간 안의 시각만 고를 수 있어서 바로 게시중으로 저장한다
- * (미리 만들어 두는 예약 게시 S-205는 P1). 메뉴 값은 등록 당시 값을 복사한다(D12)
+ * (미리 만들어 두는 예약 게시 S-205는 P1). 메뉴 값은 등록 당시 값을 복사한다(D12).
+ * 취소 시간대 재등록(relist-store.ts)도 같은 확인을 거치도록 이 함수를 쓰고, 원래 매물을 relistedFromSlotId로 넘긴다
  */
 export async function createSlotInDb(
   db: Db,
@@ -28,6 +32,7 @@ export async function createSlotInDb(
   createdBy: string,
   input: unknown,
   now: Date,
+  { relistedFromSlotId }: CreateSlotOptions = {},
 ): Promise<Result<CreatedSlot>> {
   const pricing = parseSlotPricing(input);
   if (!pricing) return fail('INVALID_DISCOUNT_RATE', SLOT_PRICING_ERROR);
@@ -55,6 +60,7 @@ export async function createSlotInDb(
           endAt: end,
           publishAt: now,
           status: 'published',
+          relistedFromSlotId,
           createdBy,
         })
         .returning({ id: slots.id });
