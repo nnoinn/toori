@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { maskPhone, reservationView, showsFullPhone } from './reservation-detail';
+import {
+  maskPhone,
+  reservationView,
+  showsFullPhone,
+  VISIT_ACTIONS,
+  visitFailShowsNewState,
+} from './reservation-detail';
 
 const startAt = new Date('2026-11-01T14:00:00+09:00');
 const before = new Date('2026-11-01T13:59:00+09:00');
@@ -35,5 +41,20 @@ describe('원장님 예약 상세 (O11, S-403)', () => {
     expect(maskPhone('010-123-5678')).toBe('010-***-5678');
     // 하이픈 모양이 아니면 뒷자리 4개만
     expect(maskPhone('01012345678')).toBe('****5678');
+  });
+});
+
+describe('방문 완료·노쇼 처리 (O14, S-405·S-406)', () => {
+  it('노쇼 확인 창만 결제 금액이 환불되지 않는다고 알린다', () => {
+    expect(VISIT_ACTIONS.no_show.consequence).toContain('환불되지 않고');
+    expect(VISIT_ACTIONS.visited.consequence).toBeNull();
+  });
+
+  it('그 사이 처리됐거나 취소됐으면 화면을 다시 받고, 다른 실패는 문구만 보여준다', () => {
+    expect(visitFailShowsNewState('ALREADY_RECORDED')).toBe(true);
+    expect(visitFailShowsNewState('NOT_RESERVED')).toBe(true);
+    expect(visitFailShowsNewState('TOO_EARLY')).toBe(false);
+    expect(visitFailShowsNewState('RESERVATION_NOT_FOUND')).toBe(false);
+    expect(visitFailShowsNewState('UNAUTHENTICATED')).toBe(false);
   });
 });

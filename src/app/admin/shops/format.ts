@@ -3,12 +3,7 @@
 import type { PgSellerStatus } from '@/db/schema/shops';
 import { SHOP_CATEGORIES } from '@/server/policy';
 
-/** 사업자등록번호 10자리 → 000-00-00000. 저장은 숫자 10자리(#117) */
-export function formatBusinessNumber(digits: string): string {
-  return /^\d{10}$/.test(digits)
-    ? `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`
-    : digits;
-}
+// 사업자등록번호 모양(formatBusinessNumber)은 원장님 화면과 같이 쓰려고 '@/lib/business-number'로 옮겼다(#205, #213)
 
 export function labelCategory(key: string): string {
   return SHOP_CATEGORIES.find((category) => category.key === key)?.label ?? key;

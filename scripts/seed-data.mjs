@@ -294,6 +294,20 @@ export const SEED_SHOPS = [
  * b: 원장님 A 샵 이용 완료·노쇼 이력 있음 → A 샵의 신규 고객 전용 매물이 안 보여야 한다
  * c: 예정·이용 완료·취소 예약이 하나씩(내 예약 탭)
  */
+/**
+ * 계속 쓰는 시험 매물(11/2). 위 매물은 시드를 넣는 시각 기준이라 이틀쯤 지나면 대부분 지나간다.
+ * 그래서 매물이 있는 승인된 샵마다 넣은 날(한국 날짜)로부터 fromDay~toDay일째의 times시(쉬는 요일 제외)에
+ * 예약대기 매물을 더 넣는다. 게시 시각(시작 48시간 전)이 되면 차례로 게시중이 되어 3주 동안 예약해 볼 매물이 이어진다.
+ * fromDay는 위 매물(최대 72시간 뒤)과 시간이 겹치지 않게 4일째부터다. 메뉴·할인율은 돌아가며 쓰고 newOnlyEvery번째마다 신규 고객 전용
+ */
+export const ROLLING_SLOTS = {
+  fromDay: 4,
+  toDay: 21,
+  times: [11, 15],
+  rates: [10, 20, 30, 40, 50],
+  newOnlyEvery: 7,
+};
+
 export const SEED_CUSTOMERS = [
   { key: 'a', nickname: '샘플 고객 A' },
   { key: 'b', nickname: '샘플 고객 B' },

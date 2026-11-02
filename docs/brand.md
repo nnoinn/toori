@@ -53,6 +53,7 @@ import { Logo } from '@/components/ui/logo';
 | `wordmark/toori-wordmark-{light\|dark}.svg`, `-{512\|1024\|2048}.png` | 글자 로고. 투명 바탕이고 여백 없이 잘려 있어요 |
 | `app-icon/toori-app-icon-{light\|dark}.svg`, `-{1024…128}.png` | 둥근 모서리 앱 아이콘. 모서리 밖은 투명이에요(발표 자료, 화면 안 표시) |
 | `app-icon/toori-app-icon-{light\|dark}-square.svg`, `-square-{1024\|512}.png` | 모서리 없는 정사각형. 앱 스토어와 OS에 올리는 원본이에요(1024는 App Store, 512는 Google Play) |
+| `app-icon/toori-app-icon-gray.svg`, `-gray-{512…128}.png`, `-gray-square.svg`, `-gray-square-{512\|192}.png` | 회색 앱 아이콘. 지금 들어와 있지 않은 계정의 알림에만 써요(아래 "다른 계정 알림 아이콘") |
 | `web/favicon.svg`, `favicon.ico`, `favicon-{light\|dark}-{16\|32\|48}.png` | 브라우저 탭 아이콘 |
 | `web/apple-touch-icon-{light\|dark}.png` | 아이폰 홈 화면(180) |
 | `web/pwa-icon-{light\|dark}-{192\|512}.png` | PWA 아이콘(정사각형, maskable 가능) |
@@ -82,10 +83,22 @@ import { Logo } from '@/components/ui/logo';
 | `cover-{light\|dark}-1280x640.png` | 깃허브 저장소 대표 이미지(Settings → Social preview) |
 | `cover-{light\|dark}-1200x630.png` | 링크 미리보기 이미지. 앱은 `src/app/opengraph-image.png`(라이트)를 써서, 카톡에 링크를 붙이면 이 그림이 보여요 |
 
+## 다른 계정 알림 아이콘(회색)
+
+- 한 기기에서 고객·원장님 알림을 모두 받을 때, 지금 들어와 있지 않은 계정의 알림에 써요(11/1 결정, #131).
+- 꺼진 느낌이 나는 회색으로 만들었어요(11/2, 후보 4가지 중 G3).
+  - 모양과 크기는 흰 앱 아이콘(`-light`)과 같고 색만 달라요.
+  - 칸 `#F5F5F5`, 글자 `#737373`, i 점 `#A3A3A3`예요. 앱의 회색(`muted`, `muted-foreground`)과 같은 줄이에요.
+- 지금 계정 알림의 아이콘과 같은 모양끼리 짝을 맞춰 써요.
+  - 둥근 모서리: `app-icon/toori-app-icon-light-192.png` ↔ `app-icon/toori-app-icon-gray-192.png`
+  - 정사각형: `web/pwa-icon-light-192.png` ↔ `app-icon/toori-app-icon-gray-square-192.png`
+- 아이폰은 알림마다 아이콘을 바꾸지 못할 수 있어요. 그래서 제목 앞 `[원장님]`·`[고객]`으로도 구분해요.
+- 알림 말고 다른 곳에는 쓰지 않아요.
+
 ## 쓰는 규칙
 
 - 비율 그대로 써요. 늘리거나 누르지 않아요.
-- 색을 바꾸지 않아요.
+- 색을 바꾸지 않아요. 다른 계정 알림의 회색 아이콘만 예외예요.
   - 글자는 검정 또는 흰색만 써요.
   - i 점은 언제나 초록이에요.
   - 초록 바탕 위에는 쓰지 않아요. i 점이 안 보여요.

@@ -32,6 +32,7 @@ Claude는 코드를 만들거나 고칠 때 이 문서를 따른다. 1장은 정
 - 서비스 이름은 '투리'다(10/12 확정). 화면에 이름을 직접 쓰지 않고 공통 설정값(`src/lib/site.ts`의 `SITE_NAME`)을 가져다 쓴다
 - 브랜드 색(초록 계열)과 글꼴(Pretendard)은 10/12에 정했다. 색은 공통 UI의 색 이름(테마 토큰: `bg-primary`, `bg-secondary`, `bg-accent`, `bg-background`, `bg-card`)만 쓰고, 색 코드(`#10B981`)를 화면 코드에 직접 쓰지 않는다. 색 값은 `src/app/globals.css` 한 곳에만 있다
 - 로고는 10/28에 정했다(Fredoka SemiBold 글자 `toori` + 초록 i 점). 화면에는 공통 UI `Logo`(`src/components/ui/logo.tsx`)만 쓰고, 글자 `toori`를 직접 쓰거나 로고 이미지를 새로 만들지 않는다. 로고 파일(앱 아이콘, SNS 이미지 등)은 `public/brand/`에 있다(`docs/brand.md`)
+- 번호 입력칸(휴대폰·전화번호, 사업자등록번호, 계좌번호 등)은 숫자만 받고, 양식의 자릿수를 넘으면 더 받지 않고, 양식에 하이픈이 있으면 치는 동안 자동으로 넣는다. 폰에서는 숫자 키패드를 띄운다(11/2). 휴대폰은 공통 UI `PhoneInput`을 쓴다. 주민등록번호는 받지 않는다
 
 ### 돈, 시간, 정책
 
