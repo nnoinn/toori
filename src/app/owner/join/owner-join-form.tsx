@@ -4,6 +4,7 @@
 // [입점 신청하기]를 누르면 화면에서 한 번 검사하고, 강규민님 createOwnerAccount가 다시 검사한 뒤 샵을 '승인 대기'로 만든다.
 // 검사를 통과하면 정산 계좌 확인 창(#163)에서 계좌번호 전체를 한 번 더 확인받고 신청한다.
 // 성공하면 /owner로 가고 거기서 "입점 신청을 마쳤어요" 안내 상자가 잠깐 뜬다(joined-notice.tsx).
+// 휴대폰·사업자등록번호·샵 전화번호·계좌번호 칸은 숫자만 쳐도 양식대로 맞춘다(#205).
 
 import { useRef, useState, useTransition } from 'react';
 import { unstable_rethrow, useRouter } from 'next/navigation';
@@ -12,15 +13,19 @@ import { ChevronRight, FileUp } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DigitInput } from '@/components/ui/digit-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PhoneInput } from '@/components/ui/phone-input';
 import type { GeocodeCandidate } from '@/features/map/geocode';
+import { BUSINESS_NUMBER_INPUT } from '@/lib/business-number';
 import { SITE_NAME } from '@/lib/site';
 import { createOwnerAccount, type CreateOwnerAccountInput } from '@/server/auth/owner-account';
 import { BANKS } from '@/server/policy';
 import { SHOP_CATEGORIES } from '@/server/policy/catalog';
 
 import { AddressSearchButton } from '../(console)/settings/shop/address-search-button';
+import { ACCOUNT_NUMBER_INPUT } from '../business-fields';
 import { PayoutConfirmDialog, payoutKey } from '../payout-confirm-dialog';
 import { BUSINESS_DOC_ACCEPT, uploadBusinessDoc } from './business-doc';
 import { clearJoinPending, markJoinPending } from './joined-notice';
@@ -165,6 +170,14 @@ export function OwnerJoinForm({ today }: { today: string }) {
     value: form[field],
     onChange: (event: React.ChangeEvent<HTMLInputElement>) => update(field, event.target.value),
   });
+  /** 번호 칸(#205): 숫자만 쳐도 양식대로 맞추는 PhoneInput·DigitInput에 넘긴다 */
+  const digits = (
+    field: 'ownerPhone' | 'businessRegistrationNumber' | 'shopPhone' | 'accountNumber',
+  ) => ({
+    ...fieldProps(field),
+    value: form[field],
+    onValueChange: (value: string) => update(field, value),
+  });
 
   const allAgreed = Object.values(form.agreements).every(Boolean);
   const busy = pending || doc?.uploading === true;
@@ -195,13 +208,7 @@ export function OwnerJoinForm({ today }: { today: string }) {
             <Input {...text('ownerName')} autoComplete="name" />
           </Field>
           <Field label="휴대폰 번호" field="ownerPhone" error={errors.ownerPhone}>
-            <Input
-              {...text('ownerPhone')}
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="010-1234-5678"
-            />
+            <PhoneInput {...digits('ownerPhone')} />
           </Field>
         </CardContent>
       </Card>
@@ -225,9 +232,9 @@ export function OwnerJoinForm({ today }: { today: string }) {
             field="businessRegistrationNumber"
             error={errors.businessRegistrationNumber}
           >
-            <Input
-              {...text('businessRegistrationNumber')}
-              inputMode="numeric"
+            <DigitInput
+              {...digits('businessRegistrationNumber')}
+              rule={BUSINESS_NUMBER_INPUT}
               placeholder="123-45-67890"
             />
           </Field>
@@ -299,7 +306,7 @@ export function OwnerJoinForm({ today }: { today: string }) {
             </select>
           </Field>
           <Field label="샵 전화번호" field="shopPhone" error={errors.shopPhone}>
-            <Input {...text('shopPhone')} type="tel" inputMode="tel" placeholder="031-123-4567" />
+            <PhoneInput {...digits('shopPhone')} kind="any" autoComplete="off" />
           </Field>
           <div className="col-span-2 flex flex-col gap-2">
             <Label htmlFor="roadAddress">주소</Label>
@@ -391,10 +398,9 @@ export function OwnerJoinForm({ today }: { today: string }) {
             error={errors.accountNumber}
             className="col-span-2"
           >
-            <Input
-              {...text('accountNumber')}
-              inputMode="numeric"
-              autoComplete="off"
+            <DigitInput
+              {...digits('accountNumber')}
+              rule={ACCOUNT_NUMBER_INPUT}
               placeholder="숫자만 입력해 주세요"
             />
           </Field>

@@ -6,7 +6,8 @@ const TODAY = '2026-10-30';
 const business = {
   businessName: ' 투리 테스트 헤어 ',
   representativeName: '테스트 원장',
-  businessRegistrationNumber: '000-00-00000',
+  // 검증번호가 맞는 가짜 번호(만드는 법은 src/lib/business-number.test.ts)
+  businessRegistrationNumber: '123-45-67891',
   openedOn: '2025-01-01',
   businessDocPath: 'shops/shop-1/doc.jpg',
 };
@@ -18,9 +19,26 @@ describe('사업자 정보 검사 (S-101, D3)', () => {
       data: {
         ...business,
         businessName: '투리 테스트 헤어',
-        businessRegistrationNumber: '0000000000',
+        businessRegistrationNumber: '1234567891',
       },
     });
+  });
+
+  it('사업자등록번호: 10자리가 아니면 자릿수 안내, 검증번호가 틀리면 다시 확인 안내(#205)', () => {
+    const short = validateBusinessInput(
+      { ...business, businessRegistrationNumber: '123-45-6789' },
+      TODAY,
+    );
+    expect(short.ok === false && short.fieldErrors.businessRegistrationNumber).toBe(
+      '사업자등록번호 10자리를 입력해 주세요(예: 123-45-67890)',
+    );
+    const wrong = validateBusinessInput(
+      { ...business, businessRegistrationNumber: '123-45-67890' },
+      TODAY,
+    );
+    expect(wrong.ok === false && wrong.fieldErrors.businessRegistrationNumber).toBe(
+      '사업자등록번호를 다시 확인해 주세요',
+    );
   });
 
   it('개업일자가 오늘 뒤면, 등록증이 없으면 막는다', () => {
