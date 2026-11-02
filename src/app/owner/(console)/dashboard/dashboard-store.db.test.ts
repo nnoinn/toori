@@ -60,6 +60,33 @@ describeDb('원장님 대시보드 조회 (실제 DB)', () => {
     });
   });
 
+  it('재등록한 취소 매물은 새 매물 id를 같이 주고, 줄은 한 번씩만 나온다(O13)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx);
+      const [cancelled, notRelisted] = await tx
+        .insert(slots)
+        .values([
+          testSlot(shop, '13:00', '14:00', { status: 'cancelled' }),
+          testSlot(shop, '16:00', '17:00', { status: 'cancelled' }),
+        ])
+        .returning({ id: slots.id });
+      const [relisted] = await tx
+        .insert(slots)
+        .values(testSlot(shop, '13:00', '14:00', { relistedFromSlotId: cancelled.id }))
+        .returning({ id: slots.id });
+
+      const rows = await selectDashboardSlots(tx, shop.shopId, from);
+      expect(rows.map((row) => [row.id, row.status, row.relistedSlotId])).toEqual(
+        expect.arrayContaining([
+          [cancelled.id, 'cancelled', relisted.id],
+          [relisted.id, 'published', null],
+          [notRelisted.id, 'cancelled', null],
+        ]),
+      );
+      expect(rows).toHaveLength(3);
+    });
+  });
+
   it('처리 필요: 시작이 지났고 방문·노쇼 기록이 없는 예정 예약만', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);

@@ -4,7 +4,8 @@
 // 판매 전 매물은 목록에서 [수정]·[마감](O10, S-206). 결제 중(홀딩)이면 버튼을 잠근다("다른 고객이 결제 중" 배지가 같이 보인다).
 // 버튼은 글자만 쓰고 [수정]·[마감] 둘 다 테두리 버튼이다.
 // 예약이 있는 매물(예약됨·완료·취소)은 [상세], "처리 필요" 줄은 [처리하기]로 예약 상세(O11)에 간다.
-// 방문 완료·노쇼(O14)는 예약 상세에서 처리한다. 재등록(O13)은 만들 때 연결한다.
+// 방문 완료·노쇼(O14)는 예약 상세에서 처리한다. 시작 전 '취소' 매물은 [재등록](O13, S-408)으로 같은 조건의 새 매물을 올리고,
+// 재등록한 매물에는 "재등록함"을 보여준다.
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -31,6 +32,7 @@ import {
 } from './dashboard';
 import type { SlotStatus } from '@/features/slot-status/slot-status';
 
+import { canRelist } from '../slots/relist';
 import { SLOT_CLOSE_REASON_LABELS } from '../slots/slot-edit';
 import { CloseSlotDialog } from './close-slot-dialog';
 
@@ -160,6 +162,10 @@ function SlotRow({
   // 판매 전(예약대기·게시중)만 고치거나 마감할 수 있고, 결제 중이면 잠근다(O1 canEditSlot과 같은 기준)
   const beforeSale = status === 'scheduled' || status === 'published';
   const held = beforeSale && onHold(slot, now);
+  const relistable = canRelist(
+    { status: slot.status, startAt: new Date(slot.startAt), relistedSlotId: slot.relistedSlotId },
+    now,
+  );
   const badges: SlotBadgeKind[] = [];
   if (slot.newCustomerOnly) badges.push('newCustomerOnly');
   if (held) badges.push('onHold');
@@ -190,9 +196,12 @@ function SlotRow({
             {SLOT_CLOSE_REASON_LABELS[slot.closeReason]}
           </span>
         ) : null}
+        {slot.relistedSlotId ? (
+          <span className="text-xs text-muted-foreground">재등록함</span>
+        ) : null}
       </div>
-      {/* 버튼이 없는 줄도 같은 폭을 비워 상태 배지 줄을 맞춘다 */}
-      <div className="flex w-28 shrink-0 justify-end gap-1">
+      {/* 버튼이 없는 줄도 같은 폭을 비워 상태 배지 줄을 맞춘다. 취소 매물은 [재등록]·[상세] 두 개라 폭을 넉넉히 */}
+      <div className="flex w-36 shrink-0 justify-end gap-1">
         {beforeSale ? (
           <>
             {held ? (
@@ -208,6 +217,11 @@ function SlotRow({
               마감
             </Button>
           </>
+        ) : null}
+        {relistable ? (
+          <Button asChild variant="outline">
+            <Link href={`/owner/slots/${slot.id}/relist`}>재등록</Link>
+          </Button>
         ) : null}
         {slot.reservationId ? <DetailButton reservationId={slot.reservationId} /> : null}
       </div>
