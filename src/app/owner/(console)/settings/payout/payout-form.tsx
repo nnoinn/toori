@@ -2,6 +2,7 @@
 
 // 매장 설정 > 정산 계좌 (O7 ②, S-107). 은행·예금주·계좌번호 뒷자리만 보여주고, [계좌 바꾸기]로 새로 입력한다.
 // 저장 전 확인 창에 입력한 계좌번호 전체를 보여주고 확인받는다(#163). 저장한 뒤에는 뒷자리만 보여준다.
+// 등록된 계좌가 없으면(시드 등 계좌 없이 만든 원장님) "등록된 정산 계좌가 없어요"와 등록 칸을 바로 보여준다(#213).
 
 import { useState, useTransition } from 'react';
 import { cn } from 'cn';
@@ -27,8 +28,35 @@ const EMPTY: PayoutInput = { bankCode: '', accountNumber: '', accountHolder: '' 
 const SELECT_CLASS =
   'h-9 rounded-lg border bg-card px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive';
 
-export function PayoutForm({ shopId, account }: { shopId: string; account: PayoutAccountView }) {
-  const [editing, setEditing] = useState(false);
+/** 등록할 때와 바꿀 때 다른 문구 */
+const MODE_TEXT = {
+  register: {
+    formTitle: '정산 계좌 등록',
+    confirmDescription: '이용이 끝난 예약의 정산금을 이 계좌로 받아요.',
+    confirmLabel: '맞아요, 등록하기',
+    pendingLabel: '등록하는 중…',
+    saved: '정산 계좌를 등록했어요',
+  },
+  change: {
+    formTitle: '새 정산 계좌',
+    confirmDescription: '다음 정산부터 이 계좌로 보내요.',
+    confirmLabel: '맞아요, 바꾸기',
+    pendingLabel: '바꾸는 중…',
+    saved: '정산 계좌를 바꿨어요',
+  },
+} as const;
+
+export function PayoutForm({
+  shopId,
+  account,
+}: {
+  shopId: string;
+  /** 등록된 계좌. 없으면 null */
+  account: PayoutAccountView | null;
+}) {
+  const text = MODE_TEXT[account ? 'change' : 'register'];
+  // 계좌가 없으면 등록 칸을 처음부터 연다
+  const [editing, setEditing] = useState(account === null);
   const [form, setForm] = useState<PayoutInput>(EMPTY);
   const [errors, setErrors] = useState<PayoutFieldErrors>({});
   // 확인 창에 보여줄 계좌(검사를 통과한 값)
@@ -42,7 +70,7 @@ export function PayoutForm({ shopId, account }: { shopId: string; account: Payou
   const current = JSON.stringify(account);
   if (current !== received) {
     setReceived(current);
-    setEditing(false);
+    setEditing(account === null);
     setForm(EMPTY);
     setErrors({});
   }
@@ -70,13 +98,15 @@ export function PayoutForm({ shopId, account }: { shopId: string; account: Payou
   }
 
   function save() {
+    // 저장하면 계좌가 생겨서 문구가 '바꾸기'로 바뀌므로 누른 때의 문구를 쓴다
+    const savedText = text.saved;
     startTransition(async () => {
       const result = await savePayoutAccount(shopId, form);
       setConfirming(null);
       if (result.ok) {
         setEditing(false);
         setForm(EMPTY);
-        setStatus({ kind: 'saved', text: '정산 계좌를 바꿨어요' });
+        setStatus({ kind: 'saved', text: savedText });
         return;
       }
       setErrors(result.error.fieldErrors ?? {});
@@ -92,30 +122,42 @@ export function PayoutForm({ shopId, account }: { shopId: string; account: Payou
 
   return (
     <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>지금 정산 계좌</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            이용이 끝난 예약의 정산금을 받는 계좌예요. 계좌번호는 암호화해서 저장하고 뒷자리만
-            보여요.
-          </p>
-        </CardHeader>
-        <CardContent className="flex items-end justify-between gap-4">
-          <dl className="grid grid-cols-[6rem_1fr] gap-y-2 text-sm">
-            <dt className="text-muted-foreground">은행</dt>
-            <dd>{bankName(account.bankCode)}</dd>
-            <dt className="text-muted-foreground">계좌번호</dt>
-            <dd>****{account.accountLast4}</dd>
-            <dt className="text-muted-foreground">예금주</dt>
-            <dd>{account.accountHolder}</dd>
-          </dl>
-          {editing ? null : (
-            <Button type="button" variant="outline" size="lg" onClick={openEditor}>
-              계좌 바꾸기
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+      {account ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>지금 정산 계좌</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              이용이 끝난 예약의 정산금을 받는 계좌예요. 계좌번호는 암호화해서 저장하고 뒷자리만
+              보여요.
+            </p>
+          </CardHeader>
+          <CardContent className="flex items-end justify-between gap-4">
+            <dl className="grid grid-cols-[6rem_1fr] gap-y-2 text-sm">
+              <dt className="text-muted-foreground">은행</dt>
+              <dd>{bankName(account.bankCode)}</dd>
+              <dt className="text-muted-foreground">계좌번호</dt>
+              <dd>****{account.accountLast4}</dd>
+              <dt className="text-muted-foreground">예금주</dt>
+              <dd>{account.accountHolder}</dd>
+            </dl>
+            {editing ? null : (
+              <Button type="button" variant="outline" size="lg" onClick={openEditor}>
+                계좌 바꾸기
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>등록된 정산 계좌가 없어요</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              이용이 끝난 예약의 정산금을 받으려면 계좌를 등록해 주세요. 계좌번호는 암호화해서
+              저장하고 뒷자리만 보여요.
+            </p>
+          </CardHeader>
+        </Card>
+      )}
 
       {status && !editing ? (
         <p
@@ -139,7 +181,7 @@ export function PayoutForm({ shopId, account }: { shopId: string; account: Payou
         >
           <Card>
             <CardHeader>
-              <CardTitle>새 정산 계좌</CardTitle>
+              <CardTitle>{text.formTitle}</CardTitle>
               <p className="text-sm text-muted-foreground">
                 예금주는 통장에 적힌 이름과 똑같이 입력해 주세요.
               </p>
@@ -188,15 +230,18 @@ export function PayoutForm({ shopId, account }: { shopId: string; account: Payou
                     {status.text}
                   </span>
                 ) : null}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="lg"
-                  disabled={pending}
-                  onClick={() => setEditing(false)}
-                >
-                  취소
-                </Button>
+                {/* 등록할 때는 돌아갈 계좌가 없어서 [취소]가 없다 */}
+                {account ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    disabled={pending}
+                    onClick={() => setEditing(false)}
+                  >
+                    취소
+                  </Button>
+                ) : null}
                 <Button type="submit" size="lg" disabled={pending}>
                   저장
                 </Button>
@@ -208,9 +253,9 @@ export function PayoutForm({ shopId, account }: { shopId: string; account: Payou
 
       <PayoutConfirmDialog
         account={confirming}
-        description="다음 정산부터 이 계좌로 보내요."
-        confirmLabel="맞아요, 바꾸기"
-        pendingLabel="바꾸는 중…"
+        description={text.confirmDescription}
+        confirmLabel={text.confirmLabel}
+        pendingLabel={text.pendingLabel}
         pending={pending}
         onConfirm={save}
         onCancel={() => setConfirming(null)}
