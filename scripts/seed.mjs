@@ -16,11 +16,31 @@ import {
   salePrice,
   SLOT_TIME_STEP_MINUTES,
 } from './dev-db.mjs';
-import { SEED_ACCOUNTS, SEED_CUSTOMERS, SEED_EMAIL_DOMAIN, SEED_SHOPS } from './seed-data.mjs';
+import {
+  ROLLING_SLOTS,
+  SEED_ACCOUNTS,
+  SEED_CUSTOMERS,
+  SEED_EMAIL_DOMAIN,
+  SEED_SHOPS,
+} from './seed-data.mjs';
 
 export { salePrice };
 
 const pad = (n, width) => String(n).padStart(width, '0');
+const KST_OFFSET = 9 * HOUR;
+
+/** 계속 쓰는 시험 매물의 시작 시각(ROLLING_SLOTS). 넣는 날의 한국 날짜 기준이고, 그 샵이 쉬는 요일은 뺀다 */
+export function rollingStarts(base, hours) {
+  const kstMidnight = Math.floor((base + KST_OFFSET) / DAY) * DAY - KST_OFFSET;
+  const closed = new Set(hours.filter((h) => h.closed).map((h) => h.weekday));
+  const starts = [];
+  for (let day = ROLLING_SLOTS.fromDay; day <= ROLLING_SLOTS.toDay; day += 1) {
+    const midnight = kstMidnight + day * DAY;
+    if (closed.has(new Date(midnight + KST_OFFSET).getUTCDay())) continue;
+    for (const hour of ROLLING_SLOTS.times) starts.push(new Date(midnight + hour * HOUR));
+  }
+  return starts;
+}
 
 /** 시드 계정(userIds)의 데이터를 지운다. 로그인 정보(auth.users)와 profiles는 다음 시드에서 다시 쓰려고 남긴다 */
 async function clearSeedData(sql, userIds) {
@@ -152,35 +172,54 @@ export async function seedDevData(sql, { now, userIds }) {
       menus.push(row);
     });
 
+    /** 매물 한 줄. 정가·소요 시간은 메뉴에서, 할인가는 정가 × (1 − 할인율) */
+    const slotRow = (menu, startAt, rate, newOnly, status) => ({
+      id: crypto.randomUUID(),
+      shop_id: shopId,
+      menu_id: menu.id,
+      service_type: menu.service_type,
+      menu_name: menu.name,
+      list_price: menu.list_price,
+      duration_minutes: menu.duration_minutes,
+      discount_rate: rate,
+      sale_price: salePrice(menu.list_price, rate),
+      new_customer_only: newOnly,
+      start_at: startAt,
+      end_at: new Date(startAt.getTime() + menu.duration_minutes * 60 * 1000),
+      publish_at: new Date(startAt.getTime() - PUBLISH_BEFORE_HOURS * HOUR),
+      status,
+      created_by: ownerUserId,
+    });
+
     const slotIdByKey = {};
     for (const slot of shop.slots) {
-      const menu = menuByKey[slot.menu];
-      const startAt = at(slot.at);
-      const id = crypto.randomUUID();
-      if (slot.id) slotIdByKey[slot.id] = id;
+      const row = slotRow(
+        menuByKey[slot.menu],
+        at(slot.at),
+        slot.rate,
+        slot.newOnly ?? false,
+        slot.status ?? 'published',
+      );
+      if (slot.id) slotIdByKey[slot.id] = row.id;
       slots.push({
-        id,
-        shop_id: shopId,
-        menu_id: menu.id,
-        service_type: menu.service_type,
-        menu_name: menu.name,
-        list_price: menu.list_price,
-        duration_minutes: menu.duration_minutes,
-        discount_rate: slot.rate,
-        sale_price: salePrice(menu.list_price, slot.rate),
-        new_customer_only: slot.newOnly ?? false,
-        start_at: startAt,
-        end_at: new Date(startAt.getTime() + menu.duration_minutes * 60 * 1000),
-        publish_at: new Date(startAt.getTime() - PUBLISH_BEFORE_HOURS * HOUR),
-        status: slot.status ?? 'published',
+        ...row,
         hold_customer_id: slot.hold ? holdCustomerId : null,
         hold_expires_at: slot.hold ? new Date(now.getTime() + HOLD_MINUTES * 60 * 1000) : null,
         closed_at: slot.closeReason ? ago(HOUR) : null,
         close_reason: slot.closeReason ?? null,
         relisted_from_slot_id: slot.relistOf ? slotIdByKey[slot.relistOf] : null,
-        created_by: ownerUserId,
       });
       if (slot.book) bookings.push({ row: slots.at(-1), slot, ownerUserId });
+    }
+
+    // 계속 쓰는 시험 매물(ROLLING_SLOTS). 매물이 있는 승인된 샵만(승인 대기·반려·시흥시 샵은 그대로 비워 둔다)
+    if (shop.status === 'approved' && shop.slots.length > 0) {
+      const visible = shop.menus.filter((menu) => !menu.hidden).map((menu) => menuByKey[menu.key]);
+      rollingStarts(base, shop.hours).forEach((startAt, k) => {
+        const { rates, newOnlyEvery } = ROLLING_SLOTS;
+        const newOnly = (k + 1) % newOnlyEvery === 0;
+        slots.push(slotRow(visible[k % visible.length], startAt, rates[k % rates.length], newOnly, 'scheduled'));
+      });
     }
   });
 
