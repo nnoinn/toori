@@ -1,4 +1,4 @@
-// 푸시 구독 저장·지우기 (연결 #12, #131). 지금 모드의 계정으로 저장하는지, 입력 모양을 확인하는지 본다.
+// 푸시 구독 저장·지우기·조회 (연결 #12, #131). 지금 모드의 계정으로 다루는지, 입력 모양을 확인하는지 본다.
 // 로그인·DB·요청 헤더는 가짜로 바꿔서 DB 없이 돈다. 실제 저장은 subscription-store.db.test.ts가 본다.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,6 +10,9 @@ const state = vi.hoisted(() => ({
   userAgent: 'Mozilla/5.0 (iPhone)' as string | null,
   upserts: [] as unknown[],
   deletes: [] as unknown[],
+  deviceDeletes: [] as unknown[],
+  lookups: [] as unknown[],
+  subscribed: false,
 }));
 
 vi.mock('next/headers', () => ({
@@ -17,22 +20,37 @@ vi.mock('next/headers', () => ({
     get: (name: string) => (name === 'user-agent' ? state.userAgent : null),
   }),
 }));
-vi.mock('@/db', () => ({ getDb: () => 'db' }));
+vi.mock('@/db', () => ({
+  getDb: () => ({ transaction: (run: (tx: string) => unknown) => run('tx') }),
+}));
 vi.mock('@/server/auth', async (importOriginal) => ({
   AUTH_ERRORS: (await importOriginal<typeof import('@/server/auth')>()).AUTH_ERRORS,
   getCurrentAccount: async () => state.account,
 }));
 vi.mock('./subscription-store', () => ({
-  upsertPushSubscription: async (db: unknown, input: unknown) => {
-    state.upserts.push({ db, input });
+  upsertPushSubscription: async (tx: unknown, input: unknown) => {
+    state.upserts.push({ tx, input });
   },
-  deletePushSubscription: async (db: unknown, input: unknown) => {
-    state.deletes.push({ db, input });
+  deletePushSubscription: async (_db: unknown, input: unknown) => {
+    state.deletes.push(input);
     return true;
+  },
+  deleteDevicePushSubscriptions: async (_db: unknown, input: unknown) => {
+    state.deviceDeletes.push(input);
+    return 2;
+  },
+  hasPushSubscription: async (_db: unknown, input: unknown) => {
+    state.lookups.push(input);
+    return state.subscribed;
   },
 }));
 
-const { removePushSubscription, savePushSubscription } = await import('./subscriptions');
+const {
+  getPushSubscriptionStatus,
+  removeDevicePushSubscriptions,
+  removePushSubscription,
+  savePushSubscription,
+} = await import('./subscriptions');
 
 const SUBSCRIPTION = {
   endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
@@ -55,6 +73,9 @@ beforeEach(() => {
   state.userAgent = 'Mozilla/5.0 (iPhone)';
   state.upserts = [];
   state.deletes = [];
+  state.deviceDeletes = [];
+  state.lookups = [];
+  state.subscribed = false;
 });
 
 describe('savePushSubscription', () => {
@@ -65,7 +86,7 @@ describe('savePushSubscription', () => {
       expect(await savePushSubscription(SUBSCRIPTION)).toEqual(ok(null));
       expect(state.upserts).toEqual([
         {
-          db: 'db',
+          tx: 'tx',
           input: {
             userId: 'user-1',
             accountType: mode,
@@ -120,11 +141,13 @@ describe('savePushSubscription', () => {
 });
 
 describe('removePushSubscription', () => {
-  it('내 구독만 지우고, 없어도 성공', async () => {
+  it.each(['customer', 'owner'] as const)('%s 모드면 그 계정의 구독만 지운다', async (mode) => {
+    state.account = account(mode);
     expect(await removePushSubscription(SUBSCRIPTION.endpoint)).toEqual(ok(null));
     expect(state.deletes).toEqual([
-      { db: 'db', input: { userId: 'user-1', endpoint: SUBSCRIPTION.endpoint } },
+      { userId: 'user-1', accountType: mode, endpoint: SUBSCRIPTION.endpoint },
     ]);
+    expect(state.deviceDeletes).toEqual([]);
   });
 
   it('로그인하지 않았으면 UNAUTHENTICATED, 모양이 틀린 주소는 지우지 않고 성공', async () => {
@@ -134,5 +157,52 @@ describe('removePushSubscription', () => {
     state.account = account('customer');
     expect(await removePushSubscription('x'.repeat(3000))).toEqual(ok(null));
     expect(state.deletes).toEqual([]);
+  });
+});
+
+describe('removeDevicePushSubscriptions', () => {
+  it('이 기기의 내 구독을 계정 종류와 상관없이 지운다', async () => {
+    expect(await removeDevicePushSubscriptions(SUBSCRIPTION.endpoint)).toEqual(ok(null));
+    expect(state.deviceDeletes).toEqual([{ userId: 'user-1', endpoint: SUBSCRIPTION.endpoint }]);
+    expect(state.deletes).toEqual([]);
+  });
+
+  it('로그인하지 않았으면 UNAUTHENTICATED, 모양이 틀린 주소는 지우지 않고 성공', async () => {
+    state.account = null;
+    const result = await removeDevicePushSubscriptions(SUBSCRIPTION.endpoint);
+    expect(result.ok === false && result.error.code).toBe('UNAUTHENTICATED');
+    state.account = account('customer');
+    expect(await removeDevicePushSubscriptions('not a url')).toEqual(ok(null));
+    expect(state.deviceDeletes).toEqual([]);
+  });
+});
+
+describe('getPushSubscriptionStatus', () => {
+  it.each([
+    ['customer', true],
+    ['customer', false],
+    ['owner', true],
+    ['owner', false],
+  ] as const)(
+    '%s 모드에서 구독이 있는지(%s)를 지금 계정 기준으로 본다',
+    async (mode, subscribed) => {
+      state.account = account(mode);
+      state.subscribed = subscribed;
+      expect(await getPushSubscriptionStatus(SUBSCRIPTION.endpoint)).toEqual(ok({ subscribed }));
+      expect(state.lookups).toEqual([
+        { userId: 'user-1', accountType: mode, endpoint: SUBSCRIPTION.endpoint },
+      ]);
+    },
+  );
+
+  it('로그인하지 않았으면 UNAUTHENTICATED, 모양이 틀린 주소는 DB를 보지 않고 꺼짐', async () => {
+    state.account = null;
+    const result = await getPushSubscriptionStatus(SUBSCRIPTION.endpoint);
+    expect(result.ok === false && result.error.code).toBe('UNAUTHENTICATED');
+    state.account = account('customer');
+    expect(await getPushSubscriptionStatus('http://push.example/x')).toEqual(
+      ok({ subscribed: false }),
+    );
+    expect(state.lookups).toEqual([]);
   });
 });

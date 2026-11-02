@@ -43,6 +43,13 @@
       "when": 1793277282025,
       "tag": "0005_orders_booker_info",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793610474218,
+      "tag": "0006_push_subscriptions_two_accounts",
+      "breakpoints": true
     }
   ]
 }

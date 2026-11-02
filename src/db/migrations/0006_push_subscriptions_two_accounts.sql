@@ -1,0 +1,2 @@
+ALTER TABLE "push_subscriptions" DROP CONSTRAINT "push_subscriptions_endpoint_unique";--> statement-breakpoint
+ALTER TABLE "push_subscriptions" ADD CONSTRAINT "push_subscriptions_endpoint_account_type_unique" UNIQUE("endpoint","account_type");
