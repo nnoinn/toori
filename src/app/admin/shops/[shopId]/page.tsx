@@ -7,17 +7,13 @@ import { BackButton } from '@/components/ui/back-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
+import { formatBusinessNumber } from '@/lib/business-number';
 import { formatKst } from '@/lib/time';
 import { ensureAdminPage } from '@/server/auth';
 import { getBusinessDocUrl } from '@/server/storage/upload';
 import { bankName } from '@/server/policy';
 
-import {
-  formatBusinessNumber,
-  labelCategory,
-  labelPgSellerStatus,
-  labelReviewAction,
-} from '../format';
+import { labelCategory, labelPgSellerStatus, labelReviewAction } from '../format';
 import { selectShopForReview, type ShopReviewDetail } from '../queries';
 import { StatusBadge } from '../status-badge';
 import { ReviewActions } from './review-actions';

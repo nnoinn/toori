@@ -1,20 +1,11 @@
-// 입점 심사 화면 표시 모양 (A-101). 사업자등록번호·은행·업종·PG 셀러 상태·심사 기록 이름.
+// 입점 심사 화면 표시 모양 (A-101). 은행·업종·PG 셀러 상태·심사 기록 이름.
+// 사업자등록번호 모양은 src/lib/business-number.test.ts에서 본다(#205).
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  formatBusinessNumber,
-  labelCategory,
-  labelPgSellerStatus,
-  labelReviewAction,
-} from './format';
+import { labelCategory, labelPgSellerStatus, labelReviewAction } from './format';
 
 describe('입점 심사 표시 모양', () => {
-  it('사업자등록번호는 000-00-00000, 10자리가 아니면 그대로', () => {
-    expect(formatBusinessNumber('1234567890')).toBe('123-45-67890');
-    expect(formatBusinessNumber('123')).toBe('123');
-  });
-
   it('은행은 이름으로, 목록에 없으면 코드 그대로', () => {});
 
   it('업종·PG 셀러 상태·심사 기록은 화면 이름으로', () => {

@@ -30,7 +30,7 @@ export function isValidBusinessNumber(raw: string): boolean {
   return businessNumberCheckDigit(digits.slice(0, 9)) === Number(digits[9]);
 }
 
-/** 숫자 10자리 → 123-45-67890. 10자리가 아니면 그대로 */
+/** 숫자 10자리 → 123-45-67890. 10자리가 아니면 그대로. 운영자 입점 심사 화면에 있던 것을 옮겨 원장님 화면과 같이 쓴다(#213) */
 export function formatBusinessNumber(digits: string): string {
   return /^\d{10}$/.test(digits)
     ? `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`
