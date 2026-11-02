@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Price } from '@/components/ui/price';
 import { SlotBadges, type SlotBadgeKind } from '@/components/ui/slot-badge';
 import { EmptyState } from '@/components/ui/state';
-import { formatKst } from '@/lib/time';
+import { formatKst, formatKstTime } from '@/lib/time';
 
 import {
   countByStatus,
@@ -31,7 +31,6 @@ import {
 } from './dashboard';
 import type { SlotStatus } from '@/features/slot-status/slot-status';
 
-import { timeLabel } from '../slots/new/slot-time';
 import { SLOT_CLOSE_REASON_LABELS } from '../slots/slot-edit';
 import { CloseSlotDialog } from './close-slot-dialog';
 
@@ -169,7 +168,7 @@ function SlotRow({
     <li className="flex items-center gap-4 px-4 py-3">
       <div className="w-36 shrink-0 text-sm">
         <p className="font-semibold">{formatKst(new Date(slot.startAt))}</p>
-        <p className="text-muted-foreground">~ {timeLabel(new Date(slot.endAt))}</p>
+        <p className="text-muted-foreground">~ {formatKstTime(new Date(slot.endAt))}</p>
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="truncate font-medium">{slot.menuName}</span>

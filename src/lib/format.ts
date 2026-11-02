@@ -23,6 +23,18 @@ export function formatRemaining(ms: number): string {
   return `${minutes}분`;
 }
 
+/**
+ * 소요 시간. 예: 60 → "1시간", 90 → "1시간 30분", 45 → "45분". 0 이하이거나 숫자가 아니면 빈 문자열.
+ * 원장님 메뉴·매물·예약 상세가 쓴다. 고객 쪽 detail-format.ts의 같은 함수를 여기로 모으는 중이다(#182 리뷰)
+ */
+export function formatDuration(minutes: number): string {
+  if (!Number.isFinite(minutes) || minutes <= 0) return '';
+  const hours = Math.floor(minutes / 60);
+  const rest = Math.round(minutes % 60);
+  if (hours === 0) return `${rest}분`;
+  return rest === 0 ? `${hours}시간` : `${hours}시간 ${rest}분`;
+}
+
 /** 시계 모양 남은 시간(10분 홀딩 타이머용). 예: "09:41", 1시간 이상이면 "1:02:03". 지났으면 "00:00" */
 export function formatClock(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));

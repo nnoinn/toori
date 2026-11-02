@@ -40,7 +40,13 @@ export function utcToKst(date: Date): KstDateTime & { weekday: number } {
 /** 화면 표시용 한국 시간. 예: "10/12(월) 15:00" */
 export function formatKst(date: Date): string {
   const t = utcToKst(date);
-  return `${t.month}/${t.day}(${WEEKDAYS[t.weekday]}) ${pad2(t.hour)}:${pad2(t.minute)}`;
+  return `${t.month}/${t.day}(${WEEKDAYS[t.weekday]}) ${formatKstTime(date)}`;
+}
+
+/** 화면 표시용 한국 시각만. 예: "15:00". 끝 시각("10/12(월) 15:00 ~ 16:00")이나 시작 시각 고르기 버튼에 쓴다 */
+export function formatKstTime(date: Date): string {
+  const t = utcToKst(date);
+  return `${pad2(t.hour)}:${pad2(t.minute)}`;
 }
 
 /** target까지 남은 시간(밀리초). 이미 지났으면 음수 */
