@@ -14,6 +14,7 @@ import {
   recordAutoCancel,
   recordOrderOutcome,
 } from './confirm-store';
+import { ABANDONED_ORDER_CODE } from './errors';
 import { createPendingOrder, newPaymentId } from './order-store';
 import { RESERVATION_CODE_PATTERN } from './reservation-code';
 
@@ -189,6 +190,62 @@ describeDb('결제 확인 저장 (실제 DB)', () => {
       ).toBe(false);
       const [still] = await tx.select().from(orders).where(eq(orders.id, second.orderId));
       expect(still.status).toBe('confirmed');
+    });
+  });
+
+  /** 정리 작업이 결제 안 함으로 둔 주문(W12 ②) */
+  async function abandoned(tx: TestTx) {
+    const held = await heldAndOrdered(tx);
+    await recordOrderOutcome(tx, held.orderId, {
+      status: 'failed',
+      pgStatus: 'READY',
+      failureCode: ABANDONED_ORDER_CODE,
+    });
+    return held;
+  }
+
+  it('결제 안 함으로 둔 주문에 뒤늦게 결제가 들어오면 결제 대기처럼 처리한다', async () => {
+    await withRollback(async (tx) => {
+      const inTime = await abandoned(tx);
+      const outcome = await confirmPaidOrder(tx, { orderId: inTime.orderId, ...paidAt(3) });
+      expect(outcome.ok).toBe(true);
+      const [confirmed] = await tx.select().from(orders).where(eq(orders.id, inTime.orderId));
+      expect(confirmed).toMatchObject({ status: 'confirmed', failureCode: null });
+    });
+    await withRollback(async (tx) => {
+      const late = await abandoned(tx);
+      expect(await confirmPaidOrder(tx, { orderId: late.orderId, ...paidAt(11) })).toEqual({
+        ok: false,
+        code: 'HOLD_EXPIRED',
+      });
+      const [paid] = await tx.select().from(orders).where(eq(orders.id, late.orderId));
+      expect(paid).toMatchObject({ status: 'paid', failureCode: 'HOLD_EXPIRED' });
+    });
+  });
+
+  it('결제 안 함으로 둔 주문에는 결과를 다시 기록할 수 있고, 다른 실패 주문은 그대로다', async () => {
+    await withRollback(async (tx) => {
+      const { orderId } = await abandoned(tx);
+      expect(
+        await recordOrderOutcome(tx, orderId, {
+          status: 'paid',
+          pgStatus: 'PAID',
+          failureCode: 'AMOUNT_MISMATCH',
+        }),
+      ).toBe(true);
+      const [paid] = await tx.select().from(orders).where(eq(orders.id, orderId));
+      expect(paid).toMatchObject({ status: 'paid', failureCode: 'AMOUNT_MISMATCH' });
+
+      const failed = await heldAndOrdered(tx);
+      const reallyFailed = { status: 'failed', pgStatus: 'FAILED', failureCode: 'X' } as const;
+      await recordOrderOutcome(tx, failed.orderId, reallyFailed);
+      expect(
+        await recordOrderOutcome(tx, failed.orderId, { ...reallyFailed, failureCode: 'Y' }),
+      ).toBe(false);
+      const outcome = await confirmPaidOrder(tx, { orderId: failed.orderId, ...paidAt(3) });
+      expect(outcome.ok).toBe(false);
+      const [still] = await tx.select().from(orders).where(eq(orders.id, failed.orderId));
+      expect(still).toMatchObject({ status: 'failed', failureCode: 'X' });
     });
   });
 
