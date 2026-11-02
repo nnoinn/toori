@@ -7,9 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fail, ok } from '@/lib/result';
 
 import type { CheckoutSlot } from './checkout-store';
+import { autoCancelFail, unconfirmedFail } from './errors';
 import type { ConfirmOutcome, MyOrder, OrderOutcome } from './confirm-store';
 import type { HoldOutcome } from './hold-store';
-import type { PortOneLookup } from './portone';
+import type { PortOneCancel, PortOneLookup } from './portone';
 
 const SLOT = '2b3c4d5e-6f70-4812-9a3b-4c5d6e7f8091';
 const OTHER_SLOT = '9f8e7d6c-5b4a-4321-8fed-cba987654321';
@@ -38,6 +39,10 @@ const state = vi.hoisted(() => ({
   /** 정해 두면 포트원 조회가 이 결과를 돌려준다. 없으면 주문 금액 그대로 결제 완료(PAID) */
   portone: null as PortOneLookup | null,
   portoneCalls: [] as string[],
+  /** 정해 두면 포트원 취소가 이 결과를 돌려준다. 없으면 전액 취소 성공 */
+  cancel: null as PortOneCancel | null,
+  cancelCalls: [] as string[],
+  autoCancels: [] as Record<string, unknown>[],
   confirmOverride: null as ConfirmOutcome | null,
   confirmCalls: [] as unknown[],
   outcomes: [] as { orderId: string; outcome: OrderOutcome }[],
@@ -150,8 +155,19 @@ vi.mock('./confirm-store', () => ({
     }
     return outcome;
   },
+  recordAutoCancel: async (tx: unknown, input: { orderId: string }) => {
+    state.autoCancels.push({ tx, ...input });
+    const order = recordOf(input.orderId);
+    if (order.status !== 'paid') return false;
+    Object.assign(order, { status: 'auto_cancelled', pgStatus: 'CANCELLED' });
+    return true;
+  },
 }));
 vi.mock('./portone', () => ({
+  cancelPortOnePayment: async (paymentId: string): Promise<PortOneCancel> => {
+    state.cancelCalls.push(paymentId);
+    return state.cancel ?? { ok: true, cancellationId: 'cancellation-1', amount: 23_450 };
+  },
   getPortOnePayment: async (paymentId: string): Promise<PortOneLookup> => {
     state.portoneCalls.push(paymentId);
     if (state.portone) return state.portone;
@@ -167,6 +183,7 @@ vi.mock('./portone', () => ({
         method: 'PaymentMethodCard',
         failureReason: null,
         failureCode: null,
+        cancellations: [],
       },
     };
   },
@@ -226,6 +243,9 @@ beforeEach(() => {
   state.orderRecords = new Map();
   state.portone = null;
   state.portoneCalls = [];
+  state.cancel = null;
+  state.cancelCalls = [];
+  state.autoCancels = [];
   state.confirmOverride = null;
   state.confirmCalls = [];
   state.outcomes = [];
@@ -454,6 +474,7 @@ describe('confirmPayment', () => {
         method: 'PaymentMethodCard',
         failureReason: status === 'FAILED' ? '카드 한도 초과' : null,
         failureCode: extra.failureCode ?? null,
+        cancellations: [],
       },
     };
   };
@@ -591,33 +612,92 @@ describe('confirmPayment', () => {
     expect(result.ok === false && result.error.code).toBe('PAYMENT_CANCELLED');
   });
 
-  it('금액이 다르면 확정하지 않고 주문을 결제 확인(paid)·AMOUNT_MISMATCH로 기록, autoCancelled는 아직 false(W12)', async () => {
+  it('금액이 다르면 확정하지 않고 주문을 결제 확인(paid)·AMOUNT_MISMATCH로 기록한 뒤 자동 취소한다', async () => {
     const paymentId = await started();
     paidAs('PAID', { amountTotal: 100, paidAt: at(1) });
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const result = await confirmPayment({ paymentId });
-    expect(result.ok === false && result.error).toMatchObject({
-      code: 'AMOUNT_MISMATCH',
-      autoCancelled: false,
-    });
+    expect(result).toEqual(autoCancelFail('AMOUNT_MISMATCH'));
     expect(state.confirmCalls).toEqual([]);
     expect(state.outcomes[0].outcome).toMatchObject({
       status: 'paid',
       failureCode: 'AMOUNT_MISMATCH',
     });
-    const again = await confirmPayment({ paymentId });
-    expect(again.ok === false && again.error.code).toBe('AMOUNT_MISMATCH');
+    expect(state.cancelCalls).toEqual([paymentId]);
+    expect(state.orderRecords.get(paymentId)?.status).toBe('auto_cancelled');
   });
 
   it.each(['HOLD_EXPIRED', 'SLOT_SOLD'] as const)(
-    '확정 저장이 %s면 그 코드(autoCancelled false)',
+    '확정 저장이 %s면 포트원에서 취소하고 자동 취소로 기록한다(autoCancelled true)',
     async (code) => {
       const paymentId = await started();
       state.confirmOverride = { ok: false, code };
       const result = await confirmPayment({ paymentId });
-      expect(result.ok === false && result.error).toMatchObject({ code, autoCancelled: false });
+      expect(result).toEqual(autoCancelFail(code));
+      expect(state.cancelCalls).toEqual([paymentId]);
+      expect(state.autoCancels).toEqual([
+        {
+          tx: 'tx',
+          orderId: 'order-1',
+          refundAmount: 23_450,
+          pgCancellationId: 'cancellation-1',
+          now: NOW,
+        },
+      ]);
     },
   );
+
+  it('예약을 확정했으면 취소하지 않는다', async () => {
+    const paymentId = await started();
+    expect((await confirmPayment({ paymentId })).ok).toBe(true);
+    expect(state.cancelCalls).toEqual([]);
+  });
+
+  it('자동 취소한 주문을 새로고침하면 다시 취소하지 않고 같은 답', async () => {
+    const paymentId = await started();
+    state.confirmOverride = { ok: false, code: 'HOLD_EXPIRED' };
+    const first = await confirmPayment({ paymentId });
+    state.portoneCalls = [];
+    expect(await confirmPayment({ paymentId })).toEqual(first);
+    expect(state.portoneCalls).toEqual([]);
+    expect(state.cancelCalls).toEqual([paymentId]);
+  });
+
+  it.each([
+    ['포트원 장애', { ok: false, reason: 'unavailable' }],
+    ['결제사가 처리 중', { ok: false, reason: 'pending' }],
+  ] as const)(
+    '%s로 취소를 끝내지 못하면 autoCancelled false이고 주문은 paid로 남는다',
+    async (_, cancel) => {
+      const paymentId = await started();
+      state.confirmOverride = { ok: false, code: 'HOLD_EXPIRED' };
+      state.cancel = cancel;
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const result = await confirmPayment({ paymentId });
+      expect(result).toEqual(unconfirmedFail('HOLD_EXPIRED'));
+      expect(state.autoCancels).toEqual([]);
+      expect(state.orderRecords.get(paymentId)?.status).toBe('paid');
+    },
+  );
+
+  it('취소를 끝내지 못한 주문을 새로고침하면 포트원 조회 없이 취소를 다시 시도한다', async () => {
+    const paymentId = await started();
+    state.confirmOverride = { ok: false, code: 'SLOT_SOLD' };
+    state.cancel = { ok: false, reason: 'unavailable' };
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await confirmPayment({ paymentId });
+    state.portoneCalls = [];
+
+    const stillFailing = await confirmPayment({ paymentId });
+    expect(stillFailing.ok === false && stillFailing.error.autoCancelled).toBe(false);
+
+    state.cancel = null;
+    const done = await confirmPayment({ paymentId });
+    expect(done).toEqual(autoCancelFail('SLOT_SOLD'));
+    expect(state.cancelCalls).toHaveLength(3);
+    expect(state.portoneCalls).toEqual([]);
+    expect(state.orderRecords.get(paymentId)?.status).toBe('auto_cancelled');
+  });
 
   it('포트원에 묻지 못하거나 모르는 상태면 PAYMENT_CHECK_UNAVAILABLE이고 주문은 그대로', async () => {
     const paymentId = await started();
@@ -642,15 +722,22 @@ describe('실패 흉내 스위치 DEV_FAKE_PAYMENT_FAILURE (로컬 개발만)', 
     expect(state.acquireCalls).toEqual([]);
   });
 
-  it('confirmPayment의 금액 불일치는 진짜와 같은 모양(W11: autoCancelled false)', async () => {
+  it('confirmPayment의 금액 불일치는 자동 취소한 모양, _NOT_CANCELLED를 붙이면 취소하지 못한 모양', async () => {
     vi.stubEnv('NODE_ENV', 'development');
     vi.stubEnv('DEV_FAKE_PAYMENT_FAILURE', 'confirmPayment:AMOUNT_MISMATCH');
-    const result = await confirmPayment({ paymentId: 'toori-any' });
-    expect(result.ok === false && result.error).toMatchObject({
+    const cancelled = await confirmPayment({ paymentId: 'toori-any' });
+    expect(cancelled.ok === false && cancelled.error).toMatchObject({
+      code: 'AMOUNT_MISMATCH',
+      autoCancelled: true,
+    });
+    vi.stubEnv('DEV_FAKE_PAYMENT_FAILURE', 'confirmPayment:AMOUNT_MISMATCH_NOT_CANCELLED');
+    const notCancelled = await confirmPayment({ paymentId: 'toori-any' });
+    expect(notCancelled.ok === false && notCancelled.error).toMatchObject({
       code: 'AMOUNT_MISMATCH',
       autoCancelled: false,
     });
     expect(state.portoneCalls).toEqual([]);
+    expect(state.cancelCalls).toEqual([]);
   });
 
   it('다른 함수를 가리키거나 그 함수에 없는 코드면 평소대로', async () => {

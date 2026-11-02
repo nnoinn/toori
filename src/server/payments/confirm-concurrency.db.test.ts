@@ -15,6 +15,7 @@ import {
   orders,
   owners,
   profiles,
+  refunds,
   reservations,
   shops,
   slots,
@@ -22,7 +23,7 @@ import {
 
 import { createTestCustomer, createTestShop, testSlot } from '../../../tests/db/fixtures';
 import { assertLocalTestDb, describeDb } from '../../../tests/db/test-db';
-import { confirmPaidOrder } from './confirm-store';
+import { confirmPaidOrder, recordAutoCancel } from './confirm-store';
 import { createPendingOrder, newPaymentId } from './order-store';
 
 const NOW = new Date('2026-11-01T09:00:00+09:00');
@@ -66,6 +67,12 @@ describeDb('결제 확인 동시에 두 번 (실제 DB, 연결 여러 개)', () 
         await tx.select({ id: slots.id }).from(slots).where(eq(slots.shopId, made.shopId))
       ).map((row) => row.id);
       if (slotIds.length > 0) {
+        const orderIds = (
+          await tx.select({ id: orders.id }).from(orders).where(inArray(orders.slotId, slotIds))
+        ).map((row) => row.id);
+        if (orderIds.length > 0) {
+          await tx.delete(refunds).where(inArray(refunds.orderId, orderIds));
+        }
         await tx.delete(reservations).where(inArray(reservations.slotId, slotIds));
         await tx.delete(orders).where(inArray(orders.slotId, slotIds));
       }
@@ -132,6 +139,36 @@ describeDb('결제 확인 동시에 두 번 (실제 DB, 연결 여러 개)', () 
       expect(rows).toHaveLength(1);
       const [slot] = await db.select().from(slots).where(eq(slots.id, slotId));
       expect(slot.status).toBe('reserved');
+    }
+  });
+
+  it('자동 취소를 동시에 두 번 기록해도 환불 기록은 한 줄이다', async () => {
+    for (let round = REPEAT; round < REPEAT * 2; round++) {
+      const { orderId } = await heldAndOrdered(round);
+      // 홀딩이 끝난 뒤 결제되어 결제 확인(paid)으로 남은 주문
+      await db.transaction((tx) =>
+        confirmPaidOrder(tx, {
+          orderId,
+          pgStatus: 'PAID',
+          payMethod: 'PaymentMethodCard',
+          paidAt: new Date(NOW.getTime() + 11 * 60 * 1000),
+        }),
+      );
+      const record = () =>
+        db.transaction((tx) =>
+          recordAutoCancel(tx, {
+            orderId,
+            refundAmount: 14_000,
+            pgCancellationId: 'cancellation-1',
+            now: NOW,
+          }),
+        );
+      const results = await Promise.all([record(), record()]);
+      expect(results.filter(Boolean)).toHaveLength(1);
+      const rows = await db.select().from(refunds).where(eq(refunds.orderId, orderId));
+      expect(rows).toHaveLength(1);
+      const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+      expect(order.status).toBe('auto_cancelled');
     }
   });
 });

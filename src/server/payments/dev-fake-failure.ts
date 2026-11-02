@@ -1,16 +1,20 @@
 // 실패 화면 확인용 스위치. 서버에서만 부른다. 로컬 개발(NODE_ENV=development)에서만 켜지고 배포 주소와 테스트에서는 꺼져 있다.
 // .env.local에 DEV_FAKE_PAYMENT_FAILURE=<함수>:<코드>를 적으면 그 함수가 그 실패를 돌려준다.
-// 예: DEV_FAKE_PAYMENT_FAILURE=confirmPayment:AMOUNT_MISMATCH. 진짜 결제로는 만들기 어려운 실패(금액 불일치 등) 화면을 볼 때 쓴다
+// 예: DEV_FAKE_PAYMENT_FAILURE=confirmPayment:AMOUNT_MISMATCH. 뒤에 _NOT_CANCELLED를 붙이면 자동 취소를 끝내지 못한 경우(autoCancelled false).
+// 진짜 결제로는 만들기 어려운 실패(금액 불일치 등) 화면을 볼 때 쓴다
 
 import 'server-only';
 
 import {
+  autoCancelFail,
   PAYMENT_ERRORS,
   type PaymentError,
   paymentFail,
   UNCONFIRMED_ERRORS,
   unconfirmedFail,
 } from './errors';
+
+const NOT_CANCELLED = '_NOT_CANCELLED';
 
 /** 함수마다 스위치로 흉내 낼 수 있는 실패 코드 */
 const SWITCHABLE = {
@@ -44,15 +48,17 @@ export function devFakeFailure(
   context: { slotId?: string; holdActive?: boolean } = {},
 ): { ok: false; error: PaymentError } | null {
   if (process.env.NODE_ENV !== 'development') return null;
-  const [target, code] = (process.env.DEV_FAKE_PAYMENT_FAILURE ?? '').split(':');
+  const [target, raw = ''] = (process.env.DEV_FAKE_PAYMENT_FAILURE ?? '').split(':');
   if (target !== fn) return null;
+  const code = raw.endsWith(NOT_CANCELLED) ? raw.slice(0, -NOT_CANCELLED.length) : raw;
   if (!(SWITCHABLE[fn] as readonly string[]).includes(code)) {
     console.warn(`[dev-fake-failure] ${fn}에서 흉내 낼 수 없는 실패 코드예요: ${code}`);
     return null;
   }
-  // 결제는 됐는데 확정할 수 없는 경우는 진짜와 같은 모양으로(W11: 기록만, autoCancelled false)
+  // 결제는 됐는데 확정할 수 없는 경우는 진짜와 같은 모양으로(보통은 자동 취소, autoCancelled true)
   if (fn === 'confirmPayment' && code in UNCONFIRMED_ERRORS) {
-    return unconfirmedFail(code as keyof typeof UNCONFIRMED_ERRORS);
+    const unconfirmed = code as keyof typeof UNCONFIRMED_ERRORS;
+    return raw === code ? autoCancelFail(unconfirmed) : unconfirmedFail(unconfirmed);
   }
   const paymentCode = code as keyof typeof PAYMENT_ERRORS;
   if (paymentCode === 'ALREADY_HOLDING') {
