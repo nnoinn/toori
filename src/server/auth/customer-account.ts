@@ -9,6 +9,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
+import { normalizePhone } from '@/lib/phone';
 import { fail, ok, type Result } from '@/lib/result';
 import { safeNextPath } from '@/lib/safe-next';
 
@@ -39,15 +40,19 @@ const createSchema = z.object({
     location: z.boolean(),
     marketing: z.boolean(),
   }),
+  phone: z.string().optional(),
   next: z.string().optional(),
 });
 
 /**
- * 고객 계정을 만들고 약관 동의를 기록한다(첫 로그인 뒤 /join). 닉네임은 카카오·구글 프로필 이름으로 시작한다.
+ * 고객 계정을 만들고 약관 동의와 휴대폰 번호를 저장한다(첫 로그인 뒤 /join, C-104). 닉네임은 카카오·구글 프로필 이름으로 시작한다.
+ * 번호는 인증 없이 모양만 보고 하이픈 넣은 모양으로 맞춰 저장한다. 다른 고객과 같은 번호여도 막지 않는다(#183).
  * 성공하면 돌아오지 않고 next(안전한 주소만, 없으면 홈)로 보낸다. 실패했을 때만 결과를 돌려준다
  */
 export async function createCustomerAccount(input: {
   agreements: { age14: true; service: true; privacy: true; location: true; marketing: boolean };
+  // TODO(#183): /join 번호 칸이 머지되면 필수로 바꾸고, 보내지 않은 경우도 PHONE_REQUIRED로 막는다
+  phone?: string;
   next?: string;
 }): Promise<Result<never>> {
   const parsed = createSchema.safeParse(input);
@@ -56,6 +61,14 @@ export async function createCustomerAccount(input: {
   if (CUSTOMER_REQUIRED_TERMS.some((type) => !agreements[type])) {
     return fail('REQUIRED_TERMS_MISSING', '필수 항목에 모두 동의해 주세요');
   }
+  let phone: string | null = null;
+  if (parsed.data.phone !== undefined) {
+    if (parsed.data.phone.trim() === '') {
+      return fail('PHONE_REQUIRED', '휴대폰 번호를 입력해 주세요');
+    }
+    phone = normalizePhone(parsed.data.phone, 'mobile');
+    if (!phone) return fail('INVALID_INPUT', '휴대폰 번호를 확인해 주세요. 예: 010-1234-5678');
+  }
   const user = await getSessionUser();
   if (!user) return fail('UNAUTHENTICATED', AUTH_ERRORS.UNAUTHENTICATED);
 
@@ -63,6 +76,7 @@ export async function createCustomerAccount(input: {
     saveCustomerAccount(tx, {
       userId: user.userId,
       nickname: user.name ?? DEFAULT_CUSTOMER_NICKNAME,
+      phone,
       marketing: agreements.marketing,
     }),
   );

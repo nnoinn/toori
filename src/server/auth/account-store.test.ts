@@ -16,6 +16,7 @@ import {
 } from './account-store';
 
 const at = (iso: string) => new Date(iso);
+const PHONE = '010-1234-5678';
 
 describe('toMarketingConsent', () => {
   it('기록이 없으면 동의한 적 없음', () => {
@@ -62,12 +63,13 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
       const saved = await saveCustomerAccount(tx, {
         userId,
         nickname: '김투리',
+        phone: PHONE,
         marketing: false,
       });
 
       const [customer] = await tx.select().from(customers).where(eq(customers.userId, userId));
       expect(saved).toEqual({ customerId: customer.id, marketingAgreedAt: null });
-      expect(customer).toMatchObject({ nickname: '김투리' });
+      expect(customer).toMatchObject({ nickname: '김투리', phone: PHONE });
       expect(await termsOf(tx, userId)).toEqual(
         ['age14', 'location', 'privacy', 'service'].map((termsType) => ({
           accountType: 'customer',
@@ -82,7 +84,12 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
   it('광고성 정보 수신에 동의하면 marketing 기록도 남기고 그 동의 시각을 돌려준다', async () => {
     await withRollback(async (tx) => {
       const userId = await createTestUser(tx);
-      const saved = await saveCustomerAccount(tx, { userId, nickname: '김투리', marketing: true });
+      const saved = await saveCustomerAccount(tx, {
+        userId,
+        nickname: '김투리',
+        phone: PHONE,
+        marketing: true,
+      });
       expect((await termsOf(tx, userId)).map((row) => row.termsType)).toContain('marketing');
       const consent = await readMarketingConsent(tx, userId, 'customer');
       expect(consent).toMatchObject({ agreed: true });
@@ -90,14 +97,40 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
     });
   });
 
-  it('이미 고객 계정이 있으면 null이고 동의 기록을 더 남기지 않는다', async () => {
+  it('이미 고객 계정이 있으면 null이고 동의 기록을 더 남기지 않고 번호도 바꾸지 않는다', async () => {
     await withRollback(async (tx) => {
       const { userId } = await createTestCustomer(tx);
       const before = await termsOf(tx, userId);
       expect(
-        await saveCustomerAccount(tx, { userId, nickname: '다시', marketing: true }),
+        await saveCustomerAccount(tx, { userId, nickname: '다시', phone: PHONE, marketing: true }),
       ).toBeNull();
       expect(await termsOf(tx, userId)).toEqual(before);
+      const [customer] = await tx.select().from(customers).where(eq(customers.userId, userId));
+      expect(customer.phone).toBeNull();
+    });
+  });
+
+  it('다른 고객과 같은 번호여도 저장한다', async () => {
+    await withRollback(async (tx) => {
+      for (const nickname of ['첫째', '둘째']) {
+        const userId = await createTestUser(tx);
+        const saved = await saveCustomerAccount(tx, {
+          userId,
+          nickname,
+          phone: PHONE,
+          marketing: false,
+        });
+        expect(saved).not.toBeNull();
+      }
+    });
+  });
+
+  it('번호를 보내지 않은 동안에는 번호 없이 저장한다(#183, 임시)', async () => {
+    await withRollback(async (tx) => {
+      const userId = await createTestUser(tx);
+      await saveCustomerAccount(tx, { userId, nickname: '김투리', phone: null, marketing: false });
+      const [customer] = await tx.select().from(customers).where(eq(customers.userId, userId));
+      expect(customer.phone).toBeNull();
     });
   });
 
