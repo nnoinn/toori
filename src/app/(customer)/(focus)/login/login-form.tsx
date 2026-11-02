@@ -11,10 +11,10 @@ import { customerJoinPath, OWNER_JOIN_PATH } from '@/server/auth/paths';
 import { signInWithProvider, switchAccountMode } from '@/server/auth/session';
 
 import {
-  DEFAULT_NEXT,
   LOGIN_ERROR_MESSAGES,
   type LoginErrorCode,
   type LoginMode,
+  nextForMode,
 } from './login-params';
 import { ProviderButton, type ProviderKey } from './provider-button';
 
@@ -28,7 +28,7 @@ const PROVIDERS: ProviderKey[] = ['kakao', 'google'];
 
 type LoginFormProps = {
   initialMode: LoginMode;
-  /** 주소에 있던 안전한 next. 없으면 고른 모드의 기본 주소로 돌아간다 */
+  /** 주소에 있던 안전한 next. 없거나 고른 모드의 화면이 아니면 그 모드의 기본 주소로 간다(#207) */
   nextParam: string | null;
   /** 로그인 콜백이 돌려보낸 실패 이유(?error=) */
   error: LoginErrorCode | null;
@@ -53,7 +53,8 @@ export function LoginForm({ initialMode, nextParam, error, signedInEmail }: Logi
   const [message, setMessage] = useState<string | null>(error ? LOGIN_ERROR_MESSAGES[error] : null);
   const [continuing, startContinue] = useTransition();
   const [, startTransition] = useTransition();
-  const next = nextParam ?? DEFAULT_NEXT[mode];
+  // 토글로 고른 모드와 next가 맞지 않으면 그 모드의 기본 주소(#207). 계속하기·간편 로그인 모두 이 값으로 간다
+  const next = nextForMode(mode, nextParam);
   const busy = pendingProvider !== null || continuing;
 
   // 카카오·구글 화면에서 뒤로가기로 돌아오면 브라우저가 이 화면을 그대로 되살려서(bfcache)
