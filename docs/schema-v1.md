@@ -348,13 +348,16 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | order_id | uuid → orders | |
 | reservation_id | uuid, null → reservations | 예약을 만들기 전에 결제를 취소하는 자동 취소(`auto_cancel`, C-406)에서는 비어 있다. 어떤 결제의 환불인지는 `order_id`로 안다(#64) |
 | reason | text | `customer_cancel` / `owner_fault` / `auto_cancel` / `admin_exception` |
+| status | text, 기본값 `done` | `requested`(포트원을 부르기 전에 저장한 취소 진행 중) / `done`(끝남) |
 | band | text, null | 적용 구간: `over_24h`(30%) / `6h_to_24h`(50%) / `under_6h`(100%) |
 | penalty_rate | integer | 적용한 위약금 비율(당시 값) |
 | refund_amount | integer | 고객에게 돌려준 금액(실제 결제액 기준) |
 | penalty_amount | integer | 남은 금액(위약금) |
 | pg_cancellation_id | text, null | 포트원 취소 번호 |
-| processed_at | timestamptz | |
+| review_reason | text, null | 운영자 확인이 필요한 이유(포트원이 돌려준 금액이 계산과 다를 때). 비어 있으면 확인할 것 없음 |
+| processed_at | timestamptz, null | 진행 중(`requested`)에는 비어 있고, `done`이면 반드시 있다(check) |
 | processed_by | uuid, null → profiles | 운영자 처리일 때 |
+| created_at | timestamptz | 정리 작업이 오래된 진행 중 기록을 찾을 때 쓴다 |
 
 ### coupons — 쿠폰
 
@@ -534,6 +537,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | slots | check: discount_rate 10~50, end_at > start_at | |
 | reservations | unique(code), unique(slot_id), (customer_id), (status) | 예약번호, 매물당 하나, 내 예약 |
 | orders | unique(payment_id), (customer_id), (status) | 결제 검증, 복구 |
+| refunds | unique(reservation_id) where reason = `customer_cancel`, (created_at) where status = `requested` | 한 예약에 고객 취소 기록 하나, 오래된 진행 중 기록 찾기 |
 | coupons | (customer_id, expires_at) | 보유 쿠폰 |
 | settlement_items | (shop_id, settlement_id) | 정산 묶기 |
 | notifications | unique(dedupe_key) | 중복 발송 방지 |
@@ -572,3 +576,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 2026-10-28 | `orders`에 예약자 정보 제공 동의 기록(`booker_info_version`·`booker_info_agreed_at`)을 더한다(#121). 강규민이 결제 함수(W9~)와 같이 마이그레이션한다. 전화번호(`customers`·`owners`·`shops`의 `phone`)는 모두 하이픈 넣은 모양으로 저장한다(`src/lib/phone.ts`) |
 | 2026-10-29 | 회원 탈퇴(P1) 방향: 샵 상태 `withdrawn`, 마감 사유 `account_withdrawal`, 고객·원장님 계정 unique를 탈퇴하지 않은 계정 기준으로, 같은 사람 표시(해시) 5년. 탈퇴 뒤 30일 되살리기 기간에는 정보를 그대로 두고 30일 뒤 지운다(10장 메모, #148). 예약자 정보 제공 동의 칸은 빈 값 허용(#153) |
 | 2026-11-02 | `push_subscriptions`의 unique를 `endpoint`에서 (`endpoint`, `account_type`)으로 바꾼다(#193). 한 기기에서 켜 둔 계정의 알림을 모두 받는다(11/1 결정, #131). 마이그레이션 0006 |
+| 2026-11-03 | `refunds`에 `status`, `review_reason`, `created_at`을 더하고 `processed_at`을 비어 있을 수 있게 바꿨다. 고객 취소는 포트원을 부르기 전에 `requested`로 저장하고, 정리 작업이 마무리한다. 한 예약에 고객 취소 기록은 하나만(unique) (#222) |

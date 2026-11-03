@@ -42,6 +42,35 @@ describeDb('내 예약 조회', () => {
     });
   });
 
+  it('취소 진행 중(requested)인 기록은 환불 내역으로 보이지 않는다', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const me = await createTestCustomer(tx);
+      const { reservation, order } = await createTestReservation(
+        tx,
+        shop,
+        me.customerId,
+        '17:00',
+        '18:00',
+        'confirmed',
+      );
+      await tx.insert(refunds).values({
+        orderId: order.id,
+        reservationId: reservation.id,
+        reason: 'customer_cancel',
+        status: 'requested',
+        band: 'over_24h',
+        penaltyRate: 30,
+        refundAmount: 9800,
+        penaltyAmount: 4200,
+      });
+
+      const mine = await selectMyReservationDetail(tx, me.customerId, reservation.id);
+      expect(mine?.status).toBe('confirmed');
+      expect(mine?.refund).toBeNull();
+    });
+  });
+
   it('상세는 본인 예약만 열리고, 취소면 환불 내역이 함께 온다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
