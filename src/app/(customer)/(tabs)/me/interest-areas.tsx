@@ -5,7 +5,7 @@ import { Check, Plus, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { RegionBrowser } from '@/features/map/region-browser';
-import { findRegion } from '@/features/map/regions';
+import { findRegion, regionFullName } from '@/features/map/regions';
 import { setInterestAreas } from '@/server/notifications/interest-areas';
 
 import {
@@ -87,7 +87,9 @@ export function InterestAreas({
           <span className="text-sm text-muted-foreground">아직 고른 관심 동네가 없어요.</span>
         ) : (
           codes.map((code) => {
-            const label = findRegion(code)?.sigungu ?? code;
+            // 중구·동구처럼 이름이 겹치는 동네는 시·도까지 보여준다
+            const region = findRegion(code);
+            const label = region ? regionFullName(region) : code;
             return (
               <Button
                 key={code}
