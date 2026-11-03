@@ -31,7 +31,7 @@ export const DEFAULT_CUSTOMER_NICKNAME = '고객';
  */
 export async function saveCustomerAccount(
   tx: Db,
-  input: { userId: string; nickname: string; phone: string | null; marketing: boolean },
+  input: { userId: string; nickname: string; phone: string; marketing: boolean },
 ): Promise<{ customerId: string; marketingAgreedAt: Date | null } | null> {
   const [customer] = await tx
     .insert(customers)
