@@ -64,6 +64,11 @@ export function kakaoMapLink(name: string, lat: number, lng: number): string {
   return `https://map.kakao.com/link/map/${encodeURIComponent(name)},${lat},${lng}`;
 }
 
+/** 카카오맵 길찾기(새 창, C-307). 도착지만 샵으로 정하고 출발지는 카카오맵이 정한다(보통 내 위치) */
+export function kakaoDirectionsLink(name: string, lat: number, lng: number): string {
+  return `https://map.kakao.com/link/to/${encodeURIComponent(name)},${lat},${lng}`;
+}
+
 /** 전화 걸기 링크용 숫자만. 예: "031-123-4567" → "tel:0311234567" */
 export function telHref(phone: string): string | null {
   const digits = phone.replace(/[^\d+]/g, '');

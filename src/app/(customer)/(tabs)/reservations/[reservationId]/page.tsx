@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { Clock, Info, MapPin, Phone } from 'lucide-react';
+import { Clock, Info, MapPin, Navigation, Phone } from 'lucide-react';
 
 import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,7 @@ import { ensureCustomerPage } from '@/server/auth';
 import { previewRefund } from '@/server/refunds/cancel';
 import { REFUND_ERRORS } from '@/server/refunds/errors';
 
-import { formatDuration } from '../../slots/[slotId]/detail-format';
+import { formatDuration, kakaoDirectionsLink } from '../../slots/[slotId]/detail-format';
 import { getMyReservationDetail } from '../queries';
 import { isVisitPending, showsCancelSection } from '../reservation-tabs';
 import { CancelReservation } from './cancel-reservation';
@@ -90,6 +90,16 @@ async function DetailContent({ params }: { params: Params }) {
           {r.shop.roadAddress}
           {r.shop.addressDetail ? ` ${r.shop.addressDetail}` : ''}
         </p>
+        {/* 샵까지 길찾기(C-307). 카카오맵이 새 창으로 열린다 */}
+        <a
+          href={kakaoDirectionsLink(r.shop.name, r.shop.lat, r.shop.lng)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 text-sm"
+        >
+          <Navigation className="size-4 text-muted-foreground" aria-hidden />
+          카카오맵으로 길찾기
+        </a>
         {tel.length >= 8 ? (
           <a href={`tel:${tel}`} className="flex items-center gap-2 text-sm">
             <Phone className="size-4 text-muted-foreground" aria-hidden />

@@ -1,5 +1,13 @@
 import Image from 'next/image';
-import { ChevronDown, Clock, ExternalLink, ImageOff, MapPin, Phone } from 'lucide-react';
+import {
+  ChevronDown,
+  Clock,
+  ExternalLink,
+  ImageOff,
+  MapPin,
+  Navigation,
+  Phone,
+} from 'lucide-react';
 
 import { BackButton } from '@/components/ui/back-button';
 import { buttonVariants } from '@/components/ui/button';
@@ -14,6 +22,7 @@ import { NO_SHOW_PENALTY_RATE, OWNER_FAULT_COUPON_AMOUNT, REFUND_BANDS } from '@
 import {
   formatBusinessHours,
   formatDuration,
+  kakaoDirectionsLink,
   kakaoMapLink,
   refundPolicyLines,
   refundPolicyNotes,
@@ -143,15 +152,26 @@ export function SlotDetailView({ slot, serverNow }: SlotDetailViewProps) {
           </span>
         </p>
         <ShopLocationMap shopId={shop.shopId} name={shop.name} lat={shop.lat} lng={shop.lng} />
-        <a
-          href={kakaoMapLink(shop.name, shop.lat, shop.lng)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 self-start text-sm text-muted-foreground"
-        >
-          카카오맵에서 크게 보기
-          <ExternalLink className="size-3.5" aria-hidden />
-        </a>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <a
+            href={kakaoDirectionsLink(shop.name, shop.lat, shop.lng)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 font-medium"
+          >
+            <Navigation className="size-4 text-muted-foreground" aria-hidden />
+            카카오맵으로 길찾기
+          </a>
+          <a
+            href={kakaoMapLink(shop.name, shop.lat, shop.lng)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-muted-foreground"
+          >
+            카카오맵에서 크게 보기
+            <ExternalLink className="size-3.5" aria-hidden />
+          </a>
+        </div>
         {tel ? (
           <a href={tel} className="flex items-center gap-2 text-sm">
             <Phone className="size-4 text-muted-foreground" aria-hidden />
