@@ -1,5 +1,6 @@
 // 홈 목록·지도 매물 조회 (J4, C-201·C-204·C-205·C-206, #19 D4·D8). 이 화면에서만 쓰는 서버 코드라 화면 폴더에 둔다.
-// 지금 지도에 보이는 영역 안의, 고객에게 보이는 게시중 매물만 본다. 조건 세 가지를 꼭 같이 넣는다:
+// 지도는 지금 보이는 영역 안, 지도 없는 매물 목록(#215)은 고른 시·군·구 안의, 고객에게 보이는 게시중 매물만 본다.
+// 조건 세 가지를 꼭 같이 넣는다:
 //   승인 샵(customerVisibleShop, #50) · 게시중(slotStatusIs, 연결 #16) · 신규 고객 전용(newCustomerOnlyVisible, #49)
 // select…는 DB를 받아서 테스트(withRollback)에서도 같은 조회를 쓸 수 있게 했다.
 
@@ -27,6 +28,9 @@ type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 
 /** 지도에 한 번에 찍는 샵 수 상한. 넓게 축소해도 응답이 너무 커지지 않게 한다 */
 export const MAP_SHOP_LIMIT = 300;
+
+/** 매물을 찾는 범위: 지도 영역, 또는 시·군·구(지도 없는 매물 목록, #215) */
+export type SlotArea = { bounds: MapBounds } | { sigunguCode: string };
 
 export type HomeSlotQuery = {
   bounds: MapBounds;
@@ -87,15 +91,28 @@ function filterConditions(filters: HomeFilters): (SQL | undefined)[] {
   ];
 }
 
-/** 홈 목록·지도에 보이는 매물 조건 */
-function visibleSlotConditions(query: HomeSlotQuery): SQL {
+/** 범위(지도 영역 또는 시·군·구)와 필터·로그인·시각 */
+export type VisibleSlotQuery = Omit<HomeSlotQuery, 'bounds'> & SlotArea;
+
+/** 홈 목록·지도·매물 목록에 보이는 매물 조건 */
+function visibleSlotConditions(query: VisibleSlotQuery): SQL {
   return and(
     customerVisibleShop(),
     slotStatusIs('published', query.now),
     newCustomerOnlyVisible(query.customerId),
-    inBounds(query.bounds),
+    'bounds' in query ? inBounds(query.bounds) : eq(shops.sigunguCode, query.sigunguCode),
     ...filterConditions(query.filters),
   )!;
+}
+
+/** 범위 안 매물 수(매물 목록 제목, #215) */
+export async function countSlots(db: DbReader, query: VisibleSlotQuery): Promise<number> {
+  const [row] = await db
+    .select({ total: count() })
+    .from(slots)
+    .innerJoin(shops, eq(shops.id, slots.shopId))
+    .where(visibleSlotConditions(query));
+  return row?.total ?? 0;
 }
 
 /** 지도 마커: 영역 안 샵별 매물 수. 가까운 순이 아니라 매물 많은 순으로 상한까지 */
@@ -121,7 +138,7 @@ export async function selectMapShops(db: DbReader, query: HomeSlotQuery): Promis
   return rows.map((row) => ({ ...row, category: row.category as MapShop['category'] }));
 }
 
-export type SlotPageQuery = HomeSlotQuery & {
+export type SlotPageQuery = VisibleSlotQuery & {
   /** 거리순 기준점: 내 위치, 없으면 고른 동네 중심(D4) */
   origin: LatLng;
   sort: SlotSort;

@@ -17,7 +17,7 @@ import { closeTestDb, describeDb, type TestTx, withRollback } from '../../../../
 import { EMPTY_FILTERS, type HomeFilters } from '../filters';
 import type { MapBounds } from '../types';
 import { decodeCursor, SLOT_PAGE_SIZE } from './cursor';
-import { type HomeSlotQuery, selectMapShops, selectSlotPage } from './queries';
+import { countSlots, type HomeSlotQuery, selectMapShops, selectSlotPage } from './queries';
 import type { SlotSort } from './sort';
 
 afterAll(closeTestDb);
@@ -67,6 +67,32 @@ async function insertSlot(
 const ids = (items: { slotId: string }[]) => items.map((item) => item.slotId);
 
 describeDb('홈 목록·지도 조회', () => {
+  it('매물 목록: 고른 시·군·구 안의 매물만, 매물 수도 같은 조건(#215)', async () => {
+    await withRollback(async (tx) => {
+      // 테스트 샵은 기본이 안산시 단원구(41273)
+      const danwon = await createTestShop(tx, { status: 'approved' });
+      const sangnok = await createTestShop(tx, {
+        status: 'approved',
+        sigunguCode: '41271',
+        sigungu: '안산시 상록구',
+      });
+      const shown = await insertSlot(tx, danwon, '10:00', '11:00');
+      await insertSlot(tx, sangnok, '10:00', '11:00');
+      await insertSlot(tx, danwon, '12:00', '13:00', { status: 'closed' });
+
+      const query = { sigunguCode: '41273', filters: EMPTY_FILTERS, customerId: null, now: NOW };
+      const result = await selectSlotPage(tx, {
+        ...query,
+        origin: TEST_LOCATION,
+        sort: 'near',
+        cursor: null,
+        shopId: null,
+      });
+      expect(ids(result.items)).toEqual([shown.id]);
+      expect(await countSlots(tx, query)).toBe(1);
+    });
+  });
+
   it('승인 샵의 게시중 매물만, 지도 영역 안에서만', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
