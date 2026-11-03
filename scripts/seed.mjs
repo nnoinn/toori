@@ -29,6 +29,21 @@ export { salePrice };
 const pad = (n, width) => String(n).padStart(width, '0');
 const KST_OFFSET = 9 * HOUR;
 
+/**
+ * 국세청 검증번호 가중치. src/lib/business-number.ts와 같은 계산이다
+ * (스크립트에서 TS 파일을 부르면 Node 경고가 떠서 여기 다시 둔다. 같은지는 tests/db/seed.test.ts가 본다)
+ */
+const CHECK_WEIGHTS = [1, 3, 7, 1, 3, 7, 1, 3, 5];
+
+/** 시드 샵 n번의 가짜 사업자등록번호(숫자 10자리). 검증번호가 맞아서 원장님 화면에서 그대로 다시 저장할 수 있다(#242) */
+export function seedBusinessNumber(n) {
+  const first9 = `00000${pad(n, 4)}`;
+  const sum =
+    CHECK_WEIGHTS.reduce((acc, weight, i) => acc + Number(first9[i]) * weight, 0) +
+    Math.floor((Number(first9[8]) * 5) / 10);
+  return `${first9}${(10 - (sum % 10)) % 10}`;
+}
+
 /** 계속 쓰는 시험 매물의 시작 시각(ROLLING_SLOTS). 넣는 날의 한국 날짜 기준이고, 그 샵이 쉬는 요일은 뺀다 */
 export function rollingStarts(base, hours) {
   const kstMidnight = Math.floor((base + KST_OFFSET) / DAY) * DAY - KST_OFFSET;
@@ -149,7 +164,7 @@ export async function seedDevData(sql, { now, userIds }) {
       naver_place_url: shop.links.naver ?? null,
       business_name: shop.name,
       representative_name: ownerName,
-      business_registration_number: `000-00-${pad(n, 5)}`,
+      business_registration_number: seedBusinessNumber(n),
       opened_on: '2021-03-02',
       business_doc_path: `seed/${shop.key}/business-doc.jpg`,
       status: shop.status,
