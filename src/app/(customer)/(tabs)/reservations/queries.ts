@@ -141,7 +141,7 @@ export async function selectMyReservationDetail(
     .limit(1);
   if (!row) return null;
 
-  // 환불은 예약 하나에 보통 하나다. 여러 개면 가장 최근 것
+  // 환불은 예약 하나에 보통 하나다. 여러 개면 가장 최근 것. 진행 중(requested)인 기록은 아직 환불 내역이 아니다
   const [refund] = await db
     .select({
       refundAmount: refunds.refundAmount,
@@ -150,7 +150,7 @@ export async function selectMyReservationDetail(
       processedAt: refunds.processedAt,
     })
     .from(refunds)
-    .where(eq(refunds.reservationId, row.reservationId))
+    .where(and(eq(refunds.reservationId, row.reservationId), eq(refunds.status, 'done')))
     .orderBy(desc(refunds.processedAt))
     .limit(1);
 
@@ -180,7 +180,7 @@ export async function selectMyReservationDetail(
       amount: row.amount,
       paidAt: iso(row.paidAt),
     },
-    refund: refund
+    refund: refund?.processedAt
       ? {
           refundAmount: refund.refundAmount,
           penaltyAmount: refund.penaltyAmount,

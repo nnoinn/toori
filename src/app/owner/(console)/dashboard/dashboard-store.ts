@@ -4,6 +4,7 @@
 import 'server-only';
 
 import { and, asc, eq, gte, isNull, lte } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 import { getDb } from '@/db';
 import { reservations, slots } from '@/db/schema';
@@ -12,6 +13,9 @@ import type { SlotCloseReason, SlotStatus } from '@/db/schema/slots';
 import type { DashboardSlot } from './dashboard';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select'>;
+
+/** 이 매물로 재등록한 새 매물(O13). '취소' 매물 줄에 [재등록]·"재등록함"을 고른다 */
+const relisted = alias(slots, 'relisted');
 
 const slotColumns = {
   id: slots.id,
@@ -29,14 +33,16 @@ const slotColumns = {
   closeReason: slots.closeReason,
   reservationId: reservations.id,
   reservationCode: reservations.code,
+  relistedSlotId: relisted.id,
 };
 
-type ReservationKey = 'reservationId' | 'reservationCode';
+/** 왼쪽 조인이라 없으면 null인 칸 */
+type JoinedKey = 'reservationId' | 'reservationCode' | 'relistedSlotId';
 
 type SlotRow = {
-  [K in keyof typeof slotColumns]: K extends ReservationKey
+  [K in keyof typeof slotColumns]: K extends JoinedKey
     ? string | null
-    : (typeof slots.$inferSelect)[Exclude<K, ReservationKey>];
+    : (typeof slots.$inferSelect)[Exclude<K, JoinedKey>];
 };
 
 function toDashboardSlot(row: SlotRow): DashboardSlot {
@@ -63,6 +69,7 @@ export async function selectDashboardSlots(
     .select(slotColumns)
     .from(slots)
     .leftJoin(reservations, eq(reservations.slotId, slots.id))
+    .leftJoin(relisted, eq(relisted.relistedFromSlotId, slots.id))
     .where(and(eq(slots.shopId, shopId), gte(slots.startAt, from)))
     .orderBy(asc(slots.startAt));
   return rows.map(toDashboardSlot);
@@ -81,6 +88,7 @@ export async function selectNeedsVisitRecord(
     .select(slotColumns)
     .from(slots)
     .innerJoin(reservations, eq(reservations.slotId, slots.id))
+    .leftJoin(relisted, eq(relisted.relistedFromSlotId, slots.id))
     .where(
       and(
         eq(slots.shopId, shopId),

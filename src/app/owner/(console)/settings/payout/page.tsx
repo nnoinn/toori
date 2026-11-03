@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
 import { BackButton } from '@/components/ui/back-button';
-import { ErrorState, LoadingCards } from '@/components/ui/state';
+import { LoadingCards } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { ensureOwnerPage } from '@/server/auth';
 
@@ -31,8 +31,8 @@ export default function PayoutPage() {
 async function PayoutContent() {
   // 로그인하지 않았으면 로그인 화면, 원장님 가입 전이면 /owner/join 으로 보낸다
   const auth = await ensureOwnerPage(PAGE_PATH);
+  // 가입 때 넣지만, 계좌 없이 만든 원장님(시드 등)은 null이고 등록 칸을 보여준다(#213)
   const account = await selectPayoutAccount(getDb(), auth.shopId);
-  if (!account) return <ErrorState description="정산 계좌를 찾을 수 없어요" />;
   // 저장된 계좌가 바뀌면 폼이 입력 중이던 칸을 닫는다(payout-form.tsx)
   return <PayoutForm shopId={auth.shopId} account={account} />;
 }

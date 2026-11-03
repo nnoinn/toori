@@ -7,16 +7,17 @@ import { cn } from 'cn';
 import { CalendarCheck, House, User } from 'lucide-react';
 
 import { Logo } from '@/components/ui/logo';
+import { CUSTOMER_HOME } from '@/server/auth/paths';
 
 // 고객 화면 메뉴(홈 / 내 예약 / 내 정보). 폰은 아래 메뉴(CustomerBottomNav), PC(md 이상)는 위쪽 메뉴(CustomerTopNav). 주소는 정찬형이 화면을 만들면서 바꿀 수 있다(바꾸면 여기만 고친다).
 const ITEMS = [
-  { href: '/', label: '홈', icon: House },
+  { href: CUSTOMER_HOME, label: '홈', icon: House },
   { href: '/reservations', label: '내 예약', icon: CalendarCheck },
   { href: '/me', label: '내 정보', icon: User },
 ] as const;
 
 function isActive(pathname: string, href: string) {
-  return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 // 지금 주소(usePathname)는 주소가 바뀌는 화면(예: /slots/[slotId])에서 미리 만들 때 알 수 없어서,
@@ -73,7 +74,7 @@ export function CustomerTopNav() {
   return (
     <header className="sticky top-0 z-40 hidden h-16 border-b bg-card md:block">
       <div className="flex h-full w-full items-center justify-between px-6">
-        <Link href="/" className="flex items-center">
+        <Link href={CUSTOMER_HOME} className="flex items-center">
           <Logo className="h-7" />
         </Link>
         <nav aria-label="고객 메뉴">

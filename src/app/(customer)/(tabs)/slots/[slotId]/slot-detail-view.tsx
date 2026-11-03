@@ -8,6 +8,7 @@ import { Price } from '@/components/ui/price';
 import { SlotBadges } from '@/components/ui/slot-badge';
 import { ShopLocationMap } from '@/features/map/shop-location-map';
 import { formatKst } from '@/lib/time';
+import { CUSTOMER_HOME } from '@/server/auth/paths';
 import { NO_SHOW_PENALTY_RATE, OWNER_FAULT_COUPON_AMOUNT, REFUND_BANDS } from '@/server/policy';
 
 import {
@@ -48,7 +49,11 @@ export function SlotDetailView({ slot, serverNow }: SlotDetailViewProps) {
     <article className="flex flex-1 flex-col pb-24 md:mx-auto md:grid md:w-full md:max-w-5xl md:grid-cols-[minmax(0,1fr)_380px] md:items-start md:gap-x-8 md:px-6 md:py-6">
       {slot.imageUrls.length > 0 ? (
         <div className="relative md:col-start-1 md:row-start-1 md:overflow-hidden md:rounded-2xl">
-          <BackButton className="absolute top-2 left-2 z-10 bg-background/80" />
+          {/* 공유한 주소로 바로 들어와 이전 화면이 없으면 고객 홈으로(#215) */}
+          <BackButton
+            fallbackHref={CUSTOMER_HOME}
+            className="absolute top-2 left-2 z-10 bg-background/80"
+          />
           <ul className="flex snap-x snap-mandatory overflow-x-auto" aria-label="스타일 이미지">
             {slot.imageUrls.map((url, index) => (
               <li key={url} className="relative aspect-[4/3] w-full shrink-0 snap-center">
@@ -67,7 +72,7 @@ export function SlotDetailView({ slot, serverNow }: SlotDetailViewProps) {
       ) : (
         // 사진이 없으면 큰 회색 칸 대신 뒤로가기와 작은 안내만 두어 샵 정보가 바로 위로 올라오게 한다(#214)
         <div className="flex items-center gap-2 px-2 pt-2 md:col-start-1 md:row-start-1 md:px-0 md:pt-0">
-          <BackButton />
+          <BackButton fallbackHref={CUSTOMER_HOME} />
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <ImageOff className="size-4" aria-hidden />
             사진이 아직 없어요

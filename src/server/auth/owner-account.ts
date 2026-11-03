@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { getDb } from '@/db';
 import { owners } from '@/db/schema';
 import { geocodeAddress, type GeocodeError } from '@/features/map/geocode';
+import { isValidBusinessNumber } from '@/lib/business-number';
 import { normalizePhone } from '@/lib/phone';
 import { getRequestNow } from '@/lib/request-time';
 import { fail, ok } from '@/lib/result';
@@ -105,6 +106,10 @@ export async function createOwnerAccount(
   const { owner, shop, payout, agreements } = parsed.data;
   if (Object.values(agreements).includes(false)) {
     return fail('REQUIRED_TERMS_MISSING', '필수 항목에 모두 동의해 주세요');
+  }
+  // 화면에서도 보지만, 화면을 거치지 않은 요청도 막는다(#205)
+  if (!isValidBusinessNumber(shop.businessRegistrationNumber)) {
+    return fail('INVALID_INPUT', '사업자등록번호를 다시 확인해 주세요');
   }
   if (shop.openedOn > kstDateKey(await getRequestNow())) {
     return fail('INVALID_INPUT', '개업일자를 다시 확인해 주세요');
