@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { LoaderCircle, X } from 'lucide-react';
 import { cn } from 'cn';
 
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/state';
 
 import { KakaoMap } from './kakao-map';
@@ -160,7 +161,13 @@ export function HomeExplorer({ center, myLocation, header, sort, serverNow }: Ho
             empty={
               <EmptyState
                 title="이 지역에 지금 올라온 매물이 없어요"
-                description="지도를 옮기거나 필터를 바꿔 보세요."
+                description="지도를 옮기거나 필터를 바꿔 보세요. 관심 동네를 정해 두면 새 매물이 올라올 때 알려 드려요."
+                // 지도 영역은 동네 하나가 아니라서 바로 등록하지 않고 내 정보의 관심 동네로 보낸다(C-208)
+                action={
+                  <Link href="/me" className={buttonVariants({ size: 'sm' })}>
+                    관심 동네 정하기
+                  </Link>
+                }
               />
             }
           />

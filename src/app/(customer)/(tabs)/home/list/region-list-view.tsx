@@ -18,13 +18,21 @@ type RegionListViewProps = {
   sort: SlotSort;
   /** 서버가 준 "지금"(ISO). 목록을 받기 전 카드 남은 시간 기준 */
   serverNow: string;
+  /** 매물이 없을 때 안내 아래에 둘 것(새 매물 알림 권유, C-208) */
+  emptyAction?: React.ReactNode;
 };
 
 /**
  * 지도 없는 매물 목록 (#215 2장). 고른 동네(또는 내 위치가 속한 시·군·구) 안의 매물을 필터·정렬로 본다.
  * 다시 불러오는 동안 이전 목록을 두고 제목 옆에 작은 표시만, 실패하면 목록 위에 안내와 '다시 시도'(지도 홈과 같게)
  */
-export function RegionListView({ areaCode, areaLabel, sort, serverNow }: RegionListViewProps) {
+export function RegionListView({
+  areaCode,
+  areaLabel,
+  sort,
+  serverNow,
+  emptyAction,
+}: RegionListViewProps) {
   const search = useSearchParams().toString();
   const list = useRegionSlots({ areaCode, search });
 
@@ -67,6 +75,7 @@ export function RegionListView({ areaCode, areaLabel, sort, serverNow }: RegionL
             <EmptyState
               title="이 동네에 지금 올라온 매물이 없어요"
               description="필터를 바꾸거나 다른 동네를 골라 보세요."
+              action={emptyAction}
             />
           }
         />
