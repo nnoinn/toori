@@ -8,6 +8,7 @@ import { Price } from '@/components/ui/price';
 import { SlotBadges } from '@/components/ui/slot-badge';
 import { ShopLocationMap } from '@/features/map/shop-location-map';
 import { formatKst } from '@/lib/time';
+import { CUSTOMER_HOME } from '@/server/auth/paths';
 import { NO_SHOW_PENALTY_RATE, OWNER_FAULT_COUPON_AMOUNT, REFUND_BANDS } from '@/server/policy';
 
 import {
@@ -47,7 +48,11 @@ export function SlotDetailView({ slot, serverNow }: SlotDetailViewProps) {
   return (
     <article className="flex flex-1 flex-col pb-24 md:mx-auto md:grid md:w-full md:max-w-5xl md:grid-cols-[minmax(0,1fr)_380px] md:items-start md:gap-x-8 md:px-6 md:py-6">
       <div className="relative md:col-start-1 md:row-start-1 md:overflow-hidden md:rounded-2xl">
-        <BackButton className="absolute top-2 left-2 z-10 bg-background/80" />
+        {/* 공유한 주소로 바로 들어와 이전 화면이 없으면 고객 홈으로(#215) */}
+        <BackButton
+          fallbackHref={CUSTOMER_HOME}
+          className="absolute top-2 left-2 z-10 bg-background/80"
+        />
         {slot.imageUrls.length > 0 ? (
           <ul className="flex snap-x snap-mandatory overflow-x-auto" aria-label="스타일 이미지">
             {slot.imageUrls.map((url, index) => (

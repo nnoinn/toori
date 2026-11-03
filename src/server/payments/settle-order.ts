@@ -1,4 +1,4 @@
-// 포트원에서 결제 완료(PAID)를 확인한 주문의 처리 (X-201, C-406, W12). 서버에서만 부른다. 결제 확인(confirmPayment)과 웹훅(W13)이 같이 쓴다.
+// 포트원에서 결제 상태를 확인한 주문의 처리 (X-201, C-406, W12). 서버에서만 부른다. 결제 확인(confirmPayment), 정리 작업, 웹훅(W13)이 같이 쓴다.
 // 금액이 맞고 확정할 수 있으면 예약을 확정하고, 아니면 포트원에서 결제를 취소해 전액 돌려준다.
 // 포트원 호출 동안 DB 줄을 잠그지 않도록, 주문을 결제 확인(paid)으로 먼저 저장한 뒤 취소한다.
 // 취소하지 못했거나 기록 전에 서버가 멈춰도 주문이 paid로 남아서, 다시 부르면 이어서 처리된다(이미 취소된 결제는 포트원 취소 내역으로 기록).
@@ -20,6 +20,16 @@ export type SettleOutcome =
   | { ok: true; reservationId: string; reservationCode: string }
   /** autoCancelled: 포트원에서 결제를 취소했으면 true. false면 주문이 paid로 남아 있어 다시 시도한다 */
   | { ok: false; code: UnconfirmedCode; autoCancelled: boolean };
+
+/** 포트원에서 결제가 안 된 것(실패·취소)으로 확인한 주문을 실패로 기록한다 */
+export function recordFailedPayment(db: Db, orderId: string, payment: PortOnePayment) {
+  return recordOrderOutcome(db, orderId, {
+    status: 'failed',
+    pgStatus: payment.status,
+    failureCode: payment.failureCode ?? payment.status,
+    failureMessage: payment.failureReason,
+  });
+}
 
 /** 결제 완료를 확인한 주문을 예약으로 확정하거나, 확정할 수 없으면 자동 취소한다. 트랜잭션 밖에서 부른다 */
 export async function settlePaidOrder(

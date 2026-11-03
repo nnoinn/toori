@@ -108,6 +108,7 @@ describe('createCustomerAccount', () => {
     await expect(
       createCustomerAccount({
         agreements: { ...ALL_REQUIRED, marketing: false },
+        phone: PHONE,
         next: '//evil.example',
       }),
     ).rejects.toThrow('redirect:/');
@@ -160,14 +161,12 @@ describe('createCustomerAccount', () => {
     },
   );
 
-  it('번호 칸이 생기기 전 화면처럼 번호를 보내지 않으면 번호 없이 저장한다(#183, 임시)', async () => {
-    await expect(
-      createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: false } }),
-    ).rejects.toThrow('redirect:/');
-    expect(state.saveCustomerAccount).toHaveBeenCalledWith(
-      'tx',
-      expect.objectContaining({ phone: null }),
-    );
+  it('번호를 보내지 않은 요청도 PHONE_REQUIRED이고 저장하지 않는다(화면을 거치지 않은 요청)', async () => {
+    const result = await createCustomerAccount({
+      agreements: { ...ALL_REQUIRED, marketing: false },
+    } as never);
+    expect(result.ok === false && result.error.code).toBe('PHONE_REQUIRED');
+    expect(state.saveCustomerAccount).not.toHaveBeenCalled();
   });
 
   it('입력 모양이 틀리면 INVALID_INPUT', async () => {
@@ -180,6 +179,7 @@ describe('createCustomerAccount', () => {
     state.user = null;
     const result = await createCustomerAccount({
       agreements: { ...ALL_REQUIRED, marketing: false },
+      phone: PHONE,
     });
     expect(result.ok === false && result.error.code).toBe('UNAUTHENTICATED');
     expect(state.saveCustomerAccount).not.toHaveBeenCalled();
@@ -189,6 +189,7 @@ describe('createCustomerAccount', () => {
     state.saved = null;
     const result = await createCustomerAccount({
       agreements: { ...ALL_REQUIRED, marketing: false },
+      phone: PHONE,
     });
     expect(result).toEqual(fail('ALREADY_EXISTS', '이미 가입한 계정이에요'));
     expect(state.cookieSet).not.toHaveBeenCalled();
@@ -201,7 +202,7 @@ describe('가입 직후 광고성 동의 처리 결과 안내', () => {
   it('가입 때 광고성 동의를 골랐으면 누구의 동의인지와 동의 시각을 14일짜리 쿠키로 남긴다', async () => {
     state.saved = { customerId: 'customer-1', marketingAgreedAt: AGREED_AT };
     await expect(
-      createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: true } }),
+      createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: true }, phone: PHONE }),
     ).rejects.toThrow('redirect:/');
     expect(state.cookieSet).toHaveBeenCalledWith(
       'marketing_consent_notice',
@@ -212,7 +213,7 @@ describe('가입 직후 광고성 동의 처리 결과 안내', () => {
 
   it('광고성 동의를 고르지 않았으면 남기지 않는다', async () => {
     await expect(
-      createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: false } }),
+      createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: false }, phone: PHONE }),
     ).rejects.toThrow('redirect:/');
     expect(state.cookieSet).not.toHaveBeenCalledWith(
       'marketing_consent_notice',

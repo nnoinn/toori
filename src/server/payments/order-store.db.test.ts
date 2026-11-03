@@ -15,7 +15,7 @@ import {
   violatedConstraint,
   withRollback,
 } from '../../../tests/db/test-db';
-import { createPendingOrder, newPaymentId } from './order-store';
+import { createPendingOrder, newPaymentId, readStaleOrders } from './order-store';
 
 const AGREED_AT = new Date('2026-11-01T09:00:00+09:00');
 
@@ -80,6 +80,46 @@ describeDb('주문 저장 (실제 DB)', () => {
       expect(await violatedConstraint(tx, (t) => createPendingOrder(t, order))).toBe(
         'orders_payment_id_unique',
       );
+    });
+  });
+
+  it('readStaleOrders는 기준 시각 전에 만든 결제 대기·결제 확인 주문만 오래된 순서로 고른다', async () => {
+    await withRollback(async (tx) => {
+      const { slotId, customerId } = await setup(tx);
+      /** 다른 테스트의 주문과 섞이지 않게 아주 오래전에 만든 것으로 둔다 */
+      const make = async (status: string, createdAt: string) => {
+        const paymentId = newPaymentId();
+        const orderId = await createPendingOrder(tx, {
+          paymentId,
+          slotId,
+          customerId,
+          salePrice: 14_000,
+          couponAmount: 0,
+          amount: 14_000,
+          agreedAt: AGREED_AT,
+        });
+        await tx
+          .update(orders)
+          .set({ status, createdAt: new Date(createdAt) })
+          .where(eq(orders.id, orderId));
+        return { orderId, paymentId };
+      };
+
+      const paid = await make('paid', '2020-01-02T00:00:00Z');
+      const pending = await make('pending', '2020-01-01T00:00:00Z');
+      await make('confirmed', '2020-01-03T00:00:00Z');
+      await make('failed', '2020-01-04T00:00:00Z');
+      await make('auto_cancelled', '2020-01-05T00:00:00Z');
+      await make('pending', '2020-06-01T00:00:00Z');
+
+      const createdBefore = new Date('2020-03-01T00:00:00Z');
+      expect(await readStaleOrders(tx, { createdBefore, limit: 10 })).toEqual([
+        { ...pending, amount: 14_000, status: 'pending' },
+        { ...paid, amount: 14_000, status: 'paid' },
+      ]);
+      expect(await readStaleOrders(tx, { createdBefore, limit: 1 })).toEqual([
+        { ...pending, amount: 14_000, status: 'pending' },
+      ]);
     });
   });
 });

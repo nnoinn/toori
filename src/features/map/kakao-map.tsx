@@ -7,12 +7,15 @@ import { cn } from 'cn';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ui/state';
 
+import { categoryPinUrl, PIN_SIZE, PIN_TIP } from './category-pins';
 import {
   kakaoMapSdkUrl,
   MAP_BOUNDS_DEBOUNCE_MS,
-  MAP_CLUSTER_MIN_LEVEL,
   MAP_INITIAL_LEVEL,
+  MAP_OVERLAP_GRID_SIZE,
+  MAP_REGION_GROUP_MIN_LEVEL,
 } from './map-config';
+import { groupShopsByRegion, type RegionGroup } from './region-groups';
 import type { LatLng, MapBounds, MapShop } from './types';
 
 const APP_KEY = process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY;
@@ -24,12 +27,34 @@ const MY_LOCATION_DOT =
     '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"><circle cx="11" cy="11" r="8" fill="#3b82f6" stroke="white" stroke-width="3"/></svg>',
   );
 
+/** 구 묶음 표시("단원구 12"). 누르면 그 구로 확대한다(#204) */
+function regionGroupElement(group: RegionGroup, onClick: () => void): HTMLElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className =
+    'flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm font-semibold shadow-md';
+  button.setAttribute(
+    'aria-label',
+    `${group.name ?? '이 지역'} 매물 ${group.count}개. 누르면 확대해요`,
+  );
+  if (group.name) button.append(group.name);
+  const count = document.createElement('span');
+  count.className = 'rounded-full bg-primary px-2 text-xs text-primary-foreground';
+  count.textContent = String(group.count);
+  button.append(count);
+  button.addEventListener('click', onClick);
+  return button;
+}
+
 type KakaoMapProps = {
   /** 지도 가운데. 바뀌면 그 자리로 옮긴다 */
   center: LatLng;
   /** 내 위치를 쓰고 있으면 그 자리에 점을 찍는다 */
   myLocation?: LatLng | null;
-  /** 마커로 찍을 샵. 가까운 마커는 개수로 묶는다 */
+  /**
+   * 마커로 찍을 샵. 업종이 있으면 업종별 핀(#204). 멀리서 볼 때는 시·군·구마다 묶어 매물 수를 보여주고,
+   * 가까이서는 거의 겹치는 핀만 숫자로 묶는다
+   */
   shops?: MapShop[];
   /** 지도 이동·확대가 끝나면 보이는 영역을 알린다(잠깐 기다렸다가) */
   onBoundsChange?: (bounds: MapBounds) => void;
@@ -60,6 +85,8 @@ export function KakaoMap({
   const mapRef = useRef<kakao.maps.Map | null>(null);
   const clustererRef = useRef<kakao.maps.MarkerClusterer | null>(null);
   const myMarkerRef = useRef<kakao.maps.Marker | null>(null);
+  const overlaysRef = useRef<kakao.maps.CustomOverlay[]>([]);
+  const [level, setLevel] = useState(MAP_INITIAL_LEVEL);
   const callbacksRef = useRef({ onBoundsChange, onSelectShop });
   const hiddenRef = useRef(hidden);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
@@ -84,7 +111,8 @@ export function KakaoMap({
     clustererRef.current = new maps.MarkerClusterer({
       map,
       averageCenter: true,
-      minLevel: MAP_CLUSTER_MIN_LEVEL,
+      minLevel: 1,
+      gridSize: MAP_OVERLAP_GRID_SIZE,
     });
     // center·zoomable은 처음 만들 때만 쓴다. center가 바뀌면 아래 효과에서 옮긴다
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,6 +146,16 @@ export function KakaoMap({
     };
   }, [status]);
 
+  // 확대 정도가 바뀌면 핀과 구 묶음 중 무엇을 보여줄지 다시 고른다(#204)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const { maps } = window.kakao!;
+    const handleZoom = () => setLevel(map.getLevel());
+    maps.event.addListener(map, 'zoom_changed', handleZoom);
+    return () => maps.event.removeListener(map, 'zoom_changed', handleZoom);
+  }, [status]);
+
   // 가운데가 바뀌면(동네 바꾸기, 내 위치로) 옮긴다
   useEffect(() => {
     const map = mapRef.current;
@@ -144,17 +182,54 @@ export function KakaoMap({
       : null;
   }, [status, myLocation?.lat, myLocation?.lng, myLocation]);
 
-  // 샵 마커와 묶기
+  // 샵 마커와 묶기. 멀리서 볼 때는 핀 대신 구 묶음(#204)
   useEffect(() => {
+    const map = mapRef.current;
     const clusterer = clustererRef.current;
-    if (!clusterer) return;
+    if (!map || !clusterer) return;
     const { maps } = window.kakao!;
     clusterer.clear();
+    overlaysRef.current.forEach((overlay) => overlay.setMap(null));
+    overlaysRef.current = [];
+
+    if (level >= MAP_REGION_GROUP_MIN_LEVEL) {
+      overlaysRef.current = groupShopsByRegion(shops).map((group) => {
+        const position = new maps.LatLng(group.center.lat, group.center.lng);
+        return new maps.CustomOverlay({
+          position,
+          map,
+          clickable: true,
+          content: regionGroupElement(group, () => {
+            map.setLevel(MAP_INITIAL_LEVEL, { anchor: position });
+            map.setCenter(position);
+          }),
+        });
+      });
+      return;
+    }
+
+    // 업종별 핀 그림. 색은 테마 색 이름(--primary)을 읽어 넣는다. 못 읽으면 카카오 기본 핀
+    const color = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim();
+    const images = new Map<string, kakao.maps.MarkerImage>();
+    const pinImage = (category: MapShop['category']) => {
+      if (!category || !color) return undefined;
+      let image = images.get(category);
+      if (!image) {
+        image = new maps.MarkerImage(
+          categoryPinUrl(category, color),
+          new maps.Size(PIN_SIZE.width, PIN_SIZE.height),
+          { offset: new maps.Point(PIN_TIP.x, PIN_TIP.y) },
+        );
+        images.set(category, image);
+      }
+      return image;
+    };
     const markers = shops.map((shop) => {
       const marker = new maps.Marker({
         position: new maps.LatLng(shop.lat, shop.lng),
         title: shop.name,
         clickable: true,
+        image: pinImage(shop.category),
       });
       maps.event.addListener(marker, 'click', () => {
         callbacksRef.current.onSelectShop?.(shop.shopId);
@@ -162,7 +237,7 @@ export function KakaoMap({
       return marker;
     });
     clusterer.addMarkers(markers);
-  }, [status, shops]);
+  }, [status, shops, level]);
 
   // 지도가 다시 보이면(목록 시트를 반으로 줄임) 크기를 다시 재고 가운데를 지킨다. 가려질 때는 재지 않는다
   useEffect(() => {

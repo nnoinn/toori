@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Plus, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { REGIONS } from '@/features/map/regions';
+import { RegionBrowser } from '@/features/map/region-browser';
+import { findRegion } from '@/features/map/regions';
 import { setInterestAreas } from '@/server/notifications/interest-areas';
 
 import {
@@ -17,7 +18,8 @@ import type { MarketingConsent } from './marketing-switch';
 const SAVE_FAILED = '관심 동네를 저장하지 못했어요. 잠시 후 다시 시도해 주세요';
 
 /**
- * 관심 동네 고르기 (J14, C-601). 누르면 바로 저장한다(setInterestAreas, 강규민 #172).
+ * 관심 동네 고르기 (J14, C-601, 전국 #200). 고른 동네는 칩으로, 더하기는 동네 고르기(시·도 → 시·군·구)로 한다.
+ * 누르면 바로 저장한다(setInterestAreas, 강규민 #172).
  * 저장하는 동안에는 다시 누를 수 없다(저장이 겹쳐 화면과 서버 목록이 어긋나지 않게).
  * 동네를 골랐는데 광고성 정보 수신 동의가 없으면 이 자리에서 동의를 받는다(D15). 동네 저장은 동의와 상관없이 된다
  */
@@ -33,6 +35,8 @@ export function InterestAreas({
   const [saved, setSaved] = useState(initialCodes);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [error, setError] = useState<string | null>(null);
+  /** 동네 더하기(전국 시·도 → 시·군·구)를 펼쳤는지 */
+  const [adding, setAdding] = useState(false);
   // 화면을 떠났다 와도 예전 상태가 남으므로(Activity) 서버 값이 바뀌었으면 맞춘다
   const [server, setServer] = useState(initialCodes);
   if (server.join() !== initialCodes.join()) {
@@ -73,24 +77,52 @@ export function InterestAreas({
         </span>
         <span className="text-xs text-muted-foreground">{INTEREST_AREA_NOTE}</span>
       </div>
-      <div className="flex flex-wrap gap-2" role="group" aria-labelledby="interest-label">
-        {REGIONS.map((region) => {
-          const selected = codes.includes(region.code);
-          return (
-            <Button
-              key={region.code}
-              type="button"
-              variant={selected ? 'default' : 'outline'}
-              className="h-9 rounded-full px-4"
-              aria-pressed={selected}
-              disabled={status === 'saving'}
-              onClick={() => toggle(region.code)}
-            >
-              {region.name}
-            </Button>
-          );
-        })}
+      {/* 고른 관심 동네. 전국 시·군·구라 모두 늘어놓지 않고, 고른 곳만 보여 주고 아래에서 더한다(#200) */}
+      <div
+        className="flex flex-wrap items-center gap-2"
+        role="group"
+        aria-labelledby="interest-label"
+      >
+        {codes.length === 0 ? (
+          <span className="text-sm text-muted-foreground">아직 고른 관심 동네가 없어요.</span>
+        ) : (
+          codes.map((code) => {
+            const label = findRegion(code)?.sigungu ?? code;
+            return (
+              <Button
+                key={code}
+                type="button"
+                className="h-9 gap-1 rounded-full pr-2.5 pl-4"
+                aria-label={`${label} 빼기`}
+                disabled={status === 'saving'}
+                onClick={() => toggle(code)}
+              >
+                {label}
+                <X className="size-4" aria-hidden />
+              </Button>
+            );
+          })
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          className="h-9 gap-1 rounded-full px-3"
+          aria-expanded={adding}
+          onClick={() => setAdding((open) => !open)}
+        >
+          <Plus className="size-4" aria-hidden />
+          {adding ? '닫기' : '동네 더하기'}
+        </Button>
       </div>
+      {adding ? (
+        <div className="rounded-xl border bg-card p-3">
+          <RegionBrowser
+            selectedCodes={codes}
+            onPick={(region) => toggle(region.code)}
+            disabled={status === 'saving'}
+          />
+        </div>
+      ) : null}
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {error}

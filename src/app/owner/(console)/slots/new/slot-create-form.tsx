@@ -14,13 +14,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Price } from '@/components/ui/price';
 import type { BusinessHours } from '@/db/schema/shops';
-import { formatWon } from '@/lib/format';
-import { formatKst, kstDateKey, utcToKst } from '@/lib/time';
+import { formatDuration, formatWon } from '@/lib/format';
+import { formatKst, formatKstTime, kstDateKey, utcToKst } from '@/lib/time';
 import { DISCOUNT_RATE_OPTIONS, type DiscountRate, PUBLISH_WINDOW_HOURS } from '@/server/policy';
 import { previewSettlement, type SettlementPreview } from '@/server/settlements';
 
 import { withObjectParticle } from '../../../korean';
-import { formatMinutes, serviceTypeLabel } from '../../settings/menu/menu';
+import { serviceTypeLabel } from '../../settings/menu/menu';
 import { checkSlotEdit, updateSlot } from '../actions';
 import { checkSlotDraft, createSlot } from './actions';
 import {
@@ -29,7 +29,6 @@ import {
   rangesOverlap,
   slotEnd,
   startCandidates,
-  timeLabel,
 } from './slot-time';
 
 export type SlotMenuOption = {
@@ -257,7 +256,7 @@ export function SlotCreateForm({
                 </Badge>
                 <span className="font-semibold">{item.name}</span>
                 <span className="text-sm text-muted-foreground">
-                  정가 {formatWon(item.listPrice)} · {formatMinutes(item.durationMinutes)}
+                  정가 {formatWon(item.listPrice)} · {formatDuration(item.durationMinutes)}
                 </span>
               </button>
             ))}
@@ -271,7 +270,7 @@ export function SlotCreateForm({
             <CardTitle>② 언제 시작할까요?</CardTitle>
             <p className="text-sm text-muted-foreground">
               지금부터 {PUBLISH_WINDOW_HOURS}시간 안의 시각만 올릴 수 있어요. 끝 시각은 {menu.name}{' '}
-              소요 시간({formatMinutes(menu.durationMinutes)})으로 정해져요.
+              소요 시간({formatDuration(menu.durationMinutes)})으로 정해져요.
             </p>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -318,7 +317,7 @@ export function SlotCreateForm({
                     }}
                     className={cn(blocked && 'line-through')}
                   >
-                    {timeLabel(candidate)}
+                    {formatKstTime(candidate)}
                   </Button>
                 );
               })}
@@ -396,7 +395,7 @@ export function SlotCreateForm({
           </span>
           {start ? (
             <span>
-              {formatKst(start)} ~ {timeLabel(slotEnd(start, menu.durationMinutes))}
+              {formatKst(start)} ~ {formatKstTime(slotEnd(start, menu.durationMinutes))}
             </span>
           ) : (
             <span className="text-muted-foreground">시작 시각을 골라 주세요</span>
@@ -530,7 +529,7 @@ function CreatedCard({
         <div className="flex flex-col gap-1 rounded-lg bg-muted p-3 text-sm">
           <span className="font-semibold">{created.menuName}</span>
           <span>
-            {formatKst(created.start)} ~ {timeLabel(created.end)}
+            {formatKst(created.start)} ~ {formatKstTime(created.end)}
           </span>
           <Price
             listPrice={created.listPrice}

@@ -50,6 +50,12 @@ export const AUTO_CANCEL_ERRORS = {
 export type PaymentErrorCode = keyof typeof PAYMENT_ERRORS | keyof typeof AUTO_CANCEL_ERRORS;
 export type UnconfirmedCode = keyof typeof UNCONFIRMED_ERRORS;
 
+/**
+ * 정리 작업이 결제 안 함으로 둔 주문의 실패 코드(failure_code, W12 ②). 화면에 보여 주는 코드가 아니다.
+ * 그 뒤 결제가 들어오면 안 되므로 이 주문만 실패여도 포트원에 다시 묻고, 결제됐으면 결제 대기처럼 처리한다
+ */
+export const ABANDONED_ORDER_CODE = 'ABANDONED';
+
 /** 주문에 기록된 실패 코드를 확정 못 한 이유로 읽는다. 다른 값이면 SLOT_SOLD */
 export function toUnconfirmedCode(failureCode: string | null): UnconfirmedCode {
   return failureCode && failureCode in UNCONFIRMED_ERRORS

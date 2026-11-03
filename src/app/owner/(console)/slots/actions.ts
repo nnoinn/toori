@@ -1,9 +1,11 @@
 'use server';
 
-// 매물 수정·마감 서버 함수 (O10, S-206). 대시보드의 [마감]과 수정 화면(slots/[slotId]/edit)에서 부른다.
+// 매물 수정·마감·재등록 서버 함수 (O10 S-206, O13 S-408). 대시보드의 [마감], 수정 화면(slots/[slotId]/edit),
+// 재등록 화면(slots/[slotId]/relist)에서 부른다.
 // 수정은 등록(new/actions.ts)과 같은 순서다: ①② 고르면 checkSlotEdit로 확인, ③까지 고르면 updateSlot으로 저장.
 
 import { refresh } from 'next/cache';
+import { redirect } from 'next/navigation';
 
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
@@ -13,6 +15,7 @@ import { assertShopApproved } from '@/server/shops';
 
 import type { CreatedSlot } from './new/slot-create-store';
 import { validateSlotDraft } from './new/slot-draft-store';
+import { relistSlotInDb } from './relist-store';
 import { checkEditable, closeSlotInDb, updateSlotInDb } from './slot-edit-store';
 
 async function allowed(shopId: string): Promise<Result<null>> {
@@ -68,4 +71,26 @@ export async function updateSlot(
   const updated = await updateSlotInDb(getDb(), shopId, slotId, input, await getRequestNow());
   if (updated.ok) refresh();
   return updated;
+}
+
+/**
+ * 취소된 매물을 같은 조건(메뉴·시간·할인율·신규 고객 전용)의 새 매물로 바로 게시한다(O13). 원래 매물은 '취소'로 남긴다.
+ * 성공하면 대시보드로 보낸다. 새 매물(게시중)과 원래 매물의 "재등록함"이 보인다. 막히면 이유를 돌려준다
+ */
+export async function relistSlot(shopId: string, slotId: string): Promise<Result<CreatedSlot>> {
+  const auth = await requireShopOwner(shopId);
+  if (!auth.ok) return auth;
+  const approved = await assertShopApproved(shopId);
+  if (!approved.ok) return approved;
+
+  const relisted = await relistSlotInDb(
+    getDb(),
+    shopId,
+    auth.data.userId,
+    slotId,
+    await getRequestNow(),
+  );
+  if (!relisted.ok) return relisted;
+  // 서버 함수의 redirect는 대시보드를 새로 받아 와서 이동한다
+  redirect('/owner');
 }

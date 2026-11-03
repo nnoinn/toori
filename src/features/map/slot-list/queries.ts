@@ -108,6 +108,8 @@ export async function selectMapShops(db: DbReader, query: HomeSlotQuery): Promis
       lat: sql<number>`ST_Y(${shops.location}::geometry)`.mapWith(Number),
       lng: sql<number>`ST_X(${shops.location}::geometry)`.mapWith(Number),
       slotCount,
+      category: shops.category,
+      sigunguCode: shops.sigunguCode,
     })
     .from(slots)
     .innerJoin(shops, eq(shops.id, slots.shopId))
@@ -115,7 +117,8 @@ export async function selectMapShops(db: DbReader, query: HomeSlotQuery): Promis
     .groupBy(shops.id)
     .orderBy(desc(slotCount), asc(shops.id))
     .limit(MAP_SHOP_LIMIT);
-  return rows;
+  // 업종은 DB 검사 조건(shops_category_check)으로 두 값만 들어 있다
+  return rows.map((row) => ({ ...row, category: row.category as MapShop['category'] }));
 }
 
 export type SlotPageQuery = HomeSlotQuery & {

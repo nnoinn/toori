@@ -58,14 +58,14 @@ describe('signInWithProvider', () => {
     });
   });
 
-  it('다른 사이트 주소는 돌아갈 주소로 쓰지 않는다(고객 기본 /)', async () => {
+  it('다른 사이트 주소는 돌아갈 주소로 쓰지 않는다(고객 기본 /home, #215)', async () => {
     state.signInWithOAuth.mockResolvedValue({ data: { url: 'https://accounts.example/b' } });
 
     await expect(
       signInWithProvider({ provider: 'google', mode: 'customer', next: '//evil.example' }),
     ).rejects.toThrow('redirect:');
     expect(state.signInWithOAuth.mock.calls[0][0].options.redirectTo).toBe(
-      'http://localhost:3000/api/auth/callback?mode=customer&next=%2F',
+      'http://localhost:3000/api/auth/callback?mode=customer&next=%2Fhome',
     );
   });
 
