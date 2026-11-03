@@ -1,12 +1,14 @@
 // 주소→좌표 변환 (X-501, X-502, 연결 #6). 서버에서만 부른다.
 // 입출력 약속은 Issue #51 확정본을 따른다. 바꿀 일이 생기면 #51에 먼저 알린다.
-// 카카오 로컬 API(주소 검색)를 부른다. REST 키(KAKAO_REST_API_KEY)는 서버에서만 쓴다.
+// 카카오 로컬 API(주소 검색)를 부른다. 키·시간 제한·실패 기록은 kakao-local.ts가 맡는다.
 
 import 'server-only';
 
 import { z } from 'zod';
 
 import { ok, type ResultError } from '@/lib/result';
+
+import { fetchKakaoLocal } from './kakao-local';
 
 export type GeocodeResult = {
   /** → shops.road_address */
@@ -45,11 +47,6 @@ export const GEOCODE_ERRORS = {
 } as const;
 
 export type GeocodeErrorCode = keyof typeof GEOCODE_ERRORS;
-
-const KAKAO_ADDRESS_SEARCH_URL = 'https://dapi.kakao.com/v2/local/search/address.json';
-
-/** 카카오가 이 시간 안에 답하지 않으면 GEOCODE_UNAVAILABLE */
-const KAKAO_TIMEOUT_MS = 5000;
 
 const addressSchema = z.string().trim().min(1);
 
@@ -102,45 +99,25 @@ function toResult(
 
 /** 카카오 주소 검색을 부른다. 키가 없거나 오류·시간 초과·이상한 응답이면 null */
 async function searchKakaoAddress(query: string): Promise<KakaoAddressDocument[] | null> {
-  const key = process.env.KAKAO_REST_API_KEY;
-  if (!key) {
-    console.error('[geocode] KAKAO_REST_API_KEY가 없어요');
-    return null;
-  }
+  const response = await fetchKakaoLocal({
+    name: '주소 검색',
+    path: 'search/address.json',
+    params: { query, analyze_type: 'exact' },
+    schema: kakaoAddressResponseSchema,
+  });
+  if (!response) return null;
 
-  const url = new URL(KAKAO_ADDRESS_SEARCH_URL);
-  url.searchParams.set('query', query);
-  url.searchParams.set('analyze_type', 'exact');
-
-  try {
-    const res = await fetch(url, {
-      headers: { Authorization: `KakaoAK ${key}` },
-      signal: AbortSignal.timeout(KAKAO_TIMEOUT_MS),
-    });
-    if (!res.ok) {
-      console.error(`[geocode] 카카오 주소 검색 실패: HTTP ${res.status}`);
-      return null;
-    }
-    const parsed = kakaoAddressResponseSchema.safeParse(await res.json());
-    if (!parsed.success) {
-      console.error('[geocode] 카카오 주소 검색 응답 모양이 달라요');
-      return null;
-    }
-    const { documents } = parsed.data;
-    const valid = documents.flatMap((doc) => {
-      const result = kakaoDocumentSchema.safeParse(doc);
-      return result.success ? [result.data] : [];
-    });
-    if (valid.length < documents.length) {
-      console.error(`[geocode] 모양이 다른 결과 ${documents.length - valid.length}개를 뺐어요`);
-    }
-    // 결과는 있는데 하나도 읽을 수 없으면 카카오 응답 모양이 바뀐 것이라 '잠시 후 다시'로 본다
-    if (documents.length > 0 && valid.length === 0) return null;
-    return valid;
-  } catch (e) {
-    console.error('[geocode] 카카오 주소 검색 호출 실패:', e instanceof Error ? e.name : e);
-    return null;
+  const { documents } = response;
+  const valid = documents.flatMap((doc) => {
+    const result = kakaoDocumentSchema.safeParse(doc);
+    return result.success ? [result.data] : [];
+  });
+  if (valid.length < documents.length) {
+    console.error(`[geocode] 모양이 다른 결과 ${documents.length - valid.length}개를 뺐어요`);
   }
+  // 결과는 있는데 하나도 읽을 수 없으면 카카오 응답 모양이 바뀐 것이라 '잠시 후 다시'로 본다
+  if (documents.length > 0 && valid.length === 0) return null;
+  return valid;
 }
 
 /**

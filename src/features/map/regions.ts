@@ -38,6 +38,21 @@ export function findRegion(code: string): Region | undefined {
   return BY_CODE.get(code);
 }
 
+/** 여러 시·도에 같은 이름이 있는 시·군·구(중구·동구·서구·남구·북구·강서구·고성군) */
+const SHARED_SIGUNGU = new Set(
+  REGIONS.map((region) => region.sigungu).filter(
+    (name, index, names) => names.indexOf(name) !== index,
+  ),
+);
+
+/**
+ * 문장·제목에 쓰는 동네 이름. 이름만으로 어느 동네인지 알 수 있게, 다른 시·도에도 같은 이름이 있으면 시·도를 앞에 붙인다.
+ * 예: 안산시 단원구, 강남구, 부산광역시 중구
+ */
+export function regionFullName(region: Region): string {
+  return SHARED_SIGUNGU.has(region.sigungu) ? `${region.sido} ${region.sigungu}` : region.sigungu;
+}
+
 /** 지금 영업하는 동네. 동네 고르기에서 시·도를 고르지 않고 바로 고를 수 있게 맨 위에 둔다(#200) */
 export const FEATURED_REGIONS: readonly Region[] = ['41271', '41273'].map((code) => {
   const region = findRegion(code);
