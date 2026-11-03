@@ -5,6 +5,7 @@ import {
   addMinutes,
   formatHourLabel,
   formatKst,
+  formatKstTime,
   hoursUntil,
   kstToUtc,
   minutesUntil,
@@ -49,6 +50,13 @@ describe('formatKst', () => {
   it('"월/일(요일) 시:분" 형식으로 보여준다', () => {
     expect(formatKst(new Date('2026-10-12T06:00:00.000Z'))).toBe('10/12(월) 15:00');
     expect(formatKst(new Date('2026-10-11T23:05:00.000Z'))).toBe('10/12(월) 08:05');
+  });
+
+  it('formatKstTime: 한국 시각만 "HH:MM"', () => {
+    expect(formatKstTime(new Date('2026-10-12T06:00:00.000Z'))).toBe('15:00');
+    expect(formatKstTime(new Date('2026-10-11T23:05:00.000Z'))).toBe('08:05');
+    // 한국 자정
+    expect(formatKstTime(new Date('2026-10-11T15:00:00.000Z'))).toBe('00:00');
   });
 });
 

@@ -20,12 +20,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { EmptyState } from '@/components/ui/state';
 import { Textarea } from '@/components/ui/textarea';
-import { formatWon } from '@/lib/format';
+import { formatDuration, formatWon } from '@/lib/format';
 import type { ShopCategory } from '@/server/policy';
 
 import { moveMenu, saveMenu, setMenuHidden } from './actions';
 import {
-  formatMinutes,
   MENU_DURATION_OPTIONS,
   MENU_LIMITS,
   type MenuField,
@@ -208,7 +207,7 @@ function MenuSummary({ menu }: { menu: MenuItem }) {
         <span className="truncate font-semibold">{menu.name}</span>
       </div>
       <span className="text-sm text-muted-foreground">
-        {formatWon(menu.listPrice)} · {formatMinutes(menu.durationMinutes)}
+        {formatWon(menu.listPrice)} · {formatDuration(menu.durationMinutes)}
         {menu.description ? ` · ${menu.description}` : ''}
       </span>
     </div>
@@ -338,7 +337,7 @@ function MenuDialog({
               >
                 {MENU_DURATION_OPTIONS.map((minutes) => (
                   <option key={minutes} value={minutes}>
-                    {formatMinutes(minutes)}
+                    {formatDuration(minutes)}
                   </option>
                 ))}
               </select>

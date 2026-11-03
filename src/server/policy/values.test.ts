@@ -21,11 +21,13 @@ import {
 import { NO_SHOW_PENALTY_RATE, REFUND_BANDS } from './refund';
 import {
   HOLD_MINUTES,
+  ORDER_SWEEP_BATCH,
   IMMINENT_WITHIN_HOURS,
   MENU_DURATION_STEP_MINUTES,
   NON_REFUNDABLE_WITHIN_HOURS,
   PUBLISH_WINDOW_HOURS,
   SLOT_START_STEP_MINUTES,
+  STALE_ORDER_MINUTES,
 } from './slot-time';
 import { CHECKOUT_CONSENT_VERSIONS, TERMS_VERSIONS } from './terms';
 import {
@@ -43,6 +45,11 @@ describe('시간 (#48 1장)', () => {
     expect(HOLD_MINUTES).toBe(10);
     expect(SLOT_START_STEP_MINUTES).toBe(30);
     expect(MENU_DURATION_STEP_MINUTES).toBe(30);
+  });
+
+  it('결제 대기 주문은 30분 뒤에 정리하고, 한 번에 20건까지', () => {
+    expect(STALE_ORDER_MINUTES).toBe(30);
+    expect(ORDER_SWEEP_BATCH).toBe(20);
   });
 });
 

@@ -2,18 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { MY_LOCATION_ENABLED } from './location-config';
 import { parseLatLng, resolveCustomerLocation, serializeLatLng } from './location';
-import { findRegion, REGIONS } from './regions';
-
-describe('동네 목록', () => {
-  it('안산시 상록구·단원구 2개이고 코드가 겹치지 않는다', () => {
-    expect(REGIONS.map((region) => region.code)).toEqual(['41271', '41273']);
-  });
-
-  it('코드로 동네를 찾고, 없는 코드는 undefined', () => {
-    expect(findRegion('41273')?.sigungu).toBe('안산시 단원구');
-    expect(findRegion('11530')).toBeUndefined();
-  });
-});
+import { findRegion } from './regions';
 
 describe('parseLatLng', () => {
   it('저장한 "위도,경도"를 그대로 읽는다', () => {

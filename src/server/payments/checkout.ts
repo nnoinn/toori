@@ -19,9 +19,10 @@ import { isNewCustomer } from '@/server/customers';
 import { calcPaymentAmount } from './amount';
 import { isMyActiveHold } from './checkout-rules';
 import { readCheckoutSlot, readCustomerPhone } from './checkout-store';
-import { type MyOrder, readMyOrder, recordOrderOutcome } from './confirm-store';
+import { type MyOrder, readMyOrder } from './confirm-store';
 import { devFakeFailure } from './dev-fake-failure';
 import {
+  ABANDONED_ORDER_CODE,
   autoCancelFail,
   type PaymentResult,
   paymentFail,
@@ -31,7 +32,7 @@ import {
 import { acquireHold, releaseMyHold } from './hold-store';
 import { createPendingOrder, newPaymentId } from './order-store';
 import { getPortOnePayment } from './portone';
-import { autoCancelOrder, settlePaidOrder } from './settle-order';
+import { autoCancelOrder, recordFailedPayment, settlePaidOrder } from './settle-order';
 import type { ConfirmedReservation, HoldInfo, MyHold, PaymentRequest } from './types';
 
 const slotIdSchema = z.uuid();
@@ -198,8 +199,9 @@ export async function confirmPayment(input: {
       : unconfirmedFail(code);
   }
 
-  // 이미 결과가 정해진 주문(새로고침, 웹훅이 먼저 처리)
-  const settled = settledResult(order);
+  // 이미 결과가 정해진 주문(새로고침, 웹훅이 먼저 처리). 정리 작업이 결제 안 함으로 둔 주문은 그 뒤 결제됐을 수 있어 다시 묻는다
+  const abandoned = order.status === 'failed' && order.failureCode === ABANDONED_ORDER_CODE;
+  const settled = abandoned ? null : settledResult(order);
   if (settled === 'not_paid') {
     const failed = order.pgStatus === 'FAILED' && !isCustomerCancel(order.failureCode);
     return notPaid(failed ? 'PAYMENT_FAILED' : 'PAYMENT_CANCELLED');
@@ -219,19 +221,14 @@ export async function confirmPayment(input: {
       break;
     case 'READY':
       // 결제창에서 결제하지 않고 돌아왔다(code가 붙어 옴). code가 없으면 아직 진행 중으로 본다
-      return code ? notPaid('PAYMENT_CANCELLED') : paymentFail('PAYMENT_PENDING');
+      return code || abandoned ? notPaid('PAYMENT_CANCELLED') : paymentFail('PAYMENT_PENDING');
     case 'PENDING':
     case 'VIRTUAL_ACCOUNT_ISSUED':
       return paymentFail('PAYMENT_PENDING');
     case 'FAILED':
     case 'CANCELLED':
     case 'PARTIAL_CANCELLED': {
-      await recordOrderOutcome(db, order.orderId, {
-        status: 'failed',
-        pgStatus: payment.status,
-        failureCode: payment.failureCode ?? payment.status,
-        failureMessage: payment.failureReason,
-      });
+      await recordFailedPayment(db, order.orderId, payment);
       // 고객이 결제창을 닫아도 포트원은 FAILED로 둔다(11/1 실제 테스트 결제에서 확인). 그때는 '취소'로 알린다
       const failed = payment.status === 'FAILED' && !isCustomerCancel(payment.failureCode);
       return notPaid(failed ? 'PAYMENT_FAILED' : 'PAYMENT_CANCELLED');

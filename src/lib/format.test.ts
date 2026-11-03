@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatClock, formatRemaining, formatWon } from './format';
+import { formatClock, formatDuration, formatRemaining, formatWon } from './format';
 
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
@@ -11,6 +11,23 @@ describe('formatWon', () => {
     expect(formatWon(28000)).toBe('28,000원');
     expect(formatWon(0)).toBe('0원');
     expect(formatWon(1234567)).toBe('1,234,567원');
+  });
+});
+
+describe('formatDuration', () => {
+  it.each([
+    [40, '40분'],
+    [60, '1시간'],
+    [90, '1시간 30분'],
+    [480, '8시간'],
+  ])('%i분 → %s', (minutes, text) => {
+    expect(formatDuration(minutes)).toBe(text);
+  });
+
+  it('0 이하이거나 숫자가 아니면 빈 문자열', () => {
+    expect(formatDuration(0)).toBe('');
+    expect(formatDuration(-30)).toBe('');
+    expect(formatDuration(Number.NaN)).toBe('');
   });
 });
 
