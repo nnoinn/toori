@@ -47,13 +47,13 @@ export function SlotDetailView({ slot, serverNow }: SlotDetailViewProps) {
 
   return (
     <article className="flex flex-1 flex-col pb-24 md:mx-auto md:grid md:w-full md:max-w-5xl md:grid-cols-[minmax(0,1fr)_380px] md:items-start md:gap-x-8 md:px-6 md:py-6">
-      <div className="relative md:col-start-1 md:row-start-1 md:overflow-hidden md:rounded-2xl">
-        {/* 공유한 주소로 바로 들어와 이전 화면이 없으면 고객 홈으로(#215) */}
-        <BackButton
-          fallbackHref={CUSTOMER_HOME}
-          className="absolute top-2 left-2 z-10 bg-background/80"
-        />
-        {slot.imageUrls.length > 0 ? (
+      {slot.imageUrls.length > 0 ? (
+        <div className="relative md:col-start-1 md:row-start-1 md:overflow-hidden md:rounded-2xl">
+          {/* 공유한 주소로 바로 들어와 이전 화면이 없으면 고객 홈으로(#215) */}
+          <BackButton
+            fallbackHref={CUSTOMER_HOME}
+            className="absolute top-2 left-2 z-10 bg-background/80"
+          />
           <ul className="flex snap-x snap-mandatory overflow-x-auto" aria-label="스타일 이미지">
             {slot.imageUrls.map((url, index) => (
               <li key={url} className="relative aspect-[4/3] w-full shrink-0 snap-center">
@@ -68,12 +68,17 @@ export function SlotDetailView({ slot, serverNow }: SlotDetailViewProps) {
               </li>
             ))}
           </ul>
-        ) : (
-          <div className="flex aspect-[4/3] w-full items-center justify-center bg-muted text-muted-foreground">
-            <ImageOff className="size-8" aria-hidden />
-          </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        // 사진이 없으면 큰 회색 칸 대신 뒤로가기와 작은 안내만 두어 샵 정보가 바로 위로 올라오게 한다(#214)
+        <div className="flex items-center gap-2 px-2 pt-2 md:col-start-1 md:row-start-1 md:px-0 md:pt-0">
+          <BackButton fallbackHref={CUSTOMER_HOME} />
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <ImageOff className="size-4" aria-hidden />
+            사진이 아직 없어요
+          </span>
+        </div>
+      )}
 
       <section className="flex flex-col gap-3 px-4 py-4 md:sticky md:top-22 md:col-start-2 md:row-span-2 md:row-start-1 md:rounded-2xl md:border md:bg-card md:p-5">
         <p className="text-sm text-muted-foreground">{shop.name}</p>
