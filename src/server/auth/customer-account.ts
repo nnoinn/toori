@@ -51,8 +51,7 @@ const createSchema = z.object({
  */
 export async function createCustomerAccount(input: {
   agreements: { age14: true; service: true; privacy: true; location: true; marketing: boolean };
-  // TODO(#183): /join 번호 칸이 머지되면 필수로 바꾸고, 보내지 않은 경우도 PHONE_REQUIRED로 막는다
-  phone?: string;
+  phone: string;
   next?: string;
 }): Promise<Result<never>> {
   const parsed = createSchema.safeParse(input);
@@ -61,14 +60,12 @@ export async function createCustomerAccount(input: {
   if (CUSTOMER_REQUIRED_TERMS.some((type) => !agreements[type])) {
     return fail('REQUIRED_TERMS_MISSING', '필수 항목에 모두 동의해 주세요');
   }
-  let phone: string | null = null;
-  if (parsed.data.phone !== undefined) {
-    if (parsed.data.phone.trim() === '') {
-      return fail('PHONE_REQUIRED', '휴대폰 번호를 입력해 주세요');
-    }
-    phone = normalizePhone(parsed.data.phone, 'mobile');
-    if (!phone) return fail('INVALID_INPUT', '휴대폰 번호를 확인해 주세요. 예: 010-1234-5678');
+  // 화면을 거치지 않은 요청이 번호를 보내지 않아도 같은 실패로 막는다
+  if (!parsed.data.phone?.trim()) {
+    return fail('PHONE_REQUIRED', '휴대폰 번호를 입력해 주세요');
   }
+  const phone = normalizePhone(parsed.data.phone, 'mobile');
+  if (!phone) return fail('INVALID_INPUT', '휴대폰 번호를 확인해 주세요. 예: 010-1234-5678');
   const user = await getSessionUser();
   if (!user) return fail('UNAUTHENTICATED', AUTH_ERRORS.UNAUTHENTICATED);
 
