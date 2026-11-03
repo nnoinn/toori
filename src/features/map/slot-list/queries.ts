@@ -9,14 +9,14 @@ import 'server-only';
 import { and, asc, count, desc, eq, gt, gte, inArray, lt, or, type SQL, sql } from 'drizzle-orm';
 
 import { getDb } from '@/db';
-import { shopImages, shops, slots } from '@/db/schema';
+import { favorites, shopImages, shops, slots } from '@/db/schema';
 import { slotStatusIs } from '@/features/slot-status/slot-status-sql';
 import { KST_TIME_ZONE } from '@/lib/time';
 import { newCustomerOnlyVisible } from '@/server/customers';
 import { PRICE_FILTER_RANGES, TIME_FILTER_RANGES } from '@/server/policy';
 import { customerVisibleShop } from '@/server/shops/visibility';
 
-import type { HomeFilters } from '../filters';
+import { EMPTY_FILTERS, type HomeFilters } from '../filters';
 import type { LatLng, MapBounds, MapShop } from '../types';
 import { slotBadges } from './badges';
 import { encodeCursor, SLOT_PAGE_SIZE, type SlotCursor } from './cursor';
@@ -29,8 +29,15 @@ type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 /** 지도에 한 번에 찍는 샵 수 상한. 넓게 축소해도 응답이 너무 커지지 않게 한다 */
 export const MAP_SHOP_LIMIT = 300;
 
-/** 매물을 찾는 범위: 지도 영역, 또는 시·군·구(지도 없는 매물 목록, #215) */
-export type SlotArea = { bounds: MapBounds } | { sigunguCode: string };
+/** 매물을 찾는 범위: 지도 영역, 시·군·구(지도 없는 매물 목록), 그 고객이 찜한 샵(#215, C-209) */
+export type SlotArea = { bounds: MapBounds } | { sigunguCode: string } | { favoritesOf: string };
+
+/** 범위 → 조건 */
+function areaCondition(area: SlotArea): SQL {
+  if ('bounds' in area) return inBounds(area.bounds);
+  if ('sigunguCode' in area) return eq(shops.sigunguCode, area.sigunguCode);
+  return sql`${slots.shopId} in (select ${favorites.shopId} from ${favorites} where ${favorites.customerId} = ${area.favoritesOf})`;
+}
 
 export type HomeSlotQuery = {
   bounds: MapBounds;
@@ -100,7 +107,7 @@ function visibleSlotConditions(query: VisibleSlotQuery): SQL {
     customerVisibleShop(),
     slotStatusIs('published', query.now),
     newCustomerOnlyVisible(query.customerId),
-    'bounds' in query ? inBounds(query.bounds) : eq(shops.sigunguCode, query.sigunguCode),
+    areaCondition(query),
     ...filterConditions(query.filters),
   )!;
 }
@@ -189,23 +196,7 @@ export async function selectSlotPage(db: DbReader, query: SlotPageQuery): Promis
   }
 
   const rows = await db
-    .select({
-      slotId: slots.id,
-      shopId: slots.shopId,
-      shopName: shops.name,
-      menuName: slots.menuName,
-      startAt: slots.startAt,
-      listPrice: slots.listPrice,
-      salePrice: slots.salePrice,
-      discountRate: slots.discountRate,
-      newCustomerOnly: slots.newCustomerOnly,
-      holdCustomerId: slots.holdCustomerId,
-      holdExpiresAt: slots.holdExpiresAt,
-      distanceMeters: distance,
-      imagePath: sql<
-        string | null
-      >`(select ${shopImages.storagePath} from ${shopImages} where ${shopImages.shopId} = ${shops.id} and ${shopImages.kind} = 'main' order by ${shopImages.sortOrder} limit 1)`,
-    })
+    .select(listColumns(distance))
     .from(slots)
     .innerJoin(shops, eq(shops.id, slots.shopId))
     .where(
@@ -246,9 +237,31 @@ type SlotRow = {
   newCustomerOnly: boolean;
   holdCustomerId: string | null;
   holdExpiresAt: Date | null;
-  distanceMeters: number;
+  /** 기준점이 없으면(찜한 샵 매물, 위치를 아직 안 고름) null */
+  distanceMeters: number | null;
   imagePath: string | null;
 };
+
+/** 목록 카드에 쓰는 칸(샵 대표 사진 하나 포함) */
+function listColumns<Distance extends number | null>(distance: SQL<Distance>) {
+  return {
+    slotId: slots.id,
+    shopId: slots.shopId,
+    shopName: shops.name,
+    menuName: slots.menuName,
+    startAt: slots.startAt,
+    listPrice: slots.listPrice,
+    salePrice: slots.salePrice,
+    discountRate: slots.discountRate,
+    newCustomerOnly: slots.newCustomerOnly,
+    holdCustomerId: slots.holdCustomerId,
+    holdExpiresAt: slots.holdExpiresAt,
+    distanceMeters: distance,
+    imagePath: sql<
+      string | null
+    >`(select ${shopImages.storagePath} from ${shopImages} where ${shopImages.shopId} = ${shops.id} and ${shopImages.kind} = 'main' order by ${shopImages.sortOrder} limit 1)`,
+  };
+}
 
 /** 배지는 서버 시각으로 정한다(공통 UI SlotCard 규칙, badges.ts) */
 function toListItem(row: SlotRow, query: Pick<HomeSlotQuery, 'customerId' | 'now'>): SlotListItem {
@@ -265,4 +278,31 @@ function toListItem(row: SlotRow, query: Pick<HomeSlotQuery, 'customerId' | 'now
     distanceMeters: row.distanceMeters,
     badges: slotBadges(row, query.customerId, query.now),
   };
+}
+
+/** 찜한 샵 매물 화면에 한 번에 보여주는 매물 수 상한(찜한 샵의 지금 예약할 수 있는 매물이라 많지 않다) */
+export const FAVORITE_SLOT_LIMIT = 50;
+
+/**
+ * 찜한 샵의 지금 예약할 수 있는 매물(#215 2장, C-209). 목록·지도와 같은 조건(승인 샵·게시중·신규 고객 전용)이고 임박순이다.
+ * origin(내 위치·고른 동네)이 있으면 거리를 같이 준다
+ */
+export async function selectFavoriteSlots(
+  db: DbReader,
+  query: { customerId: string; now: Date; origin: LatLng | null },
+): Promise<SlotListItem[]> {
+  const conditions = visibleSlotConditions({
+    favoritesOf: query.customerId,
+    filters: EMPTY_FILTERS,
+    customerId: query.customerId,
+    now: query.now,
+  });
+  const rows = await db
+    .select(listColumns(query.origin ? distanceFrom(query.origin) : sql<null>`null::float8`))
+    .from(slots)
+    .innerJoin(shops, eq(shops.id, slots.shopId))
+    .where(conditions)
+    .orderBy(asc(slots.startAt), asc(slots.id))
+    .limit(FAVORITE_SLOT_LIMIT);
+  return rows.map((row) => toListItem(row, query));
 }

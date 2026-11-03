@@ -16,7 +16,8 @@ type SlotListProps = {
   items: SlotListItem[];
   /** 서버가 준 "지금"(ISO). 남은 시간 계산 기준 */
   serverNow: string;
-  sort: SlotSort;
+  /** 고른 정렬. 없으면 정렬 탭을 숨긴다(찜한 샵 매물은 임박순만) */
+  sort?: SlotSort;
   /** loading: 처음 불러오는 중, error: 불러오지 못함 */
   status?: 'ready' | 'loading' | 'error';
   errorMessage?: string;
@@ -99,7 +100,7 @@ export function SlotList({
 
   return (
     <div className="flex flex-col gap-2">
-      <SortTabs sort={sort} />
+      {sort ? <SortTabs sort={sort} /> : null}
       {status === 'loading' ? (
         <LoadingCards count={3} />
       ) : status === 'error' ? (

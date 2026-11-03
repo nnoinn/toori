@@ -8,6 +8,7 @@ import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { getCurrentAccount } from '@/server/auth';
 
+import { isFavoriteShop } from '../../home/favorites/store';
 import { selectSlotDetail } from './queries';
 import { SlotDetailView } from './slot-detail-view';
 
@@ -34,9 +35,11 @@ async function DetailContent({ params }: { params: Params }) {
   // 매물 ID 모양이 아니면 DB에 묻지 않고 없는 매물로 본다
   if (!z.uuid().safeParse(slotId).success) notFound();
   const [customerId, now] = await Promise.all([currentCustomerId(), getRequestNow()]);
-  const slot = await selectSlotDetail(getDb(), { slotId, customerId, now });
+  const db = getDb();
+  const slot = await selectSlotDetail(db, { slotId, customerId, now });
   if (!slot) notFound();
-  return <SlotDetailView slot={slot} serverNow={now.toISOString()} />;
+  const favorite = customerId ? await isFavoriteShop(db, customerId, slot.shop.shopId) : false;
+  return <SlotDetailView slot={slot} serverNow={now.toISOString()} favorite={favorite} />;
 }
 
 function DetailSkeleton() {
