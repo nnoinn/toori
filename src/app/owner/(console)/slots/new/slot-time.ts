@@ -99,12 +99,6 @@ export function checkBusinessHours(range: TimeRange, hours: BusinessHours): Hour
   return null;
 }
 
-/** 한국 시각만. 예: "14:00". 원장님 화면(등록·대시보드·예약 상세)에서 "10/12(월) 15:00 ~ 16:00"의 끝 시각에 쓴다 */
-export function timeLabel(date: Date): string {
-  const t = utcToKst(date);
-  return `${String(t.hour).padStart(2, '0')}:${String(t.minute).padStart(2, '0')}`;
-}
-
 /** 시작 시각 후보를 한국 날짜별로 묶는다(날짜 순서 유지) */
 export function groupByKstDate(starts: Date[]): { dateKey: string; starts: Date[] }[] {
   const groups = new Map<string, Date[]>();

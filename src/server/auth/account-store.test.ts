@@ -125,15 +125,6 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
     });
   });
 
-  it('번호를 보내지 않은 동안에는 번호 없이 저장한다(#183, 임시)', async () => {
-    await withRollback(async (tx) => {
-      const userId = await createTestUser(tx);
-      await saveCustomerAccount(tx, { userId, nickname: '김투리', phone: null, marketing: false });
-      const [customer] = await tx.select().from(customers).where(eq(customers.userId, userId));
-      expect(customer.phone).toBeNull();
-    });
-  });
-
   it('광고성 동의를 켜고 끄고 다시 켜면 기록을 지우지 않고 쌓는다', async () => {
     await withRollback(async (tx) => {
       const { userId } = await createTestCustomer(tx);

@@ -3,15 +3,30 @@
 
 import { safeNextPath } from '@/lib/safe-next';
 import { firstParam, type SearchValue } from '@/lib/search-params';
+import { DEFAULT_NEXT } from '@/server/auth/paths';
+
+export { DEFAULT_NEXT };
 
 /** 로그인 화면 토글 값 */
 export type LoginMode = 'customer' | 'owner';
 
-/** next가 없거나 안전하지 않을 때 돌아갈 곳 */
-export const DEFAULT_NEXT: Record<LoginMode, string> = {
-  customer: '/',
-  owner: '/owner',
-};
+const OWNER_PATH = /^\/owner(?:[/?#]|$)/;
+const ADMIN_PATH = /^\/admin(?:[/?#]|$)/;
+
+/** 고른 모드로 들어갈 수 있는 화면인지. 원장님은 /owner 아래만, 고객은 /owner·/admin이 아닌 곳 */
+export function isPathForMode(path: string, mode: LoginMode): boolean {
+  if (mode === 'owner') return OWNER_PATH.test(path);
+  return !OWNER_PATH.test(path) && !ADMIN_PATH.test(path);
+}
+
+/**
+ * 로그인하고 갈 곳(#207). next가 고른 모드의 화면이 아니면 그 모드의 기본 주소로 간다.
+ * 예: 고객 화면(/me)에서 넘어온 로그인 화면에서 원장님을 고르면 /owner. 그대로 /me로 가면
+ * 고객 화면이 원장님 모드를 다시 고객 로그인 화면으로 보내서 제자리로 돌아온다
+ */
+export function nextForMode(mode: LoginMode, nextParam: string | null): string {
+  return nextParam && isPathForMode(nextParam, mode) ? nextParam : DEFAULT_NEXT[mode];
+}
 
 /** mode 값. owner가 아니면 모두 customer */
 export function parseLoginMode(value: SearchValue): LoginMode {

@@ -699,6 +699,46 @@ describe('confirmPayment', () => {
     expect(state.orderRecords.get(paymentId)?.status).toBe('auto_cancelled');
   });
 
+  describe('정리 작업이 결제 안 함(ABANDONED)으로 둔 주문', () => {
+    async function abandoned() {
+      const paymentId = await started();
+      Object.assign(state.orderRecords.get(paymentId)!, {
+        status: 'failed',
+        pgStatus: 'READY',
+        failureCode: 'ABANDONED',
+      });
+      return paymentId;
+    }
+
+    it('포트원에 다시 묻고, 그 뒤 결제됐으면 결제 대기처럼 처리한다', async () => {
+      const paymentId = await abandoned();
+      const result = await confirmPayment({ paymentId });
+      expect(state.portoneCalls).toEqual([paymentId]);
+      expect(result.ok).toBe(true);
+    });
+
+    it('그 뒤 결제됐는데 확정할 수 없으면 자동 취소한다', async () => {
+      const paymentId = await abandoned();
+      state.confirmOverride = { ok: false, code: 'HOLD_EXPIRED' };
+      expect(await confirmPayment({ paymentId })).toEqual(autoCancelFail('HOLD_EXPIRED'));
+      expect(state.cancelCalls).toEqual([paymentId]);
+    });
+
+    it('아직 결제하지 않았으면(READY) code가 없어도 PAYMENT_CANCELLED', async () => {
+      const paymentId = await abandoned();
+      paidAs('READY');
+      const result = await confirmPayment({ paymentId });
+      expect(result.ok === false && result.error.code).toBe('PAYMENT_CANCELLED');
+    });
+
+    it('포트원에 결제가 없으면 PAYMENT_CANCELLED', async () => {
+      const paymentId = await abandoned();
+      state.portone = { ok: false, reason: 'not_found' };
+      const result = await confirmPayment({ paymentId });
+      expect(result.ok === false && result.error.code).toBe('PAYMENT_CANCELLED');
+    });
+  });
+
   it('포트원에 묻지 못하거나 모르는 상태면 PAYMENT_CHECK_UNAVAILABLE이고 주문은 그대로', async () => {
     const paymentId = await started();
     state.portone = { ok: false, reason: 'unavailable' };

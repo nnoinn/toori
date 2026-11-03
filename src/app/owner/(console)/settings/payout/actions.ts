@@ -7,19 +7,19 @@
 import { refresh } from 'next/cache';
 
 import { getDb } from '@/db';
-import { fail, type ResultError } from '@/lib/result';
+import type { ResultError } from '@/lib/result';
 import { requireShopOwner } from '@/server/auth';
 import { encryptAccountNumber } from '@/server/payouts/account-crypto';
 
 import { type PayoutInput, validatePayoutInput } from '../../../business-fields';
-import { updatePayoutAccount } from './payout-store';
+import { upsertPayoutAccount } from './payout-store';
 
 export type PayoutFieldErrors = Partial<Record<keyof PayoutInput, string>>;
 
 export type SavePayoutResponse =
   { ok: true } | { ok: false; error: ResultError & { fieldErrors?: PayoutFieldErrors } };
 
-/** 정산 계좌를 바꾼다. 다음 정산부터 새 계좌로 보낸다 */
+/** 정산 계좌를 바꾼다(없으면 등록한다, #213). 다음 정산부터 새 계좌로 보낸다 */
 export async function savePayoutAccount(
   shopId: string,
   input: PayoutInput,
@@ -39,13 +39,12 @@ export async function savePayoutAccount(
     };
   }
   const { bankCode, accountNumber, accountHolder } = checked.data;
-  const saved = await updatePayoutAccount(getDb(), shopId, {
+  await upsertPayoutAccount(getDb(), shopId, {
     bankCode,
     accountNumberEncrypted: encryptAccountNumber(accountNumber),
     accountLast4: accountNumber.slice(-4),
     accountHolder,
   });
-  if (!saved) return fail('PAYOUT_ACCOUNT_NOT_FOUND', '정산 계좌를 찾을 수 없어요');
 
   refresh();
   return { ok: true };

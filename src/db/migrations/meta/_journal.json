@@ -50,6 +50,13 @@
       "when": 1793610474218,
       "tag": "0006_push_subscriptions_two_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793669727065,
+      "tag": "0007_refunds_cancel_status",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,16 @@
 // 환불·쿠폰·패널티 테이블 (docs/schema-v1.md 5장, X-202, X-203, X-207, C-407, S-409).
 
 import { sql } from 'drizzle-orm';
-import { type AnyPgColumn, check, index, integer, pgTable, text, uuid } from 'drizzle-orm/pg-core';
+import {
+  type AnyPgColumn,
+  check,
+  index,
+  integer,
+  pgTable,
+  text,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 import { customers, profiles } from './accounts';
 import { orders, reservations } from './payments';
@@ -17,6 +26,10 @@ export const REFUND_REASONS = [
   'admin_exception',
 ] as const;
 export type RefundReason = (typeof REFUND_REASONS)[number];
+
+/** 환불 기록 상태: 포트원을 부르기 전에 저장한 진행 중 / 끝남 */
+export const REFUND_STATUSES = ['requested', 'done'] as const;
+export type RefundStatus = (typeof REFUND_STATUSES)[number];
 
 /** 적용한 위약금 구간: 24시간 이상(30%) / 6~24시간(50%) / 6시간 미만(100%) */
 export const REFUND_BANDS_DB = ['over_24h', '6h_to_24h', 'under_6h'] as const;
@@ -37,6 +50,7 @@ export const refunds = pgTable(
     // 예약을 만들기 전에 결제를 취소하는 자동 취소(auto_cancel, C-406)에서는 비어 있다(#64)
     reservationId: uuid().references((): AnyPgColumn => reservations.id),
     reason: text().notNull(),
+    status: text().notNull().default('done'),
     band: text(),
     // 적용한 위약금 비율(당시 값, %)
     penaltyRate: integer().notNull(),
@@ -45,13 +59,30 @@ export const refunds = pgTable(
     // 남은 금액(위약금)
     penaltyAmount: integer().notNull(),
     pgCancellationId: text(),
-    processedAt: timestamptz().notNull(),
+    // 운영자 확인이 필요한 이유(포트원이 돌려준 금액이 계산과 다를 때). 비어 있으면 확인할 것 없음
+    reviewReason: text(),
+    // 진행 중(requested)에는 비어 있다
+    processedAt: timestamptz(),
     // 운영자 처리일 때
     processedBy: uuid().references(() => profiles.id),
+    createdAt: createdAt(),
   },
   (t) => [
     check('refunds_reason_check', inValues(t.reason, REFUND_REASONS)),
+    check('refunds_status_check', inValues(t.status, REFUND_STATUSES)),
+    check(
+      'refunds_done_processed_check',
+      sql`${t.status} <> 'done' or ${t.processedAt} is not null`,
+    ),
     check('refunds_band_check', sql`${t.band} is null or ${inValues(t.band, REFUND_BANDS_DB)}`),
+    // 한 예약에 고객 취소 환불 기록은 하나만
+    uniqueIndex('refunds_customer_cancel_unique')
+      .on(t.reservationId)
+      .where(sql`${t.reason} = 'customer_cancel'`),
+    // 정리 작업이 오래된 진행 중 기록을 찾을 때
+    index('refunds_requested_created_at_idx')
+      .on(t.createdAt)
+      .where(sql`${t.status} = 'requested'`),
   ],
 ).enableRLS();
 

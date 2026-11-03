@@ -19,7 +19,7 @@ import {
 import type { SlotDetail } from '@/app/(customer)/(tabs)/slots/[slotId]/types';
 import { formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';
-import { loginPath } from '@/server/auth/paths';
+import { CUSTOMER_HOME, loginPath } from '@/server/auth/paths';
 import { releaseHold, startPayment } from '@/server/payments/checkout';
 import { PAYMENT_ERRORS } from '@/server/payments/errors';
 import type { MyHold } from '@/server/payments/types';
@@ -134,7 +134,7 @@ export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProp
   return (
     <section className="flex flex-1 flex-col gap-6 px-4 pt-2 pb-8">
       <div className="flex items-center justify-between">
-        <BackButton className="-ml-2" />
+        <BackButton fallbackHref={CUSTOMER_HOME} className="-ml-2" />
         <div
           className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-sm font-semibold tabular-nums"
           aria-label="결제 가능 남은 시간"
@@ -346,7 +346,7 @@ function BookerInfoConsent({
 export function HoldEnded({ slotId }: { slotId: string }) {
   return (
     <section className="flex flex-1 flex-col gap-4 px-4 pt-2 pb-8">
-      <BackButton className="-ml-2 self-start" />
+      <BackButton fallbackHref={CUSTOMER_HOME} className="-ml-2 self-start" />
       <EmptyState
         title="결제할 수 있는 상태가 아니에요"
         description={PAYMENT_ERRORS.NOT_HOLDER}

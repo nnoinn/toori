@@ -1,13 +1,15 @@
-// 주문 저장 (X-201, W11). 서버에서만 부른다.
+// 주문 저장·정리 대상 읽기 (X-201, W11, W12 ②). 서버에서만 부른다.
 // 결제 시작(startPayment)이 결제창을 열기 전에 결제 대기(pending) 주문을 남긴다. 결제 확인(W11 ②)과 웹훅(W13)이 이 주문으로 금액을 검증한다.
 
 import 'server-only';
+
+import { and, asc, inArray, lt } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { orders } from '@/db/schema';
 import { CHECKOUT_CONSENT_VERSIONS } from '@/server/policy';
 
-type Db = Pick<ReturnType<typeof getDb>, 'insert'>;
+type Db = Pick<ReturnType<typeof getDb>, 'select' | 'insert'>;
 
 /** 포트원에 넘기는 우리 결제 번호. 포트원 규칙: 영문·숫자·-·_, 6~64자 */
 export function newPaymentId(): string {
@@ -41,4 +43,35 @@ export async function createPendingOrder(db: Db, input: NewPendingOrder): Promis
     })
     .returning({ id: orders.id });
   return row.id;
+}
+
+export type StaleOrder = {
+  orderId: string;
+  paymentId: string;
+  amount: number;
+  status: 'pending' | 'paid';
+};
+
+/**
+ * 정리 작업이 볼 주문: 결제 대기(pending)와 취소를 끝내지 못한 결제 확인(paid) 중 createdBefore 전에 만든 것, 오래된 순서로.
+ * 결제 중인 주문을 건드리지 않도록 최근 주문은 고르지 않는다
+ */
+export async function readStaleOrders(
+  db: Pick<Db, 'select'>,
+  input: { createdBefore: Date; limit: number },
+): Promise<StaleOrder[]> {
+  const rows = await db
+    .select({
+      orderId: orders.id,
+      paymentId: orders.paymentId,
+      amount: orders.amount,
+      status: orders.status,
+    })
+    .from(orders)
+    .where(
+      and(inArray(orders.status, ['pending', 'paid']), lt(orders.createdAt, input.createdBefore)),
+    )
+    .orderBy(asc(orders.createdAt))
+    .limit(input.limit);
+  return rows as StaleOrder[];
 }

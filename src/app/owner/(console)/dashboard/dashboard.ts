@@ -31,6 +31,8 @@ export type DashboardSlot = {
   reservationId: string | null;
   /** 예약이 있는 매물이면 예약번호 */
   reservationCode: string | null;
+  /** '취소' 매물로 재등록한 새 매물(O13). 없으면 null */
+  relistedSlotId: string | null;
 };
 
 /** 대시보드 상태 필터 순서(상태 이름 6개, X-301) */

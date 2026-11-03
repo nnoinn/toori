@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { LoginError } from '@/server/auth/paths';
 
 import {
+  isPathForMode,
   LOGIN_ERROR_MESSAGES,
+  nextForMode,
   parseLoginError,
   parseLoginMode,
   readNextParam,
@@ -51,5 +53,37 @@ describe('로그인 실패 이유', () => {
     const messages: Record<LoginError, string> = LOGIN_ERROR_MESSAGES;
     expect(Object.keys(messages).sort()).toEqual(['email_required', 'login_failed']);
     for (const text of Object.values(messages)) expect(text.length).toBeGreaterThan(0);
+  });
+});
+
+describe('로그인하고 갈 곳: 고른 모드와 next가 맞지 않으면 그 모드의 기본 주소 (#207)', () => {
+  it('고객 화면에서 넘어와 원장님을 고르면 /owner', () => {
+    expect(nextForMode('owner', '/me')).toBe('/owner');
+    expect(nextForMode('owner', '/slots/abc')).toBe('/owner');
+    expect(nextForMode('owner', '/')).toBe('/owner');
+  });
+
+  it('원장님·운영자 화면에서 넘어와 고객을 고르면 고객 홈', () => {
+    expect(nextForMode('customer', '/owner')).toBe('/home');
+    expect(nextForMode('customer', '/owner/slots/new')).toBe('/home');
+    expect(nextForMode('customer', '/admin/shops')).toBe('/home');
+  });
+
+  it('맞으면 보던 화면 그대로', () => {
+    expect(nextForMode('customer', '/me')).toBe('/me');
+    expect(nextForMode('customer', '/slots/abc?x=1')).toBe('/slots/abc?x=1');
+    expect(nextForMode('owner', '/owner/slots/new')).toBe('/owner/slots/new');
+    expect(nextForMode('owner', '/owner?tab=1')).toBe('/owner?tab=1');
+  });
+
+  it('next가 없으면 그 모드의 기본 주소', () => {
+    expect(nextForMode('customer', null)).toBe('/home');
+    expect(nextForMode('owner', null)).toBe('/owner');
+  });
+
+  it('/owner로 시작하는 다른 이름은 원장님 화면이 아니다', () => {
+    expect(isPathForMode('/owners', 'owner')).toBe(false);
+    expect(isPathForMode('/owners', 'customer')).toBe(true);
+    expect(isPathForMode('/administrator', 'customer')).toBe(true);
   });
 });
