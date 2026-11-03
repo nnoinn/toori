@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { FEATURED_REGIONS, findRegion, REGION_SIDOS, REGIONS } from './regions';
+import { FEATURED_REGIONS, findRegion, REGION_SIDOS, REGIONS, regionFullName } from './regions';
 
 describe('전국 동네 목록 (#200)', () => {
   it('시·군·구 코드는 다섯 자리이고 겹치지 않는다', () => {
@@ -49,5 +49,22 @@ describe('전국 동네 목록 (#200)', () => {
 
   it('없는 코드는 undefined', () => {
     expect(findRegion('99999')).toBeUndefined();
+  });
+});
+
+describe('문장에 쓰는 동네 이름', () => {
+  it('이름이 하나뿐이면 시·군·구 이름 그대로', () => {
+    expect(regionFullName(findRegion('41273')!)).toBe('안산시 단원구');
+    expect(regionFullName(findRegion('11680')!)).toBe('강남구');
+  });
+
+  it('다른 시·도에도 같은 이름이 있으면 시·도를 앞에 붙인다', () => {
+    expect(regionFullName(findRegion('11140')!)).toBe('서울특별시 중구');
+    expect(regionFullName(findRegion('26110')!)).toBe('부산광역시 중구');
+  });
+
+  it('붙인 뒤에는 전국에서 이름이 겹치지 않는다', () => {
+    const names = REGIONS.map(regionFullName);
+    expect(new Set(names).size).toBe(names.length);
   });
 });

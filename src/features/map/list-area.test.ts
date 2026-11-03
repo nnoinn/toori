@@ -43,4 +43,10 @@ describe('매물 목록 범위', () => {
       fromMyLocation: false,
     });
   });
+
+  it('이름이 겹치는 동네는 시·도를 붙인 이름', async () => {
+    const region = findRegion('26110')!;
+    const area = await resolveListArea({ kind: 'region', point: region.center, region });
+    expect(area?.label).toBe('부산광역시 중구');
+  });
 });
