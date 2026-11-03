@@ -22,6 +22,7 @@ import { Textarea } from '@/components/ui/textarea';
 import type { GeocodeCandidate } from '@/features/map/geocode';
 import { SHOP_CATEGORIES } from '@/server/policy/catalog';
 
+import { withDirectionParticle } from '../../../korean';
 import { getCategoryChangeImpact, saveShopProfile } from './actions';
 import { AddressSearchButton } from './address-search-button';
 import type { CategoryChangeImpact } from './category-change-store';
@@ -437,7 +438,7 @@ export function CategoryChangeDialog({
           <DialogHeader>
             <DialogTitle>업종을 정말 변경할까요?</DialogTitle>
             <DialogDescription>
-              업종을 &apos;{nextCategoryLabel}&apos;(으)로 바꿔요.
+              업종을 {withDirectionParticle(nextCategoryLabel)} 바꿔요.
             </DialogDescription>
           </DialogHeader>
         )}
