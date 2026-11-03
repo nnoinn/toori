@@ -2,7 +2,7 @@
 
 import 'server-only';
 
-import { and, asc, eq, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, lt, type SQL, sql } from 'drizzle-orm';
 
 import { getDb } from '@/db';
 import {
@@ -58,6 +58,21 @@ export async function readRefundTarget(
   customerId: string,
   db: DbReader = getDb(),
 ): Promise<RefundTarget | null> {
+  return readTargetWhere(
+    db,
+    and(eq(reservations.id, reservationId), eq(reservations.customerId, customerId)),
+  );
+}
+
+/** 주문의 예약. 웹훅처럼 고객 없이 볼 때 쓴다. 예약이 없으면 null */
+export async function readRefundTargetByOrder(
+  db: DbReader,
+  orderId: string,
+): Promise<RefundTarget | null> {
+  return readTargetWhere(db, eq(reservations.orderId, orderId));
+}
+
+async function readTargetWhere(db: DbReader, where: SQL | undefined): Promise<RefundTarget | null> {
   const [row] = await db
     .select({
       reservationId: reservations.id,
@@ -86,7 +101,7 @@ export async function readRefundTarget(
         eq(refunds.status, 'requested'),
       ),
     )
-    .where(and(eq(reservations.id, reservationId), eq(reservations.customerId, customerId)))
+    .where(where)
     .limit(1);
   if (!row) return null;
   const {

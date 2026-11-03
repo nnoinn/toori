@@ -47,4 +47,6 @@ export {
   settlePaidOrder,
 } from './settle-order';
 export { type SweepSummary, sweepStaleOrders } from './sweep-orders';
+export { handlePortOneWebhook, type WebhookOutcome } from './webhook';
+export { type VerifiedWebhook, verifyWebhook } from './webhook-signature';
 export type { ConfirmedReservation, HoldInfo, MyHold, PaymentRequest } from './types';

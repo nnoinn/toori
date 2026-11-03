@@ -10,9 +10,10 @@ import { ORDER_SWEEP_BATCH, STALE_ORDER_MINUTES } from '@/server/policy';
 
 import { recordOrderOutcome } from './confirm-store';
 import { ABANDONED_ORDER_CODE } from './errors';
-import { readStaleOrders, type StaleOrder } from './order-store';
+import { markOrderChecked, readStaleOrders, type StaleOrder } from './order-store';
+import { applyPaymentStatus } from './payment-status';
 import { getPortOnePayment } from './portone';
-import { autoCancelOrder, recordFailedPayment, settlePaidOrder } from './settle-order';
+import { autoCancelOrder } from './settle-order';
 
 type Db = ReturnType<typeof getDb>;
 
@@ -34,18 +35,28 @@ export async function sweepStaleOrders(db: Db, now: Date): Promise<SweepSummary>
     left: 0,
   };
   for (const order of stale) {
+    let result: SweepResult = 'left';
     try {
-      summary[await sweepOrder(db, order, now)] += 1;
+      result = await sweepOrder(db, order, now);
     } catch (error) {
-      console.error(
-        '[payments] 주문 정리 실패:',
-        order.orderId,
-        error instanceof Error ? error.name : 'unknown',
-      );
-      summary.left += 1;
+      logSweepError(order.orderId, error);
+    }
+    summary[result] += 1;
+    if (result === 'left') {
+      await markOrderChecked(db, order.orderId, now).catch((error: unknown) => {
+        logSweepError(order.orderId, error);
+      });
     }
   }
   return summary;
+}
+
+function logSweepError(orderId: string, error: unknown) {
+  console.error(
+    '[payments] 주문 정리 실패:',
+    orderId,
+    error instanceof Error ? error.name : 'unknown',
+  );
 }
 
 async function sweepOrder(db: Db, order: StaleOrder, now: Date): Promise<SweepResult> {
@@ -60,29 +71,12 @@ async function sweepOrder(db: Db, order: StaleOrder, now: Date): Promise<SweepRe
     await recordAbandoned(db, order.orderId, 'NOT_FOUND');
     return 'abandoned';
   }
-  const payment = lookup.payment;
-  switch (payment.status) {
-    case 'PAID': {
-      const settled = await settlePaidOrder(db, order, payment, now);
-      if (settled.ok) return 'confirmed';
-      return settled.autoCancelled ? 'autoCancelled' : 'left';
-    }
-    case 'READY':
-      // 결제창에서 결제하지 않았다
-      await recordAbandoned(db, order.orderId, payment.status);
-      return 'abandoned';
-    case 'FAILED':
-    case 'CANCELLED':
-    case 'PARTIAL_CANCELLED':
-      await recordFailedPayment(db, order.orderId, payment);
-      return 'failed';
-    case 'PENDING':
-    case 'VIRTUAL_ACCOUNT_ISSUED':
-      return 'left';
-    default:
-      console.error('[payments] 알 수 없는 포트원 결제 상태:', payment.status);
-      return 'left';
+  // 결제창에서 결제하지 않았다
+  if (lookup.payment.status === 'READY') {
+    await recordAbandoned(db, order.orderId, lookup.payment.status);
+    return 'abandoned';
   }
+  return applyPaymentStatus(db, order, lookup.payment, now);
 }
 
 function recordAbandoned(db: Db, orderId: string, pgStatus: string) {
