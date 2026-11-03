@@ -17,7 +17,7 @@ import { requireCustomer } from '@/server/auth';
 
 import { calcRefund } from './calc-refund';
 import { refundFail, type RefundResult } from './errors';
-import { finishCancel } from './finish-cancel';
+import { finishCancel, lookUpRefund, type RefundLookup } from './finish-cancel';
 import { refundPayment } from './refund-payment';
 import {
   clearRequestedCancel,
@@ -139,10 +139,15 @@ export async function cancelReservation(input: {
     paidAmount: target.paidAmount,
     refundAmount: requested.refundAmount,
   });
-  if (!refund.ok) {
-    // 결과를 기다리거나 모르면 진행 중으로 두고 정리 작업이 포트원에 물어 정한다
-    if (refund.reason !== 'rejected') return refundFail('CANCEL_FINISHING');
-    // 거절돼서 돌려준 돈이 없다. 못 지워도 정리 작업이 지운다
+  // 결과를 기다리거나 모르면 진행 중으로 두고 정리 작업이 포트원에 물어 정한다
+  if (!refund.ok && refund.reason !== 'rejected') return refundFail('CANCEL_FINISHING');
+  // 거절 답이 와도 돈이 돌아갔거나 돌아가는 중일 수 있다(결제사 통신 오류, 앞선 요청의 환불). 지우기 전에 취소 내역을 본다
+  const found: RefundLookup = refund.ok
+    ? { state: 'refunded', refund }
+    : await lookUpRefund(target.paymentId);
+  if (found.state === 'pending') return refundFail('CANCEL_FINISHING');
+  if (found.state === 'none') {
+    // 돌려준 돈이 없다. 못 지워도 정리 작업이 지운다
     await clearRequestedCancel(db, reservationId).catch((error: unknown) => {
       logCancelError('진행 중 표시 지우기 실패:', reservationId, error);
     });
@@ -150,7 +155,7 @@ export async function cancelReservation(input: {
   }
 
   try {
-    const finished = await finishCancel(db, { ...target, ...requested }, refund, now);
+    const finished = await finishCancel(db, { ...target, ...requested }, found.refund, now);
     if (!finished) return refundFail('ALREADY_CANCELLED');
     return ok({
       reservationId,

@@ -26,6 +26,8 @@ const state = vi.hoisted(() => ({
   clearError: null as Error | null,
   finishes: [] as unknown[][],
   finished: { refundAmount: 31_500 } as { refundAmount: number } | null | Error,
+  lookups: [] as string[],
+  lookup: { state: 'none' } as unknown,
 }));
 
 vi.mock('@/lib/request-time', () => ({ getRequestNow: async () => state.now }));
@@ -63,6 +65,10 @@ vi.mock('./finish-cancel', () => ({
     if (state.finished instanceof Error) throw state.finished;
     return state.finished;
   },
+  lookUpRefund: async (paymentId: string) => {
+    state.lookups.push(paymentId);
+    return state.lookup;
+  },
 }));
 
 const { cancelReservation, previewRefund } = await import('./cancel');
@@ -97,6 +103,8 @@ beforeEach(() => {
   state.clearError = null;
   state.finishes = [];
   state.finished = { refundAmount: 31_500 };
+  state.lookups = [];
+  state.lookup = { state: 'none' };
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -253,11 +261,47 @@ describe('cancelReservation', () => {
     expect(await cancel()).toMatchObject({ ok: true, data: { refundAmount: 20_000 } });
   });
 
-  it('포트원이 거절하면 진행 중 표시를 지우고 REFUND_FAILED(돌려준 돈이 없다)', async () => {
+  it('포트원이 거절했고 취소 내역이 없으면 진행 중 표시를 지우고 REFUND_FAILED', async () => {
     state.pgResult = { ok: false, reason: 'rejected' };
     expect(codeOf(await cancel())).toBe('REFUND_FAILED');
+    expect(state.lookups).toEqual(['toori-1']);
     expect(state.cleared).toEqual([RESERVATION]);
     expect(state.finishes).toEqual([]);
+  });
+
+  it('포트원이 거절했어도 끝난 취소가 있으면 그 금액으로 끝내고 성공', async () => {
+    state.pgResult = { ok: false, reason: 'rejected' };
+    state.lookup = { state: 'refunded', refund: { cancellationId: 'c-9', amount: 31_500 } };
+    expect(await cancel()).toEqual(
+      ok({
+        reservationId: RESERVATION,
+        refundAmount: 31_500,
+        cancelledAt: before(30).toISOString(),
+      }),
+    );
+    expect(state.finishes[0]?.[1]).toEqual({ cancellationId: 'c-9', amount: 31_500 });
+    expect(state.cleared).toEqual([]);
+  });
+
+  it('포트원이 거절했고 끝난 취소가 있는데 다른 요청이 먼저 끝냈으면 ALREADY_CANCELLED', async () => {
+    state.pgResult = { ok: false, reason: 'rejected' };
+    state.lookup = { state: 'refunded', refund: { cancellationId: 'c-9', amount: 31_500 } };
+    state.finished = null;
+    expect(codeOf(await cancel())).toBe('ALREADY_CANCELLED');
+    expect(state.cleared).toEqual([]);
+  });
+
+  it('포트원이 거절했고 처리 중이거나 묻지 못하면 기록을 두고 CANCEL_FINISHING', async () => {
+    state.pgResult = { ok: false, reason: 'rejected' };
+    state.lookup = { state: 'pending' };
+    expect(codeOf(await cancel())).toBe('CANCEL_FINISHING');
+    expect(state.cleared).toEqual([]);
+    expect(state.finishes).toEqual([]);
+  });
+
+  it('환불이 끝났으면 취소 내역을 다시 묻지 않는다', async () => {
+    expect((await cancel()).ok).toBe(true);
+    expect(state.lookups).toEqual([]);
   });
 
   it('진행 중 표시를 못 지워도 REFUND_FAILED(정리 작업이 지운다)', async () => {

@@ -51,6 +51,23 @@ export async function finishCancel(
 }
 
 /**
+ * 포트원 취소 내역으로 본 환불 상태. refunded: 끝난 환불이 있다. pending: 결제사가 처리 중이거나 포트원에 묻지 못했다.
+ * none: 환불이 없다(포트원에 결제가 없는 경우 포함)
+ */
+export type RefundLookup =
+  | { state: 'refunded'; refund: { cancellationId: string | null; amount: number | null } }
+  | { state: 'pending' }
+  | { state: 'none' };
+
+export async function lookUpRefund(paymentId: string): Promise<RefundLookup> {
+  const lookup = await getPortOnePayment(paymentId);
+  if (!lookup.ok) return lookup.reason === 'unavailable' ? { state: 'pending' } : { state: 'none' };
+  const refund = finishedCancellation(lookup.payment);
+  if (refund) return { state: 'refunded', refund };
+  return lookup.payment.cancelInProgress ? { state: 'pending' } : { state: 'none' };
+}
+
+/**
  * finished: 환불이 있어서 취소를 끝냈다. cleared: 환불이 없어서(또는 예약이 이미 바뀌어서) 진행 중 표시를 지웠다.
  * left: 결제사가 처리 중이거나 포트원에 묻지 못해 그대로 뒀다
  */
@@ -72,13 +89,9 @@ export async function settleRequestedCancel(
     return finish({ cancellationId: null, amount: request.refundAmount });
   }
 
-  const lookup = await getPortOnePayment(request.paymentId);
-  if (!lookup.ok && lookup.reason === 'unavailable') return 'left';
-  if (lookup.ok) {
-    const finished = finishedCancellation(lookup.payment);
-    if (finished) return finish(finished);
-    if (lookup.payment.cancelInProgress) return 'left';
-  }
+  const found = await lookUpRefund(request.paymentId);
+  if (found.state === 'refunded') return finish(found.refund);
+  if (found.state === 'pending') return 'left';
   await clearRequestedCancel(db, request.reservationId);
   return 'cleared';
 }

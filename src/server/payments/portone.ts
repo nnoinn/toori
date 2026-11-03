@@ -137,7 +137,7 @@ export type PortOneCancel =
   /** 취소가 끝났다. amount는 실제로 돌려준 금액(모르면 null) */
   | { ok: true; cancellationId: string | null; amount: number | null }
   /**
-   * pending: 결제사가 취소를 처리 중. rejected: 포트원이나 결제사가 거절해서 돌려준 돈이 없다.
+   * pending: 결제사가 취소를 처리 중. rejected: 포트원이나 결제사가 거절했다고 답했다. 결제사 통신 오류면 돈이 돌아갔을 수 있어서, 돌려준 돈이 없다고 단정하려면 취소 내역을 본다.
    * unavailable: 키가 없거나 응답을 받지 못해 취소됐는지 모른다(시간 초과 뒤에 처리될 수 있다)
    */
   | { ok: false; reason: 'pending' | 'rejected' | 'unavailable' };

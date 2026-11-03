@@ -27,7 +27,7 @@ vi.mock('./refund-store', () => ({
   },
 }));
 
-const { finishCancel, settleRequestedCancel } = await import('./finish-cancel');
+const { finishCancel, lookUpRefund, settleRequestedCancel } = await import('./finish-cancel');
 
 const db = {
   transaction: (run: (tx: string) => unknown) => run('tx'),
@@ -117,6 +117,27 @@ describe('finishCancel', () => {
     expect(
       await finishCancel(db, request, { cancellationId: 'c-1', amount: 31_500 }, NOW),
     ).toBeNull();
+  });
+});
+
+describe('lookUpRefund', () => {
+  it('끝난 취소가 있으면 refunded, 처리 중이면 pending, 없으면 none', async () => {
+    state.lookup = payment([{ id: 'c-1', amount: 31_500 }]);
+    expect(await lookUpRefund('toori-1')).toEqual({
+      state: 'refunded',
+      refund: { cancellationId: 'c-1', amount: 31_500 },
+    });
+    state.lookup = payment([], true);
+    expect(await lookUpRefund('toori-1')).toEqual({ state: 'pending' });
+    state.lookup = payment([]);
+    expect(await lookUpRefund('toori-1')).toEqual({ state: 'none' });
+  });
+
+  it('묻지 못하면 pending, 포트원에 결제가 없으면 none', async () => {
+    state.lookup = { ok: false, reason: 'unavailable' };
+    expect(await lookUpRefund('toori-1')).toEqual({ state: 'pending' });
+    state.lookup = { ok: false, reason: 'not_found' };
+    expect(await lookUpRefund('toori-1')).toEqual({ state: 'none' });
   });
 });
 
