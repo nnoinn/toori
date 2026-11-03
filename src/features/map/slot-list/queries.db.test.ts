@@ -3,7 +3,7 @@
 
 import { afterAll, expect, it } from 'vitest';
 
-import { slots } from '@/db/schema';
+import { favorites, slots } from '@/db/schema';
 
 import {
   createTestCustomer,
@@ -17,7 +17,13 @@ import { closeTestDb, describeDb, type TestTx, withRollback } from '../../../../
 import { EMPTY_FILTERS, type HomeFilters } from '../filters';
 import type { MapBounds } from '../types';
 import { decodeCursor, SLOT_PAGE_SIZE } from './cursor';
-import { type HomeSlotQuery, selectMapShops, selectSlotPage } from './queries';
+import {
+  countSlots,
+  type HomeSlotQuery,
+  selectFavoriteSlots,
+  selectMapShops,
+  selectSlotPage,
+} from './queries';
 import type { SlotSort } from './sort';
 
 afterAll(closeTestDb);
@@ -67,6 +73,73 @@ async function insertSlot(
 const ids = (items: { slotId: string }[]) => items.map((item) => item.slotId);
 
 describeDb('홈 목록·지도 조회', () => {
+  it('매물 목록: 고른 시·군·구 안의 매물만, 매물 수도 같은 조건(#215)', async () => {
+    await withRollback(async (tx) => {
+      // 테스트 샵은 기본이 안산시 단원구(41273)
+      const danwon = await createTestShop(tx, { status: 'approved' });
+      const sangnok = await createTestShop(tx, {
+        status: 'approved',
+        sigunguCode: '41271',
+        sigungu: '안산시 상록구',
+      });
+      const shown = await insertSlot(tx, danwon, '10:00', '11:00');
+      await insertSlot(tx, sangnok, '10:00', '11:00');
+      await insertSlot(tx, danwon, '12:00', '13:00', { status: 'closed' });
+
+      const query = { sigunguCode: '41273', filters: EMPTY_FILTERS, customerId: null, now: NOW };
+      const result = await selectSlotPage(tx, {
+        ...query,
+        origin: TEST_LOCATION,
+        sort: 'near',
+        cursor: null,
+        shopId: null,
+      });
+      expect(ids(result.items)).toEqual([shown.id]);
+      expect(await countSlots(tx, query)).toBe(1);
+    });
+  });
+
+  it('찜한 샵 매물: 내가 찜한 샵의 보이는 매물만 임박순, 기준점이 없으면 거리 없음(#215, C-209)', async () => {
+    await withRollback(async (tx) => {
+      const liked = await createTestShop(tx, { status: 'approved' });
+      // 찜한 샵이 멀리 있어도(지도 영역·시·군·구와 상관없이) 나온다
+      const likedFar = await createTestShop(tx, {
+        status: 'approved',
+        location: FAR_LOCATION,
+        sigunguCode: '30200',
+      });
+      const notLiked = await createTestShop(tx, { status: 'approved' });
+      const me = await createTestCustomer(tx);
+      const other = await createTestCustomer(tx);
+      await tx.insert(favorites).values([
+        { customerId: me.customerId, shopId: liked.shopId },
+        { customerId: me.customerId, shopId: likedFar.shopId },
+        { customerId: other.customerId, shopId: notLiked.shopId },
+      ]);
+
+      const later = await insertSlot(tx, liked, '14:00', '15:00');
+      const sooner = await insertSlot(tx, likedFar, '10:00', '11:00');
+      await insertSlot(tx, liked, '12:00', '13:00', { status: 'closed' });
+      await insertSlot(tx, notLiked, '09:00', '10:00');
+
+      const items = await selectFavoriteSlots(tx, {
+        customerId: me.customerId,
+        now: NOW,
+        origin: null,
+      });
+      expect(ids(items)).toEqual([sooner.id, later.id]);
+      expect(items.map((item) => item.distanceMeters)).toEqual([null, null]);
+
+      const near = await selectFavoriteSlots(tx, {
+        customerId: me.customerId,
+        now: NOW,
+        origin: TEST_LOCATION,
+      });
+      expect(near[1].distanceMeters).toBeLessThan(1);
+      expect(near[0].distanceMeters).toBeGreaterThan(10_000);
+    });
+  });
+
   it('승인 샵의 게시중 매물만, 지도 영역 안에서만', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });

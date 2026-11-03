@@ -6,6 +6,8 @@ import { isValidBusinessNumber } from '@/lib/business-number';
 import type { DigitInputRule } from '@/lib/digit-input';
 import { BANK_CODES, type BankCode } from '@/server/policy';
 
+import { withObjectParticle } from './korean';
+
 export const OWNER_FIELD_LIMITS = {
   personName: 20,
   businessName: 40,
@@ -47,7 +49,7 @@ export function onlyDigits(value: string): string {
   return value.replace(/[-\s]/g, '');
 }
 
-/** 비면 "…을(를) 입력해 주세요", 길면 "N자 이하로". 앞뒤 빈칸을 뺀 값을 돌려준다 */
+/** 비면 "예금주를 입력해 주세요"처럼(조사는 받침에 맞춘다), 길면 "N자 이하로". 앞뒤 빈칸을 뺀 값을 돌려준다 */
 export function checkRequired<K extends string>(
   errors: Partial<Record<K, string>>,
   field: K,
@@ -56,7 +58,7 @@ export function checkRequired<K extends string>(
   max?: number,
 ): string {
   const text = value.trim();
-  if (text === '') errors[field] = `${label}을(를) 입력해 주세요`;
+  if (text === '') errors[field] = `${withObjectParticle(label)} 입력해 주세요`;
   else if (max !== undefined && text.length > max) errors[field] = `${max}자 이하로 입력해 주세요`;
   return text;
 }

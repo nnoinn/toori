@@ -13,6 +13,7 @@ import { PAYMENT_ERRORS, type PaymentError } from '@/server/payments/errors';
 import type { ConfirmedReservation } from '@/server/payments/types';
 
 import { CompletedReservationDetails } from './completed-reservation';
+import { ReservationAlerts } from './reservation-alerts';
 import { canRecheck, CONFIRM_FAILED, failureAction } from './result-rules';
 
 type ResultState =
@@ -107,7 +108,8 @@ export function PaymentResultView({
           </p>
         </div>
         <CompletedReservationDetails reservationId={reservationId} />
-        {/* TODO(J14): "예약 알림 받기"로 푸시 권한을 여기서 처음 묻는다(C-601, 기술 가이드 연결 지점) */}
+        {/* 푸시 권한은 여기서 처음 묻는다(J14, C-602, 기술 가이드 연결 지점) */}
+        <ReservationAlerts />
         <div className="flex w-full flex-col gap-2">
           <Link
             href={`/reservations/${reservationId}`}

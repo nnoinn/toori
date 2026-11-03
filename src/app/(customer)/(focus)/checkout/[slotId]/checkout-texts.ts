@@ -27,3 +27,9 @@ export const BOOKER_INFO_REFUSAL_NOTE =
 export function intermediaryNotice(shopName: string): string {
   return `${SITE_NAME}는 통신판매중개자로서 서비스의 당사자가 아니에요. 서비스에 대한 책임은 ${shopName}에 있어요.`;
 }
+
+/**
+ * 결제할 수 없는 화면(HoldEnded)의 설명. 제목("결제할 수 있는 상태가 아니에요")과 같은 말로 시작하는
+ * 서버 문구(PAYMENT_ERRORS.NOT_HOLDER) 대신, 다음에 할 일만 적는다(#214)
+ */
+export const HOLD_ENDED_HINT = '매물 화면에서 예약하기를 다시 눌러 주세요';

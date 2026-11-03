@@ -152,6 +152,23 @@ async function deleteBookings(sql, orderIds) {
   await sql`delete from orders where id in (${orderIds()})`;
 }
 
+/**
+ * 매물 조건(fragment)에 걸린 매물을 지운다. 그 매물로 재등록한 매물(또 재등록했으면 그 뒤까지)도 예약·주문과 같이 지운다.
+ * 재등록한 매물은 시나리오 표시 없이 원래 매물을 가리켜서(relisted_from_slot_id), 남겨 두면 원래 매물을 지우지 못한다(#224)
+ */
+async function deleteSlots(sql, slotIds) {
+  const withRelisted = () => sql`
+    with recursive chain as (
+      select id from slots where id in (${slotIds()})
+      union
+      select s.id from slots s join chain c on s.relisted_from_slot_id = c.id
+    )
+    select id from chain`;
+  await deleteBookings(sql, () => sql`select id from orders where slot_id in (${withRelisted()})`);
+  // 원래 매물과 재등록한 매물을 한 번에 지워야 서로 가리키는 제약에 걸리지 않는다
+  await sql`delete from slots where id in (${withRelisted()})`;
+}
+
 async function myShop(sql, userId) {
   const [row] = await sql`
     select s.id, s.name, s.status, s.business_doc_path from shops s
@@ -223,7 +240,10 @@ async function customerNew(sql, me, key) {
     select o.id from orders o join slots sl on sl.id = o.slot_id
     where o.payment_id like ${`${myPayment(me.id)}%`} and sl.shop_id = ${shop.id}`;
   await deleteBookings(sql, mine);
-  await sql`delete from slots where shop_id = ${shop.id} and menu_description like ${`${myTag(me.id)}%`}`;
+  await deleteSlots(
+    sql,
+    () => sql`select id from slots where shop_id = ${shop.id} and menu_description like ${`${myTag(me.id)}%`}`,
+  );
   const [{ n }] = await sql`
     select count(*)::int as n from reservations r join slots sl on sl.id = r.slot_id
     join customers c on c.id = r.customer_id
@@ -241,7 +261,7 @@ async function myReservations(sql, me, now) {
     select o.id from orders o join slots sl on sl.id = o.slot_id
     where o.payment_id like ${`${myPayment(me.id)}%`} and sl.menu_description = ${tag}`;
   await deleteBookings(sql, prev);
-  await sql`delete from slots where menu_description = ${tag}`;
+  await deleteSlots(sql, () => sql`select id from slots where menu_description = ${tag}`);
 
   const base = floorHour(now).getTime();
   const plan = [
@@ -331,7 +351,7 @@ async function ownerSlots(sql, me, now) {
   const tag = `${myTag(me.id)} owner`;
   const prev = () => sql`select o.id from orders o join slots sl on sl.id = o.slot_id where sl.menu_description = ${tag}`;
   await deleteBookings(sql, prev);
-  await sql`delete from slots where menu_description = ${tag}`;
+  await deleteSlots(sql, () => sql`select id from slots where menu_description = ${tag}`);
 
   const [ownerRow] = await sql`select user_id from owners where user_id = ${me.id}`;
   const b = await seedCustomer(sql, 'b');
@@ -373,7 +393,10 @@ async function reset(sql, me) {
   const scenarioShops = () => sql`select id from shops where business_doc_path like ${`${myShopDoc(me.id)}%`}`;
   const shopOrders = () => sql`select o.id from orders o join slots sl on sl.id = o.slot_id where sl.shop_id in (${scenarioShops()})`;
   await deleteBookings(sql, shopOrders);
-  await sql`delete from slots where menu_description like ${`${myTag(me.id)}%`} or shop_id in (${scenarioShops()})`;
+  await deleteSlots(
+    sql,
+    () => sql`select id from slots where menu_description like ${`${myTag(me.id)}%`} or shop_id in (${scenarioShops()})`,
+  );
   await sql`delete from shop_images where shop_id in (${scenarioShops()})`;
   await sql`delete from payout_accounts where shop_id in (${scenarioShops()})`;
   await sql`delete from menus where shop_id in (${scenarioShops()})`;
