@@ -4,10 +4,11 @@ import type postgres from 'postgres';
 import { describe, expect, it } from 'vitest';
 
 import { SLOT_STATUSES } from '@/db/schema';
+import { isValidBusinessNumber } from '@/lib/business-number';
 
 import { SLOT_TIME_STEP_MINUTES } from '../../scripts/dev-db.mjs';
 import { ROLLING_SLOTS, SEED_ACCOUNTS, SEED_SHOPS } from '../../scripts/seed-data.mjs';
-import { rollingStarts, salePrice, seedDevData } from '../../scripts/seed.mjs';
+import { rollingStarts, salePrice, seedBusinessNumber, seedDevData } from '../../scripts/seed.mjs';
 
 import { describeDb, withRollbackSql } from './test-db';
 
@@ -67,6 +68,18 @@ describe('salePrice', () => {
   it('정가 × (1 − 할인율)에서 원 미만만 버린다 (S-203)', () => {
     expect(salePrice(33500, 30)).toBe(23450);
     expect(salePrice(33333, 10)).toBe(29999);
+  });
+});
+
+describe('시드 사업자등록번호 (#242)', () => {
+  it('샵마다 검증번호가 맞는 숫자 10자리(앱이 저장하는 모양)이고 서로 다르다', () => {
+    const numbers = SEED_SHOPS.map((_, i) => seedBusinessNumber(i + 1));
+    for (const number of numbers) {
+      expect(number).toMatch(/^\d{10}$/);
+      // 스크립트에 다시 둔 계산이 src/lib/business-number.ts와 같은지
+      expect(isValidBusinessNumber(number)).toBe(true);
+    }
+    expect(new Set(numbers).size).toBe(numbers.length);
   });
 });
 

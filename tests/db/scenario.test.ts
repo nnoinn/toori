@@ -4,6 +4,7 @@
 import type postgres from 'postgres';
 import { expect, it } from 'vitest';
 
+import { bookingRows, insertBookings } from '../../scripts/dev-db.mjs';
 import { runScenario } from '../../scripts/scenario.mjs';
 import { SEED_ACCOUNTS } from '../../scripts/seed-data.mjs';
 import { seedDevData } from '../../scripts/seed.mjs';
@@ -136,6 +137,68 @@ describeDb('시나리오 명령 (실제 DB)', () => {
         { n: number }[]
       >`select count(*)::int as n from owners where user_id = ${meId}`;
       expect(n).toBe(0);
+    });
+  });
+
+  it('시나리오 취소 매물로 재등록한 매물(이어서 재등록한 것과 그 예약까지)도 owner-slots·reset이 같이 지운다 (#224)', async () => {
+    await withRollbackSql(async (sql) => {
+      const { meId, run, counts } = await setup(sql);
+      const before = await counts();
+      await run('owner-shop', 'approved');
+      await run('owner-slots');
+
+      // 원장님 화면의 재등록처럼 원래 매물을 가리키는 새 매물을 만든다. 시나리오 표시는 붙지 않는다
+      const relist = async (fromId: string, status: string) => {
+        const [row] = await sql`
+          insert into slots (shop_id, menu_id, service_type, menu_name, list_price, duration_minutes,
+            discount_rate, sale_price, new_customer_only, start_at, end_at, publish_at, status,
+            created_by, relisted_from_slot_id)
+          select shop_id, menu_id, service_type, menu_name, list_price, duration_minutes,
+            discount_rate, sale_price, new_customer_only, start_at, end_at, publish_at, ${status},
+            created_by, id
+          from slots where id = ${fromId}
+          returning *`;
+        return row;
+      };
+      /** 시나리오의 취소 매물 → 재등록(또 취소) → 재등록(예약됨, 예약 하나) */
+      const relistChain = async () => {
+        const [cancelled] = await sql<{ id: string; customer_id: string }[]>`
+          select sl.id, r.customer_id from slots sl join reservations r on r.slot_id = sl.id
+          join shops s on s.id = sl.shop_id join owners o on o.id = s.owner_id
+          where o.user_id = ${meId} and sl.status = 'cancelled' and sl.relisted_from_slot_id is null`;
+        const first = await relist(cancelled.id, 'cancelled');
+        const second = await relist(first.id, 'reserved');
+        await insertBookings(sql, [
+          bookingRows({
+            slot: second,
+            customerId: cancelled.customer_id,
+            recordedBy: meId,
+            now: NOW,
+            paymentPrefix: 'test_relist_',
+            policyVersion: 'test',
+          }),
+        ]);
+        return [first.id as string, second.id as string];
+      };
+      const relistedLeft = async (ids: string[]) => {
+        const [{ n }] = await sql<{ n: number }[]>`
+          select (select count(*)::int from slots where id in ${sql(ids)})
+            + (select count(*)::int from orders where slot_id in ${sql(ids)}) as n`;
+        return n;
+      };
+
+      const relisted = await relistChain();
+      await run('owner-slots');
+      expect(await relistedLeft(relisted)).toBe(0);
+      const [{ mine }] = await sql<{ mine: number }[]>`
+        select count(*)::int as mine from slots sl join shops s on s.id = sl.shop_id
+        join owners o on o.id = s.owner_id where o.user_id = ${meId}`;
+      expect(mine).toBe(8);
+
+      const again = await relistChain();
+      await run('reset');
+      expect(await relistedLeft(again)).toBe(0);
+      expect(await counts()).toEqual(before);
     });
   });
 });
