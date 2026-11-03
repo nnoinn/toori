@@ -43,6 +43,8 @@ export type PortOnePayment = {
   failureCode: string | null;
   /** 끝난 취소 내역(status SUCCEEDED만). 취소된 결제에만 있다 */
   cancellations: { id: string | null; amount: number | null }[];
+  /** 결제사가 아직 처리 중인 취소(status REQUESTED)가 있는지 */
+  cancelInProgress: boolean;
 };
 
 export type PortOneLookup =
@@ -109,15 +111,36 @@ export async function getPortOnePayment(paymentId: string): Promise<PortOneLooku
           id: cancellation.id ?? null,
           amount: cancellation.totalAmount ?? null,
         })),
+      cancelInProgress: (payment.cancellations ?? []).some(
+        (cancellation) => cancellation.status === 'REQUESTED',
+      ),
     },
+  };
+}
+
+/** 끝난 취소를 하나로 합친다. 없으면 null. 금액을 모르는 취소가 있으면 금액은 null */
+export function finishedCancellation(
+  payment: PortOnePayment,
+): { cancellationId: string | null; amount: number | null } | null {
+  const { cancellations } = payment;
+  if (cancellations.length === 0) return null;
+  const amounts = cancellations.map((cancellation) => cancellation.amount);
+  return {
+    cancellationId: cancellations.at(-1)?.id ?? null,
+    amount: amounts.some((amount) => amount === null)
+      ? null
+      : amounts.reduce<number>((sum, amount) => sum + (amount ?? 0), 0),
   };
 }
 
 export type PortOneCancel =
   /** 취소가 끝났다. amount는 실제로 돌려준 금액(모르면 null) */
   | { ok: true; cancellationId: string | null; amount: number | null }
-  /** pending: 결제사가 취소를 처리 중. unavailable: 키가 없거나, 포트원에 묻지 못했거나, 취소를 거절했다. 둘 다 나중에 다시 부른다 */
-  | { ok: false; reason: 'pending' | 'unavailable' };
+  /**
+   * pending: 결제사가 취소를 처리 중. rejected: 포트원이나 결제사가 거절해서 돌려준 돈이 없다.
+   * unavailable: 키가 없거나 응답을 받지 못해 취소됐는지 모른다(시간 초과 뒤에 처리될 수 있다)
+   */
+  | { ok: false; reason: 'pending' | 'rejected' | 'unavailable' };
 
 /**
  * 결제를 취소한다. partial이 없으면 전액, 있으면 그 금액만 돌려준다. 이미 취소된 결제면 포트원의 취소 내역을 읽어 끝난 것으로 돌려줘서, 같은 결제로 여러 번 불러도 된다.
@@ -164,7 +187,7 @@ export async function cancelPortOnePayment(
       response.status,
       typeof type === 'string' ? type : '',
     );
-    return { ok: false, reason: 'unavailable' };
+    return { ok: false, reason: typeof type === 'string' ? 'rejected' : 'unavailable' };
   }
 
   const { cancellation } = parsed.data;
@@ -177,14 +200,17 @@ export async function cancelPortOnePayment(
   }
   if (cancellation.status === 'REQUESTED') return { ok: false, reason: 'pending' };
   console.error('[portone] 결제사가 취소를 거절했어요:', cancellation.status);
-  return { ok: false, reason: 'unavailable' };
+  return { ok: false, reason: 'rejected' };
 }
 
 /** 이미 취소된 결제의 취소 내역을 읽는다(앞선 요청이 취소한 뒤 기록하지 못했을 때) */
 async function readFinishedCancel(paymentId: string): Promise<PortOneCancel> {
   const lookup = await getPortOnePayment(paymentId);
   if (!lookup.ok) return { ok: false, reason: 'unavailable' };
-  // 결제 한 건을 한 번만 취소하므로 끝난 취소는 한 건이다
-  const finished = lookup.payment.cancellations.at(-1);
-  return { ok: true, cancellationId: finished?.id ?? null, amount: finished?.amount ?? null };
+  const finished = finishedCancellation(lookup.payment);
+  return {
+    ok: true,
+    cancellationId: finished?.cancellationId ?? null,
+    amount: finished?.amount ?? null,
+  };
 }

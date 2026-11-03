@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { cancelPortOnePayment, getPortOnePayment } from './portone';
+import { cancelPortOnePayment, finishedCancellation, getPortOnePayment } from './portone';
 
 const fetchMock = vi.fn();
 
@@ -59,7 +59,19 @@ describe('getPortOnePayment', () => {
         failureReason: null,
         failureCode: null,
         cancellations: [],
+        cancelInProgress: false,
       },
+    });
+  });
+
+  it('결제사가 처리 중인 취소(REQUESTED)가 있으면 알려준다', async () => {
+    respond(200, {
+      status: 'PAID',
+      cancellations: [{ status: 'REQUESTED', id: 'c-1', totalAmount: 23_450 }],
+    });
+    expect(await getPortOnePayment('toori-1')).toMatchObject({
+      ok: true,
+      payment: { cancellations: [], cancelInProgress: true },
     });
   });
 
@@ -303,10 +315,21 @@ describe('cancelPortOnePayment', () => {
     ],
     ['결제사 오류(502)', () => respond(502, { type: 'PG_PROVIDER', message: '오류' })],
     ['결제 안 된 건(409)', () => respond(409, { type: 'PAYMENT_NOT_PAID' })],
+    ['없는 결제(404)', () => respond(404, { type: 'PAYMENT_NOT_FOUND' })],
     ['인증 실패(401)', () => respond(401, { type: 'UNAUTHORIZED' })],
+  ])('%s → rejected(돌려준 돈이 없다)', async (_, setup) => {
+    setup();
+    expect(await cancelPortOnePayment('toori-1', '자동 취소')).toEqual({
+      ok: false,
+      reason: 'rejected',
+    });
+  });
+
+  it.each([
     ['응답 모양이 다름', () => respond(200, { nope: true })],
-    ['네트워크 오류', () => fetchMock.mockRejectedValue(new TypeError('fetch failed'))],
-  ])('%s → unavailable', async (_, setup) => {
+    ['이유 없는 서버 오류', () => respond(500, {})],
+    ['네트워크 오류·시간 초과', () => fetchMock.mockRejectedValue(new TypeError('fetch failed'))],
+  ])('%s → unavailable(취소됐는지 모른다)', async (_, setup) => {
     setup();
     expect(await cancelPortOnePayment('toori-1', '자동 취소')).toEqual({
       ok: false,
@@ -321,5 +344,45 @@ describe('cancelPortOnePayment', () => {
       reason: 'unavailable',
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('finishedCancellation', () => {
+  const payment = (cancellations: { id: string | null; amount: number | null }[]) => ({
+    status: 'PARTIAL_CANCELLED',
+    amountTotal: 45_000,
+    currency: 'KRW',
+    paidAt: null,
+    method: null,
+    failureReason: null,
+    failureCode: null,
+    cancellations,
+    cancelInProgress: false,
+  });
+
+  it('끝난 취소가 없으면 null', () => {
+    expect(finishedCancellation(payment([]))).toBeNull();
+  });
+
+  it('여러 건이면 금액을 더하고 마지막 취소 번호를 쓴다', () => {
+    expect(
+      finishedCancellation(
+        payment([
+          { id: 'c-1', amount: 10_000 },
+          { id: 'c-2', amount: 5_000 },
+        ]),
+      ),
+    ).toEqual({ cancellationId: 'c-2', amount: 15_000 });
+  });
+
+  it('금액을 모르는 취소가 있으면 금액은 null', () => {
+    expect(
+      finishedCancellation(
+        payment([
+          { id: 'c-1', amount: 10_000 },
+          { id: 'c-2', amount: null },
+        ]),
+      ),
+    ).toEqual({ cancellationId: 'c-2', amount: null });
   });
 });

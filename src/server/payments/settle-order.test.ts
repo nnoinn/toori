@@ -53,6 +53,7 @@ const payment = (extra: Partial<PortOnePayment> = {}): PortOnePayment => ({
   failureReason: null,
   failureCode: null,
   cancellations: [],
+  cancelInProgress: false,
   ...extra,
 });
 const names = () => state.calls.map((call) => call[0]);

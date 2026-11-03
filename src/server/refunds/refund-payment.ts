@@ -12,15 +12,21 @@ const CUSTOMER_CANCEL_REASON = '고객 예약 취소';
  */
 const NO_PG_PAYMENT_PREFIXES = ['seed_', 'scenario_'];
 
-/** 결제액 중 환불액만 돌려준다. 돌려줄 돈이 없거나(쿠폰 전액 결제) 시드·시나리오 주문이면 포트원을 부르지 않는다 */
+/** 포트원을 부르지 않아도 되는 환불인지. 돌려줄 돈이 없거나(쿠폰 전액 결제) 시드·시나리오 주문이다 */
+export function skipsPortOne(paymentId: string, refundAmount: number): boolean {
+  return (
+    refundAmount === 0 || NO_PG_PAYMENT_PREFIXES.some((prefix) => paymentId.startsWith(prefix))
+  );
+}
+
+/** 결제액 중 환불액만 돌려준다 */
 export async function refundPayment(input: {
   paymentId: string;
   paidAmount: number;
   refundAmount: number;
 }): Promise<PortOneCancel> {
   const { paymentId, paidAmount, refundAmount } = input;
-  const noPayment = NO_PG_PAYMENT_PREFIXES.some((prefix) => paymentId.startsWith(prefix));
-  if (refundAmount === 0 || noPayment) {
+  if (skipsPortOne(paymentId, refundAmount)) {
     return { ok: true, cancellationId: null, amount: refundAmount };
   }
   return cancelPortOnePayment(paymentId, CUSTOMER_CANCEL_REASON, {

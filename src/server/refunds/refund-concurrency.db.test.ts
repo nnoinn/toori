@@ -28,7 +28,7 @@ import {
   type TestShop,
 } from '../../../tests/db/fixtures';
 import { assertLocalTestDb, describeDb } from '../../../tests/db/test-db';
-import { recordCustomerCancel } from './refund-store';
+import { finishCustomerCancel, requestCustomerCancel } from './refund-store';
 
 const NOW = new Date('2026-11-01T08:00:00+09:00');
 const REPEAT = 5;
@@ -88,37 +88,46 @@ describeDb('예약을 동시에 두 번 취소 (실제 DB, 연결 여러 개)', 
     await db.$client.end();
   });
 
-  it('동시에 눌러도 하나만 기록되고 환불 기록은 한 줄이다', async () => {
+  it('동시에 시작해도 진행 중 기록은 하나이고, 동시에 끝내도 환불 기록은 한 줄이다', async () => {
     for (let round = 0; round < REPEAT; round++) {
       // 매물마다 시간이 겹치지 않게 시작 시각을 바꾼다
       const hour = String(10 + round).padStart(2, '0');
       const booking = await db.transaction((tx) =>
         createTestReservation(tx, shop, made.customerId, `${hour}:00`, `${hour}:30`, 'confirmed'),
       );
-      const cancel = () =>
+      const amounts = {
+        reservationId: booking.reservation.id,
+        orderId: booking.order.id,
+        band: 'over_24h' as const,
+        penaltyRate: 30,
+        refundAmount: 9_800,
+        penaltyAmount: 4_200,
+      };
+      const start = () => requestCustomerCancel(db, { ...amounts, requestedAt: NOW });
+      const finish = () =>
         db.transaction((tx) =>
-          recordCustomerCancel(tx, {
-            reservationId: booking.reservation.id,
-            orderId: booking.order.id,
+          finishCustomerCancel(tx, {
+            ...amounts,
             slotId: booking.slot.id,
-            band: 'over_24h',
-            penaltyRate: 30,
-            refundAmount: 9_800,
-            penaltyAmount: 4_200,
             pgCancellationId: 'c-1',
+            reviewReason: null,
             hoursBeforeStart: 30,
+            requestedAt: NOW,
             now: NOW,
           }),
         );
 
-      const results = await Promise.all([cancel(), cancel()]);
-      expect(results.filter(Boolean)).toHaveLength(1);
+      const started = await Promise.all([start(), start()]);
+      expect(started.filter(Boolean)).toHaveLength(1);
+
+      const finished = await Promise.all([finish(), finish()]);
+      expect(finished.filter(Boolean)).toHaveLength(1);
 
       const rows = await db
         .select()
         .from(refunds)
         .where(eq(refunds.reservationId, booking.reservation.id));
-      expect(rows).toHaveLength(1);
+      expect(rows.map((row) => row.status)).toEqual(['done']);
     }
   });
 });

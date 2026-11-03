@@ -184,6 +184,7 @@ vi.mock('./portone', () => ({
         failureReason: null,
         failureCode: null,
         cancellations: [],
+        cancelInProgress: false,
       },
     };
   },
@@ -475,6 +476,7 @@ describe('confirmPayment', () => {
         failureReason: status === 'FAILED' ? '카드 한도 초과' : null,
         failureCode: extra.failureCode ?? null,
         cancellations: [],
+        cancelInProgress: false,
       },
     };
   };

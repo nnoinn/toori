@@ -19,8 +19,13 @@ const state = vi.hoisted(() => ({
   reads: [] as [string, string][],
   pgCalls: [] as unknown[][],
   pgResult: null as unknown,
-  records: [] as Record<string, unknown>[],
-  recorded: true as boolean | Error,
+  steps: [] as string[],
+  requests: [] as Record<string, unknown>[],
+  started: true as boolean | Error,
+  cleared: [] as string[],
+  clearError: null as Error | null,
+  finishes: [] as unknown[][],
+  finished: { refundAmount: 31_500 } as { refundAmount: number } | null | Error,
 }));
 
 vi.mock('@/lib/request-time', () => ({ getRequestNow: async () => state.now }));
@@ -30,6 +35,7 @@ vi.mock('@/db', () => ({
 }));
 vi.mock('@/server/payments/portone', () => ({
   cancelPortOnePayment: async (...args: unknown[]) => {
+    state.steps.push('portone');
     state.pgCalls.push(args);
     return state.pgResult;
   },
@@ -39,10 +45,23 @@ vi.mock('./refund-store', () => ({
     state.reads.push([reservationId, customerId]);
     return state.target;
   },
-  recordCustomerCancel: async (_tx: string, input: Record<string, unknown>) => {
-    state.records.push(input);
-    if (state.recorded instanceof Error) throw state.recorded;
-    return state.recorded;
+  requestCustomerCancel: async (_db: unknown, input: Record<string, unknown>) => {
+    state.steps.push('request');
+    state.requests.push(input);
+    if (state.started instanceof Error) throw state.started;
+    return state.started;
+  },
+  clearRequestedCancel: async (_db: unknown, reservationId: string) => {
+    state.cleared.push(reservationId);
+    if (state.clearError) throw state.clearError;
+  },
+}));
+vi.mock('./finish-cancel', () => ({
+  finishCancel: async (_db: unknown, ...args: unknown[]) => {
+    state.steps.push('finish');
+    state.finishes.push(args);
+    if (state.finished instanceof Error) throw state.finished;
+    return state.finished;
   },
 }));
 
@@ -59,6 +78,7 @@ function target(extra: Partial<RefundTarget> = {}): RefundTarget {
     salePrice: 45_000,
     couponAmount: 0,
     startAt: START,
+    requested: null,
     ...extra,
   };
 }
@@ -70,8 +90,13 @@ beforeEach(() => {
   state.reads = [];
   state.pgCalls = [];
   state.pgResult = { ok: true, cancellationId: 'c-1', amount: 31_500 };
-  state.records = [];
-  state.recorded = true;
+  state.steps = [];
+  state.requests = [];
+  state.started = true;
+  state.cleared = [];
+  state.clearError = null;
+  state.finishes = [];
+  state.finished = { refundAmount: 31_500 };
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -167,13 +192,40 @@ describe('previewRefund', () => {
   });
 });
 
+describe('previewRefund (진행 중인 취소가 있을 때)', () => {
+  it('새로 계산하지 않고 저장해 둔 금액을 보여준다(그 사이 구간이 바뀌어도)', async () => {
+    state.now = before(10); // 지금 계산하면 50% 구간이다
+    state.target = target({
+      requested: {
+        band: 'over_24h',
+        penaltyRate: 30,
+        refundAmount: 31_500,
+        penaltyAmount: 13_500,
+        requestedAt: before(30),
+      },
+    });
+    const preview = await previewRefund(RESERVATION);
+    expect(preview).toMatchObject({
+      ok: true,
+      data: { refundable: true, band: 'over_24h', penaltyRate: 30, refundAmount: 31_500 },
+    });
+  });
+});
+
 describe('cancelReservation', () => {
   const cancel = (expectedRefundAmount = 31_500) =>
     cancelReservation({ reservationId: RESERVATION, expectedRefundAmount });
   const codeOf = (result: Awaited<ReturnType<typeof cancelReservation>>) =>
     result.ok ? null : result.error.code;
+  const requested = {
+    band: 'over_24h' as const,
+    penaltyRate: 30,
+    refundAmount: 31_500,
+    penaltyAmount: 13_500,
+    requestedAt: before(30),
+  };
 
-  it('포트원에서 환불액만 돌려준 뒤 위약금 구간과 함께 기록하고 결과를 돌려준다', async () => {
+  it('진행 중으로 먼저 저장하고, 포트원에서 환불액만 돌려준 뒤 기록을 끝낸다', async () => {
     expect(await cancel()).toEqual(
       ok({
         reservationId: RESERVATION,
@@ -181,80 +233,128 @@ describe('cancelReservation', () => {
         cancelledAt: before(30).toISOString(),
       }),
     );
+    expect(state.steps).toEqual(['request', 'portone', 'finish']);
     expect(state.reads).toEqual([[RESERVATION, 'customer-1']]);
+    expect(state.requests).toEqual([
+      { reservationId: RESERVATION, orderId: 'order-1', ...requested },
+    ]);
     expect(state.pgCalls).toEqual([
       ['toori-1', '고객 예약 취소', { amount: 31_500, currentCancellableAmount: 45_000 }],
     ]);
-    expect(state.records).toEqual([
-      {
-        reservationId: RESERVATION,
-        orderId: 'order-1',
-        slotId: 'slot-1',
-        band: 'over_24h',
-        penaltyRate: 30,
-        refundAmount: 31_500,
-        penaltyAmount: 13_500,
-        pgCancellationId: 'c-1',
-        hoursBeforeStart: 30,
-        now: before(30),
-      },
+    expect(state.finishes[0]).toEqual([
+      expect.objectContaining({ reservationId: RESERVATION, paymentId: 'toori-1', ...requested }),
+      { ok: true, cancellationId: 'c-1', amount: 31_500 },
+      before(30),
     ]);
   });
 
-  it.each(['unavailable', 'pending'])(
-    '포트원 환불이 끝나지 않으면(%s) 기록하지 않고 REFUND_FAILED(예약은 그대로)',
-    async (reason) => {
-      state.pgResult = { ok: false, reason };
-      expect(codeOf(await cancel())).toBe('REFUND_FAILED');
-      expect(state.records).toEqual([]);
-    },
-  );
-
-  it('앞선 요청이 돌려준 금액이 지금 계산과 다르면 기록하지 않고 로그를 남긴다', async () => {
-    state.now = before(10); // 50% 구간으로 넘어감. 앞선 요청은 70%를 돌려줬다
-    state.pgResult = { ok: true, cancellationId: 'c-1', amount: 31_500 };
-    expect(codeOf(await cancel(22_500))).toBe('REFUND_FAILED');
-    expect(state.records).toEqual([]);
-    expect(console.error).toHaveBeenCalled();
+  it('돌려준 금액이 계산과 달라 실제 금액으로 끝냈으면 그 금액을 돌려준다', async () => {
+    state.finished = { refundAmount: 20_000 };
+    expect(await cancel()).toMatchObject({ ok: true, data: { refundAmount: 20_000 } });
   });
 
-  it('포트원이 금액을 알려주지 않으면 계산한 금액으로 기록한다', async () => {
-    state.pgResult = { ok: true, cancellationId: 'c-1', amount: null };
-    expect((await cancel()).ok).toBe(true);
-    expect(state.records[0]).toMatchObject({ refundAmount: 31_500, pgCancellationId: 'c-1' });
+  it('포트원이 거절하면 진행 중 표시를 지우고 REFUND_FAILED(돌려준 돈이 없다)', async () => {
+    state.pgResult = { ok: false, reason: 'rejected' };
+    expect(codeOf(await cancel())).toBe('REFUND_FAILED');
+    expect(state.cleared).toEqual([RESERVATION]);
+    expect(state.finishes).toEqual([]);
   });
 
-  it('다른 요청이 먼저 기록했으면 ALREADY_CANCELLED(두 번 눌렀을 때)', async () => {
-    state.recorded = false;
-    expect(codeOf(await cancel())).toBe('ALREADY_CANCELLED');
-  });
-
-  it('환불 뒤 저장이 실패하면 REFUND_FAILED(다시 누르면 앞선 환불을 읽어 기록한다)', async () => {
-    state.recorded = new Error('연결 끊김');
+  it('진행 중 표시를 못 지워도 REFUND_FAILED(정리 작업이 지운다)', async () => {
+    state.pgResult = { ok: false, reason: 'rejected' };
+    state.clearError = new Error('연결 끊김');
     expect(codeOf(await cancel())).toBe('REFUND_FAILED');
     expect(console.error).toHaveBeenCalled();
   });
 
-  it('돌려줄 돈이 없으면(쿠폰 전액 결제) 포트원을 부르지 않고 기록한다', async () => {
+  it.each(['pending', 'unavailable'])(
+    '환불 결과를 기다리거나 모르면(%s) 진행 중으로 두고 CANCEL_FINISHING',
+    async (reason) => {
+      state.pgResult = { ok: false, reason };
+      expect(codeOf(await cancel())).toBe('CANCEL_FINISHING');
+      expect(state.cleared).toEqual([]);
+      expect(state.finishes).toEqual([]);
+    },
+  );
+
+  it('환불 뒤 저장이 실패하면 CANCEL_FINISHING이고 "환불하지 못했어요"가 나오지 않는다', async () => {
+    state.finished = new Error('연결 끊김');
+    const result = await cancel();
+    expect(codeOf(result)).toBe('CANCEL_FINISHING');
+    expect(result.ok === false && result.error.message).not.toContain('환불하지 못했어요');
+    expect(state.cleared).toEqual([]);
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it('다른 요청이 먼저 기록을 끝냈으면 ALREADY_CANCELLED', async () => {
+    state.finished = null;
+    expect(codeOf(await cancel())).toBe('ALREADY_CANCELLED');
+  });
+
+  it('다른 요청이 같은 취소를 시작했으면(두 번 누름) 포트원을 부르지 않고 CANCEL_FINISHING', async () => {
+    state.started = false;
+    expect(codeOf(await cancel())).toBe('CANCEL_FINISHING');
+    expect(state.pgCalls).toEqual([]);
+  });
+
+  it('취소 시작을 저장하지 못하면 포트원을 부르지 않고 REFUND_FAILED', async () => {
+    state.started = new Error('연결 끊김');
+    expect(codeOf(await cancel())).toBe('REFUND_FAILED');
+    expect(state.pgCalls).toEqual([]);
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  describe('진행 중인 취소를 다시 누를 때', () => {
+    it('새로 계산하지 않고 저장해 둔 금액으로 처리한다(그 사이 구간이 바뀌어도)', async () => {
+      state.now = before(10); // 지금 계산하면 50% 구간이다
+      state.target = target({ requested });
+      expect(await cancel()).toEqual(
+        ok({
+          reservationId: RESERVATION,
+          refundAmount: 31_500,
+          cancelledAt: requested.requestedAt.toISOString(),
+        }),
+      );
+      expect(state.requests).toEqual([]);
+      expect(state.pgCalls[0][2]).toEqual({ amount: 31_500, currentCancellableAmount: 45_000 });
+      expect(state.finishes[0][0]).toMatchObject({ band: 'over_24h', penaltyRate: 30 });
+    });
+
+    it('시작까지 6시간 미만으로 넘어갔어도 이미 시작한 취소는 끝낼 수 있다', async () => {
+      state.now = before(3);
+      state.target = target({ requested });
+      expect((await cancel()).ok).toBe(true);
+    });
+
+    it('이용 완료한 예약이면 저장한 금액을 쓰지 않고 막는다', async () => {
+      state.now = new Date(START.getTime() + HOUR);
+      state.target = target({ status: 'completed', requested });
+      expect(codeOf(await cancel())).toBe('NOT_REFUNDABLE');
+      expect(state.pgCalls).toEqual([]);
+    });
+  });
+
+  it('돌려줄 돈이 없으면(쿠폰 전액 결제) 포트원을 부르지 않고 기록을 끝낸다', async () => {
     state.target = target({ paidAmount: 0, couponAmount: 45_000 });
+    state.finished = { refundAmount: 0 };
     expect((await cancel(0)).ok).toBe(true);
     expect(state.pgCalls).toEqual([]);
-    expect(state.records[0]).toMatchObject({ refundAmount: 0, pgCancellationId: null });
+    expect(state.finishes[0][1]).toEqual({ ok: true, cancellationId: null, amount: 0 });
   });
 
   it.each(['seed_abc', 'scenario_user_abc'])(
-    '시드·시나리오 주문(%s)은 포트원에 결제가 없어 부르지 않고 기록한다',
+    '시드·시나리오 주문(%s)은 포트원에 결제가 없어 부르지 않고 기록을 끝낸다',
     async (paymentId) => {
       state.target = target({ paymentId });
       expect((await cancel()).ok).toBe(true);
       expect(state.pgCalls).toEqual([]);
-      expect(state.records[0]).toMatchObject({ refundAmount: 31_500, pgCancellationId: null });
+      expect(state.finishes[0][1]).toEqual({ ok: true, cancellationId: null, amount: 31_500 });
     },
   );
 
   it('모르는 결제 번호는 건너뛰지 않고 포트원에 묻는다', async () => {
     state.target = target({ paymentId: 'other_seed_abc' });
-    state.pgResult = { ok: false, reason: 'unavailable' };
+    state.pgResult = { ok: false, reason: 'rejected' };
     expect(codeOf(await cancel())).toBe('REFUND_FAILED');
     expect(state.pgCalls).toHaveLength(1);
   });

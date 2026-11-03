@@ -76,6 +76,7 @@ const found = (status: string): PortOneLookup => ({
     failureReason: null,
     failureCode: null,
     cancellations: [],
+    cancelInProgress: false,
   },
 });
 const EMPTY = { checked: 1, confirmed: 0, autoCancelled: 0, failed: 0, abandoned: 0, left: 0 };
