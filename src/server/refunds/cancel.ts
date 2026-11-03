@@ -4,25 +4,48 @@
 // 화면에서는 '@/server/refunds/cancel'에서 가져온다. 환불액은 화면에서 계산하지 않고 이 결과를 그대로 보여준다.
 //
 // - previewRefund: 진짜(읽기만 한다). 금액은 calcRefund(#125)와 같은 계산이다
-// - cancelReservation: **가짜 결과 버전**. 확인(내 예약, 이미 취소, 6시간 미만, 금액이 바뀜)은 진짜로 하고, 성공하면 결과만 돌려준다.
-//   예약·매물·환불 기록·포트원은 그대로다. W14에서 진짜로 바꾸고 모양은 그대로 둔다.
-//   실패 화면은 로컬에서 DEV_FAKE_PAYMENT_FAILURE=cancelReservation:<코드>로 흉내 낸다
+// - cancelReservation: 진행 중(requested)으로 먼저 저장하고, 포트원에서 환불액만 돌려준 뒤, 예약·매물을 '취소'로 바꾸고 기록을 끝낸다(W14, #222).
+//   포트원을 부르는 동안 DB를 잠그지 않는다. 중간에 멈추면 정리 작업(sweep-cancels.ts)이 마무리한다.
+//   다시 누르면 저장해 둔 금액을 쓰고, 포트원이 앞선 환불을 알려줘서 두 번 환불되지 않는다
 
 import { z } from 'zod';
 
+import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { ok } from '@/lib/result';
 import { requireCustomer } from '@/server/auth';
 
 import { calcRefund } from './calc-refund';
 import { refundFail, type RefundResult } from './errors';
-import { devFakeCancelFailure } from './fake-cancel';
-import { readRefundTarget, type RefundTarget } from './refund-store';
+import { finishCancel, lookUpRefund, type RefundLookup } from './finish-cancel';
+import { refundPayment } from './refund-payment';
+import {
+  clearRequestedCancel,
+  readRefundTarget,
+  type RefundTarget,
+  requestCustomerCancel,
+} from './refund-store';
 import type { CancelledReservation, RefundPreview } from './types';
 
 const reservationIdSchema = z.uuid();
 
 function toPreview(target: RefundTarget, now: Date): RefundPreview {
+  // 진행 중인 취소가 있으면 새로 계산하지 않는다. 그 사이 구간이 바뀌어도 금액이 어긋나지 않는다
+  if (target.requested && target.status === 'confirmed') {
+    const { band, penaltyRate, refundAmount, penaltyAmount } = target.requested;
+    return {
+      reservationId: target.reservationId,
+      refundable: true,
+      band,
+      penaltyRate,
+      paidAmount: target.paidAmount,
+      refundAmount,
+      penaltyAmount,
+      couponAmount: target.couponAmount,
+      startAt: target.startAt.toISOString(),
+      serverNow: now.toISOString(),
+    };
+  }
   const calc = calcRefund({
     paidAmount: target.paidAmount,
     salePrice: target.salePrice,
@@ -82,18 +105,70 @@ export async function cancelReservation(input: {
   if (target.status === 'cancelled') return refundFail('ALREADY_CANCELLED');
   const now = await getRequestNow();
   const preview = toPreview(target, now);
-  const switched = devFakeCancelFailure(preview);
-  if (switched) return switched;
 
   if (!preview.refundable) return refundFail('NOT_REFUNDABLE');
   if (preview.refundAmount !== expectedRefundAmount) {
     return refundFail('REFUND_CHANGED', { preview });
   }
 
-  // 가짜 결과 버전: 예약·매물·환불 기록·포트원을 바꾸지 않고 결과만 돌려준다(W14에서 진짜로)
-  return ok({
-    reservationId,
+  const db = getDb();
+  const requested = target.requested ?? {
+    band: preview.band,
+    penaltyRate: preview.penaltyRate,
     refundAmount: preview.refundAmount,
-    cancelledAt: now.toISOString(),
+    penaltyAmount: preview.penaltyAmount,
+    requestedAt: now,
+  };
+  if (!target.requested) {
+    try {
+      const started = await requestCustomerCancel(db, {
+        reservationId,
+        orderId: target.orderId,
+        ...requested,
+      });
+      // 다른 요청이 같은 취소를 처리하고 있다(두 번 누름)
+      if (!started) return refundFail('CANCEL_FINISHING');
+    } catch (error) {
+      logCancelError('취소 시작 저장 실패:', reservationId, error);
+      return refundFail('REFUND_FAILED');
+    }
+  }
+
+  const refund = await refundPayment({
+    paymentId: target.paymentId,
+    paidAmount: target.paidAmount,
+    refundAmount: requested.refundAmount,
   });
+  // 결과를 기다리거나 모르면 진행 중으로 두고 정리 작업이 포트원에 물어 정한다
+  if (!refund.ok && refund.reason !== 'rejected') return refundFail('CANCEL_FINISHING');
+  // 거절 답이 와도 돈이 돌아갔거나 돌아가는 중일 수 있다(결제사 통신 오류, 앞선 요청의 환불). 지우기 전에 취소 내역을 본다
+  const found: RefundLookup = refund.ok
+    ? { state: 'refunded', refund }
+    : await lookUpRefund(target.paymentId);
+  if (found.state === 'pending') return refundFail('CANCEL_FINISHING');
+  if (found.state === 'none') {
+    // 돌려준 돈이 없다. 못 지워도 정리 작업이 지운다
+    await clearRequestedCancel(db, reservationId).catch((error: unknown) => {
+      logCancelError('진행 중 표시 지우기 실패:', reservationId, error);
+    });
+    return refundFail('REFUND_FAILED');
+  }
+
+  try {
+    const finished = await finishCancel(db, { ...target, ...requested }, found.refund, now);
+    if (!finished) return refundFail('ALREADY_CANCELLED');
+    return ok({
+      reservationId,
+      refundAmount: finished.refundAmount,
+      cancelledAt: requested.requestedAt.toISOString(),
+    });
+  } catch (error) {
+    // 환불은 끝났다. 정리 작업이 마무리하고, 다시 눌러도 앞선 환불을 읽어 기록한다
+    logCancelError('환불 뒤 저장 실패:', reservationId, error);
+    return refundFail('CANCEL_FINISHING');
+  }
+}
+
+function logCancelError(message: string, reservationId: string, error: unknown) {
+  console.error(`[cancel] ${message}`, reservationId, error instanceof Error ? error.name : error);
 }

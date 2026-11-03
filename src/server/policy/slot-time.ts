@@ -20,6 +20,9 @@ export const STALE_ORDER_MINUTES = 30;
 /** 주문 정리 작업이 한 번에 처리하는 주문 수(W12 ②). 남은 주문은 다음 실행이 처리한다 */
 export const ORDER_SWEEP_BATCH = 20;
 
+/** 진행 중으로 남은 고객 취소를 정리 작업이 포트원에 물어 마무리하기까지 기다리는 시간(W14). 취소 요청 하나가 끝나는 시간(최대 60초)보다 충분히 길게 둔다 */
+export const STALE_CANCEL_MINUTES = 5;
+
 /** 매물 시작 시각 단위(3탭 ②). 시작 시각은 :00·:30처럼 이 단위로만 고른다(10/28 #108, #23 D10의 10분을 바꿈) */
 export const SLOT_START_STEP_MINUTES = 30;
 
