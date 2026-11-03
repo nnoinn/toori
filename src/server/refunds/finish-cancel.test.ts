@@ -112,6 +112,16 @@ describe('finishCancel', () => {
     expect(console.error).toHaveBeenCalled();
   });
 
+  it('운영자 확인 메모를 받으면 금액이 같아도 남기고, 금액이 다르면 이유를 같이 남긴다', async () => {
+    const refund = { cancellationId: 'c-1', amount: 31_500 };
+    await finishCancel(db, request, refund, NOW, '나중에 처리된 취소예요');
+    expect(state.finishes[0]).toMatchObject({ reviewReason: '나중에 처리된 취소예요' });
+    await finishCancel(db, request, { ...refund, amount: 45_000 }, NOW, '나중에 처리된 취소예요');
+    expect(state.finishes[1]).toMatchObject({
+      reviewReason: '나중에 처리된 취소예요. 포트원 환불액 45000원이 계산한 31500원과 달라요',
+    });
+  });
+
   it('먼저 기록한 요청이 있으면 null', async () => {
     state.finished = false;
     expect(

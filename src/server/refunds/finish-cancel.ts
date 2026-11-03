@@ -20,6 +20,8 @@ export async function finishCancel(
   request: CancelRequest,
   refund: { cancellationId: string | null; amount: number | null },
   now: Date,
+  /** 금액과 상관없이 운영자가 확인해야 하는 이유 */
+  reviewNote?: string,
 ): Promise<{ refundAmount: number } | null> {
   const refundAmount = refund.amount ?? request.refundAmount;
   const differs = refundAmount !== request.refundAmount;
@@ -39,9 +41,13 @@ export async function finishCancel(
       refundAmount,
       penaltyAmount: differs ? request.paidAmount - refundAmount : request.penaltyAmount,
       pgCancellationId: refund.cancellationId,
-      reviewReason: differs
-        ? `포트원 환불액 ${refundAmount}원이 계산한 ${request.refundAmount}원과 달라요`
-        : null,
+      reviewReason:
+        [
+          reviewNote,
+          differs && `포트원 환불액 ${refundAmount}원이 계산한 ${request.refundAmount}원과 달라요`,
+        ]
+          .filter(Boolean)
+          .join('. ') || null,
       hoursBeforeStart: hoursUntil(request.startAt, request.requestedAt),
       requestedAt: request.requestedAt,
       now,

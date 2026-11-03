@@ -15,6 +15,7 @@ import {
   clearRequestedCancel,
   finishCustomerCancel,
   readRefundTarget,
+  readRefundTargetByOrder,
   readStaleCancels,
   requestCustomerCancel,
 } from './refund-store';
@@ -56,6 +57,26 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
         salePrice: 14_000,
         couponAmount: 3_000,
       });
+    });
+  });
+
+  it('readRefundTargetByOrder는 고객 없이 주문의 예약을 읽는다', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const me = await createTestCustomer(tx);
+      const { order, reservation } = await createTestReservation(
+        tx,
+        shop,
+        me.customerId,
+        '10:00',
+        '11:00',
+        'confirmed',
+      );
+      expect(await readRefundTargetByOrder(tx, order.id)).toEqual(
+        await readRefundTarget(reservation.id, me.customerId, tx),
+      );
+      await tx.delete(reservations).where(eq(reservations.id, reservation.id));
+      expect(await readRefundTargetByOrder(tx, order.id)).toBeNull();
     });
   });
 
