@@ -1,0 +1,64 @@
+import { Suspense } from 'react';
+import type { Metadata } from 'next';
+
+import { Skeleton } from '@/components/ui/skeleton';
+import { FilterSheet } from '@/features/map/filter-sheet';
+import { parseFilters } from '@/features/map/filters';
+import { getCustomerLocation } from '@/features/map/location';
+import { HomeExplorer } from '@/features/map/home-explorer';
+import { LocationIntro } from '@/features/map/location-intro';
+import { LocationSwitcher } from '@/features/map/location-switcher';
+import { parseSort } from '@/features/map/slot-list/sort';
+import { getRequestNow } from '@/lib/request-time';
+
+// 지도 = 지도 + 목록 탐색 화면(J3·J4). 주소: /home/map(고객 홈 /home에서 골라 들어온다, #215). 매물은 지도 영역이 정해지면 화면이 서버 함수(slot-list/actions.ts)로 불러온다.
+// 위치·동네가 없으면 먼저 위치 안내·동네 선택(C-102, J2)을 보여준다. 필터는 주소창 값(J5)이다.
+export const metadata: Metadata = { title: '지도' };
+
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default function MapPage({ searchParams }: { searchParams: SearchParams }) {
+  return (
+    <Suspense fallback={<MapSkeleton />}>
+      <MapContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function MapContent({ searchParams }: { searchParams: SearchParams }) {
+  const [location, params, now] = await Promise.all([
+    getCustomerLocation(),
+    searchParams,
+    getRequestNow(),
+  ]);
+  if (!location) return <LocationIntro />;
+
+  const isRegion = location.kind === 'region';
+
+  return (
+    <HomeExplorer
+      center={location.point}
+      myLocation={isRegion ? null : location.point}
+      sort={parseSort(params.sort)}
+      serverNow={now.toISOString()}
+      header={
+        <div className="flex items-center">
+          <LocationSwitcher
+            label={isRegion ? location.region.name : '내 위치'}
+            selectedCode={isRegion ? location.region.code : null}
+          />
+          <FilterSheet filters={parseFilters(params)} />
+        </div>
+      }
+    />
+  );
+}
+
+function MapSkeleton() {
+  return (
+    <div className="flex flex-col gap-4 px-4 py-3">
+      <Skeleton className="h-8 w-28" />
+      <Skeleton className="h-40 w-full" />
+    </div>
+  );
+}

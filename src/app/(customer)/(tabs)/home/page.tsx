@@ -1,61 +1,64 @@
-import { Suspense } from 'react';
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { ChevronRight, Heart, List, Map as MapIcon } from 'lucide-react';
 
-import { Skeleton } from '@/components/ui/skeleton';
-import { FilterSheet } from '@/features/map/filter-sheet';
-import { parseFilters } from '@/features/map/filters';
-import { getCustomerLocation } from '@/features/map/location';
-import { HomeExplorer } from '@/features/map/home-explorer';
-import { LocationIntro } from '@/features/map/location-intro';
-import { LocationSwitcher } from '@/features/map/location-switcher';
-import { parseSort } from '@/features/map/slot-list/sort';
-import { getRequestNow } from '@/lib/request-time';
+export const metadata: Metadata = { title: '홈' };
 
-// 고객 홈 = 지도 + 목록 탐색 화면(J3·J4). 주소: /home(첫 화면 / 는 로그인, #215). 매물은 지도 영역이 정해지면 화면이 서버 함수(slot-list/actions.ts)로 불러온다.
-// 위치·동네가 없으면 먼저 위치 안내·동네 선택(C-102, J2)을 보여준다. 필터는 주소창 값(J5)이다.
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+/** 고객 홈에서 골라 들어가는 탐색 방법(#215, 기술 가이드 7장 "홈과 메뉴" 순서) */
+const WAYS = [
+  {
+    href: '/home/list',
+    icon: List,
+    title: '매물 목록',
+    description: '고른 동네의 임박 할인 매물을 목록으로 봐요. 필터와 정렬로 골라 볼 수 있어요.',
+  },
+  {
+    href: '/home/favorites',
+    icon: Heart,
+    title: '찜한 샵 매물',
+    description: '찜한 샵에 올라온 매물만 모아 봐요. 로그인하면 볼 수 있어요.',
+  },
+  {
+    href: '/home/map',
+    icon: MapIcon,
+    title: '지도',
+    description: '지도에서 가까운 샵과 매물을 찾아요. 지도를 옮기면 그 자리의 매물이 나와요.',
+  },
+] as const;
 
-export default function HomePage({ searchParams }: { searchParams: SearchParams }) {
+// 고객 홈 = 탐색 방법 고르기 (#215 2장, 11/2 nnoinn). 주소: /home
+// 매물 목록(/home/list)·찜한 샵 매물(/home/favorites)·지도(/home/map) 중 골라 들어간다.
+// 이 화면은 로그인하지 않아도 볼 수 있다(#215 댓글). 찜한 샵 매물만 들어갈 때 로그인 화면을 거친다
+export default function CustomerHomePage() {
   return (
-    <Suspense fallback={<HomeSkeleton />}>
-      <HomeContent searchParams={searchParams} />
-    </Suspense>
-  );
-}
-
-async function HomeContent({ searchParams }: { searchParams: SearchParams }) {
-  const [location, params, now] = await Promise.all([
-    getCustomerLocation(),
-    searchParams,
-    getRequestNow(),
-  ]);
-  if (!location) return <LocationIntro />;
-
-  const isRegion = location.kind === 'region';
-
-  return (
-    <HomeExplorer
-      center={location.point}
-      myLocation={isRegion ? null : location.point}
-      sort={parseSort(params.sort)}
-      serverNow={now.toISOString()}
-      header={
-        <div className="flex items-center">
-          <LocationSwitcher
-            label={isRegion ? location.region.name : '내 위치'}
-            selectedCode={isRegion ? location.region.code : null}
-          />
-          <FilterSheet filters={parseFilters(params)} />
-        </div>
-      }
-    />
-  );
-}
-
-function HomeSkeleton() {
-  return (
-    <div className="flex flex-col gap-4 px-4 py-3">
-      <Skeleton className="h-8 w-28" />
-      <Skeleton className="h-40 w-full" />
-    </div>
+    <main className="flex flex-1 flex-col gap-6 px-4 py-6 md:mx-auto md:w-full md:max-w-3xl md:px-6 md:py-10">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-bold">어떻게 찾아볼까요?</h1>
+        <p className="text-sm text-muted-foreground">
+          취소·빈 시간이 생긴 매물을 할인된 가격으로 예약해요.
+        </p>
+      </div>
+      <ul className="grid gap-3 md:grid-cols-3">
+        {WAYS.map(({ href, icon: Icon, title, description }) => (
+          <li key={href}>
+            <Link
+              href={href}
+              className="flex h-full items-start gap-4 rounded-2xl border bg-card p-5 transition-colors hover:bg-muted/60"
+            >
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent text-primary">
+                <Icon className="size-5" aria-hidden />
+              </span>
+              <span className="flex flex-1 flex-col gap-1">
+                <span className="flex items-center justify-between font-semibold">
+                  {title}
+                  <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+                </span>
+                <span className="text-sm text-muted-foreground">{description}</span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </main>
   );
 }
