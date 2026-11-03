@@ -2,9 +2,10 @@
 
 import { InterestAreas } from './interest-areas';
 import { MarketingSwitch, useMarketingConsent } from './marketing-switch';
+import { PushSwitch } from './push-switch';
 
 /**
- * 내 정보 > 알림 설정 (C-103, C-601, J14). 관심 동네와 관심 동네 새 매물 알림(광고성 정보 수신 동의).
+ * 내 정보 > 알림 설정 (C-103, C-601·C-602, J14). 이 기기 알림 켜기·끄기, 관심 동네, 관심 동네 새 매물 알림(광고성 정보 수신 동의).
  * 관심 동네의 "동의하고 알림 받기"(D15)와 스위치가 같은 동의 상태를 쓴다.
  * interestCodes가 null이면 관심 동네를 불러오지 못한 것이다
  */
@@ -19,6 +20,7 @@ export function NotificationSettings({
   return (
     <section className="flex flex-col gap-5 border-t pt-6" aria-label="알림 설정">
       <h2 className="font-semibold">알림</h2>
+      <PushSwitch />
       {interestCodes ? (
         <InterestAreas initialCodes={interestCodes} consent={consent} />
       ) : (
