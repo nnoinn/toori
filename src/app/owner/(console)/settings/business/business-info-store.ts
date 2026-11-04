@@ -23,6 +23,7 @@ export type BusinessInfo = BusinessInput & {
   rejectionReason: string | null;
 };
 
+/** 사업자 정보와 입점 상태. 화면은 상태로 고칠 수 있는지 정한다. 샵이 없으면 null */
 export async function selectBusinessInfo(
   db: Pick<Db, 'select'>,
   shopId: string,

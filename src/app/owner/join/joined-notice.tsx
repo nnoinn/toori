@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 const JOIN_PENDING_KEY = 'toori:owner-join-pending';
 const SHOW_MS = 8000;
 
+/** 가입 신청 직전에 부른다. /owner가 이 표시를 보고 안내 상자를 띄운다 */
 export function markJoinPending() {
   try {
     sessionStorage.setItem(JOIN_PENDING_KEY, '1');
@@ -22,6 +23,7 @@ export function markJoinPending() {
   }
 }
 
+/** 신청이 실패하면 지운다. 남겨 두면 나중에 /owner를 열 때 완료 안내가 잘못 뜬다 */
 export function clearJoinPending() {
   try {
     sessionStorage.removeItem(JOIN_PENDING_KEY);
