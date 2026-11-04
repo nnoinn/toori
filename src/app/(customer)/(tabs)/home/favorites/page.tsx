@@ -42,15 +42,19 @@ async function FavoritesContent() {
 
   if (shopCount === 0) {
     return (
-      <EmptyState
-        title="아직 찜한 샵이 없어요"
-        description="매물을 보다가 샵 정보의 '찜'을 누르면 그 샵의 매물을 여기서 모아 볼 수 있어요."
-        action={
-          <Link href="/home/list" className={buttonVariants()}>
-            매물 목록 보기
-          </Link>
-        }
-      />
+      <>
+        {/* 빈 화면에도 화면 제목을 둔다(화면 읽기 프로그램용) */}
+        <h1 className="sr-only">찜한 샵 매물</h1>
+        <EmptyState
+          title="아직 찜한 샵이 없어요"
+          description="매물을 보다가 샵 정보의 '찜'을 누르면 그 샵의 매물을 여기서 모아 볼 수 있어요."
+          action={
+            <Link href="/home/list" className={buttonVariants()}>
+              매물 목록 보기
+            </Link>
+          }
+        />
+      </>
     );
   }
 
