@@ -11,8 +11,8 @@ import { getRequestNow } from '@/lib/request-time';
 import { ensureOwnerPage } from '@/server/auth';
 import { readShopReviewStatus } from '@/server/shops/review-store';
 
-import { SlotCreateForm } from '../../new/slot-create-form';
-import { selectSlotFormData } from '../../new/slot-form-data';
+import { SlotForm } from '../../slot-form';
+import { selectSlotFormData } from '../../slot-form-data';
 import { SLOT_EDIT_MESSAGES, slotEditProblem } from '../../slot-edit';
 import { selectSlotForEdit } from '../../slot-edit-store';
 
@@ -66,7 +66,7 @@ async function SlotEditContent({ params }: { params: Params }) {
   }
 
   return (
-    <SlotCreateForm
+    <SlotForm
       shopId={auth.shopId}
       nowIso={now.toISOString()}
       {...data}

@@ -1,6 +1,6 @@
 'use server';
 
-// 매물 등록 서버 함수 (O4·O5, S-201). 화면(slot-create-form.tsx)에서 부른다.
+// 매물 등록 서버 함수 (O4·O5, S-201). 화면(slot-form.tsx)에서 부른다.
 // ①②를 고르면 checkSlotDraft로 확인하고, ③까지 고르면 createSlot으로 저장한다.
 
 import { refresh } from 'next/cache';
@@ -11,8 +11,8 @@ import { ok, type Result } from '@/lib/result';
 import { requireShopOwner } from '@/server/auth';
 import { assertShopApproved } from '@/server/shops';
 
-import { type CreatedSlot, createSlotInDb } from './slot-create-store';
-import { validateSlotDraft } from './slot-draft-store';
+import { type SavedSlot, createSlotInDb } from '../slot-create-store';
+import { validateSlotDraft } from '../slot-draft-store';
 
 /** ①② 고른 메뉴·시작 시각이 올릴 수 있는 것인지 본다. 끝 시각(ISO)을 돌려준다 */
 export async function checkSlotDraft(
@@ -30,7 +30,7 @@ export async function checkSlotDraft(
 }
 
 /** ①②③ 고른 값으로 매물을 저장한다(O5). 할인가는 서버가 계산한다 */
-export async function createSlot(shopId: string, input: unknown): Promise<Result<CreatedSlot>> {
+export async function createSlot(shopId: string, input: unknown): Promise<Result<SavedSlot>> {
   const auth = await requireShopOwner(shopId);
   if (!auth.ok) return auth;
   const approved = await assertShopApproved(shopId);

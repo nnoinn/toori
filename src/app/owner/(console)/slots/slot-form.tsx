@@ -19,10 +19,10 @@ import { formatKst, formatKstTime, kstDateKey, utcToKst } from '@/lib/time';
 import { DISCOUNT_RATE_OPTIONS, type DiscountRate, PUBLISH_WINDOW_HOURS } from '@/server/policy';
 import { previewSettlement, type SettlementPreview } from '@/server/settlements';
 
-import { withObjectParticle } from '../../../korean';
-import { serviceTypeLabel } from '../../settings/menu/menu';
-import { checkSlotEdit, updateSlot } from '../actions';
-import { checkSlotDraft, createSlot } from './actions';
+import { withObjectParticle } from '../../korean';
+import { serviceTypeLabel } from '../settings/menu/menu';
+import { checkSlotEdit, updateSlot } from './actions';
+import { checkSlotDraft, createSlot } from './new/actions';
 import {
   checkBusinessHours,
   groupByKstDate,
@@ -52,7 +52,7 @@ export type SlotEditTarget = {
 const STEPS = ['서비스', '시간', '할인율'] as const;
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;
 
-export function SlotCreateForm({
+export function SlotForm({
   shopId,
   nowIso,
   businessHours,
@@ -95,7 +95,7 @@ export function SlotCreateForm({
   const [discountRate, setDiscountRate] = useState<DiscountRate | null>(edit?.discountRate ?? null);
   const [newCustomerOnly, setNewCustomerOnly] = useState(edit?.newCustomerOnly ?? false);
   // 저장한 매물(완료 카드에 보여준다)
-  const [created, setCreated] = useState<CreatedSummary | null>(null);
+  const [saved, setSaved] = useState<SavedSummary | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -174,7 +174,7 @@ export function SlotCreateForm({
         setMessage(result.error.message);
         return;
       }
-      setCreated({
+      setSaved({
         menuName: menu.name,
         start,
         end: slotEnd(start, menu.durationMinutes),
@@ -188,7 +188,7 @@ export function SlotCreateForm({
 
   /** 완료 카드에서 하나 더 올리기. 고른 메뉴는 남기고 시각·할인율부터 다시 고른다 */
   function startOver() {
-    setCreated(null);
+    setSaved(null);
     setStartIso(null);
     setDiscountRate(null);
     setNewCustomerOnly(false);
@@ -197,8 +197,8 @@ export function SlotCreateForm({
   }
 
   const saveLabel = edit ? '저장' : '등록';
-  if (created) {
-    return <CreatedCard created={created} edited={edit !== undefined} onAgain={startOver} />;
+  if (saved) {
+    return <SavedCard saved={saved} edited={edit !== undefined} onAgain={startOver} />;
   }
 
   return (
@@ -441,7 +441,7 @@ export function SlotCreateForm({
   );
 }
 
-type CreatedSummary = {
+type SavedSummary = {
   menuName: string;
   start: Date;
   end: Date;
@@ -503,12 +503,12 @@ function PricePreview({
 }
 
 /** 저장 완료. 수정이면 대시보드로 돌아가고, 등록이면 하나 더 올리거나 대시보드로 간다 */
-function CreatedCard({
-  created,
+function SavedCard({
+  saved,
   edited,
   onAgain,
 }: {
-  created: CreatedSummary;
+  saved: SavedSummary;
   edited: boolean;
   onAgain: () => void;
 }) {
@@ -527,17 +527,17 @@ function CreatedCard({
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-col gap-1 rounded-lg bg-muted p-3 text-sm">
-          <span className="font-semibold">{created.menuName}</span>
+          <span className="font-semibold">{saved.menuName}</span>
           <span>
-            {formatKst(created.start)} ~ {formatKstTime(created.end)}
+            {formatKst(saved.start)} ~ {formatKstTime(saved.end)}
           </span>
           <Price
-            listPrice={created.listPrice}
-            salePrice={created.salePrice}
-            discountRate={created.discountRate}
+            listPrice={saved.listPrice}
+            salePrice={saved.salePrice}
+            discountRate={saved.discountRate}
             size="sm"
           />
-          {created.newCustomerOnly ? (
+          {saved.newCustomerOnly ? (
             <Badge variant="secondary" className="w-fit bg-accent text-accent-foreground">
               신규 고객 전용
             </Badge>

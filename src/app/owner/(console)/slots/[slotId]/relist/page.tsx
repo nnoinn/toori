@@ -17,7 +17,7 @@ import { calcSalePrice } from '@/server/policy';
 import { readShopReviewStatus } from '@/server/shops/review-store';
 
 import { serviceTypeLabel } from '../../../settings/menu/menu';
-import { validateSlotDraft } from '../../new/slot-draft-store';
+import { validateSlotDraft } from '../../slot-draft-store';
 import { RELIST_MESSAGES, relistDraftMessage, relistProblem } from '../../relist';
 import { relistInput, selectSlotForRelist } from '../../relist-store';
 import { RelistActions } from './relist-actions';
