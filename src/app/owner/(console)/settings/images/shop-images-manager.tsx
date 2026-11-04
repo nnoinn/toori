@@ -78,6 +78,10 @@ export function ShopImagesManager({
     return saved.ok ? null : `${file.name}: ${saved.error.message}`;
   }
 
+  /**
+   * 고른 사진을 한 장씩 차례로 올리고, 진행 문구에 몇 번째인지 보여준다.
+   * 한 장이 실패해도 나머지는 올리고, 실패한 사진마다 문구를 모아 한 번에 보여준다
+   */
   async function upload(files: File[], kind: ShopImageKind) {
     setMessages([]);
     const errors: string[] = [];
@@ -98,6 +102,7 @@ export function ShopImagesManager({
     setMessages(errors);
   }
 
+  /** 파일 고르기 칸에서 고른 사진. 창을 그냥 닫아 고른 것이 없으면 아무것도 하지 않는다 */
   function choose(kind: ShopImageKind, list: FileList | null) {
     const files = Array.from(list ?? []);
     if (files.length === 0) return;
@@ -311,6 +316,7 @@ function Photo({ url, alt, className }: { url: string; alt: string; className?: 
   );
 }
 
+/** 대표 사진이 아직 없을 때 사진과 같은 비율의 빈 자리를 보여준다 */
 function EmptyPhoto({ className }: { className?: string }) {
   return (
     <div

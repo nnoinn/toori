@@ -17,12 +17,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { EmptyState } from '@/components/ui/state';
 import { Textarea } from '@/components/ui/textarea';
 import { formatDuration, formatWon } from '@/lib/format';
 import type { ShopCategory } from '@/server/policy';
 
+import { FieldError, fieldA11y, FormField } from '../../../form-field';
 import { moveMenu, saveMenu, setMenuHidden } from './actions';
 import {
   MENU_DURATION_OPTIONS,
@@ -55,6 +55,7 @@ export function MenuManager({
   const visible = menus.filter((menu) => !menu.hidden);
   const hidden = menus.filter((menu) => menu.hidden);
 
+  /** [메뉴 추가]: 업종의 첫 서비스 종류, 소요 시간 60분으로 빈 창을 연다 */
   function openNew() {
     setMessage(null);
     setEditing({
@@ -70,6 +71,7 @@ export function MenuManager({
     });
   }
 
+  /** [수정]: 저장된 값으로 창을 연다. 정가는 입력 칸 모양(천 단위 쉼표)으로 바꿔 넣는다 */
   function openEdit(menu: MenuItem) {
     setMessage(null);
     setEditing({
@@ -232,10 +234,16 @@ function MenuDialog({
   const [errors, setErrors] = useState<MenuFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  /** 칸 하나를 바꾼다. 칸 오류는 여기서 지우지 않고, 다시 [저장]할 때 새로 검사해서 바꾼다 */
   function update<K extends keyof MenuInput>(key: K, value: MenuInput[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  /**
+   * 화면에서 먼저 검사하고 저장한다. 성공하면 창을 닫는다.
+   * 목록은 서버 함수가 화면을 새로 그려(refresh) 바뀐 메뉴가 보인다
+   */
   function save() {
     const checked = validateMenu(category, form);
     if (!checked.ok) {
@@ -255,10 +263,10 @@ function MenuDialog({
     });
   }
 
-  const fieldProps = (field: MenuField) => ({
-    id: `menu-${field}`,
-    'aria-invalid': errors[field] ? true : undefined,
-  });
+  // 칸 id 앞에 menu-를 붙여 샵 정보 칸(name, description)과 겹치지 않게 한다.
+  // 앞서 연 화면이 숨은 채 남아 있을 수 있어서(Activity) id가 겹치면 라벨·오류가 엉뚱한 칸에 이어진다
+  const idOf = (field: MenuField) => `menu-${field}`;
+  const fieldProps = (field: MenuField) => fieldA11y(idOf(field), errors[field]);
 
   return (
     <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
@@ -300,11 +308,10 @@ function MenuDialog({
                 </label>
               ))}
             </div>
-            <FieldError error={errors.serviceType} />
+            <FieldError id={idOf('serviceType')} error={errors.serviceType} />
           </fieldset>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="menu-name">서비스 이름</Label>
+          <FormField label="서비스 이름" id={idOf('name')} error={errors.name}>
             <Input
               {...fieldProps('name')}
               placeholder="예: 디자인 커트"
@@ -312,12 +319,15 @@ function MenuDialog({
               value={form.name}
               onChange={(event) => update('name', event.target.value)}
             />
-            <FieldError error={errors.name} />
-          </div>
+          </FormField>
 
           <div className="flex gap-4">
-            <div className="flex flex-1 flex-col gap-2">
-              <Label htmlFor="menu-listPrice">정가(원)</Label>
+            <FormField
+              label="정가(원)"
+              id={idOf('listPrice')}
+              error={errors.listPrice}
+              className="flex-1"
+            >
               <Input
                 {...fieldProps('listPrice')}
                 inputMode="numeric"
@@ -325,10 +335,15 @@ function MenuDialog({
                 value={form.listPrice}
                 onChange={(event) => update('listPrice', formatPriceInput(event.target.value))}
               />
-              <FieldError error={errors.listPrice} />
-            </div>
-            <div className="flex flex-1 flex-col gap-2">
-              <Label htmlFor="menu-durationMinutes">소요 시간</Label>
+            </FormField>
+            <FormField
+              label="소요 시간"
+              id={idOf('durationMinutes')}
+              error={errors.durationMinutes}
+              className="flex-1"
+            >
+              {/* 가입·정산 계좌의 고르기 칸(NATIVE_SELECT_CLASS)과 테두리 모양이 조금 다르다.
+                  원장님 화면 디자인을 맞출 때 하나로 한다 */}
               <select
                 {...fieldProps('durationMinutes')}
                 value={form.durationMinutes}
@@ -341,12 +356,10 @@ function MenuDialog({
                   </option>
                 ))}
               </select>
-              <FieldError error={errors.durationMinutes} />
-            </div>
+            </FormField>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="menu-description">상세 설명 (선택)</Label>
+          <FormField label="상세 설명 (선택)" id={idOf('description')} error={errors.description}>
             <Textarea
               {...fieldProps('description')}
               rows={3}
@@ -355,8 +368,7 @@ function MenuDialog({
               value={form.description}
               onChange={(event) => update('description', event.target.value)}
             />
-            <FieldError error={errors.description} />
-          </div>
+          </FormField>
 
           {formError ? (
             <p role="alert" className="text-sm text-destructive">
@@ -382,9 +394,4 @@ function MenuDialog({
 function formatPriceInput(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 7);
   return digits ? Number(digits).toLocaleString('ko-KR') : '';
-}
-
-function FieldError({ error }: { error?: string }) {
-  if (!error) return null;
-  return <p className="text-sm text-destructive">{error}</p>;
 }
