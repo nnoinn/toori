@@ -14,6 +14,7 @@ import { previewRefund } from '@/server/refunds/cancel';
 import { REFUND_ERRORS } from '@/server/refunds/errors';
 
 import { formatDuration, kakaoDirectionsLink } from '../../slots/[slotId]/detail-format';
+import { NO_SHOW_DISPUTE_NOTE, noShowRefundNote } from '../no-show-texts';
 import { getMyReservationDetail } from '../queries';
 import { isVisitPending, showsCancelSection } from '../reservation-tabs';
 import { CancelReservation } from './cancel-reservation';
@@ -81,6 +82,16 @@ async function DetailContent({ params }: { params: Params }) {
           <Clock className="size-4 text-muted-foreground" aria-hidden />
           {formatKst(new Date(r.startAt))} · {formatDuration(r.durationMinutes)}
         </p>
+        {/* 노쇼로 처리된 예약: 환불 안내와 잘못 처리됐을 때 알리는 곳(C-105) */}
+        {r.noShow ? (
+          <div className="flex items-start gap-2 rounded-xl border bg-card p-3 text-sm">
+            <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <div className="flex flex-col gap-1">
+              <p>원장님이 노쇼로 처리한 예약이에요. {noShowRefundNote()}.</p>
+              <p className="text-muted-foreground">{NO_SHOW_DISPUTE_NOTE}.</p>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="flex flex-col gap-2 border-t px-4 pt-4" aria-label="샵 정보">
