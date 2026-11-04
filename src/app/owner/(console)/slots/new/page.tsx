@@ -30,6 +30,7 @@ export default function SlotCreatePage() {
   );
 }
 
+/** 입점 승인 → 메뉴가 있는지 차례로 보고 3탭 화면을 연다. 막히면 무엇을 먼저 해야 하는지 안내한다 */
 async function SlotCreateContent() {
   // 로그인하지 않았으면 로그인 화면, 원장님 가입 전이면 /owner/join 으로 보낸다
   const auth = await ensureOwnerPage(PAGE_PATH);

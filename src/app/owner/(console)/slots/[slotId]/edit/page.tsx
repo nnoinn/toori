@@ -33,8 +33,10 @@ export default function SlotEditPage({ params }: { params: Params }) {
   );
 }
 
+/** 입점 승인 → 그 샵 매물 → 지금 고칠 수 있는지 차례로 보고, 되면 등록 3탭 화면을 지금 값으로 채워 연다 */
 async function SlotEditContent({ params }: { params: Params }) {
   const { slotId } = await params;
+  // 모양이 틀린 id는 로그인 뒤 돌아올 주소에 넣지 않고 대시보드로 돌아오게 한다
   const validId = z.uuid().safeParse(slotId).success;
   // 로그인하지 않았으면 로그인 화면, 원장님 가입 전이면 /owner/join 으로 보낸다
   const auth = await ensureOwnerPage(validId ? `/owner/slots/${slotId}/edit` : '/owner');
@@ -82,6 +84,7 @@ async function SlotEditContent({ params }: { params: Params }) {
   );
 }
 
+/** 고칠 수 없을 때 이유와 [대시보드로] */
 function CannotEdit({ message, description }: { message: string; description?: string }) {
   return (
     <Card>

@@ -10,21 +10,12 @@ import { redirect } from 'next/navigation';
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { ok, type Result } from '@/lib/result';
-import { requireShopOwner } from '@/server/auth';
-import { assertShopApproved } from '@/server/shops';
 
+import { relistSlotInDb } from './relist-store';
+import { requireApprovedOwner } from './require-approved-owner';
 import type { SavedSlot } from './slot-create-store';
 import { validateSlotDraft } from './slot-draft-store';
-import { relistSlotInDb } from './relist-store';
 import { checkEditable, closeSlotInDb, updateSlotInDb } from './slot-edit-store';
-
-async function allowed(shopId: string): Promise<Result<null>> {
-  const auth = await requireShopOwner(shopId);
-  if (!auth.ok) return auth;
-  const approved = await assertShopApproved(shopId);
-  if (!approved.ok) return approved;
-  return ok(null);
-}
 
 /** 판매 전 매물을 마감한다. 사유: other_channel(다른 곳 예약) / mistake(잘못 올림) / other(기타) */
 export async function closeSlot(
@@ -32,7 +23,7 @@ export async function closeSlot(
   slotId: string,
   reason: unknown,
 ): Promise<Result<null>> {
-  const check = await allowed(shopId);
+  const check = await requireApprovedOwner(shopId);
   if (!check.ok) return check;
 
   const closed = await closeSlotInDb(getDb(), shopId, slotId, reason, await getRequestNow());
@@ -47,7 +38,7 @@ export async function checkSlotEdit(
   slotId: string,
   input: unknown,
 ): Promise<Result<{ endAt: string }>> {
-  const check = await allowed(shopId);
+  const check = await requireApprovedOwner(shopId);
   if (!check.ok) return check;
 
   const db = getDb();
@@ -65,7 +56,7 @@ export async function updateSlot(
   slotId: string,
   input: unknown,
 ): Promise<Result<SavedSlot>> {
-  const check = await allowed(shopId);
+  const check = await requireApprovedOwner(shopId);
   if (!check.ok) return check;
 
   const updated = await updateSlotInDb(getDb(), shopId, slotId, input, await getRequestNow());
@@ -78,10 +69,8 @@ export async function updateSlot(
  * 성공하면 대시보드로 보낸다. 새 매물(게시중)과 원래 매물의 "재등록함"이 보인다. 막히면 이유를 돌려준다
  */
 export async function relistSlot(shopId: string, slotId: string): Promise<Result<SavedSlot>> {
-  const auth = await requireShopOwner(shopId);
+  const auth = await requireApprovedOwner(shopId);
   if (!auth.ok) return auth;
-  const approved = await assertShopApproved(shopId);
-  if (!approved.ok) return approved;
 
   const relisted = await relistSlotInDb(
     getDb(),

@@ -8,10 +8,9 @@ import { refresh } from 'next/cache';
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { ok, type Result } from '@/lib/result';
-import { requireShopOwner } from '@/server/auth';
-import { assertShopApproved } from '@/server/shops';
 
-import { type SavedSlot, createSlotInDb } from '../slot-create-store';
+import { requireApprovedOwner } from '../require-approved-owner';
+import { createSlotInDb, type SavedSlot } from '../slot-create-store';
 import { validateSlotDraft } from '../slot-draft-store';
 
 /** ①② 고른 메뉴·시작 시각이 올릴 수 있는 것인지 본다. 끝 시각(ISO)을 돌려준다 */
@@ -19,10 +18,8 @@ export async function checkSlotDraft(
   shopId: string,
   input: unknown,
 ): Promise<Result<{ endAt: string }>> {
-  const auth = await requireShopOwner(shopId);
+  const auth = await requireApprovedOwner(shopId);
   if (!auth.ok) return auth;
-  const approved = await assertShopApproved(shopId);
-  if (!approved.ok) return approved;
 
   const draft = await validateSlotDraft(getDb(), shopId, input, await getRequestNow());
   if (!draft.ok) return draft;
@@ -31,10 +28,8 @@ export async function checkSlotDraft(
 
 /** ①②③ 고른 값으로 매물을 저장한다(O5). 할인가는 서버가 계산한다 */
 export async function createSlot(shopId: string, input: unknown): Promise<Result<SavedSlot>> {
-  const auth = await requireShopOwner(shopId);
+  const auth = await requireApprovedOwner(shopId);
   if (!auth.ok) return auth;
-  const approved = await assertShopApproved(shopId);
-  if (!approved.ok) return approved;
 
   const created = await createSlotInDb(
     getDb(),

@@ -14,7 +14,7 @@ import { slots, type SlotStatus } from '@/db/schema';
 import { fail, type Result } from '@/lib/result';
 import type { DiscountRate } from '@/server/policy';
 
-import { type SavedSlot, createSlotInDb } from './slot-create-store';
+import { createSlotInDb, type SavedSlot } from './slot-create-store';
 import { RELIST_MESSAGES, relistDraftMessage, relistProblem } from './relist';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select' | 'transaction'>;
