@@ -5,11 +5,13 @@ import { cn } from 'cn';
 import { ChevronRight } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { buttonVariants } from '@/components/ui/button';
 import { EmptyState, ErrorState, LoadingCards } from '@/components/ui/state';
 import { formatWon } from '@/lib/format';
 import { getRequestNow } from '@/lib/request-time';
 import { formatKst } from '@/lib/time';
 import { ensureCustomerPage } from '@/server/auth';
+import { CUSTOMER_HOME } from '@/server/auth/paths';
 
 import { getMyReservations } from './queries';
 import {
@@ -75,7 +77,14 @@ async function ReservationsContent({ searchParams }: { searchParams: SearchParam
       {!result.ok ? (
         <ErrorState description={result.error.message} />
       ) : result.data.length === 0 ? (
-        <EmptyState title={EMPTY_TEXT[tab]} />
+        <EmptyState
+          title={EMPTY_TEXT[tab]}
+          action={
+            <Link href={CUSTOMER_HOME} className={buttonVariants()}>
+              매물 보러 가기
+            </Link>
+          }
+        />
       ) : (
         <ul className="flex flex-col divide-y">
           {result.data.map((item) => (

@@ -54,6 +54,7 @@ async function DetailContent({ params }: { params: Params }) {
     return <ErrorState description={result.error.message} />;
   }
   const r = result.data;
+  const visitPending = isVisitPending(r.status, r.startAt, now);
   const tel = r.shop.phone.replace(/[^\d+]/g, '');
   const refundPreview = showsCancelSection(r.status, r.startAt, now)
     ? await previewRefund(r.reservationId)
@@ -72,9 +73,7 @@ async function DetailContent({ params }: { params: Params }) {
             {STATUS_LABEL[r.status]}
           </Badge>
           {r.noShow ? <Badge variant="destructive">노쇼</Badge> : null}
-          {isVisitPending(r.status, r.startAt, now) ? (
-            <Badge variant="secondary">방문 확인 중</Badge>
-          ) : null}
+          {visitPending ? <Badge variant="secondary">방문 확인 중</Badge> : null}
           <span>예약번호 {r.code}</span>
         </p>
         <h2 className="text-xl font-bold">{r.menuName}</h2>
@@ -91,6 +90,12 @@ async function DetailContent({ params }: { params: Params }) {
               <p className="text-muted-foreground">{NO_SHOW_DISPUTE_NOTE}.</p>
             </div>
           </div>
+        ) : null}
+        {/* 시작이 지났는데 원장님이 방문·노쇼 처리 전인 예약. 무슨 상태인지 한 줄로 알려 준다 */}
+        {visitPending ? (
+          <p className="text-sm text-muted-foreground">
+            원장님이 방문을 확인하면 &lsquo;{STATUS_LABEL.completed}&rsquo;로 바뀌어요.
+          </p>
         ) : null}
       </section>
 
