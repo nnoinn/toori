@@ -13,8 +13,8 @@ import { ok, type Result } from '@/lib/result';
 import { requireShopOwner } from '@/server/auth';
 import { assertShopApproved } from '@/server/shops';
 
-import type { CreatedSlot } from './new/slot-create-store';
-import { validateSlotDraft } from './new/slot-draft-store';
+import type { SavedSlot } from './slot-create-store';
+import { validateSlotDraft } from './slot-draft-store';
 import { relistSlotInDb } from './relist-store';
 import { checkEditable, closeSlotInDb, updateSlotInDb } from './slot-edit-store';
 
@@ -64,7 +64,7 @@ export async function updateSlot(
   shopId: string,
   slotId: string,
   input: unknown,
-): Promise<Result<CreatedSlot>> {
+): Promise<Result<SavedSlot>> {
   const check = await allowed(shopId);
   if (!check.ok) return check;
 
@@ -77,7 +77,7 @@ export async function updateSlot(
  * 취소된 매물을 같은 조건(메뉴·시간·할인율·신규 고객 전용)의 새 매물로 바로 게시한다(O13). 원래 매물은 '취소'로 남긴다.
  * 성공하면 대시보드로 보낸다. 새 매물(게시중)과 원래 매물의 "재등록함"이 보인다. 막히면 이유를 돌려준다
  */
-export async function relistSlot(shopId: string, slotId: string): Promise<Result<CreatedSlot>> {
+export async function relistSlot(shopId: string, slotId: string): Promise<Result<SavedSlot>> {
   const auth = await requireShopOwner(shopId);
   if (!auth.ok) return auth;
   const approved = await assertShopApproved(shopId);

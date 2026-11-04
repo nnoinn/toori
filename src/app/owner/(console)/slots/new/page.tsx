@@ -11,8 +11,8 @@ import { ensureOwnerPage } from '@/server/auth';
 import { SHOP_STATUS_LABELS } from '@/server/shops/status';
 import { getShopReviewStatus } from '@/server/shops/review';
 
-import { SlotCreateForm } from './slot-create-form';
-import { selectSlotFormData } from './slot-form-data';
+import { SlotForm } from '../slot-form';
+import { selectSlotFormData } from '../slot-form-data';
 
 export const metadata: Metadata = { title: '매물 등록' };
 
@@ -76,5 +76,5 @@ async function SlotCreateContent() {
     );
   }
 
-  return <SlotCreateForm shopId={auth.shopId} nowIso={now.toISOString()} {...data} />;
+  return <SlotForm shopId={auth.shopId} nowIso={now.toISOString()} {...data} />;
 }

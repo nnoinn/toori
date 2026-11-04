@@ -16,7 +16,7 @@ import { parseSlotPricing, SLOT_PRICING_ERROR } from './slot-pricing';
 
 type Db = Pick<ReturnType<typeof getDb>, 'transaction'>;
 
-export type CreatedSlot = { slotId: string; salePrice: number };
+export type SavedSlot = { slotId: string; salePrice: number };
 
 /** 재등록(O13, S-408)으로 만드는 매물이면 원래(취소된) 매물 */
 export type CreateSlotOptions = { relistedFromSlotId?: string };
@@ -33,7 +33,7 @@ export async function createSlotInDb(
   input: unknown,
   now: Date,
   { relistedFromSlotId }: CreateSlotOptions = {},
-): Promise<Result<CreatedSlot>> {
+): Promise<Result<SavedSlot>> {
   const pricing = parseSlotPricing(input);
   if (!pricing) return fail('INVALID_DISCOUNT_RATE', SLOT_PRICING_ERROR);
 

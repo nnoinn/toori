@@ -14,9 +14,9 @@ import { slotIsOnHold, slotStatusIs } from '@/features/slot-status/slot-status-s
 import { fail, ok, type Result } from '@/lib/result';
 import { calcSalePrice, type DiscountRate } from '@/server/policy';
 
-import { type CreatedSlot, violated } from './new/slot-create-store';
-import { SLOT_DRAFT_ERRORS, validateSlotDraft } from './new/slot-draft-store';
-import { parseSlotPricing, SLOT_PRICING_ERROR } from './new/slot-pricing';
+import { type SavedSlot, violated } from './slot-create-store';
+import { SLOT_DRAFT_ERRORS, validateSlotDraft } from './slot-draft-store';
+import { parseSlotPricing, SLOT_PRICING_ERROR } from './slot-pricing';
 import { SLOT_CLOSE_REASON_OPTIONS, SLOT_EDIT_MESSAGES, slotEditProblem } from './slot-edit';
 
 type Db = ReturnType<typeof getDb>;
@@ -139,7 +139,7 @@ export async function updateSlotInDb(
   slotId: string,
   input: unknown,
   now: Date,
-): Promise<Result<CreatedSlot>> {
+): Promise<Result<SavedSlot>> {
   const pricing = parseSlotPricing(input);
   if (!pricing) return fail('INVALID_DISCOUNT_RATE', SLOT_PRICING_ERROR);
 
