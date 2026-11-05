@@ -87,3 +87,30 @@ function subscriptionIs({ userId, accountType, endpoint }: SubscriptionKey) {
     eq(pushSubscriptions.userId, userId),
   );
 }
+
+export type PushTarget = { endpoint: string; p256dh: string; auth: string };
+
+/** 그 계정 종류의 구독을 기기마다 읽는다(notify). 켜 둔 기기가 없으면 빈 목록 */
+export async function readPushTargets(
+  db: Pick<Db, 'select'>,
+  input: { userId: string; accountType: AccountType },
+): Promise<PushTarget[]> {
+  return db
+    .select({
+      endpoint: pushSubscriptions.endpoint,
+      p256dh: pushSubscriptions.p256dh,
+      auth: pushSubscriptions.auth,
+    })
+    .from(pushSubscriptions)
+    .where(
+      and(
+        eq(pushSubscriptions.userId, input.userId),
+        eq(pushSubscriptions.accountType, input.accountType),
+      ),
+    );
+}
+
+/** 끝난 구독(푸시 서버가 404·410으로 답함)을 지운다. 브라우저 구독은 두 계정이 같이 쓰므로 계정 종류와 상관없이 지운다 */
+export async function deleteExpiredPushSubscription(db: Db, endpoint: string): Promise<void> {
+  await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+}
