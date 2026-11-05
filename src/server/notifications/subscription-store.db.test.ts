@@ -10,8 +10,10 @@ import { createTestUser } from '../../../tests/db/fixtures';
 import { closeTestDb, describeDb, type TestTx, withRollback } from '../../../tests/db/test-db';
 import {
   deleteDevicePushSubscriptions,
+  deleteExpiredPushSubscription,
   deletePushSubscription,
   hasPushSubscription,
+  readPushTargets,
   upsertPushSubscription,
 } from './subscription-store';
 
@@ -33,6 +35,42 @@ const device = (value: string) => ({
 
 describeDb('웹 푸시 구독 저장 (실제 DB)', () => {
   afterAll(closeTestDb);
+
+  it('readPushTargets는 그 사람의 그 계정 종류 구독만 기기마다 읽는다', async () => {
+    await withRollback(async (tx) => {
+      const userId = await createTestUser(tx);
+      const other = await createTestUser(tx);
+      const [mine1, mine2, ownerOnly, others] = [endpoint(), endpoint(), endpoint(), endpoint()];
+      await upsertPushSubscription(tx, { userId, accountType: 'customer', ...device(mine1) });
+      await upsertPushSubscription(tx, { userId, accountType: 'customer', ...device(mine2) });
+      await upsertPushSubscription(tx, { userId, accountType: 'owner', ...device(ownerOnly) });
+      await upsertPushSubscription(tx, {
+        userId: other,
+        accountType: 'customer',
+        ...device(others),
+      });
+      const targets = await readPushTargets(tx, { userId, accountType: 'customer' });
+      expect(targets.map((target) => target.endpoint).sort()).toEqual([mine1, mine2].sort());
+      expect(targets[0]).toEqual({
+        endpoint: targets[0].endpoint,
+        p256dh: 'key-1',
+        auth: 'auth-1',
+      });
+    });
+  });
+
+  it('deleteExpiredPushSubscription은 끝난 기기의 구독을 두 계정 모두 지운다', async () => {
+    await withRollback(async (tx) => {
+      const userId = await createTestUser(tx);
+      const [expired, alive] = [endpoint(), endpoint()];
+      await upsertPushSubscription(tx, { userId, accountType: 'customer', ...device(expired) });
+      await upsertPushSubscription(tx, { userId, accountType: 'owner', ...device(expired) });
+      await upsertPushSubscription(tx, { userId, accountType: 'customer', ...device(alive) });
+      await deleteExpiredPushSubscription(tx, expired);
+      expect(await rowsOf(tx, expired)).toEqual([]);
+      expect(await rowsOf(tx, alive)).toHaveLength(1);
+    });
+  });
 
   it('구독을 계정 종류·키·기기 정보와 함께 저장한다', async () => {
     await withRollback(async (tx) => {
