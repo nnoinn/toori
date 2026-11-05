@@ -14,7 +14,7 @@ export function AdminNav() {
       items={[
         { href: '/admin/shops', label: '입점 승인', icon: BadgeCheck },
         { href: '/admin/users', label: '회원', icon: Users, locked: true },
-        { href: '/admin/reservations', label: '매물·예약', icon: ClipboardList, locked: true },
+        { href: '/admin/reservations', label: '매물·예약', icon: ClipboardList },
         { href: '/admin/disputes', label: '이의제기', icon: MessageSquareWarning, locked: true },
         { href: '/admin/settlements', label: '정산', icon: Wallet, locked: true },
       ]}
