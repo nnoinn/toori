@@ -21,6 +21,7 @@ import type { VisitResult } from '@/server/visits/types';
 import { recordReservationVisit } from '../actions';
 import { VISIT_ACTIONS } from '../reservation-detail';
 
+/** [방문 완료]·[노쇼] 버튼과 확인 창. 확인 창은 버튼이 사라져도 닫힐 때까지 남는다(위 설명) */
 export function VisitActions({
   reservationId,
   canRecord,
@@ -36,15 +37,18 @@ export function VisitActions({
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  /** 버튼을 누르면 바로 처리하지 않고 확인 창을 연다(처리하면 바꿀 수 없어서) */
   function open(result: VisitResult) {
     setMessage(null);
     setTarget(result);
   }
 
+  /** 처리하는 동안에는 창을 닫지 않는다(결과 문구를 놓치지 않게) */
   function close() {
     if (!pending) setTarget(null);
   }
 
+  /** 확인 창 [방문 완료로 처리]·[노쇼로 처리]. 성공하면 창을 닫고, 실패하면 창에 이유를 보여준다 */
   function submit() {
     if (!target) return;
     setMessage(null);
