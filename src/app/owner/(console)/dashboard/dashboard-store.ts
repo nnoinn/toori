@@ -45,6 +45,7 @@ type SlotRow = {
     : (typeof slots.$inferSelect)[Exclude<K, JoinedKey>];
 };
 
+/** DB 줄을 대시보드 값(DashboardSlot)으로: 시각은 ISO 문자열로 바꾸고 상태·마감 사유 타입을 좁힌다 */
 function toDashboardSlot(row: SlotRow): DashboardSlot {
   return {
     ...row,

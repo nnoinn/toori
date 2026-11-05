@@ -68,6 +68,7 @@ export function viewStatus(slot: DashboardSlot, now: Date): SlotStatus {
   );
 }
 
+/** 지금 다른 고객이 결제 중(10분 홀딩)인지. 결제 중이면 [수정]·[마감]을 잠근다 */
 export function onHold(slot: DashboardSlot, now: Date): boolean {
   return isSlotOnHold(
     {
