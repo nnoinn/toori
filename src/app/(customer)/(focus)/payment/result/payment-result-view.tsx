@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CircleAlert, CircleCheck, Clock } from 'lucide-react';
 
+import { CHECK_IN_GUIDE } from '@/app/(customer)/(tabs)/reservations/check-in-texts';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { LoadingCards } from '@/components/ui/state';
 import { CUSTOMER_HOME, loginPath } from '@/server/auth/paths';
@@ -106,6 +107,8 @@ export function PaymentResultView({
           <p className="text-sm text-muted-foreground">
             예약번호 <span className="font-semibold text-foreground">{reservationCode}</span>
           </p>
+          {/* 번호를 어디에 쓰는지 처음 받을 때 알려 준다(C-504 방문 확인). 내 예약 상세에도 크게 나온다 */}
+          <p className="text-sm text-muted-foreground">{CHECK_IN_GUIDE}.</p>
         </div>
         <CompletedReservationDetails reservationId={reservationId} />
         {/* 푸시 권한은 여기서 처음 묻는다(J14, C-602, 기술 가이드 연결 지점) */}

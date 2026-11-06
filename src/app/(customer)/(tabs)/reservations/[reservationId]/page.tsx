@@ -16,8 +16,9 @@ import { REFUND_ERRORS } from '@/server/refunds/errors';
 import { formatDuration, kakaoDirectionsLink } from '../../slots/[slotId]/detail-format';
 import { NO_SHOW_DISPUTE_NOTE, noShowRefundNote } from '../no-show-texts';
 import { getMyReservationDetail } from '../queries';
-import { isVisitPending, showsCancelSection } from '../reservation-tabs';
+import { isVisitPending, showsCancelSection, showsCheckInCard } from '../reservation-tabs';
 import { CancelReservation } from './cancel-reservation';
+import { CheckInCard } from './check-in-card';
 
 export const metadata: Metadata = { title: '예약 상세' };
 
@@ -25,7 +26,8 @@ type Params = Promise<{ reservationId: string }>;
 
 const STATUS_LABEL = { confirmed: '예정', completed: '이용 완료', cancelled: '취소' } as const;
 
-// 예약 상세 (J12, C-502). 본인 예약만 열린다. 시작 전 예정 예약은 맨 아래에서 취소할 수 있다(J13, C-503)
+// 예약 상세 (J12, C-502). 본인 예약만 열린다. 예정 예약은 위쪽에 예약번호를 크게 보여 주는 '방문 확인' 칸이 있고(C-504),
+// 시작 전이면 맨 아래에서 취소할 수 있다(J13, C-503)
 export default function ReservationDetailPage({ params }: { params: Params }) {
   return (
     <main className="flex flex-1 flex-col md:mx-auto md:w-full md:max-w-3xl md:px-6 md:py-6">
@@ -55,6 +57,7 @@ async function DetailContent({ params }: { params: Params }) {
   }
   const r = result.data;
   const visitPending = isVisitPending(r.status, r.startAt, now);
+  const checkIn = showsCheckInCard(r.status);
   const tel = r.shop.phone.replace(/[^\d+]/g, '');
   const refundPreview = showsCancelSection(r.status, r.startAt, now)
     ? await previewRefund(r.reservationId)
@@ -74,7 +77,8 @@ async function DetailContent({ params }: { params: Params }) {
           </Badge>
           {r.noShow ? <Badge variant="destructive">노쇼</Badge> : null}
           {visitPending ? <Badge variant="secondary">방문 확인 중</Badge> : null}
-          <span>예약번호 {r.code}</span>
+          {/* 예정 예약은 아래 '방문 확인' 칸에 크게 나와서 여기서는 뺀다 */}
+          {checkIn ? null : <span>예약번호 {r.code}</span>}
         </p>
         <h2 className="text-xl font-bold">{r.menuName}</h2>
         <p className="flex items-center gap-2 text-sm">
@@ -98,6 +102,8 @@ async function DetailContent({ params }: { params: Params }) {
           </p>
         ) : null}
       </section>
+
+      {checkIn ? <CheckInCard code={r.code} /> : null}
 
       <section className="flex flex-col gap-2 border-t px-4 pt-4" aria-label="샵 정보">
         <h3 className="font-semibold">{r.shop.name}</h3>
