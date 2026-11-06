@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { MapBounds, MapShop } from '../types';
 import { loadHomeMap, loadHomeSlots } from './actions';
-import { type Failed, resultView, type Shown } from './result-view';
+import { appendPage, type Failed, resultView, type Shown } from './result-view';
 import type { SlotListItem } from './types';
 
 type ListData = { items: SlotListItem[]; nextCursor: string | null; serverNow: string };
@@ -90,18 +90,7 @@ export function useHomeSlots({
     try {
       const result = await loadHomeSlots({ bounds, search, shopId, cursor: nextCursor });
       if (!result.ok || listKeyRef.current !== requestKey) return;
-      setListShown((prev) =>
-        prev && prev.key === requestKey
-          ? {
-              ...prev,
-              data: {
-                items: [...prev.data.items, ...result.data.items],
-                nextCursor: result.data.nextCursor,
-                serverNow: result.data.serverNow,
-              },
-            }
-          : prev,
-      );
+      setListShown((prev) => appendPage(prev, requestKey, result.data));
     } catch {
       // 이어 불러오기가 실패하면 지금 목록은 그대로 두고, 끝에 다시 닿으면 또 부른다
     } finally {
