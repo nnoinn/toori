@@ -6,7 +6,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { loadRegionSlots } from '@/features/map/slot-list/actions';
-import { type Failed, resultView, type Shown } from '@/features/map/slot-list/result-view';
+import {
+  appendPage,
+  type Failed,
+  resultView,
+  type Shown,
+} from '@/features/map/slot-list/result-view';
 import type { SlotListItem } from '@/features/map/slot-list/types';
 
 type ListData = {
@@ -57,19 +62,7 @@ export function useRegionSlots({ areaCode, search }: { areaCode: string; search:
     try {
       const result = await loadRegionSlots({ search, cursor: nextCursor });
       if (!result.ok || keyRef.current !== requestKey) return;
-      setShown((prev) =>
-        prev && prev.key === requestKey
-          ? {
-              ...prev,
-              data: {
-                ...prev.data,
-                items: [...prev.data.items, ...result.data.items],
-                nextCursor: result.data.nextCursor,
-                serverNow: result.data.serverNow,
-              },
-            }
-          : prev,
-      );
+      setShown((prev) => appendPage(prev, requestKey, result.data));
     } catch {
       // 이어 불러오기가 실패하면 지금 목록은 그대로 두고, 끝에 다시 닿으면 또 부른다
     } finally {
