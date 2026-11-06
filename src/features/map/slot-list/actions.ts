@@ -86,9 +86,12 @@ export async function loadHomeSlots(
   if (!parsed.success) return fail('INVALID_INPUT', LOAD_FAILED);
   const { bounds, search, cursor, shopId } = parsed.data;
   try {
-    const [query, location] = await Promise.all([baseQuery(bounds, search), getCustomerLocation()]);
-    const sort = parseSort(searchToParams(search).sort);
-    // 위치 쿠키가 없으면(쿠키를 지운 직후 등) 지도 가운데를 기준점으로 쓴다
+    const params = searchToParams(search);
+    const [query, saved] = await Promise.all([baseQuery(bounds, search), getCustomerLocation()]);
+    // 가까운 순 기준점: 동네 링크(?region=)로 보는 중이면 그 동네 가운데(지도 화면과 같은 규칙), 아니면 고른 동네·내 위치
+    const location = withLinkedRegion(saved, params[REGION_PARAM]);
+    const sort = parseSort(params.sort);
+    // 위치 쿠키도 링크도 없으면(쿠키를 지운 직후 등) 지도 가운데를 기준점으로 쓴다
     const origin = location?.point ?? {
       lat: (bounds.sw.lat + bounds.ne.lat) / 2,
       lng: (bounds.sw.lng + bounds.ne.lng) / 2,

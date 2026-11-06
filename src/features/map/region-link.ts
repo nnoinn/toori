@@ -1,4 +1,4 @@
-// 동네 링크: /home/list?region=41273 (시·군·구 코드). 화면과 서버 어디서나 쓴다.
+// 동네 링크: /home/list?region=41273, /home/map?region=41273 (시·군·구 코드). 화면과 서버 어디서나 쓴다.
 // 링크로 연 동네는 보기만 하고, 고객이 고른 동네(쿠키)는 바꾸지 않는다(11/4). 위쪽 동네 버튼으로 직접 고르면 주소의 값을 지운다.
 // 관심 동네 알림을 눌렀을 때나 동네 매물을 공유할 때 쓴다.
 
@@ -16,8 +16,8 @@ export function regionFromParam(value: SearchValue): Region | null {
 }
 
 /**
- * 목록에서 쓸 위치. 링크의 동네가 있으면 그 동네, 없으면 저장된 위치(고른 동네·내 위치).
- * 목록 화면(page.tsx)과 목록을 불러오는 서버 함수(loadRegionSlots)가 같은 규칙을 쓴다
+ * 화면에서 쓸 위치. 링크의 동네가 있으면 그 동네, 없으면 저장된 위치(고른 동네·내 위치).
+ * 목록·지도 화면(home/list, home/map의 page.tsx)과 매물을 불러오는 서버 함수(loadRegionSlots, loadHomeSlots)가 같은 규칙을 쓴다
  */
 export function withLinkedRegion(
   saved: CustomerLocation | null,
