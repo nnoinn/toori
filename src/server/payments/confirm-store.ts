@@ -4,13 +4,17 @@
 
 import 'server-only';
 
-import { and, DrizzleQueryError, eq, or } from 'drizzle-orm';
+import { and, DrizzleQueryError, eq, or, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { type OrderStatus, orders, refunds, reservations, slots } from '@/db/schema';
 
 import { ABANDONED_ORDER_CODE, toUnconfirmedCode, type UnconfirmedCode } from './errors';
-import { newReservationCode } from './reservation-code';
+import {
+  newReservationCode,
+  RESERVATION_CODE_TAIL_LENGTH,
+  reservationCodeTail,
+} from './reservation-code';
 
 type Db = ReturnType<typeof getDb>;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -151,6 +155,7 @@ export async function confirmPaidOrder(
 
   const [slot] = await tx
     .select({
+      shopId: slots.shopId,
       status: slots.status,
       holdCustomerId: slots.holdCustomerId,
       holdExpiresAt: slots.holdExpiresAt,
@@ -177,7 +182,7 @@ export async function confirmPaidOrder(
     return { ok: false, code: blocked };
   }
 
-  const reservation = await insertReservation(tx, {
+  const reservation = await insertReservation(tx, slot.shopId, {
     slotId: order.slotId,
     orderId: input.orderId,
     customerId: order.customerId,
@@ -227,13 +232,20 @@ export async function recordAutoCancel(
   return true;
 }
 
-/** 예약번호가 우연히 겹치면(reservations_code_unique) 새 번호로 다시 넣는다. savepoint라 바깥 트랜잭션은 그대로다 */
+/**
+ * 예약을 넣는다. 예약번호가 우연히 겹치면(reservations_code_unique) 새 번호로 다시 넣는다. savepoint라 바깥 트랜잭션은 그대로다.
+ * 원장님이 끝 4자리로 방문을 확인하므로(#262), 같은 샵의 예정 예약과 끝 4자리가 같아도 새로 뽑는다.
+ * 끝 4자리는 제약으로 막지 않아서, 같은 샵에서 거의 동시에 확정되면 드물게 겹칠 수 있다.
+ * 마지막 시도에서도 겹치면 그대로 넣는다(결제는 끝났으니 예약을 못 만드는 것보다 낫다)
+ */
 async function insertReservation(
   tx: Tx,
+  shopId: string,
   values: { slotId: string; orderId: string; customerId: string },
 ): Promise<{ reservationId: string; reservationCode: string }> {
   for (let attempt = 1; ; attempt++) {
     const code = newReservationCode();
+    if (attempt < RESERVATION_CODE_TRIES && (await isTailTakenInShop(tx, shopId, code))) continue;
     try {
       return await tx.transaction(async (savepoint) => {
         const [row] = await savepoint
@@ -249,4 +261,21 @@ async function insertReservation(
         throw error;
     }
   }
+}
+
+/** 같은 샵의 예정 예약 중 끝 4자리가 같은 예약이 있는지 */
+async function isTailTakenInShop(tx: Tx, shopId: string, code: string): Promise<boolean> {
+  const [row] = await tx
+    .select({ id: reservations.id })
+    .from(reservations)
+    .innerJoin(slots, eq(slots.id, reservations.slotId))
+    .where(
+      and(
+        eq(slots.shopId, shopId),
+        eq(reservations.status, 'confirmed'),
+        sql`right(${reservations.code}, ${RESERVATION_CODE_TAIL_LENGTH}) = ${reservationCodeTail(code)}`,
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
 }
