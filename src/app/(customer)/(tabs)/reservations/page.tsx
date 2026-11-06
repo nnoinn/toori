@@ -6,6 +6,7 @@ import { ChevronRight } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import { EmptyState, ErrorState, LoadingCards } from '@/components/ui/state';
 import { formatWon } from '@/lib/format';
 import { getRequestNow } from '@/lib/request-time';
@@ -104,7 +105,7 @@ async function ReservationsContent({ searchParams }: { searchParams: SearchParam
                   <p className="truncate font-semibold">{item.menuName}</p>
                   <p className="text-sm">{formatKst(new Date(item.startAt))}</p>
                   <p className="text-xs text-muted-foreground">
-                    예약번호 {item.code} · {formatWon(item.amount)}
+                    예약번호 {formatReservationCode(item.code)} · {formatWon(item.amount)}
                   </p>
                 </div>
                 <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />

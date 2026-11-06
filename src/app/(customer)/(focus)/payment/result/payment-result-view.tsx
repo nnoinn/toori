@@ -7,6 +7,7 @@ import { CircleAlert, CircleCheck, Clock } from 'lucide-react';
 
 import { CHECK_IN_GUIDE } from '@/app/(customer)/(tabs)/reservations/check-in-texts';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { ReservationCode } from '@/components/ui/reservation-code';
 import { LoadingCards } from '@/components/ui/state';
 import { CUSTOMER_HOME, loginPath } from '@/server/auth/paths';
 import { confirmPayment } from '@/server/payments/checkout';
@@ -105,7 +106,8 @@ export function PaymentResultView({
           <CircleCheck className="size-12 text-primary" aria-hidden />
           <h1 className="text-2xl font-bold">예약이 확정됐어요</h1>
           <p className="text-sm text-muted-foreground">
-            예약번호 <span className="font-semibold text-foreground">{reservationCode}</span>
+            예약번호{' '}
+            <ReservationCode code={reservationCode} className="font-semibold text-foreground" />
           </p>
           {/* 번호를 어디에 쓰는지 처음 받을 때 알려 준다(C-504 방문 확인). 내 예약 상세에도 크게 나온다 */}
           <p className="text-sm text-muted-foreground">{CHECK_IN_GUIDE}.</p>

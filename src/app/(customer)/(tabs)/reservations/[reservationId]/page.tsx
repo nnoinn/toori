@@ -5,6 +5,7 @@ import { Clock, Info, MapPin, Navigation, Phone } from 'lucide-react';
 
 import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import { ErrorState, LoadingCards } from '@/components/ui/state';
 import { formatWon } from '@/lib/format';
 import { getRequestNow } from '@/lib/request-time';
@@ -78,7 +79,7 @@ async function DetailContent({ params }: { params: Params }) {
           {r.noShow ? <Badge variant="destructive">노쇼</Badge> : null}
           {visitPending ? <Badge variant="secondary">방문 확인 중</Badge> : null}
           {/* 예정 예약은 아래 '방문 확인' 칸에 크게 나와서 여기서는 뺀다 */}
-          {checkIn ? null : <span>예약번호 {r.code}</span>}
+          {checkIn ? null : <span>예약번호 {formatReservationCode(r.code)}</span>}
         </p>
         <h2 className="text-xl font-bold">{r.menuName}</h2>
         <p className="flex items-center gap-2 text-sm">
