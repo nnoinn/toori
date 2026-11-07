@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { LoaderCircle, X } from 'lucide-react';
@@ -10,13 +10,12 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/state';
 
 import { KakaoMap } from './kakao-map';
+import { type SheetSize, useSheetDrag } from './sheet-drag';
 import { SlotList } from './slot-list/slot-list';
 import type { SlotSort } from './slot-list/sort';
 import { useHomeSlots } from './slot-list/use-home-slots';
 import type { LatLng, MapBounds } from './types';
 import { useIsDesktop } from './use-is-desktop';
-
-type SheetSize = 'half' | 'full';
 
 function isSameBounds(a: MapBounds, b: MapBounds): boolean {
   return (
@@ -37,12 +36,16 @@ type HomeExplorerProps = {
 /**
  * 홈 = 지도 + 목록 (J3·J4, C-201·C-204, #17 Q2).
  * 폰: 아래 목록 시트. 반(지도·목록 반반, 기본) / 전체(목록만) 2단계이고, 매물 개수는 손잡이에 보여준다(D13).
+ *   손잡이를 누르면 반 ↔ 전체, 끌면 시트가 따라오고 놓으면 가까운 쪽(빠르게 튕기면 튕긴 쪽)에 붙는다(sheet-drag.ts, 11/7).
  * PC(md 이상): 지도는 왼쪽 전체, 목록은 오른쪽 고정 패널(폭 400px). 시트 크기 바꾸기는 쓰지 않는다(10/25 결정).
  * 지도를 움직이면 보이는 영역 안의 매물을 다시 불러온다(D4). 마커를 누르면 그 샵 매물만 보고, 지도를 움직이면 다시 전체다.
  * 다시 불러오는 동안 이전 핀·목록은 그대로 두고 제목 옆에 작은 표시만 한다. 실패하면 목록 위에 안내와 '다시 시도'(#199).
  */
 export function HomeExplorer({ center, myLocation, header, sort, serverNow }: HomeExplorerProps) {
   const [sheet, setSheet] = useState<SheetSize>('half');
+  const sheetRef = useRef<HTMLElement>(null);
+  const drag = useSheetDrag(sheet, setSheet, sheetRef);
+  const dragging = drag.height !== null;
   const isDesktop = useIsDesktop();
   const [bounds, setBounds] = useState<MapBounds | null>(null);
   const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
@@ -68,8 +71,14 @@ export function HomeExplorer({ center, myLocation, header, sort, serverNow }: Ho
     <main className="flex h-[calc(100dvh-3.5rem-env(safe-area-inset-bottom))] flex-col overflow-hidden md:h-[calc(100dvh-4rem)] md:flex-row">
       <div
         className={cn(
-          'relative transition-[flex-basis] duration-200',
-          sheet === 'half' ? 'flex-1' : 'h-0 flex-none overflow-hidden',
+          'relative',
+          // 끄는 동안에는 시트 높이를 손가락이 정하고 지도는 남은 칸을 채운다
+          dragging
+            ? 'min-h-0 flex-1 overflow-hidden'
+            : cn(
+                'transition-[flex-basis] duration-200',
+                sheet === 'half' ? 'flex-1' : 'h-0 flex-none overflow-hidden',
+              ),
           // PC에서는 시트 크기와 상관없이 지도가 늘 보인다
           'md:h-auto md:flex-1',
         )}
@@ -90,7 +99,8 @@ export function HomeExplorer({ center, myLocation, header, sort, serverNow }: Ho
             setSelectedShopId(shopId);
             setSheet('half');
           }}
-          hidden={sheet === 'full' && !isDesktop}
+          // 끄는 동안에는 지도 크기를 다시 재지 않는다(매번 다시 그리고 목록을 다시 부르지 않게). 놓으면 한 번 다시 잰다
+          hidden={(sheet === 'full' || dragging) && !isDesktop}
         />
         <div className="absolute top-2 left-2 z-10 rounded-lg bg-background/90 shadow-sm">
           {header}
@@ -98,18 +108,21 @@ export function HomeExplorer({ center, myLocation, header, sort, serverNow }: Ho
       </div>
 
       <section
+        ref={sheetRef}
         aria-label="매물 목록"
+        style={dragging ? { height: drag.height ?? undefined } : undefined}
         className={cn(
           'flex flex-col rounded-t-2xl border-t bg-background shadow-[0_-4px_12px_rgba(0,0,0,0.06)]',
-          sheet === 'half' ? 'h-1/2' : 'flex-1',
+          dragging ? 'flex-none' : sheet === 'half' ? 'h-1/2' : 'flex-1',
           'md:h-auto md:w-[400px] md:flex-none md:rounded-none md:border-t-0 md:border-l md:shadow-none',
         )}
       >
         <button
           type="button"
-          className="flex flex-col items-center gap-1.5 pt-2 pb-3 md:hidden"
+          // touch-none: 끄는 동안 화면이 같이 스크롤되거나 새로고침되지 않게
+          className="flex cursor-grab touch-none flex-col items-center gap-1.5 pt-2 pb-3 select-none active:cursor-grabbing md:hidden"
           aria-expanded={sheet === 'full'}
-          onClick={() => setSheet(sheet === 'half' ? 'full' : 'half')}
+          {...drag.handleProps}
         >
           <span className="h-1 w-10 rounded-full bg-muted-foreground/30" aria-hidden />
           <span className="flex items-center gap-2 text-sm font-semibold">
