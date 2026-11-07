@@ -43,7 +43,7 @@ export function SortTabs({ sort }: { sort: SlotSort }) {
   }
 
   return (
-    <div role="tablist" aria-label="정렬" className="flex gap-1 px-3">
+    <div role="tablist" aria-label="정렬" className="flex gap-1 px-3 max-md:px-4">
       {SLOT_SORTS.map((item) => (
         <button
           key={item.key}
@@ -51,7 +51,8 @@ export function SortTabs({ sort }: { sort: SlotSort }) {
           role="tab"
           aria-selected={sort === item.key}
           className={cn(
-            'rounded-full px-3 py-1 text-sm',
+            // 폰에서는 손가락으로 누르기 쉽게 높이를 키운다(36px)
+            'rounded-full px-3 py-1 text-sm max-md:py-2',
             sort === item.key
               ? 'bg-foreground font-semibold text-background'
               : 'text-muted-foreground',
@@ -102,7 +103,7 @@ export function SlotList({
     <div className="flex flex-col gap-2">
       {sort ? <SortTabs sort={sort} /> : null}
       {status === 'loading' ? (
-        <LoadingCards count={3} />
+        <LoadingCards count={3} className="max-md:px-4" />
       ) : status === 'error' ? (
         <ErrorState
           description={errorMessage}
@@ -117,7 +118,8 @@ export function SlotList({
       ) : items.length === 0 ? (
         empty
       ) : (
-        <ul className="flex flex-col divide-y">
+        // 폰에서는 카드가 화면 끝에 붙어 둥근 모서리가 잘려 보여서, 양옆 16px 여백과 카드 사이 간격을 둔다
+        <ul className="flex flex-col divide-y max-md:gap-2 max-md:divide-y-0 max-md:px-4">
           {items.map((item) => (
             <li key={item.slotId}>
               <SlotCard
@@ -139,7 +141,7 @@ export function SlotList({
       )}
       {status === 'ready' && hasMore ? (
         <div ref={sentinelRef} className="py-2">
-          {loadingMore ? <LoadingCards count={1} /> : null}
+          {loadingMore ? <LoadingCards count={1} className="max-md:px-4" /> : null}
         </div>
       ) : null}
     </div>
