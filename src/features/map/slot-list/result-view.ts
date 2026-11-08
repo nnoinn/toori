@@ -36,3 +36,32 @@ export function resultView<T>(
     current,
   };
 }
+
+/** 이어 불러온 한 쪽(20개) */
+export type ListPage<I> = { items: I[]; nextCursor: string | null; serverNow: string };
+
+/**
+ * 이어 불러온 쪽을 지금 목록 뒤에 붙인다(지도 홈 목록과 지도 없는 매물 목록이 같이 쓴다).
+ * - 부를 때의 조건(requestKey)과 지금 목록의 조건이 다르면(그사이 지도를 움직이거나 필터를 바꿨으면) 붙이지 않는다.
+ *   이전 영역의 목록 뒤에 새 영역 매물이 붙지 않게
+ * - 이미 목록에 있는 매물은 다시 붙이지 않는다. 앞 쪽을 받은 뒤 원장님이 할인율·시간을 고치면
+ *   같은 매물이 다음 쪽에 또 올 수 있어서다(같은 매물 카드가 두 번 보이지 않게)
+ * - 목록에 같이 있는 다른 값(전체 매물 수 등)은 그대로 둔다
+ */
+export function appendPage<I extends { slotId: string }, T extends ListPage<I>>(
+  prev: Shown<T> | null,
+  requestKey: string | null,
+  page: ListPage<I>,
+): Shown<T> | null {
+  if (!prev || prev.key !== requestKey) return prev;
+  const seen = new Set(prev.data.items.map((item) => item.slotId));
+  return {
+    ...prev,
+    data: {
+      ...prev.data,
+      items: [...prev.data.items, ...page.items.filter((item) => !seen.has(item.slotId))],
+      nextCursor: page.nextCursor,
+      serverNow: page.serverNow,
+    },
+  };
+}
