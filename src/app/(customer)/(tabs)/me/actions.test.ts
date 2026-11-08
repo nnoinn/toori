@@ -8,7 +8,7 @@ import { fail, ok } from '@/lib/result';
 import { requireCustomer } from '@/server/auth';
 
 import { updateMyPhone, updateMyProfile } from './actions';
-import { PHONE_FORMAT_MESSAGE } from './profile-rules';
+import { PHONE_FORMAT_MESSAGE } from '@/lib/phone';
 
 // 로그인 확인·DB·화면 새로 그리기는 흉내 낸다. 여기서는 "본인 고객 계정만 고치고(X-102),
 // 저장하는 모양(010-1234-5678)과 실패 안내, 로그에 연락처를 남기지 않는지"를 본다

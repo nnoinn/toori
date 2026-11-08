@@ -5,14 +5,15 @@
 
 import { TransactionRollbackError } from 'drizzle-orm';
 import { refresh } from 'next/cache';
-import { z } from 'zod';
+import { isUuid } from '@/lib/uuid';
 
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { fail, ok, type Result, type ResultError } from '@/lib/result';
 import { requireShopOwner } from '@/server/auth';
 
-import { isServiceTypeOf, type MenuFieldErrors, validateMenu } from './menu';
+import { type MenuFieldErrors, validateMenu } from './menu';
+import { isServiceTypeOf } from '@/server/policy';
 import {
   insertMenu,
   moveMenu as moveMenuInDb,
@@ -23,12 +24,6 @@ import {
 } from './menu-store';
 
 const MENU_NOT_FOUND = '메뉴를 찾을 수 없어요';
-
-/**
- * 메뉴 id 모양 확인. 서버 함수는 화면 밖에서도 부를 수 있어서, 모양이 틀린 id가 DB까지 가면
- * "메뉴를 찾을 수 없어요" 대신 DB 오류가 난다(사진·매물 서버 함수와 같게 먼저 막는다)
- */
-const isMenuId = (value: unknown): value is string => z.uuid().safeParse(value).success;
 
 export type SaveMenuResponse =
   { ok: true } | { ok: false; error: ResultError & { fieldErrors?: MenuFieldErrors } };
@@ -41,7 +36,7 @@ export async function saveMenu(
 ): Promise<SaveMenuResponse> {
   const auth = await requireShopOwner(shopId);
   if (!auth.ok) return auth;
-  if (menuId !== null && !isMenuId(menuId)) return fail('MENU_NOT_FOUND', MENU_NOT_FOUND);
+  if (menuId !== null && !isUuid(menuId)) return fail('MENU_NOT_FOUND', MENU_NOT_FOUND);
 
   const db = getDb();
   const category = await selectShopCategory(db, shopId);
@@ -76,7 +71,7 @@ export async function setMenuHidden(
 ): Promise<Result<null>> {
   const auth = await requireShopOwner(shopId);
   if (!auth.ok) return auth;
-  if (!isMenuId(menuId)) return fail('MENU_NOT_FOUND', MENU_NOT_FOUND);
+  if (!isUuid(menuId)) return fail('MENU_NOT_FOUND', MENU_NOT_FOUND);
 
   const db = getDb();
   const [category, menu] = await Promise.all([
@@ -104,7 +99,7 @@ export async function moveMenu(
 ): Promise<Result<null>> {
   const auth = await requireShopOwner(shopId);
   if (!auth.ok) return auth;
-  if (!isMenuId(menuId) || (direction !== 'up' && direction !== 'down')) {
+  if (!isUuid(menuId) || (direction !== 'up' && direction !== 'down')) {
     return fail('MENU_NOT_FOUND', MENU_NOT_FOUND);
   }
 

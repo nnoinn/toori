@@ -44,13 +44,6 @@ export function showsFullPhone(reservation: ReservationViewInput): boolean {
   return reservation.status === 'confirmed' && reservation.visitResult === null;
 }
 
-/** 휴대폰 번호 가운데를 가린다. 예: "010-1234-5678" → "010-****-5678" */
-export function maskPhone(phone: string): string {
-  const parts = phone.split('-');
-  if (parts.length === 3) return [parts[0], '*'.repeat(parts[1].length), parts[2]].join('-');
-  return `****${phone.slice(-4)}`;
-}
-
 /** 방문 완료·노쇼 버튼과 확인 창 문구(10/29 nnoinn, #130) */
 export const VISIT_ACTIONS: Record<
   VisitResult,

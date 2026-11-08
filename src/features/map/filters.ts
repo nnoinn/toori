@@ -6,7 +6,7 @@
 import {
   DISCOUNT_RATE_OPTIONS,
   PRICE_FILTER_RANGES,
-  SERVICE_TYPES_BY_CATEGORY,
+  serviceTypesOf,
   SHOP_CATEGORIES,
   TIME_FILTER_RANGES,
   type DiscountRate,
@@ -76,10 +76,6 @@ function pickAllowed<T extends string | number>(
 
 function isCategory(value: string): value is ShopCategory {
   return SHOP_CATEGORIES.some((category) => category.key === value);
-}
-
-export function serviceTypesOf(category: ShopCategory) {
-  return SERVICE_TYPES_BY_CATEGORY[category];
 }
 
 const PRICE_KEYS = PRICE_FILTER_RANGES.map((range) => range.key);

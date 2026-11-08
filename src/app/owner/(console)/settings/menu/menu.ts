@@ -5,10 +5,10 @@ import { z } from 'zod';
 
 import { formatWon } from '@/lib/format';
 import {
-  SERVICE_TYPES_BY_CATEGORY,
+  isServiceTypeOf,
+  MENU_DURATION_STEP_MINUTES,
   type ServiceType,
   type ShopCategory,
-  MENU_DURATION_STEP_MINUTES,
 } from '@/server/policy';
 
 // 정가는 10원 단위로 받는다(정민석 결정 10/28). 할인가 = 정가 × (1 − 할인율)에 원 미만이 생기지 않는다
@@ -24,25 +24,6 @@ export const MENU_DURATION_OPTIONS: readonly number[] = Array.from(
   { length: MENU_DURATION.max / MENU_DURATION.step },
   (_, index) => (index + 1) * MENU_DURATION.step,
 );
-
-/** 그 업종에서 고를 수 있는 서비스 종류 */
-export function serviceTypesOf(category: ShopCategory) {
-  return SERVICE_TYPES_BY_CATEGORY[category];
-}
-
-/** 서비스 종류가 그 업종 목록에 있으면 true. 업종을 바꾼 뒤 숨겨진 옛 메뉴를 가려낸다 */
-export function isServiceTypeOf(category: ShopCategory, serviceType: string): boolean {
-  return serviceTypesOf(category).some((type) => type.key === serviceType);
-}
-
-/** 서비스 종류의 화면 이름. 목록에 없으면 key 그대로 */
-export function serviceTypeLabel(serviceType: string): string {
-  for (const types of Object.values(SERVICE_TYPES_BY_CATEGORY)) {
-    const found = types.find((type) => type.key === serviceType);
-    if (found) return found.label;
-  }
-  return serviceType;
-}
 
 export type MenuInput = {
   serviceType: string;

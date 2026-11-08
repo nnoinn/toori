@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { z } from 'zod';
+import { isUuid } from '@/lib/uuid';
 
 import { BackButton } from '@/components/ui/back-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,7 +42,7 @@ function labelMarketing({ marketing }: CustomerDetail): string {
 async function Detail({ params }: { params: Params }) {
   await ensureAdminPage();
   const { customerId } = await params;
-  if (!z.uuid().safeParse(customerId).success) notFound();
+  if (!isUuid(customerId)) notFound();
   const detail = await selectCustomerDetail(getDb(), customerId);
   if (!detail) notFound();
 

@@ -13,11 +13,15 @@ import { Price } from '@/components/ui/price';
 import type { BusinessHours } from '@/db/schema/shops';
 import { formatDuration, formatWon } from '@/lib/format';
 import { formatKst, formatKstTime, utcToKst } from '@/lib/time';
-import { DISCOUNT_RATE_OPTIONS, type DiscountRate, PUBLISH_WINDOW_HOURS } from '@/server/policy';
+import {
+  DISCOUNT_RATE_OPTIONS,
+  type DiscountRate,
+  PUBLISH_WINDOW_HOURS,
+  serviceTypeLabel,
+} from '@/server/policy';
 import type { SettlementPreview } from '@/server/settlements';
 
 import { withObjectParticle } from '../../korean';
-import { serviceTypeLabel } from '../settings/menu/menu';
 import { WEEKDAY_LABELS } from '../settings/shop/shop-profile';
 import type { SlotMenuOption } from './slot-form';
 import {
