@@ -21,6 +21,7 @@ import { closeSlot } from '../slots/actions';
 import { SLOT_CLOSE_REASON_LABELS, SLOT_CLOSE_REASON_OPTIONS } from '../slots/slot-edit';
 import type { DashboardSlot } from './dashboard';
 
+/** 확인 창 틀. 처리 중(pending)은 창과 안쪽 폼이 같이 써서, 처리하는 동안 바깥을 눌러도 닫히지 않는다 */
 export function CloseSlotDialog({
   shopId,
   slot,
@@ -49,6 +50,7 @@ export function CloseSlotDialog({
   );
 }
 
+/** 사유 고르기와 [마감하기]. 매물마다 key로 새로 그려서 다른 매물을 열면 고른 사유가 비워진다 */
 function CloseSlotForm({
   shopId,
   slot,
@@ -65,6 +67,7 @@ function CloseSlotForm({
   const [reason, setReason] = useState<SlotCloseReason | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  /** 서버가 판매 전·결제 중 아님을 다시 보고 마감한다. 막히면 창을 닫지 않고 이유를 보여준다 */
   function submit() {
     if (!reason) return;
     setMessage(null);

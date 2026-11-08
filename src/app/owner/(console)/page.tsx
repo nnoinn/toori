@@ -31,6 +31,7 @@ export default function OwnerHomePage() {
   );
 }
 
+/** 입점 승인 전이면 입점 상태 안내, 승인됐으면 오늘 0시 이후 매물과 처리 필요 예약으로 대시보드를 그린다 */
 async function OwnerHomeContent() {
   // 로그인하지 않았으면 로그인 화면, 원장님 가입 전이면 /owner/join 으로 보낸다
   const auth = await ensureOwnerPage(PAGE_PATH);

@@ -48,6 +48,7 @@ export type OwnerReservation = {
   customerPhone: string | null;
 };
 
+/** 그 샵 매물의 예약 한 건과 예약자 닉네임·휴대폰. 없거나 다른 샵 예약이거나 id 모양이 틀리면 null */
 export async function selectOwnerReservation(
   db: Db,
   shopId: string,
