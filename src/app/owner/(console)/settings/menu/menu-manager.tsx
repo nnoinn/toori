@@ -149,8 +149,9 @@ export function MenuManager({
                 <Button variant="outline" onClick={() => openEdit(menu)} disabled={pending}>
                   수정
                 </Button>
+                {/* 목록 줄 버튼은 테두리 버튼으로 맞춘다(대시보드 [수정]·[마감], 숨긴 메뉴 [다시 보이기]와 같게) */}
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   onClick={() => run(() => setMenuHidden(shopId, menu.id, true))}
                   disabled={pending}
                 >

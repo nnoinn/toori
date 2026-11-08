@@ -223,25 +223,26 @@ function BusinessInfoEditor({
             </div>
             <FieldError id="businessDocPath" error={errors.businessDocPath} />
           </div>
+
+          {/* 카드 하나만 저장하는 화면이라 [저장]을 카드 안 오른쪽 아래에 둔다(정산 계좌·외부 링크와 같게) */}
+          <div className="col-span-2 flex items-center justify-end gap-3">
+            {status ? (
+              <span
+                role={status.kind === 'error' ? 'alert' : 'status'}
+                className={cn(
+                  'text-sm',
+                  status.kind === 'error' ? 'text-destructive' : 'text-muted-foreground',
+                )}
+              >
+                {status.text}
+              </span>
+            ) : null}
+            <Button type="submit" size="lg" disabled={busy}>
+              {pending ? '저장 중…' : rejected ? '고쳐서 다시 신청하기' : '저장'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
-
-      <div className="flex items-center justify-end gap-3">
-        {status ? (
-          <span
-            role={status.kind === 'error' ? 'alert' : 'status'}
-            className={cn(
-              'text-sm',
-              status.kind === 'error' ? 'text-destructive' : 'text-muted-foreground',
-            )}
-          >
-            {status.text}
-          </span>
-        ) : null}
-        <Button type="submit" size="lg" disabled={busy}>
-          {pending ? '저장 중…' : rejected ? '고쳐서 다시 신청하기' : '저장'}
-        </Button>
-      </div>
     </form>
   );
 }

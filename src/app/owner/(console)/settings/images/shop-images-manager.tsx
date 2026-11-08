@@ -155,29 +155,32 @@ export function ShopImagesManager({
       ) : null}
 
       <Card>
-        <CardHeader>
-          <CardTitle>{SHOP_IMAGE_KIND_LABELS.main}</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            매물 목록 카드와 상세 화면 첫 장에 나와요. 1장만 올릴 수 있어요.
-          </p>
+        {/* 올리기 버튼은 스타일 사진 [사진 추가]처럼 카드 제목 오른쪽에 둔다 */}
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div className="flex flex-col gap-1.5">
+            <CardTitle>{SHOP_IMAGE_KIND_LABELS.main}</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              매물 목록 카드와 상세 화면 첫 장에 나와요. 1장만 올릴 수 있어요.
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            {main ? (
+              <Button variant="outline" size="lg" disabled={busy} onClick={() => setDeleting(main)}>
+                지우기
+              </Button>
+            ) : null}
+            <Button size="lg" disabled={busy} onClick={() => mainInput.current?.click()}>
+              <ImagePlus aria-hidden />
+              {main ? '바꾸기' : '올리기'}
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent className="flex items-end gap-4">
+        <CardContent>
           {main ? (
             <Photo url={main.url} alt={SHOP_IMAGE_KIND_LABELS.main} className="w-72" />
           ) : (
             <EmptyPhoto className="w-72" />
           )}
-          <div className="flex gap-2">
-            <Button size="lg" disabled={busy} onClick={() => mainInput.current?.click()}>
-              <ImagePlus aria-hidden />
-              {main ? '바꾸기' : '올리기'}
-            </Button>
-            {main ? (
-              <Button variant="ghost" size="lg" disabled={busy} onClick={() => setDeleting(main)}>
-                지우기
-              </Button>
-            ) : null}
-          </div>
         </CardContent>
       </Card>
 
