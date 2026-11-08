@@ -29,7 +29,6 @@ import {
 import { SavedCard, type SavedSummary } from './slot-saved-card';
 import {
   groupByKstDate,
-  isClosedDay,
   publishPlan,
   slotEnd,
   startCandidates,
@@ -84,11 +83,11 @@ export function SlotForm({
 
   const [step, setStep] = useState<StepNumber>(1);
   const [menuId, setMenuId] = useState<string | null>(edit?.menuId ?? null);
-  // 처음에는 쉬는 날이 아닌 첫 날을 보여준다. 수정이면 매물 날짜
+  // 달력에서 고른 날짜. 새로 올릴 때는 비워 두고 원장님이 고르면 그 아래에 시작 시각을 보여준다.
+  // 수정이면 매물 날짜(지금 고를 수 있는 날짜일 때)
   const [dateKey, setDateKey] = useState(
     () =>
       (edit && days.find((item) => item.dateKey === kstDateKey(new Date(edit.startAt))))?.dateKey ??
-      (days.find((item) => !isClosedDay(item.starts[0], businessHours)) ?? days[0])?.dateKey ??
       '',
   );
   // 메뉴를 다시 골라야 하면 소요 시간이 달라지므로 시각도 다시 고른다. 지금 고를 수 없는 시각(범위 밖)이어도 다시 고른다
