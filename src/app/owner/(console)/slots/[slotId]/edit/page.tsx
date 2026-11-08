@@ -14,7 +14,7 @@ import { readShopReviewStatus } from '@/server/shops/review-store';
 import { OwnerPage } from '../../../owner-page';
 import { SlotForm } from '../../slot-form';
 import { selectSlotFormData } from '../../slot-form-data';
-import { SLOT_EDIT_MESSAGES, slotEditProblem } from '../../slot-edit';
+import { editStartWindow, SLOT_EDIT_MESSAGES, slotEditProblem } from '../../slot-edit';
 import { selectSlotForEdit } from '../../slot-edit-store';
 
 export const metadata: Metadata = { title: '매물 수정' };
@@ -79,6 +79,8 @@ async function SlotEditContent({ params }: { params: Params }) {
         startAt: slot.startAt.toISOString(),
         discountRate: slot.discountRate,
         newCustomerOnly: slot.newCustomerOnly,
+        // 게시중이면 48시간 안, 예약대기면 14일 안의 시각만 보여준다(S-205)
+        startWindow: editStartWindow(slot, now),
       }}
     />
   );

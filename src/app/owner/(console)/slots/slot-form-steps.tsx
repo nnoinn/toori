@@ -1,7 +1,7 @@
 'use client';
 
 // 매물 3탭 화면의 단계 버튼과 ①②③ 카드 (O4·O5·O10). 고른 값과 확인·저장은 slot-form.tsx가 갖고,
-// 여기는 받은 값으로 그리기만 한다. ② 시간 카드는 P1 미리 올리기(S-205, 14일)에서 날짜 고르기가 바뀔 자리다.
+// 여기는 받은 값으로 그리기만 한다. ② 시간 카드는 미리 올리기(S-205)로 14일 안의 날짜를 고른다.
 
 import { cn } from 'cn';
 import { Check } from 'lucide-react';
@@ -12,8 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Price } from '@/components/ui/price';
 import type { BusinessHours } from '@/db/schema/shops';
 import { formatDuration, formatWon } from '@/lib/format';
-import { formatKst, formatKstTime, utcToKst } from '@/lib/time';
+import { formatKst, formatKstTime } from '@/lib/time';
 import {
+  ADVANCE_LISTING_DAYS,
   DISCOUNT_RATE_OPTIONS,
   type DiscountRate,
   PUBLISH_WINDOW_HOURS,
@@ -29,6 +30,7 @@ import {
   isClosedDay,
   rangesOverlap,
   slotEnd,
+  type StartWindow,
   type TimeRange,
 } from './slot-time';
 
@@ -137,6 +139,8 @@ export function MenuStep({
 export function TimeStep({
   menu,
   days,
+  todayKey,
+  startWindow,
   dateKey,
   businessHours,
   busyRanges,
@@ -145,8 +149,12 @@ export function TimeStep({
   onChooseStart,
 }: {
   menu: SlotMenuOption;
-  /** 고를 수 있는 시작 시각을 한국 날짜별로 묶은 것(오늘부터) */
+  /** 고를 수 있는 시작 시각을 한국 날짜별로 묶은 것(가까운 날부터) */
   days: { dateKey: string; starts: Date[] }[];
+  /** 오늘(한국 날짜, 서버 시각 기준). 날짜 버튼에 오늘·내일·모레를 붙인다 */
+  todayKey: string;
+  /** 고를 수 있는 범위. 새로 올리기·예약대기 수정은 14일, 게시중 매물 수정은 48시간 */
+  startWindow: StartWindow;
   /** 고른 날짜. 없는 날짜면 첫 날을 보여준다 */
   dateKey: string;
   businessHours: BusinessHours;
@@ -169,13 +177,16 @@ export function TimeStep({
       <CardHeader>
         <CardTitle>② 언제 시작할까요?</CardTitle>
         <p className="text-sm text-muted-foreground">
-          지금부터 {PUBLISH_WINDOW_HOURS}시간 안의 시각만 올릴 수 있어요. 끝 시각은 {menu.name} 소요
-          시간({formatDuration(menu.durationMinutes)})으로 정해져요.
+          {startWindow === 'published'
+            ? `고객에게 이미 보이는 매물이라 지금부터 ${PUBLISH_WINDOW_HOURS}시간 안의 시각으로만 바꿀 수 있어요.`
+            : `지금부터 ${ADVANCE_LISTING_DAYS}일 안의 시각을 올릴 수 있어요. 고객에게는 시작 ${PUBLISH_WINDOW_HOURS}시간 전부터 보이고, 그 전에는 예약대기예요.`}{' '}
+          끝 시각은 {menu.name} 소요 시간({formatDuration(menu.durationMinutes)})으로 정해져요.
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <div className="flex gap-2" role="tablist" aria-label="날짜">
-          {days.map((item, index) => {
+        {/* 14일이면 날짜가 15개까지 생겨서 여러 줄로 놓는다 */}
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label="날짜">
+          {days.map((item) => {
             const closed = isClosedDay(item.starts[0], businessHours);
             return (
               <Button
@@ -187,7 +198,7 @@ export function TimeStep({
                 disabled={closed}
                 onClick={() => onChooseDate(item.dateKey)}
               >
-                {dayLabel(item.starts[0], index)}
+                {dayLabel(item.dateKey, todayKey)}
                 {closed ? ' 휴무' : ''}
               </Button>
             );
@@ -298,7 +309,16 @@ export function DiscountStep({
 }
 
 /** 단계 카드 아래 고른 메뉴·시간 요약. 단계를 오가도 지금 무엇을 골랐는지 보인다 */
-export function ChosenSummary({ menu, start }: { menu: SlotMenuOption; start: Date | null }) {
+export function ChosenSummary({
+  menu,
+  start,
+  publishNote,
+}: {
+  menu: SlotMenuOption;
+  start: Date | null;
+  /** 시각을 골랐으면 언제 고객에게 보이는지(S-205). 예: "예약대기로 올라가요. 11/18(수) 14:00부터 고객에게 보여요" */
+  publishNote: string | null;
+}) {
   return (
     <div className="flex flex-col gap-1 rounded-lg bg-muted p-3 text-sm">
       <span>
@@ -311,6 +331,7 @@ export function ChosenSummary({ menu, start }: { menu: SlotMenuOption; start: Da
       ) : (
         <span className="text-muted-foreground">시작 시각을 골라 주세요</span>
       )}
+      {start && publishNote ? <span className="text-muted-foreground">{publishNote}</span> : null}
     </div>
   );
 }
@@ -367,9 +388,14 @@ function PricePreview({
   );
 }
 
-/** 날짜 버튼. 예: "10/31(금) 오늘". days가 오늘부터라 순서(index)로 오늘·내일·모레를 붙인다 */
-function dayLabel(date: Date, index: number): string {
-  const t = utcToKst(date);
-  const suffix = ['오늘', '내일', '모레'][index] ?? '';
-  return `${t.month}/${t.day}(${WEEKDAY_LABELS[t.weekday]}) ${suffix}`.trim();
+/**
+ * 날짜 버튼. 예: "10/31(금) 오늘", "11/5(수)". 오늘에서 며칠 뒤인지로 오늘·내일·모레를 붙인다.
+ * 밤 늦게 열어 오늘 남은 시각이 없으면 첫 버튼이 내일이라, 순서가 아니라 날짜로 정한다
+ */
+function dayLabel(dateKey: string, todayKey: string): string {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  const daysAhead = Math.round((Date.parse(dateKey) - Date.parse(todayKey)) / 86_400_000);
+  const suffix = ['오늘', '내일', '모레'][daysAhead] ?? '';
+  return `${month}/${day}(${WEEKDAY_LABELS[weekday]}) ${suffix}`.trim();
 }
