@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import {
   ChevronDown,
   Clock,
@@ -30,6 +29,7 @@ import {
   telHref,
 } from './detail-format';
 import { FavoriteButton } from './favorite-button';
+import { SlotPhotos } from './slot-photos';
 import { ReserveButton } from './reserve-button';
 import type { SlotDetail } from './types';
 
@@ -67,20 +67,8 @@ export function SlotDetailView({ slot, serverNow, favorite }: SlotDetailViewProp
             fallbackHref={CUSTOMER_HOME}
             className="absolute top-2 left-2 z-10 bg-background/80"
           />
-          <ul className="flex snap-x snap-mandatory overflow-x-auto" aria-label="스타일 이미지">
-            {slot.imageUrls.map((url, index) => (
-              <li key={url} className="relative aspect-[4/3] w-full shrink-0 snap-center">
-                <Image
-                  src={url}
-                  alt={`${shop.name} 이미지 ${index + 1}`}
-                  fill
-                  sizes="(max-width: 768px) 100vw, 60vw"
-                  className="object-cover"
-                  priority={index === 0}
-                />
-              </li>
-            ))}
-          </ul>
+          {/* 다른 매물로 옮겨도 첫 장부터 보이게 매물마다 새로 시작한다 */}
+          <SlotPhotos key={slot.slotId} urls={slot.imageUrls} shopName={shop.name} />
         </div>
       ) : (
         // 사진이 없으면 큰 회색 칸 대신 뒤로가기와 작은 안내만 두어 샵 정보가 바로 위로 올라오게 한다(#214)
