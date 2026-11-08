@@ -11,6 +11,7 @@ import { getRequestNow } from '@/lib/request-time';
 import { ensureOwnerPage } from '@/server/auth';
 import { readShopReviewStatus } from '@/server/shops/review-store';
 
+import { OwnerPage } from '../../../owner-page';
 import { SlotForm } from '../../slot-form';
 import { selectSlotFormData } from '../../slot-form-data';
 import { SLOT_EDIT_MESSAGES, slotEditProblem } from '../../slot-edit';
@@ -24,12 +25,11 @@ type Params = Promise<{ slotId: string }>;
 // 등록 3탭 화면을 지금 값으로 채워서 연다. 판매 전이고 결제 중이 아닌 매물만 고칠 수 있다. PC 기준
 export default function SlotEditPage({ params }: { params: Params }) {
   return (
-    <main className="flex w-full max-w-4xl flex-1 flex-col gap-4 p-6">
-      <h1 className="text-xl font-bold">매물 수정</h1>
+    <OwnerPage title="매물 수정" width="narrow" backHref="/owner">
       <Suspense fallback={<LoadingCards count={2} />}>
         <SlotEditContent params={params} />
       </Suspense>
-    </main>
+    </OwnerPage>
   );
 }
 

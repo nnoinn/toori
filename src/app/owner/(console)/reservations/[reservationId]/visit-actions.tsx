@@ -30,7 +30,7 @@ export function VisitActions({
   reservationId: string;
   /** 버튼을 보여줄지(canRecordVisit, 서버 시각 기준) */
   canRecord: boolean;
-  /** 확인 창에 보여줄 예약. 예: "11/1(토) 14:00 커트 · 예약번호 ABCD2345" */
+  /** 확인 창에 보여줄 예약. 예: "11/1(토) 14:00 커트 · 예약번호 1234-5678-9012" */
   summary: string;
 }) {
   const [target, setTarget] = useState<VisitResult | null>(null);

@@ -6,6 +6,7 @@ import { isUuid } from '@/lib/uuid';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { formatReservationCode, ReservationCode } from '@/components/ui/reservation-code';
 import { EmptyState, LoadingCards } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
@@ -13,11 +14,9 @@ import { formatKst, formatKstTime } from '@/lib/time';
 import { ensureOwnerPage } from '@/server/auth';
 import { canRecordVisit } from '@/server/visits/rules';
 
-import {
-  RESERVATION_VIEW_LABELS,
-  type ReservationView,
-  reservationView,
-} from '../reservation-detail';
+import { OwnerPage } from '../../owner-page';
+import { RESERVATION_VIEW_STYLE } from '../../status-style';
+import { RESERVATION_VIEW_LABELS, reservationView } from '../reservation-detail';
 import { selectOwnerReservation } from '../reservation-detail-store';
 import { BookerCard, HistoryCard, ServiceCard, ViewNotice } from './reservation-cards';
 import { VisitActions } from './visit-actions';
@@ -26,27 +25,17 @@ export const metadata: Metadata = { title: '예약 상세' };
 
 type Params = Promise<{ reservationId: string }>;
 
-/** 상태 배지 색. 대시보드 매물 상태 배지와 맞춘다(예정 = 예약됨, 끝난 것은 흐리게) */
-const VIEW_STYLE: Record<ReservationView, string> = {
-  upcoming: 'bg-accent text-accent-foreground',
-  needsVisit: 'bg-warning/25 text-warning-foreground',
-  visited: 'border-border bg-background text-muted-foreground',
-  noShow: 'bg-destructive/10 text-destructive',
-  cancelled: 'bg-muted text-muted-foreground',
-};
-
 // 원장님 예약 상세 (O11, S-403). 주소: /owner/reservations/[reservationId]
 // 예약번호·예약자(닉네임·휴대폰)·서비스·시간·결제 금액(판매가). 그 샵 원장님만 본다. PC 기준
 // 시작이 지났고 처리하지 않은 예약은 [방문 완료]·[노쇼](O14, S-405). 원장님 사정으로 취소는 O18(P1)에서 넣는다.
 // 이 파일은 예약을 읽고 배치하고, 카드와 안내 상자는 reservation-cards.tsx가 그린다.
 export default function OwnerReservationPage({ params }: { params: Params }) {
   return (
-    <main className="flex w-full max-w-4xl flex-1 flex-col gap-4 p-6">
-      <h1 className="text-xl font-bold">예약 상세</h1>
+    <OwnerPage title="예약 상세" width="wide" backHref="/owner">
       <Suspense fallback={<LoadingCards count={2} />}>
         <ReservationContent params={params} />
       </Suspense>
-    </main>
+    </OwnerPage>
   );
 }
 
@@ -68,12 +57,17 @@ async function ReservationContent({ params }: { params: Params }) {
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div className="flex flex-col gap-1">
             <p className="text-sm text-muted-foreground">예약번호</p>
-            <p className="text-2xl font-bold tracking-wider tabular-nums">{reservation.code}</p>
+            {/* 끝 4자리를 굵게: 손님이 보여 주는 번호를 끝 4자리로 맞춰 본다(#262). 예전 8자리 번호는 그대로 */}
+            <ReservationCode
+              code={reservation.code}
+              emphasizeTail
+              className="text-2xl font-bold tracking-wider"
+            />
             <p className="text-sm">
               {formatKst(reservation.startAt)} ~ {formatKstTime(reservation.endAt)}
             </p>
           </div>
-          <Badge className={VIEW_STYLE[view]}>{RESERVATION_VIEW_LABELS[view]}</Badge>
+          <Badge className={RESERVATION_VIEW_STYLE[view]}>{RESERVATION_VIEW_LABELS[view]}</Badge>
         </CardHeader>
         {view === 'cancelled' ? null : (
           <CardContent>
@@ -83,7 +77,7 @@ async function ReservationContent({ params }: { params: Params }) {
         <VisitActions
           reservationId={reservation.id}
           canRecord={canRecordVisit(reservation, now)}
-          summary={`${formatKst(reservation.startAt)} ${reservation.menuName} · 예약번호 ${reservation.code}`}
+          summary={`${formatKst(reservation.startAt)} ${reservation.menuName} · 예약번호 ${formatReservationCode(reservation.code)}`}
         />
       </Card>
 

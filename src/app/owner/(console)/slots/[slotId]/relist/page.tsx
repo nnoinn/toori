@@ -16,6 +16,7 @@ import { ensureOwnerPage } from '@/server/auth';
 import { calcSalePrice, serviceTypeLabel } from '@/server/policy';
 import { readShopReviewStatus } from '@/server/shops/review-store';
 
+import { OwnerPage } from '../../../owner-page';
 import { validateSlotDraft } from '../../slot-draft-store';
 import { RELIST_MESSAGES, relistDraftMessage, relistProblem } from '../../relist';
 import { relistInput, selectSlotForRelist } from '../../relist-store';
@@ -31,12 +32,11 @@ type Params = Promise<{ slotId: string }>;
 // 지금 메뉴 값으로 계산한 가격을 보여준다(저장할 때 다시 확인한다). PC 기준
 export default function SlotRelistPage({ params }: { params: Params }) {
   return (
-    <main className="flex w-full max-w-3xl flex-1 flex-col gap-4 p-6">
-      <h1 className="text-xl font-bold">매물 재등록</h1>
+    <OwnerPage title="매물 재등록" width="narrow" backHref="/owner">
       <Suspense fallback={<LoadingCards count={1} />}>
         <RelistContent params={params} />
       </Suspense>
-    </main>
+    </OwnerPage>
   );
 }
 
