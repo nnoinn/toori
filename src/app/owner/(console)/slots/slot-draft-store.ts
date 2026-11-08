@@ -13,7 +13,7 @@ import type { BusinessHours } from '@/db/schema/shops';
 import { fail, ok, type Result } from '@/lib/result';
 import type { ShopCategory } from '@/server/policy';
 
-import { isServiceTypeOf } from '../../settings/menu/menu';
+import { isServiceTypeOf } from '../settings/menu/menu';
 import {
   checkBusinessHours,
   checkStart,

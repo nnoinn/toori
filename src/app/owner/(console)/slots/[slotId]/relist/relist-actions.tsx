@@ -14,6 +14,7 @@ export function RelistActions({ shopId, slotId }: { shopId: string; slotId: stri
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  /** [예, 다시 올리기]. 성공하면 서버 함수가 대시보드로 보내므로 여기서는 실패 문구만 다룬다 */
   function relist() {
     setMessage(null);
     startTransition(async () => {

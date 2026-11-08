@@ -6,6 +6,7 @@ import {
   checkBusinessHours,
   checkStart,
   groupByKstDate,
+  isClosedDay,
   isOnStep,
   latestStart,
   rangesOverlap,
@@ -153,5 +154,27 @@ describe('groupByKstDate', () => {
       ['2026-10-31', 1],
       ['2026-11-01', 2],
     ]);
+  });
+});
+
+describe('isClosedDay', () => {
+  // 2026-11-01은 일요일, 11-02는 월요일, 11-03은 화요일
+  const hours = [
+    { weekday: 0, closed: true as const },
+    { weekday: 1, open: '10:00', close: '20:00' },
+  ];
+
+  it('쉬는 날로 입력한 요일만 true', () => {
+    expect(isClosedDay(at('2026-11-01T12:00:00'), hours)).toBe(true);
+    expect(isClosedDay(at('2026-11-02T12:00:00'), hours)).toBe(false);
+  });
+
+  it('영업시간을 입력하지 않은 요일과 날짜가 없을 때는 false', () => {
+    expect(isClosedDay(at('2026-11-03T12:00:00'), hours)).toBe(false);
+    expect(isClosedDay(undefined, hours)).toBe(false);
+  });
+
+  it('한국 날짜로 본다(UTC로는 전날이어도 한국 일요일이면 쉬는 날)', () => {
+    expect(isClosedDay(at('2026-11-01T08:00:00'), hours)).toBe(true);
   });
 });

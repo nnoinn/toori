@@ -11,8 +11,8 @@ import { ensureOwnerPage } from '@/server/auth';
 import { SHOP_STATUS_LABELS } from '@/server/shops/status';
 import { getShopReviewStatus } from '@/server/shops/review';
 
-import { SlotCreateForm } from './slot-create-form';
-import { selectSlotFormData } from './slot-form-data';
+import { SlotForm } from '../slot-form';
+import { selectSlotFormData } from '../slot-form-data';
 
 export const metadata: Metadata = { title: '매물 등록' };
 
@@ -30,6 +30,7 @@ export default function SlotCreatePage() {
   );
 }
 
+/** 입점 승인 → 메뉴가 있는지 차례로 보고 3탭 화면을 연다. 막히면 무엇을 먼저 해야 하는지 안내한다 */
 async function SlotCreateContent() {
   // 로그인하지 않았으면 로그인 화면, 원장님 가입 전이면 /owner/join 으로 보낸다
   const auth = await ensureOwnerPage(PAGE_PATH);
@@ -76,5 +77,5 @@ async function SlotCreateContent() {
     );
   }
 
-  return <SlotCreateForm shopId={auth.shopId} nowIso={now.toISOString()} {...data} />;
+  return <SlotForm shopId={auth.shopId} nowIso={now.toISOString()} {...data} />;
 }
