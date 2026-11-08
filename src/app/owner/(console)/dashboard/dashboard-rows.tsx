@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Price } from '@/components/ui/price';
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import { SlotBadges, type SlotBadgeKind } from '@/components/ui/slot-badge';
 import type { SlotStatus } from '@/features/slot-status/slot-status';
 import { formatKst, formatKstTime } from '@/lib/time';
@@ -67,7 +68,9 @@ export function SlotRow({
       <div className="flex flex-col items-end gap-1">
         <StatusBadge status={status} />
         {slot.reservationCode ? (
-          <span className="text-xs text-muted-foreground">예약번호 {slot.reservationCode}</span>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            예약번호 {formatReservationCode(slot.reservationCode)}
+          </span>
         ) : null}
         {status === 'closed' && slot.closeReason ? (
           <span className="text-xs text-muted-foreground">
@@ -165,7 +168,9 @@ export function NeedsVisitCard({ slots }: { slots: DashboardSlot[] }) {
               <span className="w-36 shrink-0 font-medium">{formatKst(new Date(slot.startAt))}</span>
               <span className="min-w-0 flex-1 truncate">{slot.menuName}</span>
               {slot.reservationCode ? (
-                <span className="text-muted-foreground">예약번호 {slot.reservationCode}</span>
+                <span className="text-muted-foreground tabular-nums">
+                  예약번호 {formatReservationCode(slot.reservationCode)}
+                </span>
               ) : null}
               {slot.reservationId ? (
                 <DetailButton reservationId={slot.reservationId} label="처리하기" />

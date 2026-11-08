@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { formatReservationCode, ReservationCode } from '@/components/ui/reservation-code';
 import { EmptyState, LoadingCards } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
@@ -68,7 +69,12 @@ async function ReservationContent({ params }: { params: Params }) {
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div className="flex flex-col gap-1">
             <p className="text-sm text-muted-foreground">예약번호</p>
-            <p className="text-2xl font-bold tracking-wider tabular-nums">{reservation.code}</p>
+            {/* 끝 4자리를 굵게: 손님이 보여 주는 번호를 끝 4자리로 맞춰 본다(#262). 예전 8자리 번호는 그대로 */}
+            <ReservationCode
+              code={reservation.code}
+              emphasizeTail
+              className="text-2xl font-bold tracking-wider"
+            />
             <p className="text-sm">
               {formatKst(reservation.startAt)} ~ {formatKstTime(reservation.endAt)}
             </p>
@@ -83,7 +89,7 @@ async function ReservationContent({ params }: { params: Params }) {
         <VisitActions
           reservationId={reservation.id}
           canRecord={canRecordVisit(reservation, now)}
-          summary={`${formatKst(reservation.startAt)} ${reservation.menuName} · 예약번호 ${reservation.code}`}
+          summary={`${formatKst(reservation.startAt)} ${reservation.menuName} · 예약번호 ${formatReservationCode(reservation.code)}`}
         />
       </Card>
 
