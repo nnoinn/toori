@@ -58,7 +58,8 @@ export function SlotDetailView({ slot, serverNow, favorite }: SlotDetailViewProp
   const refundNotes = refundPolicyNotes(OWNER_FAULT_COUPON_AMOUNT);
 
   return (
-    <article className="flex flex-1 flex-col pb-24 md:mx-auto md:grid md:w-full md:max-w-5xl md:grid-cols-[minmax(0,1fr)_380px] md:items-start md:gap-x-8 md:px-6 md:py-6">
+    // PC: 오른쪽 카드가 두 줄에 걸쳐 있다. 둘째 줄(샵 정보)을 1fr로 두어 카드 높이가 첫 줄(사진·안내)을 늘리지 않게 한다
+    <article className="flex flex-1 flex-col pb-24 md:mx-auto md:grid md:w-full md:max-w-5xl md:grid-cols-[minmax(0,1fr)_380px] md:grid-rows-[auto_1fr] md:items-start md:gap-x-8 md:px-6 md:py-6">
       {slot.imageUrls.length > 0 ? (
         <div className="relative md:col-start-1 md:row-start-1 md:overflow-hidden md:rounded-2xl">
           {/* 공유한 주소로 바로 들어와 이전 화면이 없으면 고객 홈으로(#215) */}

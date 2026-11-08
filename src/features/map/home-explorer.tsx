@@ -53,7 +53,13 @@ export function HomeExplorer({ center, myLocation, header, sort, serverNow }: Ho
   const slotCount = selectedShop
     ? selectedShop.slotCount
     : home.shops.reduce((sum, shop) => sum + shop.slotCount, 0);
-  const title = `${selectedShop ? `${selectedShop.name} · ` : ''}${home.shopsReady ? `매물 ${slotCount}개` : home.status === 'loading' ? '매물 불러오는 중' : '매물'}`;
+  // 목록 화면은 동네 전체를 세고 지도는 보이는 영역만 세서 숫자가 다를 수 있다. 그래서 전체일 때 "지도에 보이는"을 붙인다
+  const count = home.shopsReady
+    ? `${selectedShop ? '' : '지도에 보이는 '}매물 ${slotCount}개`
+    : home.status === 'loading'
+      ? '매물 불러오는 중'
+      : '매물';
+  const title = `${selectedShop ? `${selectedShop.name} · ` : ''}${count}`;
   const refreshing = home.refreshing ? (
     <span
       role="status"

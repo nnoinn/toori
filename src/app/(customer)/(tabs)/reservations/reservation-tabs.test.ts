@@ -6,6 +6,7 @@ import {
   parseTab,
   RESERVATION_TABS,
   showsCancelSection,
+  showsCheckInCard,
   statusOfTab,
   tabHref,
 } from './reservation-tabs';
@@ -50,6 +51,17 @@ describe('방문 확인 중', () => {
   it('이용 완료·취소 예약은 시간이 지나도 아니다', () => {
     expect(isVisitPending('completed', '2026-10-27T09:00:00+09:00', now)).toBe(false);
     expect(isVisitPending('cancelled', '2026-10-27T09:00:00+09:00', now)).toBe(false);
+  });
+});
+
+describe('방문 확인 칸 (C-504)', () => {
+  it('예정 예약이면 시작 전이든 방문 확인 중이든 둔다', () => {
+    expect(showsCheckInCard('confirmed')).toBe(true);
+  });
+
+  it('이용 완료·취소 예약에는 두지 않는다', () => {
+    expect(showsCheckInCard('completed')).toBe(false);
+    expect(showsCheckInCard('cancelled')).toBe(false);
   });
 });
 
