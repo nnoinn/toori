@@ -11,6 +11,7 @@ import { ensureOwnerPage } from '@/server/auth';
 import { SHOP_STATUS_LABELS } from '@/server/shops/status';
 import { getShopReviewStatus } from '@/server/shops/review';
 
+import { OwnerPage } from '../../owner-page';
 import { SlotForm } from '../slot-form';
 import { selectSlotFormData } from '../slot-form-data';
 
@@ -21,12 +22,11 @@ const PAGE_PATH = '/owner/slots/new';
 // 매물 3탭 등록 ① 서비스 ② 시간 (O4, S-201·S-204·S-209). ③ 할인율·저장은 O5. PC 기준
 export default function SlotCreatePage() {
   return (
-    <main className="flex w-full max-w-4xl flex-1 flex-col gap-4 p-6">
-      <h1 className="text-xl font-bold">매물 등록</h1>
+    <OwnerPage title="매물 등록" width="narrow">
       <Suspense fallback={<LoadingCards count={2} />}>
         <SlotCreateContent />
       </Suspense>
-    </main>
+    </OwnerPage>
   );
 }
 

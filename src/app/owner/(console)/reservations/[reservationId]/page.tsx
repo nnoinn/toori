@@ -14,6 +14,7 @@ import { formatKst, formatKstTime } from '@/lib/time';
 import { ensureOwnerPage } from '@/server/auth';
 import { canRecordVisit } from '@/server/visits/rules';
 
+import { OwnerPage } from '../../owner-page';
 import {
   RESERVATION_VIEW_LABELS,
   type ReservationView,
@@ -42,12 +43,11 @@ const VIEW_STYLE: Record<ReservationView, string> = {
 // 이 파일은 예약을 읽고 배치하고, 카드와 안내 상자는 reservation-cards.tsx가 그린다.
 export default function OwnerReservationPage({ params }: { params: Params }) {
   return (
-    <main className="flex w-full max-w-4xl flex-1 flex-col gap-4 p-6">
-      <h1 className="text-xl font-bold">예약 상세</h1>
+    <OwnerPage title="예약 상세" width="wide" backHref="/owner">
       <Suspense fallback={<LoadingCards count={2} />}>
         <ReservationContent params={params} />
       </Suspense>
-    </main>
+    </OwnerPage>
   );
 }
 
