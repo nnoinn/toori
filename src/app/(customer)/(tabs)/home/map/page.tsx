@@ -8,11 +8,13 @@ import { getCustomerLocation } from '@/features/map/location';
 import { HomeExplorer } from '@/features/map/home-explorer';
 import { LocationIntro } from '@/features/map/location-intro';
 import { LocationSwitcher } from '@/features/map/location-switcher';
+import { REGION_PARAM, withLinkedRegion } from '@/features/map/region-link';
 import { parseSort } from '@/features/map/slot-list/sort';
 import { getRequestNow } from '@/lib/request-time';
 
 // 지도 = 지도 + 목록 탐색 화면(J3·J4). 주소: /home/map(고객 홈 /home에서 골라 들어온다, #215). 매물은 지도 영역이 정해지면 화면이 서버 함수(slot-list/actions.ts)로 불러온다.
 // 위치·동네가 없으면 먼저 위치 안내·동네 선택(C-102, J2)을 보여준다. 필터는 주소창 값(J5)이다.
+// 동네 링크 /home/map?region=41273 으로 들어오면 그 동네 가운데에서 지도를 연다(region-link.ts, 목록과 같은 규칙).
 export const metadata: Metadata = { title: '지도' };
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -26,11 +28,13 @@ export default function MapPage({ searchParams }: { searchParams: SearchParams }
 }
 
 async function MapContent({ searchParams }: { searchParams: SearchParams }) {
-  const [location, params, now] = await Promise.all([
+  const [saved, params, now] = await Promise.all([
     getCustomerLocation(),
     searchParams,
     getRequestNow(),
   ]);
+  // 동네 링크(?region=)로 들어왔으면 고른 동네·내 위치 대신 그 동네를 보여준다. 고른 동네(쿠키)는 그대로 둔다
+  const location = withLinkedRegion(saved, params[REGION_PARAM]);
   if (!location) return <LocationIntro />;
 
   const isRegion = location.kind === 'region';
