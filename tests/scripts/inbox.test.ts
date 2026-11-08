@@ -93,6 +93,13 @@ describe('excerpt', () => {
   it('부른 아이디와 인사, 마크다운 기호를 뺀다', () => {
     expect(excerpt('@nnoinn 정민석이에요. **"3. 디자인·사용성"** 바꿀 목록이에요')).toBe('"3. 디자인·사용성" 바꿀 목록이에요');
   });
+
+  it('코드는 글자만 남기고, 가로줄·표 구분선·목록 기호는 뺀다', () => {
+    expect(excerpt('머지되면 `reservation.cancelled`가 와요')).toBe('머지되면 reservation.cancelled가 와요');
+    expect(excerpt('@chosanai 강규민이에요. 바뀐 것\n\n---\n- 첫째\n1. 둘째\n| a | b |\n| --- | --- |')).toBe(
+      '바뀐 것 첫째 둘째 a b',
+    );
+  });
 });
 
 describe('waitingItem: Issue', () => {
