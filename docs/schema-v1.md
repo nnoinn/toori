@@ -297,7 +297,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | id | uuid PK | |
-| code | text, unique | 예약번호: 영문 대문자+숫자 8자리, 0/O·1/I 제외 |
+| code | text, unique | 예약번호: 숫자 12자리, 하이픈 없이 저장. 같은 샵의 예정 예약끼리 끝 4자리가 겹치지 않게 만든다(#262, 11/8). 11/8 전에 만든 번호는 영문 대문자+숫자 8자리(0/O·1/I 제외) |
 | slot_id | uuid, unique → slots | 매물 하나에 예약 하나(취소되면 재등록은 새 매물) |
 | order_id | uuid, unique → orders | |
 | customer_id | uuid → customers | |
