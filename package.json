@@ -19,7 +19,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "node scripts/seed.mjs",
     "scenario": "node scripts/scenario.mjs",
-    "screenshot": "node scripts/pr-screenshot.mjs"
+    "screenshot": "node scripts/pr-screenshot.mjs",
+    "inbox": "node scripts/inbox.mjs"
   },
   "dependencies": {
     "@portone/browser-sdk": "^0.1.13",
