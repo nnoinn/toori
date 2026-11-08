@@ -54,12 +54,20 @@ export function mentionedLogins(body) {
   );
 }
 
-/** 목록에 보여줄 한 줄 요약: 부른 아이디, "OOO이에요." 인사, 마크다운 기호를 뺀다 */
+/** 목록에 보여줄 한 줄 요약: 부른 아이디, "OOO이에요." 인사, 인용·가로줄·목록 기호, 마크다운 기호를 뺀다(코드는 글자만 남긴다) */
 export function excerpt(body, max = 70) {
-  const text = plainText(body)
+  const text = (body ?? '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .split('\n')
+    // 인용, 가로줄(---), 표 구분선(| --- |)은 뺀다
+    .filter((line) => !/^\s*(>|\|?\s*-{3,})/.test(line))
+    // 목록 기호(- , * , 1. )는 뺀다
+    .map((line) => line.replace(/^\s*(?:[-*]|\d+\.)\s+/, ''))
+    .join(' ')
     .replace(/https?:\/\/\S+/g, '')
     .replace(/@[A-Za-z0-9_-]+/g, '')
-    .replace(/[*_#|[\]]/g, '')
+    .replace(/[`*#|[\]]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/^\S+이에요[.!]?\s*/u, '');
