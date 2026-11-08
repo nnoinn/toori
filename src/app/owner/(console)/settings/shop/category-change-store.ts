@@ -36,6 +36,7 @@ const activeSlotsOf = (shopId: string, now: Date) =>
     ),
   );
 
+/** 업종 변경을 막는 매물 수. 확인 창을 띄울 때와 메뉴를 초기화하기 직전에 두 번 센다(그사이 매물이 생길 수 있다) */
 async function countActiveSlots(db: Pick<Db, 'select'>, shopId: string, now: Date) {
   const [row] = await db.select({ n: count() }).from(slots).where(activeSlotsOf(shopId, now));
   return row.n;
@@ -51,6 +52,7 @@ const menusOfCategory = (shopId: string, category: ShopCategory) =>
     ),
   );
 
+/** 업종 변경 확인 창에 보여줄 숫자: 막는 매물 수와 초기화될 메뉴 수(지금 업종 메뉴, 숨긴 메뉴 포함) */
 export async function selectCategoryChangeImpact(
   db: Pick<Db, 'select'>,
   shopId: string,
