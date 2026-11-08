@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Textarea } from '@/components/ui/textarea';
 import type { GeocodeCandidate } from '@/features/map/geocode';
-import { SHOP_CATEGORIES } from '@/server/policy/catalog';
+import { categoryLabel, SHOP_CATEGORIES } from '@/server/policy/catalog';
 
 import { FieldError, fieldA11y, FormField } from '../../../form-field';
 import { withDirectionParticle } from '../../../korean';
@@ -346,9 +346,7 @@ export function ShopProfileForm({
 
       <CategoryChangeDialog
         state={confirm}
-        nextCategoryLabel={
-          SHOP_CATEGORIES.find((category) => category.key === form.category)?.label ?? ''
-        }
+        nextCategoryLabel={categoryLabel(form.category)}
         pending={pending}
         onCancel={() => setConfirm(null)}
         onConfirmStep1={confirmStep1}

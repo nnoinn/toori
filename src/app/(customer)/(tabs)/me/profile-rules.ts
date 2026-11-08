@@ -4,14 +4,12 @@
 
 import { z } from 'zod';
 
-import { normalizePhone } from '@/lib/phone';
+import { normalizePhone, PHONE_FORMAT_MESSAGE } from '@/lib/phone';
 import { SITE_NAME } from '@/lib/site';
 import { utcToKst } from '@/lib/time';
 
 /** 닉네임 최대 글자 수 */
 export const NICKNAME_MAX_LENGTH = 20;
-
-export const PHONE_FORMAT_MESSAGE = '휴대폰 번호를 확인해 주세요. 예: 010-1234-5678';
 
 /**
  * 고객 연락처. 비우면 null(지운다). 휴대폰만 받고(#19 D31) 저장 모양은 고객·원장님·샵 공통(010-1234-5678, 10/28 결정).

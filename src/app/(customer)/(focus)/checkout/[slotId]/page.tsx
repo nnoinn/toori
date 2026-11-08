@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { eq } from 'drizzle-orm';
-import { z } from 'zod';
+import { isUuid } from '@/lib/uuid';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
@@ -31,7 +31,7 @@ export default function CheckoutPage({ params }: { params: Params }) {
 
 async function CheckoutContent({ params }: { params: Params }) {
   const { slotId } = await params;
-  if (!z.uuid().safeParse(slotId).success) notFound();
+  if (!isUuid(slotId)) notFound();
   const { customerId } = await ensureCustomerPage(`/checkout/${slotId}`);
 
   const now = await getRequestNow();

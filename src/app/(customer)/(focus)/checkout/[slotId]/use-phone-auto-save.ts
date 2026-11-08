@@ -1,8 +1,7 @@
 import { useRef, useState } from 'react';
 
 import { updateMyPhone } from '@/app/(customer)/(tabs)/me/actions';
-import { PHONE_FORMAT_MESSAGE } from '@/app/(customer)/(tabs)/me/profile-rules';
-import { isPhoneInputFull } from '@/lib/phone';
+import { isPhoneInputFull, PHONE_FORMAT_MESSAGE } from '@/lib/phone';
 
 import { isPhoneReady, phoneSubmit } from './phone-save-rules';
 

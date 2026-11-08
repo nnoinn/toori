@@ -9,7 +9,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
-import { normalizePhone } from '@/lib/phone';
+import { normalizePhone, PHONE_FORMAT_MESSAGE } from '@/lib/phone';
 import { fail, ok, type Result } from '@/lib/result';
 import { safeNextPath } from '@/lib/safe-next';
 
@@ -65,7 +65,7 @@ export async function createCustomerAccount(input: {
     return fail('PHONE_REQUIRED', '휴대폰 번호를 입력해 주세요');
   }
   const phone = normalizePhone(parsed.data.phone, 'mobile');
-  if (!phone) return fail('INVALID_INPUT', '휴대폰 번호를 확인해 주세요. 예: 010-1234-5678');
+  if (!phone) return fail('INVALID_INPUT', PHONE_FORMAT_MESSAGE);
   const user = await getSessionUser();
   if (!user) return fail('UNAUTHENTICATED', AUTH_ERRORS.UNAUTHENTICATED);
 

@@ -14,7 +14,8 @@ import { cn } from '@/lib/utils';
 import { ensureAdminPage } from '@/server/auth';
 
 import { StatusBadge } from '../shops/status-badge';
-import { maskPhone, toSearchQuery, toUserTab, USER_TABS, type UserTab } from './format';
+import { toSearchQuery, toUserTab, USER_TABS, type UserTab } from './format';
+import { maskPhone } from '@/lib/phone';
 import { type ListResult, selectCustomers, selectOwners, USER_LIST_LIMIT } from './queries';
 
 export const metadata: Metadata = { title: '회원' };

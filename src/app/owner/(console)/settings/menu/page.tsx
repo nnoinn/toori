@@ -6,7 +6,7 @@ import { ErrorState, LoadingCards } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { ensureOwnerPage } from '@/server/auth';
 
-import { isServiceTypeOf } from './menu';
+import { isServiceTypeOf } from '@/server/policy';
 import { MenuManager } from './menu-manager';
 import { selectMenus, selectShopCategory } from './menu-store';
 

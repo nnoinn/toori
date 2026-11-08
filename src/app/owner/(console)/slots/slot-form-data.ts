@@ -7,7 +7,9 @@ import { getDb } from '@/db';
 import type { BusinessHours } from '@/db/schema/shops';
 import { addMinutes } from '@/lib/time';
 
-import { isServiceTypeOf, MENU_DURATION } from '../settings/menu/menu';
+import { isServiceTypeOf } from '@/server/policy';
+
+import { MENU_DURATION } from '../settings/menu/menu';
 import { selectMenus } from '../settings/menu/menu-store';
 import type { SlotMenuOption } from './slot-form';
 import { type DraftOptions, selectBusyRanges, selectSlotShop } from './slot-draft-store';

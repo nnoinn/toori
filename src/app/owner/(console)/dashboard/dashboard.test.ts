@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  countByStatus,
-  type DashboardSlot,
-  onHold,
-  splitByDay,
-  startOfKstDay,
-  viewStatus,
-} from './dashboard';
+import { countByStatus, type DashboardSlot, onHold, splitByDay, viewStatus } from './dashboard';
+import { startOfKstDay } from '@/lib/time';
 
 // 한국 시간 10/31 낮 12시
 const now = new Date('2026-10-31T12:00:00+09:00');

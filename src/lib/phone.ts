@@ -3,7 +3,7 @@
 // 저장한 모양 그대로 화면에 보여 주면 된다. 인증 없이 모양만 본다(schema-v1). 화면·서버 어디서나 쓴다.
 // 입력칸이 치는 동안 보여 주는 모양도 여기 둔다. 휴대폰은 formatPhoneInput(#183), 샵 전화번호는 formatAnyPhoneInput(#205).
 
-import { type DigitInputRule, editDigitInput } from './digit-input';
+import type { DigitInputRule } from './digit-input';
 
 /** mobile: 휴대폰만(고객 연락처, #19 D31). any: 원장님·샵 전화번호 */
 export type PhoneKind = 'mobile' | 'any';
@@ -121,16 +121,13 @@ export const PHONE_INPUT_RULES: Record<PhoneKind, DigitInputRule> = {
   any: { format: formatAnyPhoneInput, maxDigits: anyPhoneMaxDigits },
 };
 
-/**
- * 전화번호 입력칸 글자가 바뀌었을 때 새 모양과 커서 위치(#183, 공통 UI PhoneInput이 쓴다).
- * prev는 바뀌기 전 값, raw는 브라우저가 바꾼 값, caret은 바뀐 뒤 커서 위치다. 커서·지우기·자릿수 규칙은 editDigitInput
- */
-export function editPhoneInput(
-  prev: string,
-  raw: string,
-  caret: number,
-  deleteForward = false,
-  kind: PhoneKind = 'mobile',
-): { value: string; caret: number } {
-  return editDigitInput(PHONE_INPUT_RULES[kind], prev, raw, caret, deleteForward);
+/** 휴대폰 번호 오류 문구(고객 연락처). 화면과 서버 함수가 같이 쓴다 */
+export const PHONE_FORMAT_MESSAGE = '휴대폰 번호를 확인해 주세요. 예: 010-1234-5678';
+
+/** 휴대폰 번호 가운데를 가린다(운영자 목록, 원장님 예약 상세). 예: "010-1234-5678" → "010-****-5678". 번호가 없으면 "-" */
+export function maskPhone(phone: string | null): string {
+  if (!phone) return '-';
+  const parts = phone.split('-');
+  if (parts.length === 3) return [parts[0], '*'.repeat(parts[1].length), parts[2]].join('-');
+  return `****${phone.slice(-4)}`;
 }

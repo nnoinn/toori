@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { ensureAdminPage } from '@/server/auth';
 import { SHOP_STATUS_LABELS } from '@/server/shops/status';
 
-import { labelCategory } from './format';
+import { categoryLabel } from '@/server/policy';
 import { REVIEW_FILTERS, type ReviewFilter, selectShopsForReview } from './queries';
 import { StatusBadge } from './status-badge';
 
@@ -91,7 +91,7 @@ async function ShopList({ searchParams }: { searchParams: SearchParams }) {
                       {row.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-3">{labelCategory(row.category)}</td>
+                  <td className="px-4 py-3">{categoryLabel(row.category)}</td>
                   <td className="px-4 py-3">{row.businessName}</td>
                   <td className="px-4 py-3">{row.sigungu}</td>
                   <td className="px-4 py-3 whitespace-nowrap">{formatKst(row.appliedAt)}</td>

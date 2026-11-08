@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { z } from 'zod';
+import { isUuid } from '@/lib/uuid';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -53,7 +53,7 @@ export default function OwnerReservationPage({ params }: { params: Params }) {
 /** 그 샵 예약을 읽어 상태(예정·방문 처리 필요·방문 완료·노쇼·취소)를 서버 시각으로 정하고 카드를 놓는다 */
 async function ReservationContent({ params }: { params: Params }) {
   const { reservationId } = await params;
-  const validId = z.uuid().safeParse(reservationId).success;
+  const validId = isUuid(reservationId);
   // 로그인하지 않았으면 로그인 화면, 원장님 가입 전이면 /owner/join 으로 보낸다
   const auth = await ensureOwnerPage(validId ? `/owner/reservations/${reservationId}` : '/owner');
   const reservation = await selectOwnerReservation(getDb(), auth.shopId, reservationId);

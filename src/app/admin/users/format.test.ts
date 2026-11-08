@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { labelReservation, maskPhone, toSearchQuery, toUserTab } from './format';
+import { labelReservation, toSearchQuery, toUserTab } from './format';
 
 describe('회원 조회 표시 모양', () => {
   it('탭은 owners만 원장님이고 나머지는 고객', () => {
@@ -16,13 +16,6 @@ describe('회원 조회 표시 모양', () => {
     expect(toSearchQuery('  김  ')).toBe('김');
     expect(toSearchQuery(undefined)).toBe('');
     expect(toSearchQuery('가'.repeat(60))).toHaveLength(50);
-  });
-
-  it('번호 가운데를 가리고, 번호가 없으면 -', () => {
-    expect(maskPhone('010-1234-5678')).toBe('010-****-5678');
-    expect(maskPhone('011-123-5678')).toBe('011-***-5678');
-    expect(maskPhone('01012345678')).toBe('****5678');
-    expect(maskPhone(null)).toBe('-');
   });
 
   it('예약 상태 이름. 노쇼는 이용 완료보다 먼저 본다', () => {

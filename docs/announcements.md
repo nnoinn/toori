@@ -13,6 +13,13 @@ nnoinn이 팀원에게 알릴 내용을 PR과 함께 이 파일에 추가한다.
 
 ---
 
+## 2026-11-08 · 전원 (공통 함수 모으기 1부)
+- **여러 곳에 따로 있던 함수를 한곳으로 모았다(동작은 그대로).** 새로 만들기 전에 아래를 먼저 쓴다(`docs/conventions.md`)
+  - id 모양 확인: `isUuid`(`@/lib/uuid`). `z.uuid().safeParse(id).success`를 화면마다 쓰지 않는다
+  - 업종·서비스 이름과 목록: `serviceTypesOf`·`isServiceTypeOf`·`serviceTypeLabel`·`categoryLabel`(`@/server/policy`). 원장님 `menu.ts`·고객 `filters.ts`·운영자 `format.ts`에 있던 것을 옮겼다
+  - 휴대폰 번호 가리기 `maskPhone`, 오류 문구 `PHONE_FORMAT_MESSAGE`(`@/lib/phone`), 한국 날짜 0시 `startOfKstDay`(`@/lib/time`), DB 제약 이름 `violatedConstraint`(`@/lib/db-error`)
+- 할 일: 내 브랜치에서 위 함수를 옛 자리에서 가져오고 있으면 main을 합칠 때 새 자리로 바꾼다(타입 검사가 알려 준다)
+
 ## 2026-11-08 · 전원 (머지 9개, 예약번호 12자리, 폰 화면 다시 미룸)
 - 머지: 예약 확정 웹 푸시와 `notify`(#257), 운영자 회원 조회(#258), 예약번호 숫자 12자리(#264), 예정 예약 방문 확인 칸·노쇼 기록·고객 화면 점검(#261, #249·#251 포함), 동네 링크(#252), 고객 서버 함수 테스트(#263), 원장님 주석·리팩토링(#254·#256·#260, #253·#255 포함)
 - **새 예약의 예약번호는 무작위 숫자 12자리다(#262).** 화면은 4자리씩 끊고 끝 4자리를 굵게 보여준다(공통 UI `ReservationCode`). 예전 8자리 번호는 그대로 두고, 시드는 다음에 다시 넣을 때 12자리가 된다
