@@ -7,7 +7,6 @@
 
 | 문서 | 대상 | 앱의 동의 종류(`terms_agreements.terms_type`) | 기능 |
 | --- | --- | --- | --- |
-| [컨시어지 개인정보 동의](concierge-consent.md) | 컨시어지 시범 운영(11/16~)의 고객·원장님 | 앱 밖(카카오톡 채널) | 컨시어지 |
 | [고객 이용약관](terms-of-service.md) | 고객 | `service` (필수) | C-104 |
 | [개인정보 처리방침](privacy-policy.md) | 고객·원장님 | 게시용. 동의는 [동의 문구](consent-texts.md)의 수집·이용 동의(`privacy`, 필수) | C-104, S-101 |
 | [위치기반서비스 이용약관](location-terms.md) | 고객 | `location` (필수) | C-104, C-102 |
