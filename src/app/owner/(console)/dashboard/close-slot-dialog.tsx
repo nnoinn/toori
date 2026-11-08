@@ -4,7 +4,6 @@
 // 서버가 판매 전·결제 중 아님을 다시 확인하고, 막히면 이유를 이 창에 보여준다.
 
 import { useState, useTransition } from 'react';
-import { cn } from 'cn';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -17,9 +16,16 @@ import {
 import type { SlotCloseReason } from '@/db/schema/slots';
 import { formatKst } from '@/lib/time';
 
+import { ChoiceChips } from '../choice-chips';
 import { closeSlot } from '../slots/actions';
 import { SLOT_CLOSE_REASON_LABELS, SLOT_CLOSE_REASON_OPTIONS } from '../slots/slot-edit';
 import type { DashboardSlot } from './dashboard';
+
+/** 마감 사유 칩(다른 곳 예약 / 잘못 올림 / 기타) */
+const REASON_CHIPS = SLOT_CLOSE_REASON_OPTIONS.map((key) => ({
+  key,
+  label: SLOT_CLOSE_REASON_LABELS[key],
+}));
 
 /** 확인 창 틀. 처리 중(pending)은 창과 안쪽 폼이 같이 써서, 처리하는 동안 바깥을 눌러도 닫히지 않는다 */
 export function CloseSlotDialog({
@@ -90,33 +96,16 @@ function CloseSlotForm({
           내려가요. 같은 시간에 새 매물은 다시 올릴 수 있어요.
         </DialogDescription>
       </DialogHeader>
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-sm font-medium">마감 사유</legend>
-        <div className="flex flex-wrap gap-2">
-          {SLOT_CLOSE_REASON_OPTIONS.map((key) => (
-            <label
-              key={key}
-              className={cn(
-                'flex h-9 cursor-pointer items-center rounded-lg border px-3 text-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50',
-                reason === key && 'border-primary bg-primary/10 font-semibold',
-              )}
-            >
-              <input
-                type="radio"
-                name="closeReason"
-                value={key}
-                checked={reason === key}
-                onChange={() => {
-                  setReason(key);
-                  setMessage(null);
-                }}
-                className="sr-only"
-              />
-              {SLOT_CLOSE_REASON_LABELS[key]}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <ChoiceChips
+        legend="마감 사유"
+        name="closeReason"
+        options={REASON_CHIPS}
+        value={reason}
+        onChange={(key) => {
+          setReason(key);
+          setMessage(null);
+        }}
+      />
       {message ? (
         <p role="alert" className="text-sm text-destructive">
           {message}

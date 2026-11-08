@@ -22,8 +22,9 @@ import { Textarea } from '@/components/ui/textarea';
 import type { GeocodeCandidate } from '@/features/map/geocode';
 import { SHOP_CATEGORIES } from '@/server/policy/catalog';
 
-import { FieldError, fieldA11y, FormField } from '../../../form-field';
+import { fieldA11y, FormField } from '../../../form-field';
 import { withDirectionParticle } from '../../../korean';
+import { ChoiceChips } from '../../choice-chips';
 import { getCategoryChangeImpact, saveShopProfile } from './actions';
 import { AddressSearchButton } from './address-search-button';
 import { BusinessHoursEditor } from './business-hours-editor';
@@ -199,31 +200,15 @@ export function ShopProfileForm({
             />
           </FormField>
 
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-2 text-sm font-medium">업종</legend>
-            <div className="flex gap-2">
-              {SHOP_CATEGORIES.map((category) => (
-                <label
-                  key={category.key}
-                  className={cn(
-                    'flex h-9 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50',
-                    form.category === category.key && 'border-primary bg-primary/10 font-semibold',
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="category"
-                    value={category.key}
-                    checked={form.category === category.key}
-                    onChange={() => update('category', category.key)}
-                    className="sr-only"
-                  />
-                  {category.label}
-                </label>
-              ))}
-            </div>
-            <FieldError id="category" error={errors.category} />
-          </fieldset>
+          <ChoiceChips
+            legend="업종"
+            name="category"
+            options={SHOP_CATEGORIES}
+            value={form.category}
+            onChange={(key) => update('category', key)}
+            errorId="category"
+            error={errors.category}
+          />
 
           <FormField label="전화번호" id="phone" error={errors.phone}>
             {/* 숫자만 쳐도 앞자리(02·031·0507 등)에 맞춰 하이픈을 넣는다(#205) */}

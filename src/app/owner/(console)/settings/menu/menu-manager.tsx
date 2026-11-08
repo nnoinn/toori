@@ -3,7 +3,6 @@
 // 메뉴 목록·추가·수정·숨김·순서 바꾸기 (O3, S-106). 저장 전에 화면에서 한 번 검사하고, 서버 함수가 다시 검사한다.
 
 import { useState, useTransition } from 'react';
-import { cn } from 'cn';
 import { ArrowDown, ArrowUp, Plus } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +21,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { formatDuration, formatWon } from '@/lib/format';
 import type { ShopCategory } from '@/server/policy';
 
-import { FieldError, fieldA11y, FormField } from '../../../form-field';
+import { fieldA11y, FormField, NATIVE_SELECT_CLASS } from '../../../form-field';
+import { ChoiceChips } from '../../choice-chips';
 import { moveMenu, saveMenu, setMenuHidden } from './actions';
 import {
   MENU_DURATION_OPTIONS,
@@ -286,31 +286,15 @@ function MenuDialog({
             save();
           }}
         >
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-2 text-sm font-medium">서비스 종류</legend>
-            <div className="flex flex-wrap gap-2">
-              {serviceTypesOf(category).map((type) => (
-                <label
-                  key={type.key}
-                  className={cn(
-                    'flex h-8 cursor-pointer items-center rounded-lg border px-3 text-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50',
-                    form.serviceType === type.key && 'border-primary bg-primary/10 font-semibold',
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="serviceType"
-                    value={type.key}
-                    checked={form.serviceType === type.key}
-                    onChange={() => update('serviceType', type.key)}
-                    className="sr-only"
-                  />
-                  {type.label}
-                </label>
-              ))}
-            </div>
-            <FieldError id={idOf('serviceType')} error={errors.serviceType} />
-          </fieldset>
+          <ChoiceChips
+            legend="서비스 종류"
+            name="serviceType"
+            options={serviceTypesOf(category)}
+            value={form.serviceType}
+            onChange={(key) => update('serviceType', key)}
+            errorId={idOf('serviceType')}
+            error={errors.serviceType}
+          />
 
           <FormField label="서비스 이름" id={idOf('name')} error={errors.name}>
             <Input
@@ -343,13 +327,12 @@ function MenuDialog({
               error={errors.durationMinutes}
               className="flex-1"
             >
-              {/* 가입·정산 계좌의 고르기 칸(NATIVE_SELECT_CLASS)과 테두리 모양이 조금 다르다.
-                  원장님 화면 디자인을 맞출 때 하나로 한다 */}
+              {/* 가입·정산 계좌의 고르기 칸과 같은 모양(오류면 빨간 테두리, #23 디자인 A8) */}
               <select
                 {...fieldProps('durationMinutes')}
                 value={form.durationMinutes}
                 onChange={(event) => update('durationMinutes', Number(event.target.value))}
-                className="h-9 rounded-lg border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                className={NATIVE_SELECT_CLASS}
               >
                 {MENU_DURATION_OPTIONS.map((minutes) => (
                   <option key={minutes} value={minutes}>

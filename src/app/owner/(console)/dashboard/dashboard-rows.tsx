@@ -19,17 +19,8 @@ import { formatKst, formatKstTime } from '@/lib/time';
 
 import { canRelist } from '../slots/relist';
 import { SLOT_CLOSE_REASON_LABELS } from '../slots/slot-edit';
+import { SLOT_STATUS_STYLE } from '../status-style';
 import { type DashboardSlot, onHold, SLOT_STATUS_LABELS, viewStatus } from './dashboard';
-
-/** 상태 배지 색. 판매 중·예약은 눈에 띄게, 끝난 것은 흐리게 */
-const STATUS_STYLE: Record<SlotStatus, string> = {
-  scheduled: 'border-border bg-background text-foreground',
-  published: 'bg-primary/15 text-primary',
-  reserved: 'bg-accent text-accent-foreground',
-  closed: 'bg-muted text-muted-foreground',
-  cancelled: 'bg-muted text-muted-foreground',
-  completed: 'border-border bg-background text-muted-foreground',
-};
 
 /** 매물 한 줄: 시간, 메뉴·가격·배지, 상태와 덧붙임(예약번호·마감 사유·재등록함), 버튼 */
 export function SlotRow({
@@ -200,5 +191,5 @@ function DetailButton({
 
 /** 화면 상태(viewStatus) 배지. 같은 이름 6개(X-301)만 쓴다 */
 function StatusBadge({ status }: { status: SlotStatus }) {
-  return <Badge className={STATUS_STYLE[status]}>{SLOT_STATUS_LABELS[status]}</Badge>;
+  return <Badge className={SLOT_STATUS_STYLE[status]}>{SLOT_STATUS_LABELS[status]}</Badge>;
 }

@@ -15,11 +15,8 @@ import { ensureOwnerPage } from '@/server/auth';
 import { canRecordVisit } from '@/server/visits/rules';
 
 import { OwnerPage } from '../../owner-page';
-import {
-  RESERVATION_VIEW_LABELS,
-  type ReservationView,
-  reservationView,
-} from '../reservation-detail';
+import { RESERVATION_VIEW_STYLE } from '../../status-style';
+import { RESERVATION_VIEW_LABELS, reservationView } from '../reservation-detail';
 import { selectOwnerReservation } from '../reservation-detail-store';
 import { BookerCard, HistoryCard, ServiceCard, ViewNotice } from './reservation-cards';
 import { VisitActions } from './visit-actions';
@@ -27,15 +24,6 @@ import { VisitActions } from './visit-actions';
 export const metadata: Metadata = { title: '예약 상세' };
 
 type Params = Promise<{ reservationId: string }>;
-
-/** 상태 배지 색. 대시보드 매물 상태 배지와 맞춘다(예정 = 예약됨, 끝난 것은 흐리게) */
-const VIEW_STYLE: Record<ReservationView, string> = {
-  upcoming: 'bg-accent text-accent-foreground',
-  needsVisit: 'bg-warning/25 text-warning-foreground',
-  visited: 'border-border bg-background text-muted-foreground',
-  noShow: 'bg-destructive/10 text-destructive',
-  cancelled: 'bg-muted text-muted-foreground',
-};
 
 // 원장님 예약 상세 (O11, S-403). 주소: /owner/reservations/[reservationId]
 // 예약번호·예약자(닉네임·휴대폰)·서비스·시간·결제 금액(판매가). 그 샵 원장님만 본다. PC 기준
@@ -79,7 +67,7 @@ async function ReservationContent({ params }: { params: Params }) {
               {formatKst(reservation.startAt)} ~ {formatKstTime(reservation.endAt)}
             </p>
           </div>
-          <Badge className={VIEW_STYLE[view]}>{RESERVATION_VIEW_LABELS[view]}</Badge>
+          <Badge className={RESERVATION_VIEW_STYLE[view]}>{RESERVATION_VIEW_LABELS[view]}</Badge>
         </CardHeader>
         {view === 'cancelled' ? null : (
           <CardContent>
