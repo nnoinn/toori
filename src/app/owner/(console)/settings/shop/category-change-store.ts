@@ -11,9 +11,7 @@ import { and, count, eq, gt, inArray, isNull, or } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { menus, slots } from '@/db/schema';
 import { slotStatusIs } from '@/features/slot-status/slot-status-sql';
-import type { ShopCategory } from '@/server/policy/catalog';
-
-import { serviceTypesOf } from '../menu/menu';
+import { serviceTypesOf, type ShopCategory } from '@/server/policy/catalog';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select' | 'update'>;
 

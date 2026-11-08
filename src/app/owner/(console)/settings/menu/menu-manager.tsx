@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/state';
 import { Textarea } from '@/components/ui/textarea';
 import { formatDuration, formatWon } from '@/lib/format';
-import type { ShopCategory } from '@/server/policy';
+import { serviceTypeLabel, serviceTypesOf, type ShopCategory } from '@/server/policy';
 
 import { fieldA11y, FormField, NATIVE_SELECT_CLASS } from '../../../form-field';
 import { ChoiceChips } from '../../choice-chips';
@@ -30,8 +30,6 @@ import {
   type MenuField,
   type MenuFieldErrors,
   type MenuInput,
-  serviceTypeLabel,
-  serviceTypesOf,
   validateMenu,
 } from './menu';
 import type { MenuItem } from './menu-store';

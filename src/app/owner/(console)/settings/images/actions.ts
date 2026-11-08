@@ -6,7 +6,7 @@
 
 import { TransactionRollbackError } from 'drizzle-orm';
 import { refresh } from 'next/cache';
-import { z } from 'zod';
+import { isUuid } from '@/lib/uuid';
 
 import { getDb } from '@/db';
 import { fail, ok, type Result, type ResultError } from '@/lib/result';
@@ -133,14 +133,6 @@ export async function saveShopLinks(
   }
   refresh();
   return { ok: true };
-}
-
-/**
- * 모양이 틀린 id면 DB 오류 대신 "찾을 수 없어요"로 답하려고 먼저 본다.
- * 메뉴 actions.ts의 isMenuId와 같은 일이라, src/lib에 공용 isUuid가 생기면 그것으로 바꾼다
- */
-function isUuid(value: unknown): value is string {
-  return z.uuid().safeParse(value).success;
 }
 
 /**

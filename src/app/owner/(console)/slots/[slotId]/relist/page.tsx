@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { z } from 'zod';
+import { isUuid } from '@/lib/uuid';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,11 +13,10 @@ import { formatDuration } from '@/lib/format';
 import { getRequestNow } from '@/lib/request-time';
 import { formatKst, formatKstTime } from '@/lib/time';
 import { ensureOwnerPage } from '@/server/auth';
-import { calcSalePrice } from '@/server/policy';
+import { calcSalePrice, serviceTypeLabel } from '@/server/policy';
 import { readShopReviewStatus } from '@/server/shops/review-store';
 
 import { OwnerPage } from '../../../owner-page';
-import { serviceTypeLabel } from '../../../settings/menu/menu';
 import { validateSlotDraft } from '../../slot-draft-store';
 import { RELIST_MESSAGES, relistDraftMessage, relistProblem } from '../../relist';
 import { relistInput, selectSlotForRelist } from '../../relist-store';
@@ -45,7 +44,7 @@ export default function SlotRelistPage({ params }: { params: Params }) {
 async function RelistContent({ params }: { params: Params }) {
   const { slotId } = await params;
   // 모양이 틀린 id는 로그인 뒤 돌아올 주소에 넣지 않고 대시보드로 돌아오게 한다
-  const validId = z.uuid().safeParse(slotId).success;
+  const validId = isUuid(slotId);
   // 로그인하지 않았으면 로그인 화면, 원장님 가입 전이면 /owner/join 으로 보낸다
   const auth = await ensureOwnerPage(validId ? `/owner/slots/${slotId}/relist` : '/owner');
   const db = getDb();

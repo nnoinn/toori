@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { z } from 'zod';
+import { isUuid } from '@/lib/uuid';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -37,7 +37,7 @@ export default function SlotEditPage({ params }: { params: Params }) {
 async function SlotEditContent({ params }: { params: Params }) {
   const { slotId } = await params;
   // 모양이 틀린 id는 로그인 뒤 돌아올 주소에 넣지 않고 대시보드로 돌아오게 한다
-  const validId = z.uuid().safeParse(slotId).success;
+  const validId = isUuid(slotId);
   // 로그인하지 않았으면 로그인 화면, 원장님 가입 전이면 /owner/join 으로 보낸다
   const auth = await ensureOwnerPage(validId ? `/owner/slots/${slotId}/edit` : '/owner');
   const db = getDb();

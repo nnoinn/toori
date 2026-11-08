@@ -13,6 +13,13 @@ nnoinn이 팀원에게 알릴 내용을 PR과 함께 이 파일에 추가한다.
 
 ---
 
+## 2026-11-08 · 전원 (공통 함수 모으기 1부)
+- **여러 곳에 따로 있던 함수를 한곳으로 모았다(동작은 그대로).** 새로 만들기 전에 아래를 먼저 쓴다(`docs/conventions.md`)
+  - id 모양 확인: `isUuid`(`@/lib/uuid`). `z.uuid().safeParse(id).success`를 화면마다 쓰지 않는다
+  - 업종·서비스 이름과 목록: `serviceTypesOf`·`isServiceTypeOf`·`serviceTypeLabel`·`categoryLabel`(`@/server/policy`). 원장님 `menu.ts`·고객 `filters.ts`·운영자 `format.ts`에 있던 것을 옮겼다
+  - 휴대폰 번호 가리기 `maskPhone`, 오류 문구 `PHONE_FORMAT_MESSAGE`(`@/lib/phone`), 한국 날짜 0시 `startOfKstDay`(`@/lib/time`), DB 제약 이름 `violatedConstraint`(`@/lib/db-error`)
+- 할 일: 내 브랜치에서 위 함수를 옛 자리에서 가져오고 있으면 main을 합칠 때 새 자리로 바꾼다(타입 검사가 알려 준다)
+
 ## 2026-11-08 · 전원 (찜한 샵 새 매물 알림 동의, 방문 완료 누르는 때)
 - **찜한 샵 새 매물 알림도 관심 동네 알림 동의 하나로 같이 받는다(#270, nnoinn).** 동의 이름은 "관심 동네·찜한 샵 새 매물 알림 수신 동의"다. 매일 오후 1시 알림(`slot.digest`) 하나에 관심 동네 매물과 찜한 샵 매물을 같이 담고(같은 매물은 한 번만), 찜한 샵 알림만 끄는 스위치는 두지 않는다. CLAUDE.md 핵심 규칙의 알림 줄, 기술 가이드 7장 "관심 동네·찜한 샵 알림 동의", 동의 문구 1·6·7장을 고쳤다
 - '방문 완료'·'노쇼'는 지금처럼 서비스 시작 시각부터 누른다(#250 Q2). 손님이 일찍 와도 미리 누르지 않고, 보통 시술이 끝난 뒤 '방문 완료'를 누른다. 고객이 직접 남기는 "도착했어요" 기록은 두지 않는다(Q3)

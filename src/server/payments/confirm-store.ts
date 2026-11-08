@@ -4,9 +4,10 @@
 
 import 'server-only';
 
-import { and, DrizzleQueryError, eq, or, sql } from 'drizzle-orm';
+import { and, eq, or, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
+import { violatedConstraint } from '@/lib/db-error';
 import { type OrderStatus, orders, refunds, reservations, slots } from '@/db/schema';
 
 import { ABANDONED_ORDER_CODE, toUnconfirmedCode, type UnconfirmedCode } from './errors';
@@ -255,8 +256,7 @@ async function insertReservation(
         return row;
       });
     } catch (error) {
-      const cause = error instanceof DrizzleQueryError ? error.cause : error;
-      const constraint = (cause as { constraint_name?: string } | undefined)?.constraint_name;
+      const constraint = violatedConstraint(error);
       if (constraint !== 'reservations_code_unique' || attempt >= RESERVATION_CODE_TRIES)
         throw error;
     }

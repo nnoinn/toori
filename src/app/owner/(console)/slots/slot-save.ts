@@ -3,8 +3,7 @@
 
 import 'server-only';
 
-import { DrizzleQueryError } from 'drizzle-orm';
-
+import { violatedConstraint } from '@/lib/db-error';
 import { fail, type Result } from '@/lib/result';
 import { calcSalePrice } from '@/server/policy';
 
@@ -36,14 +35,8 @@ export function slotValuesFrom({ menu, start, end }: SlotDraft, pricing: SlotPri
  * 확인과 저장 사이에 다른 요청이 같은 시간에 먼저 저장한 경우다. 다른 오류는 그대로 다시 던진다
  */
 export function overlapFailure(error: unknown): Result<never> {
-  if (violated(error) === 'slots_no_overlap') {
+  if (violatedConstraint(error) === 'slots_no_overlap') {
     return fail('SLOT_OVERLAP', SLOT_DRAFT_ERRORS.SLOT_OVERLAP);
   }
   throw error;
-}
-
-/** 쿼리가 어긴 DB 제약 이름 */
-function violated(error: unknown): string | undefined {
-  const cause = error instanceof DrizzleQueryError ? error.cause : error;
-  return (cause as { constraint_name?: string } | undefined)?.constraint_name;
 }

@@ -38,3 +38,27 @@ export const SHOP_CATEGORY_KEYS: readonly ShopCategory[] = SHOP_CATEGORIES.map((
 export const SERVICE_TYPE_KEYS: readonly ServiceType[] = Object.values(
   SERVICE_TYPES_BY_CATEGORY,
 ).flatMap((types) => types.map((t) => t.key));
+
+/** 그 업종에서 고를 수 있는 서비스 종류(원장님 메뉴, 고객 필터) */
+export function serviceTypesOf(category: ShopCategory) {
+  return SERVICE_TYPES_BY_CATEGORY[category];
+}
+
+/** 서비스 종류가 그 업종 목록에 있으면 true. 업종을 바꾼 뒤 숨겨진 옛 메뉴를 가려낸다 */
+export function isServiceTypeOf(category: ShopCategory, serviceType: string): boolean {
+  return serviceTypesOf(category).some((type) => type.key === serviceType);
+}
+
+/** 서비스 종류의 화면 이름. 목록에 없으면 key 그대로 */
+export function serviceTypeLabel(serviceType: string): string {
+  for (const types of Object.values(SERVICE_TYPES_BY_CATEGORY)) {
+    const found = types.find((type) => type.key === serviceType);
+    if (found) return found.label;
+  }
+  return serviceType;
+}
+
+/** 업종의 화면 이름. 목록에 없으면 key 그대로 */
+export function categoryLabel(category: string): string {
+  return SHOP_CATEGORIES.find((item) => item.key === category)?.label ?? category;
+}

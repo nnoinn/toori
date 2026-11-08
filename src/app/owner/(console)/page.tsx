@@ -8,7 +8,7 @@ import { ensureOwnerPage } from '@/server/auth';
 import { readShopReviewStatus } from '@/server/shops/review-store';
 
 import { JoinedNotice } from '../join/joined-notice';
-import { startOfKstDay } from './dashboard/dashboard';
+import { startOfKstDay } from '@/lib/time';
 import { selectDashboardSlots, selectNeedsVisitRecord } from './dashboard/dashboard-store';
 import { OwnerDashboard } from './dashboard/owner-dashboard';
 import { OwnerPage } from './owner-page';

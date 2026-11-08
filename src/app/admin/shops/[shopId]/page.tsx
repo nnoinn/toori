@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { z } from 'zod';
+import { isUuid } from '@/lib/uuid';
 
 import { BackButton } from '@/components/ui/back-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,9 +11,9 @@ import { formatBusinessNumber } from '@/lib/business-number';
 import { formatKst } from '@/lib/time';
 import { ensureAdminPage } from '@/server/auth';
 import { getBusinessDocUrl } from '@/server/storage/upload';
-import { bankName } from '@/server/policy';
+import { bankName, categoryLabel } from '@/server/policy';
 
-import { labelCategory, labelPgSellerStatus, labelReviewAction } from '../format';
+import { labelPgSellerStatus, labelReviewAction } from '../format';
 import { selectShopForReview, type ShopReviewDetail } from '../queries';
 import { StatusBadge } from '../status-badge';
 import { ReviewActions } from './review-actions';
@@ -40,7 +40,7 @@ export default function AdminShopReviewPage({ params }: { params: Params }) {
 async function ReviewDetail({ params }: { params: Params }) {
   await ensureAdminPage();
   const { shopId } = await params;
-  if (!z.uuid().safeParse(shopId).success) notFound();
+  if (!isUuid(shopId)) notFound();
   const detail = await selectShopForReview(getDb(), shopId);
   if (!detail) notFound();
   // 비공개 버킷이라 5분 동안만 열리는 주소를 화면을 열 때마다 새로 받는다(#116)
@@ -111,7 +111,7 @@ async function ReviewDetail({ params }: { params: Params }) {
           <Fields
             rows={[
               ['샵 이름', detail.shop.name],
-              ['업종', labelCategory(detail.shop.category)],
+              ['업종', categoryLabel(detail.shop.category)],
               ['전화', detail.shop.phone],
               [
                 '주소',

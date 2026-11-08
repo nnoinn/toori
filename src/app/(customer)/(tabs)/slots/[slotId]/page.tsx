@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { Skeleton } from '@/components/ui/skeleton';
-import { z } from 'zod';
+import { isUuid } from '@/lib/uuid';
 
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
@@ -34,7 +34,7 @@ async function currentCustomerId(): Promise<string | null> {
 /** 상세 조회. 화면과 탭 제목(generateMetadata)이 같이 써서 한 요청에 한 번만 조회한다. 볼 수 없으면 null */
 const loadSlot = cache(async (slotId: string) => {
   // 매물 ID 모양이 아니면 DB에 묻지 않고 없는 매물로 본다
-  if (!z.uuid().safeParse(slotId).success) return null;
+  if (!isUuid(slotId)) return null;
   const [customerId, now] = await Promise.all([currentCustomerId(), getRequestNow()]);
   const slot = await selectSlotDetail(getDb(), { slotId, customerId, now });
   return slot ? { slot, customerId, now } : null;

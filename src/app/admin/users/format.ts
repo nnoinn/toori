@@ -15,14 +15,6 @@ export function toSearchQuery(value: string | undefined): string {
   return (value ?? '').trim().slice(0, 50);
 }
 
-/** 목록에서는 번호 가운데를 가린다. 예: "010-1234-5678" → "010-****-5678". 전체 번호는 상세에서 본다 */
-export function maskPhone(phone: string | null): string {
-  if (!phone) return '-';
-  const parts = phone.split('-');
-  if (parts.length === 3) return [parts[0], '*'.repeat(parts[1].length), parts[2]].join('-');
-  return `****${phone.slice(-4)}`;
-}
-
 /** 예약 상태 이름. 노쇼는 상태가 아니라 방문 결과로 기록한다(S-405) */
 export function labelReservation(status: ReservationStatus, visitResult: VisitResult | null) {
   if (visitResult === 'no_show') return '노쇼';

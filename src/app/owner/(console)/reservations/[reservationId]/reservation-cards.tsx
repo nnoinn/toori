@@ -11,13 +11,10 @@ import { SlotBadges } from '@/components/ui/slot-badge';
 import { formatDuration, formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';
 
-import { serviceTypeLabel } from '../../settings/menu/menu';
-import {
-  CANCEL_ACTOR_LABELS,
-  maskPhone,
-  type ReservationView,
-  showsFullPhone,
-} from '../reservation-detail';
+import { maskPhone } from '@/lib/phone';
+import { serviceTypeLabel } from '@/server/policy';
+
+import { CANCEL_ACTOR_LABELS, type ReservationView, showsFullPhone } from '../reservation-detail';
 import type { OwnerReservation } from '../reservation-detail-store';
 
 /** 시작 전에는 다른 채널에서 시간 막기(D16), 시작이 지났으면 방문·노쇼 처리 안내, 처리한 뒤에는 바꿀 수 없다는 안내 */
