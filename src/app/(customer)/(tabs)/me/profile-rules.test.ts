@@ -4,7 +4,7 @@ import { SITE_NAME } from '@/lib/site';
 
 import {
   formatKstDate,
-  marketingResultMessage,
+  consentResultMessage,
   NICKNAME_MAX_LENGTH,
   profileSchema,
 } from './profile-rules';
@@ -50,9 +50,12 @@ describe('광고성 정보 수신 처리 결과 (동의 문구 6-1)', () => {
     // 한국 시간 10/29 00:30 = UTC 10/28 15:30
     const at = new Date('2026-10-28T15:30:00Z');
     expect(formatKstDate(at)).toBe('2026년 10월 29일');
-    expect(marketingResultMessage(true, at)).toBe(
-      `${SITE_NAME} · 2026년 10월 29일에 광고성 정보 수신 동의 처리가 끝났어요.`,
+    expect(consentResultMessage('marketing', true, at)).toBe(
+      `${SITE_NAME} · 2026년 10월 29일에 이벤트·혜택 소식 수신 동의 처리가 끝났어요.`,
     );
-    expect(marketingResultMessage(false, at)).toContain('거부 처리가 끝났어요.');
+    expect(consentResultMessage('interest_alert', true, at)).toBe(
+      `${SITE_NAME} · 2026년 10월 29일에 관심 동네·찜한 샵 새 매물 알림 수신 동의 처리가 끝났어요.`,
+    );
+    expect(consentResultMessage('marketing', false, at)).toContain('거부 처리가 끝났어요.');
   });
 });

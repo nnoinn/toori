@@ -1,8 +1,8 @@
 import { cookies } from 'next/headers';
 
-import { MARKETING_NOTICE_COOKIE } from '@/server/auth/consent-notice';
+import { CONSENT_NOTICE_COOKIE } from '@/server/auth/consent-notice';
 
-import { MarketingConsentNotice } from './marketing-consent-notice';
+import { ConsentNoticeToast } from './consent-notice-toast';
 
 /**
  * 가입 직후 안내 쿠키(#115)가 있는지만 안내 부품에 알려 준다. 쿠키가 없으면 화면이 열릴 때마다 서버 함수를 부르지 않는다.
@@ -12,5 +12,5 @@ import { MarketingConsentNotice } from './marketing-consent-notice';
  */
 export async function ConsentNoticeGate() {
   const store = await cookies();
-  return <MarketingConsentNotice pending={store.has(MARKETING_NOTICE_COOKIE)} />;
+  return <ConsentNoticeToast pending={store.has(CONSENT_NOTICE_COOKIE)} />;
 }
