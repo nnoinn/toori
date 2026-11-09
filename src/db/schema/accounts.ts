@@ -11,7 +11,11 @@ import { createdAt, inValues, timestamptz } from './types';
 export const ACCOUNT_TYPES = ['customer', 'owner'] as const;
 export type AccountType = (typeof ACCOUNT_TYPES)[number];
 
-/** 약관 종류. marketing(광고성 정보 수신)만 선택이고 철회할 수 있다. age14는 고객 가입의 만 14세 이상 확인(#47, 10/25) */
+/**
+ * 약관 종류. age14는 고객 가입의 만 14세 이상 확인(#47, 10/25).
+ * 선택이고 철회할 수 있는 동의는 둘이다: marketing(이벤트·혜택 광고성 정보 수신),
+ * interest_alert(관심 동네·찜한 샵 새 매물 알림 수신, 광고성 정보로 보고 marketing과 따로 받는다, #267·#270, 11/8)
+ */
 export const TERMS_TYPES = [
   'service',
   'privacy',
@@ -19,6 +23,7 @@ export const TERMS_TYPES = [
   'supplier',
   'marketing',
   'age14',
+  'interest_alert',
 ] as const;
 export type TermsType = (typeof TERMS_TYPES)[number];
 
