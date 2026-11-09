@@ -103,7 +103,7 @@ export type OptionalConsents = Record<OptionalTerms, OptionalConsent>;
 type ConsentRow = { agreedAt: Date; withdrawnAt: Date | null };
 
 /** 한 종류의 동의 기록들로 지금 상태를 만든다. 철회하지 않은 기록이 있으면 동의한 상태 */
-export function toMarketingConsent(rows: readonly ConsentRow[]): OptionalConsent {
+export function toOptionalConsent(rows: readonly ConsentRow[]): OptionalConsent {
   const latest = (dates: Date[]) =>
     dates.reduce<Date | null>((a, b) => (a && a >= b ? a : b), null);
   const agreedAt = latest(rows.filter((r) => r.withdrawnAt === null).map((r) => r.agreedAt));
@@ -126,7 +126,7 @@ export async function readOptionalConsent(
     .select({ agreedAt: termsAgreements.agreedAt, withdrawnAt: termsAgreements.withdrawnAt })
     .from(termsAgreements)
     .where(consentOf(userId, accountType, termsType));
-  return toMarketingConsent(rows);
+  return toOptionalConsent(rows);
 }
 
 /** 두 선택 동의의 상태를 한 번에 읽는다(내 정보 알림 설정) */
@@ -150,8 +150,8 @@ export async function readOptionalConsents(
       ),
     );
   return {
-    interest_alert: toMarketingConsent(rows.filter((r) => r.termsType === 'interest_alert')),
-    marketing: toMarketingConsent(rows.filter((r) => r.termsType === 'marketing')),
+    interest_alert: toOptionalConsent(rows.filter((r) => r.termsType === 'interest_alert')),
+    marketing: toOptionalConsent(rows.filter((r) => r.termsType === 'marketing')),
   };
 }
 

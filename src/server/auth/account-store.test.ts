@@ -13,7 +13,7 @@ import {
   readMarketingConsent,
   readOptionalConsents,
   saveCustomerAccount,
-  toMarketingConsent,
+  toOptionalConsent,
   writeMarketingConsent,
   writeOptionalConsent,
 } from './account-store';
@@ -30,14 +30,14 @@ describe('isOptionalTerms', () => {
   });
 });
 
-describe('toMarketingConsent', () => {
+describe('toOptionalConsent', () => {
   it('기록이 없으면 동의한 적 없음', () => {
-    expect(toMarketingConsent([])).toEqual({ agreed: false, agreedAt: null, withdrawnAt: null });
+    expect(toOptionalConsent([])).toEqual({ agreed: false, agreedAt: null, withdrawnAt: null });
   });
 
   it('철회하지 않은 기록이 있으면 동의한 상태이고 가장 최근 동의 시각을 쓴다', () => {
     expect(
-      toMarketingConsent([
+      toOptionalConsent([
         { agreedAt: at('2026-10-01T00:00:00Z'), withdrawnAt: at('2026-10-05T00:00:00Z') },
         { agreedAt: at('2026-10-20T00:00:00Z'), withdrawnAt: null },
       ]),
@@ -46,7 +46,7 @@ describe('toMarketingConsent', () => {
 
   it('모두 철회했으면 가장 최근 철회 시각을 쓴다', () => {
     expect(
-      toMarketingConsent([
+      toOptionalConsent([
         { agreedAt: at('2026-10-10T00:00:00Z'), withdrawnAt: at('2026-10-12T00:00:00Z') },
         { agreedAt: at('2026-10-01T00:00:00Z'), withdrawnAt: at('2026-10-03T00:00:00Z') },
       ]),
