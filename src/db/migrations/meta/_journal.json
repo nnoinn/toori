@@ -57,6 +57,13 @@
       "when": 1793669727065,
       "tag": "0007_refunds_cancel_status",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794200313093,
+      "tag": "0008_terms_interest_alert",
+      "breakpoints": true
     }
   ]
 }

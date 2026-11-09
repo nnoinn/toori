@@ -10,6 +10,8 @@ export const TERMS_VERSIONS = {
   supplier: 'draft-2026-10',
   marketing: 'draft-2026-10',
   age14: 'draft-2026-10',
+  // 동의 문구 7장(#266·#274, 11/8)
+  interest_alert: 'draft-2026-11',
 } as const satisfies Record<TermsType, string>;
 
 /**

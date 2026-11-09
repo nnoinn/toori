@@ -92,12 +92,12 @@ erDiagram
 | id | uuid PK | |
 | user_id | uuid → profiles | |
 | account_type | text | `customer` / `owner` |
-| terms_type | text | `service`(이용약관) / `privacy`(개인정보) / `location`(위치정보) / `supplier`(공급자 약관) / `marketing`(광고성 정보 수신, 선택) / `age14`(만 14세 이상 확인, 고객 가입 필수) |
+| terms_type | text | `service`(이용약관) / `privacy`(개인정보) / `location`(위치정보) / `supplier`(공급자 약관) / `marketing`(이벤트·혜택 광고성 정보 수신, 선택) / `age14`(만 14세 이상 확인, 고객 가입 필수) / `interest_alert`(관심 동네·찜한 샵 새 매물 알림 수신, 선택) |
 | version | text | 약관 버전. 예: `2026-10-01` |
 | agreed_at | timestamptz | |
-| withdrawn_at | timestamptz, null | 동의 철회 시각. 선택 동의(`marketing`)만 철회할 수 있다 |
+| withdrawn_at | timestamptz, null | 동의 철회 시각. 선택 동의(`marketing`, `interest_alert`)만 철회할 수 있다 |
 
-- 관심 지역 새 매물 알림(C-601)은 광고성 정보라서 `marketing`에 동의한 고객에게만 보낸다. 동의한 지 2년이 되기 전에 다시 확인하고, 동의·철회 결과를 고객에게 알린다(정보통신망법). 예약 알림(C-602)은 거래 안내라 동의가 필요 없다
+- 관심 동네·찜한 샵 새 매물 알림(C-601, C-209)은 광고성 정보라서 `interest_alert`에 동의한 고객에게만 보낸다. 이벤트·혜택 같은 다른 광고성 정보는 `marketing`에 동의한 고객에게만 보낸다. 두 동의는 따로 받고 따로 철회한다(#267, 11/8). 동의마다 동의한 지 2년이 되기 전에 다시 확인하고, 동의·철회 결과를 고객에게 알린다(정보통신망법). 예약 알림(C-602)은 거래 안내라 동의가 필요 없다
 - 예약자 이름·연락처를 원장님에게 넘기는 것은 예약 이행에 필요한 제공이다. 별도 동의가 필요한지는 약관 법률 검토 때 확인하고, 필요하면 결제 동의(C-402)와 같이 받는다
 
 ### 지금 어느 계정으로 들어왔는지 (계정 모드)
@@ -577,3 +577,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 2026-10-29 | 회원 탈퇴(P1) 방향: 샵 상태 `withdrawn`, 마감 사유 `account_withdrawal`, 고객·원장님 계정 unique를 탈퇴하지 않은 계정 기준으로, 같은 사람 표시(해시) 5년. 탈퇴 뒤 30일 되살리기 기간에는 정보를 그대로 두고 30일 뒤 지운다(10장 메모, #148). 예약자 정보 제공 동의 칸은 빈 값 허용(#153) |
 | 2026-11-02 | `push_subscriptions`의 unique를 `endpoint`에서 (`endpoint`, `account_type`)으로 바꾼다(#193). 한 기기에서 켜 둔 계정의 알림을 모두 받는다(11/1 결정, #131). 마이그레이션 0006 |
 | 2026-11-03 | `refunds`에 `status`, `review_reason`, `created_at`을 더하고 `processed_at`을 비어 있을 수 있게 바꿨다. 고객 취소는 포트원을 부르기 전에 `requested`로 저장하고, 정리 작업이 마무리한다. 한 예약에 고객 취소 기록은 하나만(unique) (#222) |
+| 2026-11-09 | `terms_agreements.terms_type`에 `interest_alert`(관심 동네·찜한 샵 새 매물 알림 수신 동의, 선택)를 더한다. 관심 동네·찜한 샵 알림은 이벤트·혜택 광고성 동의(`marketing`)와 따로 받는다(#267·#270, 11/8 결정). 이미 있는 `marketing` 기록은 출시 전이라 옮기지 않는다. 마이그레이션 0008 |
