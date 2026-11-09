@@ -4,7 +4,8 @@ import 'server-only';
 
 import { cancelPortOnePayment, type PortOneCancel } from '@/server/payments/portone';
 
-const CUSTOMER_CANCEL_REASON = '고객 예약 취소';
+/** 고객 취소 때 포트원에 보내는 사유. 웹훅이 포트원 취소 내역에서 이 사유를 보고 앱이 보낸 고객 취소인지 가른다(sync-cancel.ts) */
+export const CUSTOMER_CANCEL_REASON = '고객 예약 취소';
 
 /**
  * 시드·시나리오가 만든 주문의 결제 번호 앞부분(scripts/dev-db.mjs). 포트원에 결제가 없어서 부를 수 없다.

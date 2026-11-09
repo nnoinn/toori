@@ -2,7 +2,7 @@
 
 import 'server-only';
 
-import { and, asc, eq, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, lt, type SQL, sql } from 'drizzle-orm';
 
 import { getDb } from '@/db';
 import {
@@ -58,6 +58,21 @@ export async function readRefundTarget(
   customerId: string,
   db: DbReader = getDb(),
 ): Promise<RefundTarget | null> {
+  return readTargetWhere(
+    db,
+    and(eq(reservations.id, reservationId), eq(reservations.customerId, customerId)),
+  );
+}
+
+/** 주문의 예약. 웹훅처럼 고객 없이 볼 때 쓴다. 예약이 없으면 null */
+export async function readRefundTargetByOrder(
+  db: DbReader,
+  orderId: string,
+): Promise<RefundTarget | null> {
+  return readTargetWhere(db, eq(reservations.orderId, orderId));
+}
+
+async function readTargetWhere(db: DbReader, where: SQL | undefined): Promise<RefundTarget | null> {
   const [row] = await db
     .select({
       reservationId: reservations.id,
@@ -86,7 +101,7 @@ export async function readRefundTarget(
         eq(refunds.status, 'requested'),
       ),
     )
-    .where(and(eq(reservations.id, reservationId), eq(reservations.customerId, customerId)))
+    .where(where)
     .limit(1);
   if (!row) return null;
   const {
@@ -226,6 +241,60 @@ export async function finishCustomerCancel(
       .set({ pgStatus: input.penaltyAmount > 0 ? 'PARTIAL_CANCELLED' : 'CANCELLED' })
       .where(eq(orders.id, input.orderId));
   }
+  return true;
+}
+
+/**
+ * 앱을 거치지 않은 취소(포트원 콘솔 등)를 운영자 취소로 기록한다(11/8 nnoinn, #248). 예정 예약일 때만 바꾸고 아니면 false.
+ * 위약금 구간은 계산하지 않고 실제 돌려준 금액으로 남긴다. 예정 → 취소로 바꾼 쪽만 기록을 넣으므로
+ * 같은 예약에 운영자 취소 기록이 두 번 생기지 않는다(웹훅이 다시 와도 예약이 이미 '취소'라 넘어간다)
+ */
+export async function finishAdminCancel(
+  tx: DbWriter,
+  input: {
+    reservationId: string;
+    orderId: string;
+    slotId: string;
+    paidAmount: number;
+    refundAmount: number;
+    pgCancellationId: string | null;
+    reviewReason: string | null;
+    hoursBeforeStart: number;
+    now: Date;
+  },
+): Promise<boolean> {
+  const [cancelled] = await tx
+    .update(reservations)
+    .set({
+      status: 'cancelled',
+      cancelledAt: input.now,
+      cancelActor: 'admin',
+      hoursBeforeStartAtCancel: input.hoursBeforeStart,
+    })
+    .where(and(eq(reservations.id, input.reservationId), eq(reservations.status, 'confirmed')))
+    .returning({ id: reservations.id });
+  if (!cancelled) return false;
+
+  await tx.update(slots).set({ status: 'cancelled' }).where(eq(slots.id, input.slotId));
+  await tx.insert(refunds).values({
+    orderId: input.orderId,
+    reservationId: input.reservationId,
+    reason: 'admin_exception',
+    status: 'done',
+    band: null,
+    penaltyRate: 0,
+    refundAmount: input.refundAmount,
+    // 돌려주지 않은 나머지. 일부만 돌려줬을 때의 처리는 이의제기·정산(W15)에서 정한다
+    penaltyAmount: input.paidAmount - input.refundAmount,
+    pgCancellationId: input.pgCancellationId,
+    reviewReason: input.reviewReason,
+    processedAt: input.now,
+    createdAt: input.now,
+  });
+  await tx
+    .update(orders)
+    .set({ pgStatus: input.refundAmount < input.paidAmount ? 'PARTIAL_CANCELLED' : 'CANCELLED' })
+    .where(eq(orders.id, input.orderId));
   return true;
 }
 
