@@ -20,7 +20,7 @@ import {
   type VisitResult,
 } from '@/db/schema';
 import { normalizePhone } from '@/lib/phone';
-import { type MarketingConsent, readMarketingConsent } from '@/server/auth/account-store';
+import { type OptionalConsents, readOptionalConsents } from '@/server/auth/account-store';
 
 import { ADMIN_LIST_LIMIT, containsPattern, type ListResult, toListResult } from '../lookup';
 
@@ -151,7 +151,8 @@ export type CustomerDetail = {
   email: string;
   createdAt: Date;
   withdrawnAt: Date | null;
-  marketing: MarketingConsent;
+  /** 선택 동의 두 개(관심 동네·찜한 샵 새 매물 알림, 이벤트·혜택, #267) */
+  consents: OptionalConsents;
   reservationCount: number;
   cancelCount: number;
   noShowCount: number;
@@ -180,7 +181,7 @@ export async function selectCustomerDetail(
   if (!customer) return null;
 
   const { userId, ...info } = customer;
-  const marketing = await readMarketingConsent(db, userId, 'customer');
+  const consents = await readOptionalConsents(db, userId, 'customer');
   const [counts] = await db
     .select(reservationCounts)
     .from(reservations)
@@ -206,7 +207,7 @@ export async function selectCustomerDetail(
 
   return {
     ...info,
-    marketing,
+    consents,
     ...counts,
     // DB의 check 제약이 정해 둔 값만 허용한다
     reservations: rows.map((row) => ({

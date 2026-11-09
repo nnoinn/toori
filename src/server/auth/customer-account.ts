@@ -1,7 +1,8 @@
 'use server';
 
-// 고객 가입 저장과 광고성 정보 수신 동의 (C-104, C-601, #47 4·5장).
-// 약관 동의 화면(/join, 정찬형), 가입 직후 처음 보이는 화면, 내 정보(J9)·관심 동네(J14)에서 부른다.
+// 고객 가입 저장과 선택 동의 (C-104, C-601, #47 4·5장, #267).
+// 선택 동의는 둘이다: 관심 동네·찜한 샵 새 매물 알림(interest_alert), 이벤트·혜택 소식(marketing). 따로 받고 따로 철회한다.
+// 약관 동의 화면(/join, 정찬형), 가입 직후 처음 보이는 화면, 내 정보(J9)·관심 동네(J14)·찜 버튼에서 부른다.
 // 화면에서는 '@/server/auth/customer-account'에서 가져온다.
 
 import { cookies } from 'next/headers';
@@ -15,18 +16,23 @@ import { safeNextPath } from '@/lib/safe-next';
 
 import { ACCOUNT_MODE_COOKIE, ACCOUNT_MODE_COOKIE_OPTIONS } from './account-mode';
 import {
+  type ConsentNotice,
   CUSTOMER_REQUIRED_TERMS,
   DEFAULT_CUSTOMER_NICKNAME,
   type MarketingConsent,
-  readMarketingConsent,
+  OPTIONAL_CUSTOMER_TERMS,
+  type OptionalConsent,
+  type OptionalConsents,
+  type OptionalTerms,
+  readOptionalConsents,
   saveCustomerAccount,
-  writeMarketingConsent,
+  writeOptionalConsent,
 } from './account-store';
 import {
-  decodeMarketingNotice,
-  encodeMarketingNotice,
-  MARKETING_NOTICE_COOKIE,
-  MARKETING_NOTICE_COOKIE_OPTIONS,
+  CONSENT_NOTICE_COOKIE,
+  CONSENT_NOTICE_COOKIE_OPTIONS,
+  decodeConsentNotices,
+  encodeConsentNotices,
 } from './consent-notice';
 import { getSessionUser } from './current-account';
 import { DEFAULT_NEXT } from './paths';
@@ -39,6 +45,8 @@ const createSchema = z.object({
     privacy: z.boolean(),
     location: z.boolean(),
     marketing: z.boolean(),
+    // 화면이 아직 보내지 않으면 동의하지 않은 것으로 본다(#267 화면이 붙기 전)
+    interest_alert: z.boolean().optional(),
   }),
   phone: z.string().optional(),
   next: z.string().optional(),
@@ -50,7 +58,14 @@ const createSchema = z.object({
  * 성공하면 돌아오지 않고 next(안전한 주소만, 없으면 홈)로 보낸다. 실패했을 때만 결과를 돌려준다
  */
 export async function createCustomerAccount(input: {
-  agreements: { age14: true; service: true; privacy: true; location: true; marketing: boolean };
+  agreements: {
+    age14: true;
+    service: true;
+    privacy: true;
+    location: true;
+    marketing: boolean;
+    interest_alert?: boolean;
+  };
   phone: string;
   next?: string;
 }): Promise<Result<never>> {
@@ -74,7 +89,7 @@ export async function createCustomerAccount(input: {
       userId: user.userId,
       nickname: user.name ?? DEFAULT_CUSTOMER_NICKNAME,
       phone,
-      marketing: agreements.marketing,
+      optionalTerms: OPTIONAL_CUSTOMER_TERMS.filter((type) => agreements[type] === true),
     }),
   );
   if (!saved) return fail('ALREADY_EXISTS', '이미 가입한 계정이에요');
@@ -82,53 +97,82 @@ export async function createCustomerAccount(input: {
   const store = await cookies();
   // 가입한 계정으로 바로 쓰도록 고객 모드로 둔다(원장님 모드에서 /join에 들어온 경우)
   store.set(ACCOUNT_MODE_COOKIE, 'customer', ACCOUNT_MODE_COOKIE_OPTIONS);
-  // 광고성 동의 처리 결과는 다음 화면에서 한 번 보여준다(takeMarketingConsentNotice)
-  if (saved.marketingAgreedAt) {
+  // 선택 동의 처리 결과는 다음 화면에서 한 번 보여준다(takeConsentNotices)
+  if (saved.consentNotices.length > 0) {
     store.set(
-      MARKETING_NOTICE_COOKIE,
-      encodeMarketingNotice(user.userId, saved.marketingAgreedAt),
-      MARKETING_NOTICE_COOKIE_OPTIONS,
+      CONSENT_NOTICE_COOKIE,
+      encodeConsentNotices(user.userId, saved.consentNotices),
+      CONSENT_NOTICE_COOKIE_OPTIONS,
     );
   }
   redirect(safeNextPath(parsed.data.next, DEFAULT_NEXT.customer));
 }
 
-/**
- * 가입 때 고른 광고성 정보 수신 동의의 처리 결과(동의 문구 6-1장). 가입 직후 처음 보이는 화면이 열릴 때 부른다.
- * 읽으면서 지우므로 한 번만 나오고, 가입 때 동의하지 않았거나 이미 보여줬으면 null이다.
- * 화면은 agreedAt으로 "{날짜}에 광고성 정보 수신 동의 처리가 끝났어요"를 보여준다
- */
-export async function takeMarketingConsentNotice(): Promise<Result<{ agreedAt: Date } | null>> {
+/** 쿠키에 남은 처리 결과를 읽으면서 지운다. 없거나 남의 값이면 빈 목록 */
+async function takeNotices(): Promise<ConsentNotice[]> {
   const store = await cookies();
-  const value = store.get(MARKETING_NOTICE_COOKIE)?.value;
-  if (value === undefined) return ok(null);
-  store.delete(MARKETING_NOTICE_COOKIE);
+  const value = store.get(CONSENT_NOTICE_COOKIE)?.value;
+  if (value === undefined) return [];
+  store.delete(CONSENT_NOTICE_COOKIE);
 
   const user = await getSessionUser();
-  const agreedAt = user ? decodeMarketingNotice(value, user.userId) : null;
-  return ok(agreedAt ? { agreedAt } : null);
+  return user ? decodeConsentNotices(value, user.userId) : [];
 }
 
 /**
- * 광고성 정보 수신 동의를 켜거나 끈다(내 정보 알림 설정, 관심 동네 설정).
- * 화면은 돌려받은 시각으로 "{날짜}에 광고성 정보 수신 {동의/거부} 처리가 끝났어요"를 바로 보여준다(동의 문구 6-1)
+ * 가입 때 고른 선택 동의의 처리 결과(동의 문구 6-1장). 가입 직후 처음 보이는 화면이 열릴 때 부른다.
+ * 읽으면서 지우므로 한 번만 나오고, 가입 때 고른 선택 동의가 없거나 이미 보여줬으면 빈 목록이다.
+ * 화면은 동의마다 한 줄씩 "{날짜}에 {동의 이름} 처리가 끝났어요"를 보여준다. 순서는 관심 동네·찜한 샵 알림, 이벤트·혜택
  */
-export async function setMarketingConsent(agree: boolean): Promise<Result<MarketingConsent>> {
+export async function takeConsentNotices(): Promise<Result<ConsentNotice[]>> {
+  return ok(await takeNotices());
+}
+
+/**
+ * 예전 함수: 가입 때 고른 광고성 정보 수신(marketing) 동의의 처리 결과만. 없으면 null.
+ * 화면이 takeConsentNotices로 바뀌면 지운다(#267). 같은 쿠키를 지우므로 둘 중 하나만 부른다
+ */
+export async function takeMarketingConsentNotice(): Promise<Result<{ agreedAt: Date } | null>> {
+  const marketing = (await takeNotices()).find((notice) => notice.type === 'marketing');
+  return ok(marketing ? { agreedAt: marketing.agreedAt } : null);
+}
+
+const setSchema = z.object({ type: z.enum(OPTIONAL_CUSTOMER_TERMS), agree: z.boolean() });
+
+/**
+ * 선택 동의 하나를 켜거나 끈다(내 정보 알림 설정, 빈 동네 알림 상자, 찜 버튼).
+ * 화면은 돌려받은 시각으로 "{날짜}에 {동의 이름} {동의/거부} 처리가 끝났어요"를 바로 보여준다(동의 문구 6-1)
+ */
+export async function setOptionalConsent(
+  type: OptionalTerms,
+  agree: boolean,
+): Promise<Result<OptionalConsent>> {
   const auth = await requireCustomer();
   if (!auth.ok) return auth;
-  const parsed = z.boolean().safeParse(agree);
+  const parsed = setSchema.safeParse({ type, agree });
   if (!parsed.success) return fail('INVALID_INPUT', '알림 설정을 다시 골라 주세요');
 
   const consent = await getDb().transaction((tx) =>
-    writeMarketingConsent(tx, auth.data.userId, 'customer', parsed.data),
+    writeOptionalConsent(tx, auth.data.userId, 'customer', parsed.data.type, parsed.data.agree),
   );
   // TODO(#15 W16): 푸시를 구독한 고객에게는 처리 결과를 notify로도 알린다
   return ok(consent);
 }
 
-/** 광고성 정보 수신 동의 상태 */
-export async function getMarketingConsent(): Promise<Result<MarketingConsent>> {
+/** 두 선택 동의의 상태(관심 동네·찜한 샵 알림, 이벤트·혜택). 각각 동의 여부와 처리 시각 */
+export async function getOptionalConsents(): Promise<Result<OptionalConsents>> {
   const auth = await requireCustomer();
   if (!auth.ok) return auth;
-  return ok(await readMarketingConsent(getDb(), auth.data.userId, 'customer'));
+  return ok(await readOptionalConsents(getDb(), auth.data.userId, 'customer'));
+}
+
+/** 예전 함수: 광고성 정보 수신(marketing) 동의를 켜거나 끈다. 화면이 setOptionalConsent로 바뀌면 지운다(#267) */
+export async function setMarketingConsent(agree: boolean): Promise<Result<MarketingConsent>> {
+  return setOptionalConsent('marketing', agree);
+}
+
+/** 예전 함수: 광고성 정보 수신(marketing) 동의 상태. 화면이 getOptionalConsents로 바뀌면 지운다(#267) */
+export async function getMarketingConsent(): Promise<Result<MarketingConsent>> {
+  const consents = await getOptionalConsents();
+  return consents.ok ? ok(consents.data.marketing) : consents;
 }

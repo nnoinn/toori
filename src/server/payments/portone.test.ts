@@ -75,7 +75,7 @@ describe('getPortOnePayment', () => {
     });
   });
 
-  it('취소된 결제: 끝난 취소 내역만 읽는다', async () => {
+  it('취소된 결제: 끝난 취소 내역만 사유와 같이 읽는다', async () => {
     respond(200, {
       status: 'CANCELLED',
       cancellations: [
@@ -85,7 +85,10 @@ describe('getPortOnePayment', () => {
     });
     expect(await getPortOnePayment('toori-1')).toMatchObject({
       ok: true,
-      payment: { status: 'CANCELLED', cancellations: [{ id: 'c-1', amount: 23_450 }] },
+      payment: {
+        status: 'CANCELLED',
+        cancellations: [{ id: 'c-1', amount: 23_450, reason: '자동 취소' }],
+      },
     });
   });
 
@@ -348,7 +351,9 @@ describe('cancelPortOnePayment', () => {
 });
 
 describe('finishedCancellation', () => {
-  const payment = (cancellations: { id: string | null; amount: number | null }[]) => ({
+  const payment = (
+    cancellations: { id: string | null; amount: number | null; reason: string | null }[],
+  ) => ({
     status: 'PARTIAL_CANCELLED',
     amountTotal: 45_000,
     currency: 'KRW',
@@ -364,25 +369,29 @@ describe('finishedCancellation', () => {
     expect(finishedCancellation(payment([]))).toBeNull();
   });
 
-  it('여러 건이면 금액을 더하고 마지막 취소 번호를 쓴다', () => {
+  it('여러 건이면 금액을 더하고 마지막 취소 번호를 쓰고 사유를 모두 남긴다', () => {
     expect(
       finishedCancellation(
         payment([
-          { id: 'c-1', amount: 10_000 },
-          { id: 'c-2', amount: 5_000 },
+          { id: 'c-1', amount: 10_000, reason: '고객 예약 취소' },
+          { id: 'c-2', amount: 5_000, reason: null },
         ]),
       ),
-    ).toEqual({ cancellationId: 'c-2', amount: 15_000 });
+    ).toEqual({ cancellationId: 'c-2', amount: 15_000, reasons: ['고객 예약 취소', null] });
   });
 
   it('금액을 모르는 취소가 있으면 금액은 null', () => {
     expect(
       finishedCancellation(
         payment([
-          { id: 'c-1', amount: 10_000 },
-          { id: 'c-2', amount: null },
+          { id: 'c-1', amount: 10_000, reason: '고객 예약 취소' },
+          { id: 'c-2', amount: null, reason: '고객 예약 취소' },
         ]),
       ),
-    ).toEqual({ cancellationId: 'c-2', amount: null });
+    ).toEqual({
+      cancellationId: 'c-2',
+      amount: null,
+      reasons: ['고객 예약 취소', '고객 예약 취소'],
+    });
   });
 });
