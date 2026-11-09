@@ -22,6 +22,8 @@ export type SavedSummary = {
   salePrice: number;
   discountRate: number;
   newCustomerOnly: boolean;
+  /** 예약대기로 저장했으면 고객에게 보이기 시작하는 시각(서버가 돌려준 값). 지금 게시중이면 null(S-205) */
+  publishAt: Date | null;
 };
 
 /** 저장 완료. 수정이면 대시보드로 돌아가고, 등록이면 하나 더 올리거나 대시보드로 간다 */
@@ -42,9 +44,11 @@ export function SavedCard({
           {edited ? '매물을 고쳤어요' : '매물을 올렸어요'}
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          {edited
-            ? '고친 내용이 바로 고객 화면에 보여요.'
-            : '지금부터 고객 화면에 게시중으로 보여요.'}
+          {saved.publishAt
+            ? `예약대기로 저장했어요. ${formatKst(saved.publishAt)}부터 고객 화면에 게시중으로 보여요.`
+            : edited
+              ? '고친 내용이 바로 고객 화면에 보여요.'
+              : '지금부터 고객 화면에 게시중으로 보여요.'}
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">

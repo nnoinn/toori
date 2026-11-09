@@ -11,7 +11,7 @@ import { formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';
 import { ensureAdminPage } from '@/server/auth';
 
-import { labelReservation } from '../../format';
+import { labelReservation } from '../../../lookup';
 import { type CustomerDetail, selectCustomerDetail } from '../../queries';
 
 export const metadata: Metadata = { title: '고객 정보' };

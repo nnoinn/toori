@@ -156,7 +156,10 @@ describeDb('매물 수정 (실제 DB)', () => {
         },
         now,
       );
-      expect(result).toEqual({ ok: true, data: { slotId: slot.id, salePrice: 23450 } });
+      expect(result).toEqual({
+        ok: true,
+        data: { slotId: slot.id, salePrice: 23450, publishAt: null },
+      });
       expect(await slotRow(tx, slot.id)).toMatchObject({
         startAt: at('10:30'),
         endAt: at('11:30'),
@@ -171,7 +174,7 @@ describeDb('매물 수정 (실제 DB)', () => {
     });
   });
 
-  it('예약대기 매물을 고치면 지금 게시중으로 바뀐다', async () => {
+  it('예약대기 매물을 48시간 안으로 고치면 지금 게시중으로 바뀐다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
       const [slot] = await tx
@@ -205,7 +208,65 @@ describeDb('매물 수정 (실제 DB)', () => {
     });
   });
 
-  it('다른 매물과 겹치거나 등록 검증(48시간·할인율)에 걸리면 고치지 않는다', async () => {
+  it('예약대기 매물은 14일 안의 먼 시각으로 옮기면 게시 시각을 새 시작 48시간 전으로 다시 정한다(S-205)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx);
+      const [slot] = await tx
+        .insert(slots)
+        .values(
+          testSlot(shop, '14:00', '15:00', {
+            status: 'scheduled',
+            publishAt: new Date('2026-11-01T00:00:00+09:00'),
+          }),
+        )
+        .returning();
+
+      const startAt = '2026-11-05T05:00:00.000Z'; // 11/05(목) 14:00
+      const result = await updateSlotInDb(
+        tx,
+        shop.shopId,
+        slot.id,
+        { menuId: shop.menuId, startAt, discountRate: 20, newCustomerOnly: false },
+        now,
+      );
+      const publishAt = new Date('2026-11-03T14:00:00+09:00');
+      expect(result).toMatchObject({ ok: true, data: { publishAt: publishAt.toISOString() } });
+      expect(await slotRow(tx, slot.id)).toMatchObject({
+        startAt: new Date(startAt),
+        publishAt,
+        status: 'scheduled',
+      });
+    });
+  });
+
+  it('게시중 매물은 48시간 밖으로 옮기지 못한다(다시 예약대기로 숨지 않게, 11/9)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx);
+      const [slot] = await tx
+        .insert(slots)
+        .values(testSlot(shop, '10:00', '11:00'))
+        .returning();
+      const result = await updateSlotInDb(
+        tx,
+        shop.shopId,
+        slot.id,
+        {
+          menuId: shop.menuId,
+          startAt: '2026-11-05T05:00:00.000Z',
+          discountRate: 20,
+          newCustomerOnly: false,
+        },
+        now,
+      );
+      expect(result).toMatchObject({ ok: false, error: { code: 'TOO_FAR_PUBLISHED' } });
+      expect(await slotRow(tx, slot.id)).toMatchObject({
+        startAt: at('10:00'),
+        status: 'published',
+      });
+    });
+  });
+
+  it('다른 매물과 겹치거나 등록 검증(14일·할인율)에 걸리면 고치지 않는다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
       const [slot] = await tx
@@ -224,8 +285,9 @@ describeDb('매물 수정 (실제 DB)', () => {
       expect(await update(at('11:30').toISOString())).toMatchObject({
         error: { code: 'SLOT_OVERLAP' },
       });
+      // 게시중 매물이라 48시간(11/02 12:00)을 넘기면 막는다
       expect(await update('2026-11-02T04:00:00.000Z')).toMatchObject({
-        error: { code: 'TOO_FAR' },
+        error: { code: 'TOO_FAR_PUBLISHED' },
       });
       expect(await update(at('10:00').toISOString(), 15)).toMatchObject({
         error: { code: 'INVALID_DISCOUNT_RATE' },
