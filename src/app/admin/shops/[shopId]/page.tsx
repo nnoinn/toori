@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
 import { formatBusinessNumber } from '@/lib/business-number';
 import { formatKst } from '@/lib/time';
+import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
 import { getBusinessDocUrl } from '@/server/storage/upload';
 import { bankName, categoryLabel } from '@/server/policy';
@@ -38,11 +39,17 @@ export default function AdminShopReviewPage({ params }: { params: Params }) {
 }
 
 async function ReviewDetail({ params }: { params: Params }) {
-  await ensureAdminPage();
+  const admin = await ensureAdminPage();
   const { shopId } = await params;
   if (!isUuid(shopId)) notFound();
   const detail = await selectShopForReview(getDb(), shopId);
   if (!detail) notFound();
+  await recordAdminAccess(admin.userId, {
+    action: 'view',
+    targetType: 'shop',
+    targetId: shopId,
+    path: `/admin/shops/${shopId}`,
+  });
   // 비공개 버킷이라 5분 동안만 열리는 주소를 화면을 열 때마다 새로 받는다(#116)
   const doc = await getBusinessDocUrl(shopId);
 

@@ -11,6 +11,7 @@ import { getDb } from '@/db';
 import { formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';
 import { isUuid } from '@/lib/uuid';
+import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
 
 import {
@@ -46,11 +47,17 @@ export default function AdminReservationPage({ params }: { params: Params }) {
 }
 
 async function Detail({ params }: { params: Params }) {
-  await ensureAdminPage();
+  const admin = await ensureAdminPage();
   const { reservationId } = await params;
   if (!isUuid(reservationId)) notFound();
   const detail = await selectReservationDetail(getDb(), reservationId);
   if (!detail) notFound();
+  await recordAdminAccess(admin.userId, {
+    action: 'view',
+    targetType: 'reservation',
+    targetId: reservationId,
+    path: `/admin/reservations/${reservationId}`,
+  });
 
   return (
     <div className="flex flex-col gap-4">
