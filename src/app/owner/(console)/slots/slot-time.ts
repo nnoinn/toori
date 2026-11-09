@@ -1,9 +1,14 @@
-// 매물 등록 ② 시간 고르기 계산 (O4, S-204, S-209, #23 D10). 화면('use client')과 서버가 같이 쓴다.
+// 매물 등록 ② 시간 고르기 계산 (O4, S-204, S-205, S-209, #23 D10). 화면('use client')과 서버가 같이 쓴다.
 // "지금"은 서버 시각을 받는다. 시각은 UTC Date로 다루고, 단위(분)는 한국 시간 기준으로 맞춘다.
+// 미리 올리기(S-205): 시작이 14일 안이면 올릴 수 있고, 시작 48시간 전까지는 예약대기로 두었다가 그때 게시중이 된다.
 
 import type { BusinessHours } from '@/db/schema/shops';
-import { addMinutes, kstToUtc, utcToKst } from '@/lib/time';
-import { PUBLISH_WINDOW_HOURS, SLOT_START_STEP_MINUTES } from '@/server/policy';
+import { addHours, addMinutes, kstToUtc, utcToKst } from '@/lib/time';
+import {
+  ADVANCE_LISTING_DAYS,
+  PUBLISH_WINDOW_HOURS,
+  SLOT_START_STEP_MINUTES,
+} from '@/server/policy';
 import { kstDateKey } from '@/lib/time';
 
 const MINUTE_MS = 60 * 1000;
@@ -21,9 +26,34 @@ export function rangesOverlap(a: TimeRange, b: TimeRange): boolean {
   return a.start.getTime() < b.end.getTime() && b.start.getTime() < a.end.getTime();
 }
 
-/** 고를 수 있는 마지막 시작 시각: 지금 + 48시간(S-204). 그 시각까지 포함한다 */
-export function latestStart(now: Date): Date {
-  return new Date(now.getTime() + PUBLISH_WINDOW_HOURS * 60 * MINUTE_MS);
+/**
+ * 고를 수 있는 시작 시각의 범위.
+ * - advance: 새로 올리거나 예약대기 매물을 고칠 때. 지금부터 14일 안(S-205)
+ * - published: 이미 게시중인 매물을 고칠 때. 지금부터 48시간 안(S-204). 고객에게 보이던 매물이
+ *   다시 예약대기로 숨었다가 관심 동네 알림에 새 매물로 또 나가지 않게 막는다(11/9 정민석)
+ */
+export type StartWindow = 'advance' | 'published';
+
+/** 고를 수 있는 마지막 시작 시각. 그 시각까지 포함한다 */
+export function latestStart(now: Date, window: StartWindow = 'advance'): Date {
+  return window === 'published'
+    ? addHours(now, PUBLISH_WINDOW_HOURS)
+    : addHours(now, ADVANCE_LISTING_DAYS * 24);
+}
+
+/** 저장할 게시 상태와 게시 시각 */
+export type PublishPlan = { status: 'scheduled' | 'published'; publishAt: Date };
+
+/**
+ * 새 매물(등록·재등록)과 예약대기 매물을 고칠 때의 게시 시각(S-204·S-205).
+ * 시작 48시간 전이 아직 오지 않았으면 그 시각에 게시하는 예약대기, 이미 지났으면 지금 게시하는 게시중이다.
+ * 딱 48시간 전이면 지금 게시한다(매물 상태 계산은 지금이 게시 시각보다 앞일 때만 예약대기로 본다)
+ */
+export function publishPlan(start: Date, now: Date): PublishPlan {
+  const publishAt = addHours(start, -PUBLISH_WINDOW_HOURS);
+  return publishAt.getTime() > now.getTime()
+    ? { status: 'scheduled', publishAt }
+    : { status: 'published', publishAt: now };
 }
 
 /** 한국 시간 기준으로 단위(분)에 맞는 시각이면 true. 초·밀리초도 0이어야 한다 */
@@ -33,31 +63,38 @@ export function isOnStep(start: Date): boolean {
   return (kst.hour * 60 + kst.minute) % SLOT_START_STEP_MINUTES === 0;
 }
 
-export type StartProblem = 'NOT_ON_STEP' | 'PAST' | 'TOO_FAR';
+export type StartProblem = 'NOT_ON_STEP' | 'PAST' | 'TOO_FAR' | 'TOO_FAR_PUBLISHED';
 
 export const START_PROBLEM_MESSAGES: Record<StartProblem, string> = {
   NOT_ON_STEP: `시작 시각은 ${SLOT_START_STEP_MINUTES}분 단위로 골라 주세요`,
   PAST: '이미 지난 시각이에요',
-  TOO_FAR: `지금부터 ${PUBLISH_WINDOW_HOURS}시간 안의 시각만 올릴 수 있어요`,
+  TOO_FAR: `지금부터 ${ADVANCE_LISTING_DAYS}일 안의 시각만 올릴 수 있어요`,
+  TOO_FAR_PUBLISHED: `고객에게 이미 보이는 매물은 지금부터 ${PUBLISH_WINDOW_HOURS}시간 안의 시각으로만 바꿀 수 있어요`,
 };
 
 /** 시작 시각의 문제. 없으면 null. 지금과 같은 시각은 지난 것으로 본다 */
-export function checkStart(start: Date, now: Date): StartProblem | null {
+export function checkStart(
+  start: Date,
+  now: Date,
+  window: StartWindow = 'advance',
+): StartProblem | null {
   if (!isOnStep(start)) return 'NOT_ON_STEP';
   if (start.getTime() <= now.getTime()) return 'PAST';
-  if (start.getTime() > latestStart(now).getTime()) return 'TOO_FAR';
+  if (start.getTime() > latestStart(now, window).getTime()) {
+    return window === 'published' ? 'TOO_FAR_PUBLISHED' : 'TOO_FAR';
+  }
   return null;
 }
 
-/** 지금 이후 첫 단위 시각부터 48시간까지, 고를 수 있는 시작 시각 전부 */
-export function startCandidates(now: Date): Date[] {
+/** 지금 이후 첫 단위 시각부터 마지막 시작 시각(latestStart)까지, 고를 수 있는 시작 시각 전부 */
+export function startCandidates(now: Date, window: StartWindow = 'advance'): Date[] {
   const kst = utcToKst(now);
   // 지금이 들어 있는 분의 시작(한국 시간)에서 다음 단위로 올린다
   const minuteStart = kstToUtc(kst);
   const minutesOfDay = kst.hour * 60 + kst.minute;
   const toNext = SLOT_START_STEP_MINUTES - (minutesOfDay % SLOT_START_STEP_MINUTES);
   let cursor = addMinutes(minuteStart, toNext);
-  const last = latestStart(now).getTime();
+  const last = latestStart(now, window).getTime();
   const result: Date[] = [];
   while (cursor.getTime() <= last) {
     result.push(cursor);

@@ -15,6 +15,7 @@ import { relistSlotInDb } from './relist-store';
 import { requireApprovedOwner } from './require-approved-owner';
 import type { SavedSlot } from './slot-create-store';
 import { validateSlotDraft } from './slot-draft-store';
+import { editStartWindow } from './slot-edit';
 import { checkEditable, closeSlotInDb, updateSlotInDb } from './slot-edit-store';
 
 /** 판매 전 매물을 마감한다. 사유: other_channel(다른 곳 예약) / mistake(잘못 올림) / other(기타) */
@@ -32,7 +33,10 @@ export async function closeSlot(
   return closed;
 }
 
-/** 수정 ①② 고른 메뉴·시작 시각이 올릴 수 있는 것인지 본다. 고치는 매물 자신과는 겹쳐도 된다 */
+/**
+ * 수정 ①② 고른 메뉴·시작 시각이 올릴 수 있는 것인지 본다. 고치는 매물 자신과는 겹쳐도 된다.
+ * 게시중 매물은 48시간 안, 예약대기 매물은 14일 안의 시각만 받는다(editStartWindow)
+ */
 export async function checkSlotEdit(
   shopId: string,
   slotId: string,
@@ -45,7 +49,10 @@ export async function checkSlotEdit(
   const now = await getRequestNow();
   const editable = await checkEditable(db, shopId, slotId, now);
   if (!editable.ok) return editable;
-  const draft = await validateSlotDraft(db, shopId, input, now, { excludeSlotId: slotId });
+  const draft = await validateSlotDraft(db, shopId, input, now, {
+    excludeSlotId: slotId,
+    window: editStartWindow(editable.data, now),
+  });
   if (!draft.ok) return draft;
   return ok({ endAt: draft.data.end.toISOString() });
 }

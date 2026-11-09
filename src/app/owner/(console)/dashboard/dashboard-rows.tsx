@@ -22,7 +22,7 @@ import { SLOT_CLOSE_REASON_LABELS } from '../slots/slot-edit';
 import { SLOT_STATUS_STYLE } from '../status-style';
 import { type DashboardSlot, onHold, SLOT_STATUS_LABELS, viewStatus } from './dashboard';
 
-/** 매물 한 줄: 시간, 메뉴·가격·배지, 상태와 덧붙임(예약번호·마감 사유·재등록함), 버튼 */
+/** 매물 한 줄: 시간, 메뉴·가격·배지, 상태와 덧붙임(게시 시각·예약번호·마감 사유·재등록함), 버튼 */
 export function SlotRow({
   slot,
   now,
@@ -58,6 +58,12 @@ export function SlotRow({
       </div>
       <div className="flex flex-col items-end gap-1">
         <StatusBadge status={status} />
+        {/* 미리 올린 매물(S-205)은 언제 고객에게 보이기 시작하는지 */}
+        {status === 'scheduled' ? (
+          <span className="text-xs text-muted-foreground">
+            {formatKst(new Date(slot.publishAt))} 게시
+          </span>
+        ) : null}
         {slot.reservationCode ? (
           <span className="text-xs text-muted-foreground tabular-nums">
             예약번호 {formatReservationCode(slot.reservationCode)}

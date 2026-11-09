@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { canEditSlot, type SlotHoldInput } from '@/features/slot-status/slot-status';
 import { SLOT_STATUS_CASES } from '@/features/slot-status/slot-status-cases';
 
-import { slotEditProblem } from './slot-edit';
+import { editStartWindow, slotEditProblem } from './slot-edit';
 
 const noHold: SlotHoldInput = { holdCustomerId: null, holdExpiresAt: null };
 const heldUntil = (now: Date, deltaMs: number): SlotHoldInput => ({
@@ -40,5 +40,31 @@ describe('매물 수정·마감 가능 여부 (O10, S-206)', () => {
     expect(
       slotEditProblem({ ...base, status: 'published' }, new Date('2026-11-01T12:00:00+09:00')),
     ).toBe('SLOT_CLOSED');
+  });
+});
+
+describe('고칠 때 고를 수 있는 시작 시각 범위 (S-205, 11/9)', () => {
+  const now = new Date('2026-10-31T12:00:00+09:00');
+  const startAt = new Date('2026-11-05T14:00:00+09:00');
+
+  it('게시중이면 48시간 안, 예약대기면 14일 안', () => {
+    expect(editStartWindow({ status: 'published', publishAt: now, startAt }, now)).toBe(
+      'published',
+    );
+    expect(
+      editStartWindow(
+        { status: 'scheduled', publishAt: new Date('2026-11-03T14:00:00+09:00'), startAt },
+        now,
+      ),
+    ).toBe('advance');
+  });
+
+  it('게시 시각이 지나 저절로 게시중이 된 예약대기 매물은 게시중으로 본다', () => {
+    expect(
+      editStartWindow(
+        { status: 'scheduled', publishAt: new Date('2026-10-31T11:00:00+09:00'), startAt },
+        now,
+      ),
+    ).toBe('published');
   });
 });

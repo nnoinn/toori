@@ -10,6 +10,8 @@ import {
   type SlotStatusInput,
 } from '@/features/slot-status/slot-status';
 
+import type { StartWindow } from './slot-time';
+
 /** 마감 사유 이름(목록에 보여준다) */
 export const SLOT_CLOSE_REASON_LABELS: Record<SlotCloseReason, string> = {
   other_channel: '다른 곳 예약',
@@ -60,4 +62,12 @@ export function slotEditProblem(
     default:
       return 'SLOT_ENDED';
   }
+}
+
+/**
+ * 고칠 때 고를 수 있는 시작 시각 범위(S-205, 11/9 정민석). 이미 고객에게 보이는(게시중) 매물은 48시간 안으로만
+ * 옮길 수 있어서 다시 예약대기로 숨지 않는다. 예약대기 매물은 새로 올릴 때처럼 14일 안에서 고른다
+ */
+export function editStartWindow(slot: SlotStatusInput, now: Date): StartWindow {
+  return getSlotStatus(slot, now) === 'published' ? 'published' : 'advance';
 }

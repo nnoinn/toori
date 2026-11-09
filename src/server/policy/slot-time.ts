@@ -5,6 +5,12 @@ import { hoursUntil } from '@/lib/time';
 /** 서비스 시작 48시간 전부터 게시할 수 있다(S-204) */
 export const PUBLISH_WINDOW_HOURS = 48;
 
+/**
+ * 원장님은 서비스 시작이 지금부터 14일 안인 매물까지 미리 올릴 수 있다(S-205, 11/3 nnoinn #23).
+ * 시작 48시간 전(PUBLISH_WINDOW_HOURS)이 되기 전에는 예약대기로 두고, 그때 저절로 게시중이 된다
+ */
+export const ADVANCE_LISTING_DAYS = 14;
+
 /** 시작까지 6시간 미만이면 임박으로 강조한다(C-203) */
 export const IMMINENT_WITHIN_HOURS = 6;
 

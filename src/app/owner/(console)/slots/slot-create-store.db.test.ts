@@ -1,4 +1,4 @@
-// 매물 등록 저장이 ①②③ 검증 뒤 약속한 값으로 한 건만 저장하는지 실제 DB로 본다(O5, S-201·S-203·S-209).
+// 매물 등록 저장이 ①②③ 검증 뒤 약속한 값으로 한 건만 저장하는지 실제 DB로 본다(O5, S-201·S-203·S-205·S-209).
 // TEST_DATABASE_URL이 있을 때만 돈다(PR 자동 검사). docs/tech-guide.md 3-4 "DB 테스트"
 
 import { eq } from 'drizzle-orm';
@@ -33,7 +33,8 @@ describeDb('매물 등록 저장 (실제 DB)', () => {
         { menuId: shop.menuId, startAt: at('14:00'), discountRate: 30, newCustomerOnly: true },
         now,
       );
-      expect(result).toMatchObject({ ok: true, data: { salePrice: 23450 } });
+      // 48시간 안이라 지금 게시중이고, 게시 시각을 따로 알려 주지 않는다
+      expect(result).toMatchObject({ ok: true, data: { salePrice: 23450, publishAt: null } });
       if (!result.ok) return;
 
       const [row] = await tx.select().from(slots).where(eq(slots.id, result.data.slotId));
@@ -79,7 +80,26 @@ describeDb('매물 등록 저장 (실제 DB)', () => {
     });
   });
 
-  it('①② 검증(48시간·겹침)을 저장할 때 다시 한다', async () => {
+  it('미리 올리기: 시작이 48시간보다 멀면 예약대기로, 시작 48시간 전을 게시 시각으로 저장한다(S-205)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx);
+      const startAt = '2026-11-05T05:00:00.000Z'; // 11/05(목) 14:00
+      const result = await createSlotInDb(
+        tx,
+        shop.shopId,
+        shop.createdBy,
+        { menuId: shop.menuId, startAt, discountRate: 20, newCustomerOnly: false },
+        now,
+      );
+      const publishAt = new Date('2026-11-03T14:00:00+09:00');
+      expect(result).toMatchObject({ ok: true, data: { publishAt: publishAt.toISOString() } });
+      if (!result.ok) return;
+      const [row] = await tx.select().from(slots).where(eq(slots.id, result.data.slotId));
+      expect(row).toMatchObject({ status: 'scheduled', publishAt, startAt: new Date(startAt) });
+    });
+  });
+
+  it('①② 검증(14일·겹침)을 저장할 때 다시 한다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
       await tx.insert(slots).values(testSlot(shop, '10:00', '11:00'));
@@ -92,7 +112,8 @@ describeDb('매물 등록 저장 (실제 DB)', () => {
           now,
         );
       expect(await create(at('10:30'))).toMatchObject({ error: { code: 'SLOT_OVERLAP' } });
-      expect(await create('2026-11-02T04:00:00.000Z')).toMatchObject({
+      // 지금(10/31 12:00)부터 14일 뒤(11/14 12:00)를 30분 넘긴 시각
+      expect(await create('2026-11-14T03:30:00.000Z')).toMatchObject({
         error: { code: 'TOO_FAR' },
       });
     });
