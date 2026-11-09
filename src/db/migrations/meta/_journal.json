@@ -64,6 +64,13 @@
       "when": 1794200313093,
       "tag": "0008_terms_interest_alert",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794201241251,
+      "tag": "0009_admin_access_logs",
+      "breakpoints": true
     }
   ]
 }
