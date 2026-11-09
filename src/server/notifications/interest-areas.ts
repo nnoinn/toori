@@ -2,7 +2,7 @@
 
 // 관심 동네 읽기·바꾸기 (C-601 화면 정찬형 J14, 연결 #12 #131). 화면에서는 '@/server/notifications/interest-areas'에서 가져온다.
 // 동네는 정찬형님 동네 고르기 목록(REGIONS, src/features/map/regions.ts)에 있는 것만 받는다.
-// 광고성 정보 수신 동의는 저장 조건이 아니고 알림을 보낼 때 본다(동의 저장은 setMarketingConsent, #47 5장).
+// 관심 동네·찜한 샵 새 매물 알림 동의(interest_alert)는 저장 조건이 아니고 알림을 보낼 때 본다(동의 저장은 setOptionalConsent, #47 5장, #267).
 
 import { z } from 'zod';
 
