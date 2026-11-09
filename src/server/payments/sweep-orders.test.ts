@@ -20,12 +20,16 @@ const state = vi.hoisted(() => ({
   settle: null as unknown,
   cancelled: [] as unknown[],
   cancel: true as boolean,
+  marked: [] as unknown[],
 }));
 
 vi.mock('./order-store', () => ({
   readStaleOrders: async (_db: unknown, input: unknown) => {
     state.readInput = input;
     return state.stale;
+  },
+  markOrderChecked: async (_db: unknown, orderId: string, now: Date) => {
+    state.marked.push({ orderId, now });
   },
 }));
 vi.mock('./portone', () => ({
@@ -98,6 +102,7 @@ beforeEach(() => {
   state.settle = { ok: true, reservationId: 'r', reservationCode: 'ABCD2345' };
   state.cancelled = [];
   state.cancel = true;
+  state.marked = [];
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -180,5 +185,17 @@ describe('sweepStaleOrders', () => {
       abandoned: 1,
       left: 1,
     });
+  });
+
+  it('결과를 정하지 못한 주문만 뒤로 보내서 다음 실행이 안 본 주문부터 본다', async () => {
+    state.stale = [order('a'), order('b'), order('c')];
+    state.lookups.set('toori-a', found('PENDING'));
+    state.lookups.set('toori-b', new Error('boom'));
+    state.lookups.set('toori-c', found('PAID'));
+    await sweepStaleOrders(db, NOW);
+    expect(state.marked).toEqual([
+      { orderId: 'order-a', now: NOW },
+      { orderId: 'order-b', now: NOW },
+    ]);
   });
 });

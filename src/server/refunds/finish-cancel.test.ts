@@ -51,7 +51,7 @@ const request: CancelRequest = {
 };
 
 function payment(
-  cancellations: { id: string; amount: number }[],
+  cancellations: { id: string; amount: number; reason?: string }[],
   cancelInProgress = false,
 ): { ok: true; payment: Record<string, unknown> } {
   return { ok: true, payment: { status: 'PAID', cancellations, cancelInProgress } };
@@ -112,6 +112,16 @@ describe('finishCancel', () => {
     expect(console.error).toHaveBeenCalled();
   });
 
+  it('운영자 확인 메모를 받으면 금액이 같아도 남기고, 금액이 다르면 이유를 같이 남긴다', async () => {
+    const refund = { cancellationId: 'c-1', amount: 31_500 };
+    await finishCancel(db, request, refund, NOW, '나중에 처리된 취소예요');
+    expect(state.finishes[0]).toMatchObject({ reviewReason: '나중에 처리된 취소예요' });
+    await finishCancel(db, request, { ...refund, amount: 45_000 }, NOW, '나중에 처리된 취소예요');
+    expect(state.finishes[1]).toMatchObject({
+      reviewReason: '나중에 처리된 취소예요. 포트원 환불액 45000원이 계산한 31500원과 달라요',
+    });
+  });
+
   it('먼저 기록한 요청이 있으면 null', async () => {
     state.finished = false;
     expect(
@@ -122,10 +132,10 @@ describe('finishCancel', () => {
 
 describe('lookUpRefund', () => {
   it('끝난 취소가 있으면 refunded, 처리 중이면 pending, 없으면 none', async () => {
-    state.lookup = payment([{ id: 'c-1', amount: 31_500 }]);
+    state.lookup = payment([{ id: 'c-1', amount: 31_500, reason: '고객 예약 취소' }]);
     expect(await lookUpRefund('toori-1')).toEqual({
       state: 'refunded',
-      refund: { cancellationId: 'c-1', amount: 31_500 },
+      refund: { cancellationId: 'c-1', amount: 31_500, reasons: ['고객 예약 취소'] },
     });
     state.lookup = payment([], true);
     expect(await lookUpRefund('toori-1')).toEqual({ state: 'pending' });

@@ -4,7 +4,7 @@
 
 import 'server-only';
 
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { customers, owners, payoutAccounts, shops, termsAgreements } from '@/db/schema';
@@ -14,7 +14,7 @@ import { TERMS_VERSIONS } from '@/server/policy';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select' | 'insert' | 'update'>;
 
-/** 고객 가입의 필수 동의(만 14세 이상 확인 포함, C-104·#47 1장). 광고성 정보 수신(marketing)만 선택 */
+/** 고객 가입의 필수 동의(만 14세 이상 확인 포함, C-104·#47 1장). 나머지는 아래 선택 동의 */
 export const CUSTOMER_REQUIRED_TERMS = [
   'age14',
   'service',
@@ -22,17 +22,39 @@ export const CUSTOMER_REQUIRED_TERMS = [
   'location',
 ] as const satisfies readonly TermsType[];
 
+/**
+ * 고객이 고르는 선택 동의. 둘 다 광고성 정보라 따로 받고 따로 철회한다(#267, 11/8).
+ * interest_alert: 관심 동네·찜한 샵 새 매물 알림(W17은 이 동의만 본다). marketing: 이벤트·혜택 소식
+ */
+export const OPTIONAL_CUSTOMER_TERMS = [
+  'interest_alert',
+  'marketing',
+] as const satisfies readonly TermsType[];
+export type OptionalTerms = (typeof OPTIONAL_CUSTOMER_TERMS)[number];
+
+export function isOptionalTerms(value: string): value is OptionalTerms {
+  return (OPTIONAL_CUSTOMER_TERMS as readonly string[]).includes(value);
+}
+
+/** 가입·동의 직후 한 번 보여주는 처리 결과 한 줄(동의 문구 6-1장) */
+export type ConsentNotice = { type: OptionalTerms; agreedAt: Date };
+
 /** 프로필 이름을 받지 못했을 때의 첫 닉네임 */
 export const DEFAULT_CUSTOMER_NICKNAME = '고객';
 
 /**
  * 고객 계정과 약관 동의 기록을 저장한다. 이미 고객 계정이 있으면 아무것도 저장하지 않고 null.
- * 광고성 정보 수신에 동의했으면 그 동의 시각도 돌려준다(가입 직후 처리 결과 안내). 둘이 함께 저장되도록 트랜잭션 안에서 부른다
+ * 고른 선택 동의는 동의 시각을 돌려준다(가입 직후 처리 결과 안내). 둘이 함께 저장되도록 트랜잭션 안에서 부른다
  */
 export async function saveCustomerAccount(
   tx: Db,
-  input: { userId: string; nickname: string; phone: string; marketing: boolean },
-): Promise<{ customerId: string; marketingAgreedAt: Date | null } | null> {
+  input: {
+    userId: string;
+    nickname: string;
+    phone: string;
+    optionalTerms: readonly OptionalTerms[];
+  },
+): Promise<{ customerId: string; consentNotices: ConsentNotice[] } | null> {
   const [customer] = await tx
     .insert(customers)
     .values({ userId: input.userId, nickname: input.nickname, phone: input.phone })
@@ -40,8 +62,10 @@ export async function saveCustomerAccount(
     .returning({ id: customers.id });
   if (!customer) return null;
 
-  const termsTypes: TermsType[] = [...CUSTOMER_REQUIRED_TERMS];
-  if (input.marketing) termsTypes.push('marketing');
+  const termsTypes: TermsType[] = [
+    ...CUSTOMER_REQUIRED_TERMS,
+    ...OPTIONAL_CUSTOMER_TERMS.filter((type) => input.optionalTerms.includes(type)),
+  ];
   const agreed = await tx
     .insert(termsAgreements)
     .values(
@@ -53,12 +77,16 @@ export async function saveCustomerAccount(
       })),
     )
     .returning({ termsType: termsAgreements.termsType, agreedAt: termsAgreements.agreedAt });
-  const marketing = agreed.find((row) => row.termsType === 'marketing');
-  return { customerId: customer.id, marketingAgreedAt: marketing?.agreedAt ?? null };
+  const consentNotices = OPTIONAL_CUSTOMER_TERMS.flatMap((type) => {
+    const row = agreed.find((r) => r.termsType === type);
+    return row ? [{ type, agreedAt: row.agreedAt }] : [];
+  });
+  return { customerId: customer.id, consentNotices };
 }
 
-export type MarketingConsent = {
-  /** 지금 광고성 정보 수신에 동의한 상태인지 */
+/** 선택 동의 하나의 지금 상태 */
+export type OptionalConsent = {
+  /** 지금 동의한 상태인지 */
   agreed: boolean;
   /** 동의한 상태면 동의한 시각, 아니면 null */
   agreedAt: Date | null;
@@ -66,10 +94,16 @@ export type MarketingConsent = {
   withdrawnAt: Date | null;
 };
 
-type MarketingRow = { agreedAt: Date; withdrawnAt: Date | null };
+/** 광고성 정보 수신(marketing) 동의 상태. 예전 이름이라 OptionalConsent와 같다 */
+export type MarketingConsent = OptionalConsent;
 
-/** 광고성 동의 기록들로 지금 상태를 만든다. 철회하지 않은 기록이 있으면 동의한 상태 */
-export function toMarketingConsent(rows: readonly MarketingRow[]): MarketingConsent {
+/** 두 선택 동의의 지금 상태 */
+export type OptionalConsents = Record<OptionalTerms, OptionalConsent>;
+
+type ConsentRow = { agreedAt: Date; withdrawnAt: Date | null };
+
+/** 한 종류의 동의 기록들로 지금 상태를 만든다. 철회하지 않은 기록이 있으면 동의한 상태 */
+export function toOptionalConsent(rows: readonly ConsentRow[]): OptionalConsent {
   const latest = (dates: Date[]) =>
     dates.reduce<Date | null>((a, b) => (a && a >= b ? a : b), null);
   const agreedAt = latest(rows.filter((r) => r.withdrawnAt === null).map((r) => r.agreedAt));
@@ -81,53 +115,100 @@ export function toMarketingConsent(rows: readonly MarketingRow[]): MarketingCons
   };
 }
 
-/** 광고성 정보 수신 동의 상태를 읽는다 */
-export async function readMarketingConsent(
+/** 선택 동의 하나의 상태를 읽는다 */
+export async function readOptionalConsent(
+  db: Pick<Db, 'select'>,
+  userId: string,
+  accountType: AccountType,
+  termsType: OptionalTerms,
+): Promise<OptionalConsent> {
+  const rows = await db
+    .select({ agreedAt: termsAgreements.agreedAt, withdrawnAt: termsAgreements.withdrawnAt })
+    .from(termsAgreements)
+    .where(consentOf(userId, accountType, termsType));
+  return toOptionalConsent(rows);
+}
+
+/** 두 선택 동의의 상태를 한 번에 읽는다(내 정보 알림 설정) */
+export async function readOptionalConsents(
+  db: Pick<Db, 'select'>,
+  userId: string,
+  accountType: AccountType,
+): Promise<OptionalConsents> {
+  const rows = await db
+    .select({
+      termsType: termsAgreements.termsType,
+      agreedAt: termsAgreements.agreedAt,
+      withdrawnAt: termsAgreements.withdrawnAt,
+    })
+    .from(termsAgreements)
+    .where(
+      and(
+        eq(termsAgreements.userId, userId),
+        eq(termsAgreements.accountType, accountType),
+        inArray(termsAgreements.termsType, [...OPTIONAL_CUSTOMER_TERMS]),
+      ),
+    );
+  return {
+    interest_alert: toOptionalConsent(rows.filter((r) => r.termsType === 'interest_alert')),
+    marketing: toOptionalConsent(rows.filter((r) => r.termsType === 'marketing')),
+  };
+}
+
+/** 광고성 정보 수신(marketing) 동의 상태를 읽는다 */
+export function readMarketingConsent(
   db: Pick<Db, 'select'>,
   userId: string,
   accountType: AccountType,
 ): Promise<MarketingConsent> {
-  const rows = await db
-    .select({ agreedAt: termsAgreements.agreedAt, withdrawnAt: termsAgreements.withdrawnAt })
-    .from(termsAgreements)
-    .where(marketingOf(userId, accountType));
-  return toMarketingConsent(rows);
+  return readOptionalConsent(db, userId, accountType, 'marketing');
 }
 
 /**
- * 광고성 정보 수신 동의를 켜거나 끈다. 켜면 동의 기록을 새로 더하고(이미 켜져 있으면 그대로),
+ * 선택 동의 하나를 켜거나 끈다. 켜면 동의 기록을 새로 더하고(이미 켜져 있으면 그대로),
  * 끄면 철회하지 않은 기록에 철회 시각을 남긴다. 기록은 지우지 않는다. 트랜잭션 안에서 부른다
  */
-export async function writeMarketingConsent(
+export async function writeOptionalConsent(
   tx: Db,
   userId: string,
   accountType: AccountType,
+  termsType: OptionalTerms,
   agree: boolean,
-): Promise<MarketingConsent> {
-  const current = await readMarketingConsent(tx, userId, accountType);
+): Promise<OptionalConsent> {
+  const current = await readOptionalConsent(tx, userId, accountType, termsType);
   if (current.agreed === agree) return current;
 
   if (agree) {
     await tx.insert(termsAgreements).values({
       userId,
       accountType,
-      termsType: 'marketing',
-      version: TERMS_VERSIONS.marketing,
+      termsType,
+      version: TERMS_VERSIONS[termsType],
     });
   } else {
     await tx
       .update(termsAgreements)
       .set({ withdrawnAt: sql`now()` })
-      .where(and(marketingOf(userId, accountType), isNull(termsAgreements.withdrawnAt)));
+      .where(and(consentOf(userId, accountType, termsType), isNull(termsAgreements.withdrawnAt)));
   }
-  return readMarketingConsent(tx, userId, accountType);
+  return readOptionalConsent(tx, userId, accountType, termsType);
 }
 
-function marketingOf(userId: string, accountType: AccountType) {
+/** 광고성 정보 수신(marketing) 동의를 켜거나 끈다 */
+export function writeMarketingConsent(
+  tx: Db,
+  userId: string,
+  accountType: AccountType,
+  agree: boolean,
+): Promise<MarketingConsent> {
+  return writeOptionalConsent(tx, userId, accountType, 'marketing', agree);
+}
+
+function consentOf(userId: string, accountType: AccountType, termsType: OptionalTerms) {
   return and(
     eq(termsAgreements.userId, userId),
     eq(termsAgreements.accountType, accountType),
-    eq(termsAgreements.termsType, 'marketing'),
+    eq(termsAgreements.termsType, termsType),
   );
 }
 

@@ -117,7 +117,7 @@ describeDb('회원 조회 (실제 DB)', () => {
     });
   });
 
-  it('고객 상세는 전체 번호·이메일·광고성 동의·최근 예약을 읽고, 없는 고객은 null', async () => {
+  it('고객 상세는 전체 번호·이메일·선택 동의 두 개·최근 예약을 읽고, 없는 고객은 null', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
       const me = await namedCustomer(tx, unique('상세'), '010-1111-2222');
@@ -143,7 +143,10 @@ describeDb('회원 조회 (실제 DB)', () => {
       expect(detail).toMatchObject({
         phone: '010-1111-2222',
         email: `${me.userId}@test.invalid`,
-        marketing: { agreed: true, agreedAt, withdrawnAt: null },
+        consents: {
+          interest_alert: { agreed: false, agreedAt: null, withdrawnAt: null },
+          marketing: { agreed: true, agreedAt, withdrawnAt: null },
+        },
         reservationCount: 1,
         cancelCount: 0,
         noShowCount: 1,

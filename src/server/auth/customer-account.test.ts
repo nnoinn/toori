@@ -1,4 +1,4 @@
-// 고객 가입 저장·광고성 동의 (#47 4·5장). 로그인·DB·쿠키·화면 이동은 가짜로 바꿔서 DB 없이 돈다.
+// 고객 가입 저장·선택 동의 (#47 4·5장, #267). 로그인·DB·쿠키·화면 이동은 가짜로 바꿔서 DB 없이 돈다.
 // DB에 실제로 저장되는 모양은 account-store.test.ts가 확인한다.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,18 +8,24 @@ import { fail, ok } from '@/lib/result';
 import {
   createCustomerAccount,
   getMarketingConsent,
+  getOptionalConsents,
   setMarketingConsent,
+  setOptionalConsent,
+  takeConsentNotices,
   takeMarketingConsentNotice,
 } from './customer-account';
 
 const state = vi.hoisted(() => ({
   user: null as { userId: string; name: string | null } | null,
   customerAuth: null as unknown,
-  saved: null as { customerId: string; marketingAgreedAt: Date | null } | null,
+  saved: null as {
+    customerId: string;
+    consentNotices: { type: 'interest_alert' | 'marketing'; agreedAt: Date }[];
+  } | null,
   cookies: new Map<string, string>(),
   saveCustomerAccount: vi.fn(),
-  readMarketingConsent: vi.fn(),
-  writeMarketingConsent: vi.fn(),
+  readOptionalConsents: vi.fn(),
+  writeOptionalConsent: vi.fn(),
   cookieSet: vi.fn(),
   cookieDelete: vi.fn(),
 }));
@@ -52,9 +58,11 @@ vi.mock('./account-store', async (importOriginal) => {
   return {
     CUSTOMER_REQUIRED_TERMS: actual.CUSTOMER_REQUIRED_TERMS,
     DEFAULT_CUSTOMER_NICKNAME: actual.DEFAULT_CUSTOMER_NICKNAME,
+    OPTIONAL_CUSTOMER_TERMS: actual.OPTIONAL_CUSTOMER_TERMS,
+    isOptionalTerms: actual.isOptionalTerms,
     saveCustomerAccount: state.saveCustomerAccount,
-    readMarketingConsent: state.readMarketingConsent,
-    writeMarketingConsent: state.writeMarketingConsent,
+    readOptionalConsents: state.readOptionalConsents,
+    writeOptionalConsent: state.writeOptionalConsent,
   };
 });
 
@@ -65,7 +73,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.user = { userId: 'user-1', name: '김투리' };
   state.customerAuth = ok({ userId: 'user-1', customerId: 'customer-1' });
-  state.saved = { customerId: 'customer-1', marketingAgreedAt: null };
+  state.saved = { customerId: 'customer-1', consentNotices: [] };
   state.saveCustomerAccount.mockImplementation(async () => state.saved);
   state.cookies.clear();
   state.cookieDelete.mockImplementation((name: string) => state.cookies.delete(name));
@@ -84,7 +92,7 @@ describe('createCustomerAccount', () => {
       userId: 'user-1',
       nickname: '김투리',
       phone: PHONE,
-      marketing: true,
+      optionalTerms: ['marketing'],
     });
     expect(state.cookieSet).toHaveBeenCalledWith(
       'account_mode',
@@ -102,7 +110,7 @@ describe('createCustomerAccount', () => {
       userId: 'user-1',
       nickname: '고객',
       phone: PHONE,
-      marketing: false,
+      optionalTerms: [],
     });
 
     await expect(
@@ -194,24 +202,58 @@ describe('createCustomerAccount', () => {
     expect(result).toEqual(fail('ALREADY_EXISTS', '이미 가입한 계정이에요'));
     expect(state.cookieSet).not.toHaveBeenCalled();
   });
+
+  it('관심 동네·찜한 샵 알림 동의도 받고, 보내지 않으면 동의하지 않은 것으로 본다', async () => {
+    await expect(
+      createCustomerAccount({
+        agreements: { ...ALL_REQUIRED, marketing: true, interest_alert: true },
+        phone: PHONE,
+      }),
+    ).rejects.toThrow('redirect:/');
+    expect(state.saveCustomerAccount).toHaveBeenLastCalledWith(
+      'tx',
+      expect.objectContaining({ optionalTerms: ['interest_alert', 'marketing'] }),
+    );
+
+    await expect(
+      createCustomerAccount({
+        agreements: { ...ALL_REQUIRED, marketing: false, interest_alert: true },
+        phone: PHONE,
+      }),
+    ).rejects.toThrow('redirect:/');
+    expect(state.saveCustomerAccount).toHaveBeenLastCalledWith(
+      'tx',
+      expect.objectContaining({ optionalTerms: ['interest_alert'] }),
+    );
+  });
 });
 
 const AGREED_AT = new Date('2026-10-28T03:00:00.000Z');
+const ALERT_AT = new Date('2026-10-28T03:00:01.000Z');
 
-describe('가입 직후 광고성 동의 처리 결과 안내', () => {
-  it('가입 때 광고성 동의를 골랐으면 누구의 동의인지와 동의 시각을 14일짜리 쿠키로 남긴다', async () => {
-    state.saved = { customerId: 'customer-1', marketingAgreedAt: AGREED_AT };
+describe('가입 직후 선택 동의 처리 결과 안내', () => {
+  it('가입 때 고른 선택 동의마다 종류와 동의 시각을 누구의 것인지와 같이 14일짜리 쿠키로 남긴다', async () => {
+    state.saved = {
+      customerId: 'customer-1',
+      consentNotices: [
+        { type: 'interest_alert', agreedAt: ALERT_AT },
+        { type: 'marketing', agreedAt: AGREED_AT },
+      ],
+    };
     await expect(
-      createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: true }, phone: PHONE }),
+      createCustomerAccount({
+        agreements: { ...ALL_REQUIRED, marketing: true, interest_alert: true },
+        phone: PHONE,
+      }),
     ).rejects.toThrow('redirect:/');
     expect(state.cookieSet).toHaveBeenCalledWith(
       'marketing_consent_notice',
-      `user-1|${AGREED_AT.toISOString()}`,
+      `user-1|interest_alert=${ALERT_AT.toISOString()}|marketing=${AGREED_AT.toISOString()}`,
       expect.objectContaining({ httpOnly: true, maxAge: 14 * 24 * 60 * 60 }),
     );
   });
 
-  it('광고성 동의를 고르지 않았으면 남기지 않는다', async () => {
+  it('선택 동의를 고르지 않았으면 남기지 않는다', async () => {
     await expect(
       createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: false }, phone: PHONE }),
     ).rejects.toThrow('redirect:/');
@@ -222,8 +264,31 @@ describe('가입 직후 광고성 동의 처리 결과 안내', () => {
     );
   });
 
-  it('takeMarketingConsentNotice는 동의 시각을 한 번만 돌려주고 쿠키를 지운다', async () => {
-    state.cookies.set('marketing_consent_notice', `user-1|${AGREED_AT.toISOString()}`);
+  it('takeConsentNotices는 동의마다 처리 결과를 한 번만 돌려주고 쿠키를 지운다', async () => {
+    state.cookies.set(
+      'marketing_consent_notice',
+      `user-1|interest_alert=${ALERT_AT.toISOString()}|marketing=${AGREED_AT.toISOString()}`,
+    );
+    expect(await takeConsentNotices()).toEqual(
+      ok([
+        { type: 'interest_alert', agreedAt: ALERT_AT },
+        { type: 'marketing', agreedAt: AGREED_AT },
+      ]),
+    );
+    expect(state.cookieDelete).toHaveBeenCalledWith('marketing_consent_notice');
+    expect(await takeConsentNotices()).toEqual(ok([]));
+  });
+
+  it('예전 모양(동의 시각만)의 쿠키는 광고성 동의로 읽고, 모르는 종류는 버린다', async () => {
+    state.cookies.set('marketing_consent_notice', `user-1|${AGREED_AT.toISOString()}|other=x`);
+    expect(await takeConsentNotices()).toEqual(ok([{ type: 'marketing', agreedAt: AGREED_AT }]));
+  });
+
+  it('예전 함수 takeMarketingConsentNotice는 광고성 동의 시각만 한 번 돌려주고 쿠키를 지운다', async () => {
+    state.cookies.set(
+      'marketing_consent_notice',
+      `user-1|interest_alert=${ALERT_AT.toISOString()}|marketing=${AGREED_AT.toISOString()}`,
+    );
     expect(await takeMarketingConsentNotice()).toEqual(ok({ agreedAt: AGREED_AT }));
     expect(state.cookieDelete).toHaveBeenCalledWith('marketing_consent_notice');
     expect(await takeMarketingConsentNotice()).toEqual(ok(null));
@@ -244,36 +309,64 @@ describe('가입 직후 광고성 동의 처리 결과 안내', () => {
   });
 });
 
-describe('setMarketingConsent·getMarketingConsent', () => {
+describe('선택 동의 켜고 끄기·읽기', () => {
   const agreed = { agreed: true, agreedAt: new Date('2026-10-27T05:00:00Z'), withdrawnAt: null };
+  const never = { agreed: false, agreedAt: null, withdrawnAt: null };
 
-  it('켜고 끈 결과(시각 포함)를 돌려준다', async () => {
-    state.writeMarketingConsent.mockResolvedValue(agreed);
-    expect(await setMarketingConsent(true)).toEqual(ok(agreed));
-    expect(state.writeMarketingConsent).toHaveBeenCalledWith('tx', 'user-1', 'customer', true);
+  it('고른 종류를 켜고 끈 결과(시각 포함)를 돌려준다', async () => {
+    state.writeOptionalConsent.mockResolvedValue(agreed);
+    expect(await setOptionalConsent('interest_alert', true)).toEqual(ok(agreed));
+    expect(state.writeOptionalConsent).toHaveBeenCalledWith(
+      'tx',
+      'user-1',
+      'customer',
+      'interest_alert',
+      true,
+    );
   });
 
-  it('상태를 읽는다', async () => {
-    state.readMarketingConsent.mockResolvedValue(agreed);
-    expect(await getMarketingConsent()).toEqual(ok(agreed));
-    expect(state.readMarketingConsent).toHaveBeenCalledWith(
+  it('두 동의를 한 번에 읽는다', async () => {
+    state.readOptionalConsents.mockResolvedValue({ interest_alert: agreed, marketing: never });
+    expect(await getOptionalConsents()).toEqual(ok({ interest_alert: agreed, marketing: never }));
+    expect(state.readOptionalConsents).toHaveBeenCalledWith(
       expect.anything(),
       'user-1',
       'customer',
     );
   });
 
-  it('고객 계정이 아니면 권한 실패를 그대로 돌려주고 DB를 보지 않는다', async () => {
-    state.customerAuth = fail('NO_CUSTOMER_ACCOUNT', '약관 동의 후 이용할 수 있어요');
-    expect(await setMarketingConsent(true)).toEqual(state.customerAuth);
-    expect(await getMarketingConsent()).toEqual(state.customerAuth);
-    expect(state.writeMarketingConsent).not.toHaveBeenCalled();
-    expect(state.readMarketingConsent).not.toHaveBeenCalled();
+  it('예전 함수는 광고성(marketing) 동의만 켜고 끄고 읽는다', async () => {
+    state.writeOptionalConsent.mockResolvedValue(agreed);
+    expect(await setMarketingConsent(true)).toEqual(ok(agreed));
+    expect(state.writeOptionalConsent).toHaveBeenCalledWith(
+      'tx',
+      'user-1',
+      'customer',
+      'marketing',
+      true,
+    );
+    state.readOptionalConsents.mockResolvedValue({ interest_alert: never, marketing: agreed });
+    expect(await getMarketingConsent()).toEqual(ok(agreed));
   });
 
-  it('켜기·끄기 값이 아니면 INVALID_INPUT', async () => {
-    const result = await setMarketingConsent('yes' as never);
-    expect(result.ok === false && result.error.code).toBe('INVALID_INPUT');
-    expect(state.writeMarketingConsent).not.toHaveBeenCalled();
+  it('고객 계정이 아니면 권한 실패를 그대로 돌려주고 DB를 보지 않는다', async () => {
+    state.customerAuth = fail('NO_CUSTOMER_ACCOUNT', '약관 동의 후 이용할 수 있어요');
+    expect(await setOptionalConsent('interest_alert', true)).toEqual(state.customerAuth);
+    expect(await getOptionalConsents()).toEqual(state.customerAuth);
+    expect(await setMarketingConsent(true)).toEqual(state.customerAuth);
+    expect(await getMarketingConsent()).toEqual(state.customerAuth);
+    expect(state.writeOptionalConsent).not.toHaveBeenCalled();
+    expect(state.readOptionalConsents).not.toHaveBeenCalled();
+  });
+
+  it('종류나 켜기·끄기 값이 아니면 INVALID_INPUT', async () => {
+    for (const [type, agree] of [
+      ['interest_alert', 'yes'],
+      ['service', true],
+    ] as const) {
+      const result = await setOptionalConsent(type as never, agree as never);
+      expect(result.ok === false && result.error.code).toBe('INVALID_INPUT');
+    }
+    expect(state.writeOptionalConsent).not.toHaveBeenCalled();
   });
 });

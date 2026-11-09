@@ -10,10 +10,10 @@ import { getDb } from '@/db';
 import { formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';
 import { recordAdminAccess } from '@/server/admin/access-log';
-import { ensureAdminPage } from '@/server/auth';
+import { ensureAdminPage, type OptionalConsent } from '@/server/auth';
 
 import { labelReservation } from '../../../lookup';
-import { type CustomerDetail, selectCustomerDetail } from '../../queries';
+import { selectCustomerDetail } from '../../queries';
 
 export const metadata: Metadata = { title: '고객 정보' };
 
@@ -34,9 +34,9 @@ export default function AdminCustomerPage({ params }: { params: Params }) {
   );
 }
 
-function labelMarketing({ marketing }: CustomerDetail): string {
-  if (marketing.agreedAt) return `동의(${formatKst(marketing.agreedAt)})`;
-  if (marketing.withdrawnAt) return `철회(${formatKst(marketing.withdrawnAt)})`;
+function labelConsent(consent: OptionalConsent): string {
+  if (consent.agreedAt) return `동의(${formatKst(consent.agreedAt)})`;
+  if (consent.withdrawnAt) return `철회(${formatKst(consent.withdrawnAt)})`;
   return '동의 안 함';
 }
 
@@ -66,7 +66,8 @@ async function Detail({ params }: { params: Params }) {
               ['휴대폰', detail.phone ?? '-'],
               ['가입', formatKst(detail.createdAt)],
               ['탈퇴', detail.withdrawnAt ? formatKst(detail.withdrawnAt) : '-'],
-              ['광고성 정보 수신', labelMarketing(detail)],
+              ['관심 동네·찜한 샵 새 매물 알림', labelConsent(detail.consents.interest_alert)],
+              ['이벤트·혜택 소식', labelConsent(detail.consents.marketing)],
               [
                 '이용 기록',
                 `예약 ${detail.reservationCount}건 · 취소 ${detail.cancelCount}건 · 노쇼 ${detail.noShowCount}건`,

@@ -15,7 +15,13 @@ import {
   violatedConstraint,
   withRollback,
 } from '../../../tests/db/test-db';
-import { createPendingOrder, newPaymentId, readStaleOrders } from './order-store';
+import {
+  createPendingOrder,
+  markOrderChecked,
+  newPaymentId,
+  readOrderByPaymentId,
+  readStaleOrders,
+} from './order-store';
 
 const AGREED_AT = new Date('2026-11-01T09:00:00+09:00');
 
@@ -100,7 +106,7 @@ describeDb('주문 저장 (실제 DB)', () => {
         });
         await tx
           .update(orders)
-          .set({ status, createdAt: new Date(createdAt) })
+          .set({ status, createdAt: new Date(createdAt), updatedAt: new Date(createdAt) })
           .where(eq(orders.id, orderId));
         return { orderId, paymentId };
       };
@@ -120,6 +126,36 @@ describeDb('주문 저장 (실제 DB)', () => {
       expect(await readStaleOrders(tx, { createdBefore, limit: 1 })).toEqual([
         { ...pending, amount: 14_000, status: 'pending' },
       ]);
+
+      // 결과를 정하지 못한 주문은 뒤로 간다
+      await markOrderChecked(tx, pending.orderId, new Date('2020-02-01T00:00:00Z'));
+      expect(await readStaleOrders(tx, { createdBefore, limit: 1 })).toEqual([
+        { ...paid, amount: 14_000, status: 'paid' },
+      ]);
+    });
+  });
+
+  it('readOrderByPaymentId는 결제 번호로 주문을 읽고, 없으면 null', async () => {
+    await withRollback(async (tx) => {
+      const { slotId, customerId } = await setup(tx);
+      const paymentId = newPaymentId();
+      const orderId = await createPendingOrder(tx, {
+        paymentId,
+        slotId,
+        customerId,
+        salePrice: 14_000,
+        couponAmount: 0,
+        amount: 14_000,
+        agreedAt: AGREED_AT,
+      });
+      expect(await readOrderByPaymentId(tx, paymentId)).toEqual({
+        orderId,
+        paymentId,
+        amount: 14_000,
+        status: 'pending',
+        failureCode: null,
+      });
+      expect(await readOrderByPaymentId(tx, newPaymentId())).toBeNull();
     });
   });
 });
