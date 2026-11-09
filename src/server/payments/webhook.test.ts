@@ -66,7 +66,7 @@ function order(status: string, failureCode: string | null = null) {
   return { orderId: 'order-1', paymentId: 'toori-1', amount: 17_500, status, failureCode };
 }
 
-function paid(cancellations: { id: string; amount: number }[] = []) {
+function paid(cancellations: { id: string; amount: number; reason?: string }[] = []) {
   return {
     ok: true,
     payment: { status: 'PAID', cancellations, cancelInProgress: false },
@@ -218,10 +218,10 @@ describe('handlePortOneWebhook', () => {
 
     it('끝난 취소가 있으면 기록과 맞춘다', async () => {
       state.order = order('confirmed');
-      state.lookup = paid([{ id: 'c-1', amount: 12_250 }]);
+      state.lookup = paid([{ id: 'c-1', amount: 12_250, reason: '고객 예약 취소' }]);
       expect(await handle('Transaction.PartialCancelled')).toBe('done');
       expect(state.syncCalls).toEqual([
-        ['order-1', { cancellationId: 'c-1', amount: 12_250 }, NOW],
+        ['order-1', { cancellationId: 'c-1', amount: 12_250, reasons: ['고객 예약 취소'] }, NOW],
       ]);
       expect(recorded()).toEqual(['cancel_recorded']);
     });

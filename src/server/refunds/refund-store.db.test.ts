@@ -13,6 +13,7 @@ import {
 import { closeTestDb, describeDb, withRollback } from '../../../tests/db/test-db';
 import {
   clearRequestedCancel,
+  finishAdminCancel,
   finishCustomerCancel,
   readRefundTarget,
   readRefundTargetByOrder,
@@ -360,6 +361,70 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
           ...amounts,
           requestedAt: REQUESTED_AT,
         });
+      });
+    });
+
+    function adminCancel(made: Awaited<ReturnType<typeof booking>>, refundAmount: number) {
+      return {
+        reservationId: made.reservation.id,
+        orderId: made.order.id,
+        slotId: made.slot.id,
+        paidAmount: made.order.amount,
+        refundAmount,
+        pgCancellationId: 'c-9',
+        reviewReason: null,
+        hoursBeforeStart: 30.5,
+        now: NOW,
+      };
+    }
+
+    it('앱 밖 취소는 운영자 취소(admin_exception)로 예약·매물을 취소하고 실제 환불액을 남긴다(#248)', async () => {
+      await withRollback(async (tx) => {
+        const made = await booking(tx);
+        expect(await finishAdminCancel(tx, adminCancel(made, made.order.amount))).toBe(true);
+
+        const [reservation] = await tx
+          .select()
+          .from(reservations)
+          .where(eq(reservations.id, made.reservation.id));
+        expect(reservation).toMatchObject({
+          status: 'cancelled',
+          cancelledAt: NOW,
+          cancelActor: 'admin',
+        });
+        const [slot] = await tx.select().from(slots).where(eq(slots.id, made.slot.id));
+        expect(slot.status).toBe('cancelled');
+        const [order] = await tx.select().from(orders).where(eq(orders.id, made.order.id));
+        expect(order.pgStatus).toBe('CANCELLED');
+        expect(await rowsOf(tx, made.reservation.id)).toMatchObject([
+          {
+            status: 'done',
+            reason: 'admin_exception',
+            band: null,
+            penaltyRate: 0,
+            refundAmount: made.order.amount,
+            penaltyAmount: 0,
+            pgCancellationId: 'c-9',
+            processedAt: NOW,
+          },
+        ]);
+      });
+    });
+
+    it('운영자 취소를 두 번 불러도 기록은 한 줄이고, 일부 환불은 나머지를 남긴다', async () => {
+      await withRollback(async (tx) => {
+        const made = await booking(tx);
+        expect(await finishAdminCancel(tx, adminCancel(made, 5_000))).toBe(true);
+        expect(await finishAdminCancel(tx, adminCancel(made, 5_000))).toBe(false);
+        expect(await rowsOf(tx, made.reservation.id)).toMatchObject([
+          { refundAmount: 5_000, penaltyAmount: made.order.amount - 5_000 },
+        ]);
+        const [order] = await tx.select().from(orders).where(eq(orders.id, made.order.id));
+        expect(order.pgStatus).toBe('PARTIAL_CANCELLED');
+
+        const done = await booking(tx, 'completed');
+        expect(await finishAdminCancel(tx, adminCancel(done, 5_000))).toBe(false);
+        expect(await rowsOf(tx, done.reservation.id)).toEqual([]);
       });
     });
   });

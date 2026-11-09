@@ -51,7 +51,7 @@ const request: CancelRequest = {
 };
 
 function payment(
-  cancellations: { id: string; amount: number }[],
+  cancellations: { id: string; amount: number; reason?: string }[],
   cancelInProgress = false,
 ): { ok: true; payment: Record<string, unknown> } {
   return { ok: true, payment: { status: 'PAID', cancellations, cancelInProgress } };
@@ -132,10 +132,10 @@ describe('finishCancel', () => {
 
 describe('lookUpRefund', () => {
   it('끝난 취소가 있으면 refunded, 처리 중이면 pending, 없으면 none', async () => {
-    state.lookup = payment([{ id: 'c-1', amount: 31_500 }]);
+    state.lookup = payment([{ id: 'c-1', amount: 31_500, reason: '고객 예약 취소' }]);
     expect(await lookUpRefund('toori-1')).toEqual({
       state: 'refunded',
-      refund: { cancellationId: 'c-1', amount: 31_500 },
+      refund: { cancellationId: 'c-1', amount: 31_500, reasons: ['고객 예약 취소'] },
     });
     state.lookup = payment([], true);
     expect(await lookUpRefund('toori-1')).toEqual({ state: 'pending' });
