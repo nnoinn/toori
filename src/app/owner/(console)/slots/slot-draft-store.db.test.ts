@@ -148,14 +148,16 @@ describeDb('매물 등록 ①② 검증 (실제 DB)', () => {
     });
   });
 
-  it('지난 시각, 48시간 밖, 단위가 안 맞는 시각, 모양이 틀린 입력은 막는다', async () => {
+  it('지난 시각, 14일 밖, 단위가 안 맞는 시각, 모양이 틀린 입력은 막는다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
       const draft = (startAt: unknown) =>
         validateSlotDraft(tx, shop.shopId, { menuId: shop.menuId, startAt }, now);
 
       expect(await draft('2026-10-31T02:00:00.000Z')).toMatchObject({ error: { code: 'PAST' } });
-      expect(await draft('2026-11-02T04:00:00.000Z')).toMatchObject({ error: { code: 'TOO_FAR' } });
+      // 14일 안(S-205)이면 받고, 지금(10/31 12:00)부터 14일을 30분 넘기면 막는다
+      expect((await draft('2026-11-02T04:00:00.000Z')).ok).toBe(true);
+      expect(await draft('2026-11-14T03:30:00.000Z')).toMatchObject({ error: { code: 'TOO_FAR' } });
       expect(await draft(at('10:05'))).toMatchObject({ error: { code: 'NOT_ON_STEP' } });
       expect(await draft('내일 10시')).toMatchObject({ error: { code: 'INVALID_INPUT' } });
     });

@@ -19,6 +19,7 @@ import {
   HOURS_PROBLEM_MESSAGES,
   START_PROBLEM_MESSAGES,
   slotEnd,
+  type StartWindow,
   type TimeRange,
 } from './slot-time';
 
@@ -44,8 +45,12 @@ export type DraftMenu = {
 
 export type SlotDraft = { menu: DraftMenu; start: Date; end: Date };
 
-/** 매물 수정(O10)에서 고치는 매물 자신을 겹침에서 뺀다 */
-export type DraftOptions = { excludeSlotId?: string };
+export type DraftOptions = {
+  /** 매물 수정(O10)에서 고치는 매물 자신을 겹침에서 뺀다 */
+  excludeSlotId?: string;
+  /** 고를 수 있는 시작 시각 범위. 기본은 14일 안(S-205), 게시중 매물을 고칠 때는 48시간 안 */
+  window?: StartWindow;
+};
 
 const draftSchema = z.object({ menuId: z.uuid(), startAt: z.iso.datetime({ offset: true }) });
 
@@ -87,8 +92,8 @@ export async function selectBusyRanges(
 
 /**
  * ①② 고른 값을 검증한다. 권한·입점 승인은 부른 쪽이 먼저 확인한다.
- * 메뉴: 그 샵의 숨기지 않은 메뉴이고 지금 업종의 서비스 종류 → 시작 시각: 단위·지금 이후·48시간 안
- * → 영업시간 안(입력한 요일만) → 시간 겹침
+ * 메뉴: 그 샵의 숨기지 않은 메뉴이고 지금 업종의 서비스 종류 → 시작 시각: 단위·지금 이후·고를 수 있는 범위 안
+ * (14일, 게시중 매물을 고칠 때는 48시간) → 영업시간 안(입력한 요일만) → 시간 겹침
  */
 export async function validateSlotDraft(
   db: Db,
@@ -121,7 +126,7 @@ export async function validateSlotDraft(
   }
 
   const start = new Date(parsed.data.startAt);
-  const problem = checkStart(start, now);
+  const problem = checkStart(start, now, options.window);
   if (problem) return fail(problem, START_PROBLEM_MESSAGES[problem]);
 
   const end = slotEnd(start, menu.durationMinutes);

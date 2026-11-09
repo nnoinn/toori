@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { PUBLISH_WINDOW_HOURS, SLOT_START_STEP_MINUTES } from '@/server/policy';
+import {
+  ADVANCE_LISTING_DAYS,
+  PUBLISH_WINDOW_HOURS,
+  SLOT_START_STEP_MINUTES,
+} from '@/server/policy';
 
 import {
   checkBusinessHours,
@@ -9,6 +13,7 @@ import {
   isClosedDay,
   isOnStep,
   latestStart,
+  publishPlan,
   rangesOverlap,
   slotEnd,
   startCandidates,
@@ -62,28 +67,45 @@ describe('checkStart', () => {
     expect(checkStart(at('2026-10-31T09:00:00'), at('2026-10-31T09:00:00'))).toBe('PAST');
   });
 
-  it('48시간 정각까지 받고, 넘으면 막는다', () => {
-    const exact = at('2026-11-02T09:00:00');
+  it('14일 정각까지 받고, 넘으면 막는다(S-205)', () => {
+    const exact = at('2026-11-14T09:00:00');
     expect(checkStart(exact, at('2026-10-31T09:00:00'))).toBeNull();
     expect(checkStart(exact, at('2026-10-31T08:59:59'))).toBe('TOO_FAR');
+  });
+
+  it('게시중 매물을 고칠 때는 48시간 정각까지만 받는다(11/9)', () => {
+    const exact = at('2026-11-02T09:00:00');
+    expect(checkStart(exact, at('2026-10-31T09:00:00'), 'published')).toBeNull();
+    expect(checkStart(exact, at('2026-10-31T08:59:59'), 'published')).toBe('TOO_FAR_PUBLISHED');
+    // 같은 시각도 새로 올릴 때는 받는다
+    expect(checkStart(exact, at('2026-10-31T08:59:59'))).toBeNull();
   });
 
   it('단위에 맞지 않으면 막는다', () => {
     expect(checkStart(at('2026-10-31T12:05:00'), now)).toBe('NOT_ON_STEP');
   });
 
-  it('지금 이후 48시간 안의 단위 시각은 받는다', () => {
+  it('지금 이후 14일 안의 단위 시각은 받는다', () => {
     expect(checkStart(at('2026-11-01T14:00:00'), now)).toBeNull();
   });
 });
 
 describe('startCandidates', () => {
-  it('지금 다음 단위 시각부터 48시간까지 단위마다 하나씩', () => {
+  it('지금 다음 단위 시각부터 14일까지 단위마다 하나씩', () => {
     const now = at('2026-10-31T09:03:20');
     const starts = startCandidates(now);
     expect(starts[0]).toEqual(at(`2026-10-31T09:${String(step).padStart(2, '0')}:00`));
     expect(starts.at(-1)!.getTime()).toBeLessThanOrEqual(latestStart(now).getTime());
     expect(starts.every((start) => checkStart(start, now) === null)).toBe(true);
+    expect(starts).toHaveLength(
+      Math.floor((ADVANCE_LISTING_DAYS * 24 * 60 - (step - 3)) / step) + 1,
+    );
+  });
+
+  it('게시중 매물을 고칠 때는 48시간까지', () => {
+    const now = at('2026-10-31T09:03:20');
+    const starts = startCandidates(now, 'published');
+    expect(starts.every((start) => checkStart(start, now, 'published') === null)).toBe(true);
     expect(starts).toHaveLength(Math.floor((PUBLISH_WINDOW_HOURS * 60 - (step - 3)) / step) + 1);
   });
 
@@ -91,8 +113,35 @@ describe('startCandidates', () => {
     const now = at('2026-10-31T09:00:00');
     const starts = startCandidates(now);
     expect(starts[0]).toEqual(at(`2026-10-31T09:${String(step).padStart(2, '0')}:00`));
-    // 48시간 뒤 정각은 포함한다
-    expect(starts.at(-1)).toEqual(at('2026-11-02T09:00:00'));
+    // 14일 뒤 정각은 포함한다
+    expect(starts.at(-1)).toEqual(at('2026-11-14T09:00:00'));
+  });
+});
+
+describe('publishPlan (S-204·S-205)', () => {
+  const now = at('2026-10-31T09:00:00');
+
+  it('시작 48시간 전이 아직 오지 않았으면 그 시각에 게시하는 예약대기', () => {
+    expect(publishPlan(at('2026-11-05T14:00:00'), now)).toEqual({
+      status: 'scheduled',
+      publishAt: at('2026-11-03T14:00:00'),
+    });
+    // 48시간 30분 남았으면 30분 뒤 게시
+    expect(publishPlan(at('2026-11-02T09:30:00'), now)).toEqual({
+      status: 'scheduled',
+      publishAt: at('2026-10-31T09:30:00'),
+    });
+  });
+
+  it('딱 48시간 남았거나 그보다 가까우면 지금 게시중', () => {
+    expect(publishPlan(at('2026-11-02T09:00:00'), now)).toEqual({
+      status: 'published',
+      publishAt: now,
+    });
+    expect(publishPlan(at('2026-10-31T15:00:00'), now)).toEqual({
+      status: 'published',
+      publishAt: now,
+    });
   });
 });
 

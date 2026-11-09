@@ -1,7 +1,7 @@
 'use client';
 
 // 매물 3탭 화면의 단계 버튼과 ①②③ 카드 (O4·O5·O10). 고른 값과 확인·저장은 slot-form.tsx가 갖고,
-// 여기는 받은 값으로 그리기만 한다. ② 시간 카드는 P1 미리 올리기(S-205, 14일)에서 날짜 고르기가 바뀔 자리다.
+// 여기는 받은 값으로 그리기만 한다. ② 시간 카드는 달력(slot-date-calendar.tsx)에서 날짜를 고르면 그 아래에 시작 시각이 나온다(S-205, 14일).
 
 import { cn } from 'cn';
 import { Check } from 'lucide-react';
@@ -12,8 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Price } from '@/components/ui/price';
 import type { BusinessHours } from '@/db/schema/shops';
 import { formatDuration, formatWon } from '@/lib/format';
-import { formatKst, formatKstTime, utcToKst } from '@/lib/time';
+import { formatKst, formatKstTime } from '@/lib/time';
 import {
+  ADVANCE_LISTING_DAYS,
   DISCOUNT_RATE_OPTIONS,
   type DiscountRate,
   PUBLISH_WINDOW_HOURS,
@@ -22,13 +23,13 @@ import {
 import type { SettlementPreview } from '@/server/settlements';
 
 import { withObjectParticle } from '../../korean';
-import { WEEKDAY_LABELS } from '../settings/shop/shop-profile';
+import { dateKeyLabel, SlotDateCalendar } from './slot-date-calendar';
 import type { SlotMenuOption } from './slot-form';
 import {
   checkBusinessHours,
-  isClosedDay,
   rangesOverlap,
   slotEnd,
+  type StartWindow,
   type TimeRange,
 } from './slot-time';
 
@@ -137,6 +138,8 @@ export function MenuStep({
 export function TimeStep({
   menu,
   days,
+  todayKey,
+  startWindow,
   dateKey,
   businessHours,
   busyRanges,
@@ -145,9 +148,13 @@ export function TimeStep({
   onChooseStart,
 }: {
   menu: SlotMenuOption;
-  /** 고를 수 있는 시작 시각을 한국 날짜별로 묶은 것(오늘부터) */
+  /** 고를 수 있는 시작 시각을 한국 날짜별로 묶은 것(가까운 날부터) */
   days: { dateKey: string; starts: Date[] }[];
-  /** 고른 날짜. 없는 날짜면 첫 날을 보여준다 */
+  /** 오늘(한국 날짜, 서버 시각 기준). 달력 위에 알려 주고 그 칸을 표시한다 */
+  todayKey: string;
+  /** 고를 수 있는 범위. 새로 올리기·예약대기 수정은 14일, 게시중 매물 수정은 48시간 */
+  startWindow: StartWindow;
+  /** 고른 날짜. 아직 안 골랐으면 빈 값이고, 달력 아래 시작 시각을 보여주지 않는다 */
   dateKey: string;
   businessHours: BusinessHours;
   /** 같은 샵의 예약대기·게시중·예약됨 매물 시간 */
@@ -156,7 +163,7 @@ export function TimeStep({
   onChooseDate: (dateKey: string) => void;
   onChooseStart: (iso: string) => void;
 }) {
-  const day = days.find((item) => item.dateKey === dateKey) ?? days[0];
+  const day = days.find((item) => item.dateKey === dateKey) ?? null;
   const openStarts = (day?.starts ?? []).filter(
     (candidate) =>
       checkBusinessHours(
@@ -169,60 +176,59 @@ export function TimeStep({
       <CardHeader>
         <CardTitle>② 언제 시작할까요?</CardTitle>
         <p className="text-sm text-muted-foreground">
-          지금부터 {PUBLISH_WINDOW_HOURS}시간 안의 시각만 올릴 수 있어요. 끝 시각은 {menu.name} 소요
-          시간({formatDuration(menu.durationMinutes)})으로 정해져요.
+          {startWindow === 'published'
+            ? `고객에게 이미 보이는 매물이라 지금부터 ${PUBLISH_WINDOW_HOURS}시간 안의 시각으로만 바꿀 수 있어요.`
+            : `지금부터 ${ADVANCE_LISTING_DAYS}일 안의 시각을 올릴 수 있어요. 고객에게는 시작 ${PUBLISH_WINDOW_HOURS}시간 전부터 보이고, 그 전에는 예약대기예요.`}{' '}
+          끝 시각은 {menu.name} 소요 시간({formatDuration(menu.durationMinutes)})으로 정해져요.
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <div className="flex gap-2" role="tablist" aria-label="날짜">
-          {days.map((item, index) => {
-            const closed = isClosedDay(item.starts[0], businessHours);
-            return (
-              <Button
-                key={item.dateKey}
-                type="button"
-                role="tab"
-                aria-selected={item.dateKey === day?.dateKey}
-                variant={item.dateKey === day?.dateKey ? 'default' : 'outline'}
-                disabled={closed}
-                onClick={() => onChooseDate(item.dateKey)}
-              >
-                {dayLabel(item.starts[0], index)}
-                {closed ? ' 휴무' : ''}
-              </Button>
-            );
-          })}
-        </div>
-        {openStarts.length === 0 ? (
+        <SlotDateCalendar
+          todayKey={todayKey}
+          days={days}
+          selectedKey={day?.dateKey ?? null}
+          businessHours={businessHours}
+          onChoose={onChooseDate}
+        />
+        {day ? (
+          <section aria-label="시작 시각" className="flex flex-col gap-3 border-t pt-4">
+            <h3 className="text-sm font-semibold">{dateKeyLabel(day.dateKey)} 시작 시각</h3>
+            {openStarts.length === 0 ? (
+              <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
+                이 날은 영업시간 안에 {withObjectParticle(menu.name)} 끝낼 수 있는 시각이 없어요.
+                다른 날을 골라 주세요.
+              </p>
+            ) : null}
+            <div className="grid grid-cols-6 gap-2">
+              {openStarts.map((candidate) => {
+                const range = { start: candidate, end: slotEnd(candidate, menu.durationMinutes) };
+                const blocked = busyRanges.some((busyRange) => rangesOverlap(range, busyRange));
+                const selected = startIso === candidate.toISOString();
+                return (
+                  <Button
+                    key={candidate.toISOString()}
+                    type="button"
+                    variant={selected ? 'default' : 'outline'}
+                    disabled={blocked}
+                    title={blocked ? '이미 올린 매물과 시간이 겹쳐요' : undefined}
+                    onClick={() => onChooseStart(candidate.toISOString())}
+                    className={cn(blocked && 'line-through')}
+                  >
+                    {formatKstTime(candidate)}
+                  </Button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              매장 설정의 영업시간 안에 끝나는 시각만 보여요. 줄이 그어진 시각은 이미 올린
+              매물(예약대기·게시중·예약됨)과 시간이 겹쳐서 고를 수 없어요.
+            </p>
+          </section>
+        ) : (
           <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
-            이 날은 영업시간 안에 {withObjectParticle(menu.name)} 끝낼 수 있는 시각이 없어요. 다른
-            날을 골라 주세요.
+            달력에서 날짜를 고르면 그 날의 시작 시각이 나와요.
           </p>
-        ) : null}
-        <div className="grid grid-cols-6 gap-2">
-          {openStarts.map((candidate) => {
-            const range = { start: candidate, end: slotEnd(candidate, menu.durationMinutes) };
-            const blocked = busyRanges.some((busyRange) => rangesOverlap(range, busyRange));
-            const selected = startIso === candidate.toISOString();
-            return (
-              <Button
-                key={candidate.toISOString()}
-                type="button"
-                variant={selected ? 'default' : 'outline'}
-                disabled={blocked}
-                title={blocked ? '이미 올린 매물과 시간이 겹쳐요' : undefined}
-                onClick={() => onChooseStart(candidate.toISOString())}
-                className={cn(blocked && 'line-through')}
-              >
-                {formatKstTime(candidate)}
-              </Button>
-            );
-          })}
-        </div>
-        <p className="text-xs text-muted-foreground">
-          매장 설정의 영업시간 안에 끝나는 시각만 보여요. 줄이 그어진 시각은 이미 올린
-          매물(예약대기·게시중·예약됨)과 시간이 겹쳐서 고를 수 없어요.
-        </p>
+        )}
       </CardContent>
     </Card>
   );
@@ -298,7 +304,16 @@ export function DiscountStep({
 }
 
 /** 단계 카드 아래 고른 메뉴·시간 요약. 단계를 오가도 지금 무엇을 골랐는지 보인다 */
-export function ChosenSummary({ menu, start }: { menu: SlotMenuOption; start: Date | null }) {
+export function ChosenSummary({
+  menu,
+  start,
+  publishNote,
+}: {
+  menu: SlotMenuOption;
+  start: Date | null;
+  /** 시각을 골랐으면 언제 고객에게 보이는지(S-205). 예: "예약대기로 올라가요. 11/18(수) 14:00부터 고객에게 보여요" */
+  publishNote: string | null;
+}) {
   return (
     <div className="flex flex-col gap-1 rounded-lg bg-muted p-3 text-sm">
       <span>
@@ -311,6 +326,7 @@ export function ChosenSummary({ menu, start }: { menu: SlotMenuOption; start: Da
       ) : (
         <span className="text-muted-foreground">시작 시각을 골라 주세요</span>
       )}
+      {start && publishNote ? <span className="text-muted-foreground">{publishNote}</span> : null}
     </div>
   );
 }
@@ -365,11 +381,4 @@ function PricePreview({
       </p>
     </div>
   );
-}
-
-/** 날짜 버튼. 예: "10/31(금) 오늘". days가 오늘부터라 순서(index)로 오늘·내일·모레를 붙인다 */
-function dayLabel(date: Date, index: number): string {
-  const t = utcToKst(date);
-  const suffix = ['오늘', '내일', '모레'][index] ?? '';
-  return `${t.month}/${t.day}(${WEEKDAY_LABELS[t.weekday]}) ${suffix}`.trim();
 }
