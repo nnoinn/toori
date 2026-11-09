@@ -525,6 +525,25 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | memo | text, null | |
 | created_at | timestamptz | |
 
+### admin_access_logs — 운영자 열람 기록
+
+운영자가 개인정보가 보이는 화면(회원 목록·상세, 매물·예약 목록·예약 상세, 입점 심사 목록·상세, 앞으로 생길 이의제기·정산)을 볼 때마다 한 줄 남긴다(#269, 11/8 결정). 개인정보 안전성 확보조치 기준의 접속 기록이고, 개인정보 처리방침의 "접속 기록을 보관하고 이상 접근을 점검한다"도 이 기록으로 지킨다. `admin_actions`(작업 기록)와 달리 대상이 없는 목록·검색과 접속 IP·검색어도 남긴다.
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| id | uuid PK | |
+| admin_id | uuid → profiles | 본 운영자 |
+| action | text | `view`(상세 보기) / `search`(목록·검색). 종류가 늘 수 있어서 check를 두지 않는다 |
+| target_type | text | `customer` / `owner` / `shop` / `reservation`, 목록·검색이면 `list` |
+| target_id | uuid, null | 상세면 대상 id, 목록·검색이면 비어 있다 |
+| path | text | 본 화면 주소(검색어는 `query`에 따로) |
+| query | text, null | 목록·검색에서 쓴 검색어. 번호로 찾을 수도 있어서 개인정보로 다룬다 |
+| ip | text, null | 접속 IP(`x-forwarded-for` 첫 값). 모양이 이상해도 기록이 실패하지 않게 글자로 둔다 |
+| created_at | timestamptz | 본 시각 |
+
+- 화면은 관리자 확인(`ensureAdminPage`) 바로 뒤에 기록하고, **기록을 남기지 못하면 화면을 보여주지 않는다**(기록 없이 개인정보가 보이지 않게, 11/9)
+- 1년 이상 보관한다(정보주체 5만 명 이상이 되면 2년 이상). 앱은 넣기만 한다. **DB 트리거가 UPDATE·DELETE·TRUNCATE를 예외 없이 막는다**(위·변조 방지, 11/9 nnoinn). 보관 기간이 지난 기록을 정리하는 작업은 출시 때 보관 기간과 같이 정한다. 월 1회 이상 이상한 접근이 있는지 점검한다(나중에 운영자 화면이나 SQL로)
+
 ---
 
 ## 9. 인덱스·제약 요약
@@ -534,6 +553,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | shops | GIST(location), (status), (sigungu_code) | 지도·거리 검색, 승인된 샵만, 지역 필터 |
 | slots | (status, start_at), (shop_id, start_at), (publish_at), 시간 겹침 EXCLUDE | 목록 조회, 원장님 대시보드, 관심 지역 묶음 알림, S-209 |
 | location_use_logs | (created_at) | 6개월 지난 기록 정리 |
+| admin_access_logs | (created_at), (admin_id, created_at), UPDATE·DELETE·TRUNCATE 막는 트리거 | 보관 기간 확인, 운영자별 월 1회 점검, 기록 위·변조 방지 |
 | slots | check: discount_rate 10~50, end_at > start_at | |
 | reservations | unique(code), unique(slot_id), (customer_id), (status) | 예약번호, 매물당 하나, 내 예약 |
 | orders | unique(payment_id), (customer_id), (status) | 결제 검증, 복구 |
@@ -578,3 +598,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 2026-11-02 | `push_subscriptions`의 unique를 `endpoint`에서 (`endpoint`, `account_type`)으로 바꾼다(#193). 한 기기에서 켜 둔 계정의 알림을 모두 받는다(11/1 결정, #131). 마이그레이션 0006 |
 | 2026-11-03 | `refunds`에 `status`, `review_reason`, `created_at`을 더하고 `processed_at`을 비어 있을 수 있게 바꿨다. 고객 취소는 포트원을 부르기 전에 `requested`로 저장하고, 정리 작업이 마무리한다. 한 예약에 고객 취소 기록은 하나만(unique) (#222) |
 | 2026-11-09 | `terms_agreements.terms_type`에 `interest_alert`(관심 동네·찜한 샵 새 매물 알림 수신 동의, 선택)를 더한다. 관심 동네·찜한 샵 알림은 이벤트·혜택 광고성 동의(`marketing`)와 따로 받는다(#267·#270, 11/8 결정). 이미 있는 `marketing` 기록은 출시 전이라 옮기지 않는다. 마이그레이션 0008 |
+| 2026-11-09 | `admin_access_logs`(운영자 열람 기록)를 더한다. 운영자가 개인정보가 보이는 화면을 볼 때마다 누가·언제·어디서(IP)·누구의 정보를·무엇을(상세 보기·목록 검색) 남기고 1년 이상 보관한다. 기록하지 못하면 화면을 보여주지 않는다(#269, 11/8 결정). DB 트리거로 고치기·지우기·비우기를 막는다(#286 리뷰, 11/9). 마이그레이션 0009 |

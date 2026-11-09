@@ -18,6 +18,7 @@ import { getRequestNow } from '@/lib/request-time';
 import { firstParam, type SearchValue } from '@/lib/search-params';
 import { formatKst } from '@/lib/time';
 import { cn } from '@/lib/utils';
+import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
 
 import { ADMIN_LIST_LIMIT, labelReservation, toSearchQuery } from '../lookup';
@@ -64,11 +65,20 @@ export default function AdminReservationsPage({ searchParams }: { searchParams: 
 }
 
 async function Lookup({ searchParams }: { searchParams: SearchParams }) {
-  await ensureAdminPage();
+  const admin = await ensureAdminPage();
   const params = await searchParams;
   const tab = toLookupTab(firstParam(params.tab));
   const status = firstParam(params.status);
   const query = toSearchQuery(firstParam(params.q));
+  await recordAdminAccess(admin.userId, {
+    action: 'search',
+    targetType: 'list',
+    path: lookupHref({
+      tab,
+      status: tab === 'slots' ? toSlotFilter(status) : toReservationFilter(status),
+    }),
+    query,
+  });
 
   return (
     <div className="flex flex-col gap-4">
