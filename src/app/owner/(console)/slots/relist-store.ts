@@ -14,7 +14,7 @@ import { slots, type SlotStatus } from '@/db/schema';
 import { fail, type Result } from '@/lib/result';
 import type { DiscountRate } from '@/server/policy';
 
-import { type CreatedSlot, createSlotInDb } from './new/slot-create-store';
+import { createSlotInDb, type SavedSlot } from './slot-create-store';
 import { RELIST_MESSAGES, relistDraftMessage, relistProblem } from './relist';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select' | 'transaction'>;
@@ -88,7 +88,7 @@ export async function relistSlotInDb(
   createdBy: string,
   slotId: string,
   now: Date,
-): Promise<Result<CreatedSlot>> {
+): Promise<Result<SavedSlot>> {
   const slot = await selectSlotForRelist(db, shopId, slotId);
   if (!slot) return fail('SLOT_NOT_FOUND', RELIST_MESSAGES.SLOT_NOT_FOUND);
   const problem = relistProblem(slot, now);

@@ -18,6 +18,7 @@ export type PayoutAccountView = {
   accountHolder: string;
 };
 
+/** 화면에 보여줄 계좌(뒷자리만). 계좌 없이 만든 원장님이면 null(#213) */
 export async function selectPayoutAccount(
   db: Pick<Db, 'select'>,
   shopId: string,

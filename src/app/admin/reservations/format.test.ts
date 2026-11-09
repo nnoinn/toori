@@ -9,11 +9,9 @@ import {
   labelRefundBand,
   labelRefundReason,
   labelRefundStatus,
-  labelReservation,
   lookupHref,
   toLookupTab,
   toReservationFilter,
-  toSearchQuery,
   toSlotFilter,
 } from './format';
 
@@ -27,25 +25,12 @@ describe('매물·예약 조회 표시 모양', () => {
     expect(toSlotFilter('no_show')).toBe('all');
   });
 
-  it('검색어는 앞뒤 공백을 지우고 50자까지만', () => {
-    expect(toSearchQuery('  ABC  ')).toBe('ABC');
-    expect(toSearchQuery(undefined)).toBe('');
-    expect(toSearchQuery('가'.repeat(60))).toHaveLength(50);
-  });
-
   it('목록 주소에는 기본값을 넣지 않고 검색어를 인코딩한다', () => {
     expect(lookupHref({ tab: 'reservations' })).toBe('/admin/reservations');
     expect(lookupHref({ tab: 'reservations', status: 'all' })).toBe('/admin/reservations');
     expect(lookupHref({ tab: 'slots', status: 'closed', query: '샘플 & 헤어' })).toBe(
       '/admin/reservations?tab=slots&status=closed&q=%EC%83%98%ED%94%8C+%26+%ED%97%A4%EC%96%B4',
     );
-  });
-
-  it('예약 상태 이름. 노쇼는 이용 완료보다 먼저 본다', () => {
-    expect(labelReservation('confirmed', null)).toBe('예정');
-    expect(labelReservation('completed', 'visited')).toBe('이용 완료');
-    expect(labelReservation('completed', 'no_show')).toBe('노쇼');
-    expect(labelReservation('cancelled', null)).toBe('취소');
   });
 
   it('주문·취소·환불 이름. 모르는 값은 그대로, 없으면 -', () => {

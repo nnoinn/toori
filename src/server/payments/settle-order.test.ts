@@ -13,6 +13,13 @@ const state = vi.hoisted(() => ({
   calls: [] as unknown[][],
   confirm: null as unknown,
   cancel: null as unknown,
+  notified: [] as string[],
+}));
+
+vi.mock('@/server/notifications/alerts', () => ({
+  notifyReservationConfirmed: (_db: unknown, reservationId: string) => {
+    state.notified.push(reservationId);
+  },
 }));
 
 vi.mock('./confirm-store', () => ({
@@ -60,6 +67,7 @@ const names = () => state.calls.map((call) => call[0]);
 
 beforeEach(() => {
   state.calls = [];
+  state.notified = [];
   state.confirm = {
     ok: true,
     reservationId: 'reservation-1',
@@ -79,6 +87,15 @@ describe('settlePaidOrder', () => {
         { orderId: 'order-1', pgStatus: 'PAID', payMethod: 'PaymentMethodCard', paidAt: PAID_AT },
       ],
     ]);
+  });
+
+  it('확정하면 예약 확정 알림을 부르고, 확정하지 못하면 부르지 않는다', async () => {
+    await settlePaidOrder(db, ORDER, payment(), NOW);
+    expect(state.notified).toHaveLength(1);
+    state.notified = [];
+    state.confirm = { ok: false, code: 'SLOT_SOLD' } satisfies ConfirmOutcome;
+    await settlePaidOrder(db, ORDER, payment(), NOW);
+    expect(state.notified).toEqual([]);
   });
 
   it('결제 시각을 모르면 지금 시각으로 확정을 판단한다', async () => {

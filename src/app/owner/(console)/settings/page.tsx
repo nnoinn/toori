@@ -7,6 +7,8 @@ import { Card } from '@/components/ui/card';
 import { LoadingCards } from '@/components/ui/state';
 import { ensureOwnerPage } from '@/server/auth';
 
+import { OwnerPage } from '../owner-page';
+
 export const metadata: Metadata = { title: '매장 설정' };
 
 const PAGE_PATH = '/owner/settings';
@@ -44,12 +46,11 @@ const SECTIONS: { title: string; description: string; href?: string }[] = [
 
 export default function OwnerSettingsPage() {
   return (
-    <main className="flex w-full max-w-3xl flex-1 flex-col gap-4 p-6">
-      <h1 className="text-xl font-bold">매장 설정</h1>
+    <OwnerPage title="매장 설정" width="narrow">
       <Suspense fallback={<LoadingCards count={1} />}>
         <SettingsSections />
       </Suspense>
-    </main>
+    </OwnerPage>
   );
 }
 

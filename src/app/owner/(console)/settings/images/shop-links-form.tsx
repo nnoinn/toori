@@ -8,8 +8,8 @@ import { cn } from 'cn';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
+import { fieldA11y, FormField } from '../../../form-field';
 import { saveShopLinks } from './actions';
 import {
   SHOP_LINK_RULES,
@@ -30,6 +30,7 @@ export function ShopLinksForm({ shopId, initial }: { shopId: string; initial: Sh
   const [status, setStatus] = useState<{ kind: 'saved' | 'error'; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
 
+  /** 화면에서 먼저 검사하고 저장한다. 빈 칸은 링크를 지우는 것으로 저장된다 */
   function save() {
     setStatus(null);
     const checked = validateShopLinks(form);
@@ -66,28 +67,26 @@ export function ShopLinksForm({ shopId, initial }: { shopId: string; initial: Sh
         {FIELDS.map((field) => {
           const rule = SHOP_LINK_RULES[field];
           return (
-            <div key={field} className="flex flex-col gap-1.5">
-              <Label htmlFor={field}>{rule.label}</Label>
+            <FormField
+              key={field}
+              label={rule.label}
+              id={field}
+              error={errors[field]}
+              className="gap-1.5"
+            >
               <Input
-                id={field}
+                {...fieldA11y(field, errors[field])}
                 type="url"
                 inputMode="url"
                 placeholder={`https://${rule.hosts[0]}/...`}
                 value={form[field]}
-                aria-invalid={errors[field] ? true : undefined}
-                aria-describedby={errors[field] ? `${field}-error` : undefined}
                 onChange={(event) => {
                   const value = event.target.value;
                   setForm((prev) => ({ ...prev, [field]: value }));
                   setStatus(null);
                 }}
               />
-              {errors[field] ? (
-                <p id={`${field}-error`} className="text-sm text-destructive">
-                  {errors[field]}
-                </p>
-              ) : null}
-            </div>
+            </FormField>
           );
         })}
         <div className="flex items-center justify-end gap-3">

@@ -6,6 +6,7 @@
 import 'server-only';
 
 import type { getDb } from '@/db';
+import { notifyReservationConfirmed } from '@/server/notifications/alerts';
 
 import { confirmPaidOrder, recordAutoCancel, recordOrderOutcome } from './confirm-store';
 import type { UnconfirmedCode } from './errors';
@@ -63,7 +64,10 @@ export async function settlePaidOrder(
       paidAt: payment.paidAt ?? now,
     }),
   );
-  if (confirmed.ok) return confirmed;
+  if (confirmed.ok) {
+    notifyReservationConfirmed(db, confirmed.reservationId);
+    return confirmed;
+  }
   return { ok: false, code: confirmed.code, autoCancelled: await autoCancelOrder(db, order, now) };
 }
 

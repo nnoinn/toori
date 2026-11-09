@@ -2,7 +2,6 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { z } from 'zod';
 
 import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
 import { formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';
+import { isUuid } from '@/lib/uuid';
 import { ensureAdminPage } from '@/server/auth';
 
 import {
@@ -20,8 +20,8 @@ import {
   labelRefundBand,
   labelRefundReason,
   labelRefundStatus,
-  labelReservation,
 } from '../format';
+import { labelReservation } from '../../lookup';
 import { selectReservationDetail } from '../queries';
 
 export const metadata: Metadata = { title: '예약 정보' };
@@ -48,7 +48,7 @@ export default function AdminReservationPage({ params }: { params: Params }) {
 async function Detail({ params }: { params: Params }) {
   await ensureAdminPage();
   const { reservationId } = await params;
-  if (!z.uuid().safeParse(reservationId).success) notFound();
+  if (!isUuid(reservationId)) notFound();
   const detail = await selectReservationDetail(getDb(), reservationId);
   if (!detail) notFound();
 

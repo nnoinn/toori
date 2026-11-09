@@ -18,6 +18,7 @@ import { BUSINESS_NUMBER_INPUT, formatBusinessNumber } from '@/lib/business-numb
 import { getBusinessDocUrl } from '@/server/storage/upload';
 
 import { type BusinessInput, validateBusinessInput } from '../../../business-fields';
+import { FieldError, fieldA11y, FormField } from '../../../form-field';
 import { BUSINESS_DOC_ACCEPT, uploadBusinessDoc } from '../../../join/business-doc';
 import { type BusinessFieldErrors, saveBusinessInfo } from './actions';
 import type { BusinessInfo } from './business-info-store';
@@ -30,6 +31,7 @@ const FIELDS: { field: Exclude<Field, 'businessDocPath' | 'openedOn'>; label: st
   { field: 'businessRegistrationNumber', label: '사업자등록번호' },
 ];
 
+/** 입점 승인 뒤에는 읽기 전용, 승인 대기·반려면 입력 칸을 보여준다 */
 export function BusinessInfoForm({
   shopId,
   today,
@@ -43,6 +45,7 @@ export function BusinessInfoForm({
   return <BusinessInfoEditor shopId={shopId} today={today} initial={initial} />;
 }
 
+/** 승인 대기·반려일 때의 입력 칸. 반려면 저장과 함께 다시 신청한다 */
 function BusinessInfoEditor({
   shopId,
   today,
@@ -71,12 +74,17 @@ function BusinessInfoEditor({
     setErrors({});
   }
 
+  /** 칸 하나를 바꾼다. 그 칸 오류와 지난 저장 결과 문구는 지금 입력과 헷갈리지 않게 지운다 */
   function update(field: Field, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: undefined }));
     setStatus(null);
   }
 
+  /**
+   * 새 등록증을 고르면 바로 올린다. 올린 경로는 [저장]을 눌러야 샵에 들어간다.
+   * 실패하면 경로를 그대로 둬서 저장돼 있던 등록증이 남는다
+   */
   async function chooseDoc(file: File | undefined) {
     if (!file) return;
     setDoc({ name: file.name, uploading: true });
@@ -91,6 +99,7 @@ function BusinessInfoEditor({
     }
   }
 
+  /** 화면에서 먼저 검사하고 저장한다. 서버도 같은 규칙으로 다시 검사해서 칸별 오류를 돌려준다 */
   function save() {
     setStatus(null);
     const checked = validateBusinessInput(form, today);
@@ -115,11 +124,7 @@ function BusinessInfoEditor({
     });
   }
 
-  const fieldProps = (field: Field) => ({
-    id: field,
-    'aria-invalid': errors[field] ? true : undefined,
-    'aria-describedby': errors[field] ? `${field}-error` : undefined,
-  });
+  const fieldProps = (field: Field) => fieldA11y(field, errors[field]);
   const busy = pending || doc?.uploading === true;
 
   return (
@@ -156,7 +161,7 @@ function BusinessInfoEditor({
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4">
           {FIELDS.map(({ field, label }) => (
-            <FieldBox key={field} label={label} field={field} error={errors[field]}>
+            <FormField key={field} label={label} id={field} error={errors[field]}>
               {/* 사업자등록번호는 숫자만 쳐도 123-45-67890 모양으로(#205) */}
               {field === 'businessRegistrationNumber' ? (
                 <DigitInput
@@ -173,9 +178,9 @@ function BusinessInfoEditor({
                   onChange={(event) => update(field, event.target.value)}
                 />
               )}
-            </FieldBox>
+            </FormField>
           ))}
-          <FieldBox label="개업일자" field="openedOn" error={errors.openedOn}>
+          <FormField label="개업일자" id="openedOn" error={errors.openedOn}>
             <Input
               {...fieldProps('openedOn')}
               type="date"
@@ -183,7 +188,7 @@ function BusinessInfoEditor({
               value={form.openedOn}
               onChange={(event) => update('openedOn', event.target.value)}
             />
-          </FieldBox>
+          </FormField>
           <div className="col-span-2 flex flex-col gap-2">
             <Label htmlFor="businessDocPath">사업자등록증</Label>
             <input
@@ -216,27 +221,28 @@ function BusinessInfoEditor({
                 </span>
               ) : null}
             </div>
-            <FieldError field="businessDocPath" error={errors.businessDocPath} />
+            <FieldError id="businessDocPath" error={errors.businessDocPath} />
+          </div>
+
+          {/* 카드 하나만 저장하는 화면이라 [저장]을 카드 안 오른쪽 아래에 둔다(정산 계좌·외부 링크와 같게) */}
+          <div className="col-span-2 flex items-center justify-end gap-3">
+            {status ? (
+              <span
+                role={status.kind === 'error' ? 'alert' : 'status'}
+                className={cn(
+                  'text-sm',
+                  status.kind === 'error' ? 'text-destructive' : 'text-muted-foreground',
+                )}
+              >
+                {status.text}
+              </span>
+            ) : null}
+            <Button type="submit" size="lg" disabled={busy}>
+              {pending ? '저장 중…' : rejected ? '고쳐서 다시 신청하기' : '저장'}
+            </Button>
           </div>
         </CardContent>
       </Card>
-
-      <div className="flex items-center justify-end gap-3">
-        {status ? (
-          <span
-            role={status.kind === 'error' ? 'alert' : 'status'}
-            className={cn(
-              'text-sm',
-              status.kind === 'error' ? 'text-destructive' : 'text-muted-foreground',
-            )}
-          >
-            {status.text}
-          </span>
-        ) : null}
-        <Button type="submit" size="lg" disabled={busy}>
-          {pending ? '저장 중…' : rejected ? '고쳐서 다시 신청하기' : '저장'}
-        </Button>
-      </div>
     </form>
   );
 }
@@ -318,33 +324,4 @@ function toInput(info: BusinessInfo): BusinessInput {
     openedOn: info.openedOn,
     businessDocPath: info.businessDocPath,
   };
-}
-
-function FieldBox({
-  label,
-  field,
-  error,
-  children,
-}: {
-  label: string;
-  field: Field;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={field}>{label}</Label>
-      {children}
-      <FieldError field={field} error={error} />
-    </div>
-  );
-}
-
-function FieldError({ field, error }: { field: Field; error?: string }) {
-  if (!error) return null;
-  return (
-    <p id={`${field}-error`} className="text-sm text-destructive">
-      {error}
-    </p>
-  );
 }

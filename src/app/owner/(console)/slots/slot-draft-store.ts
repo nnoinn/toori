@@ -11,9 +11,8 @@ import { getDb } from '@/db';
 import { menus, shops, slots } from '@/db/schema';
 import type { BusinessHours } from '@/db/schema/shops';
 import { fail, ok, type Result } from '@/lib/result';
-import type { ShopCategory } from '@/server/policy';
+import { isServiceTypeOf, type ShopCategory } from '@/server/policy';
 
-import { isServiceTypeOf } from '../../settings/menu/menu';
 import {
   checkBusinessHours,
   checkStart,

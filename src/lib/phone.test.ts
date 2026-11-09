@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
+import { editDigitInput } from './digit-input';
 import {
-  editPhoneInput,
   formatAnyPhoneInput,
   formatPhoneInput,
   isPhoneInputFull,
+  maskPhone,
   normalizePhone,
+  PHONE_INPUT_RULES,
 } from './phone';
 
 describe('normalizePhone', () => {
@@ -87,12 +89,12 @@ describe('isPhoneInputFull', () => {
   });
 });
 
-describe('editPhoneInput (입력칸 글자가 바뀔 때, #183)', () => {
+describe('휴대폰 입력칸 글자가 바뀔 때 (PHONE_INPUT_RULES.mobile, #183)', () => {
   // 브라우저가 바꾼 값(raw)과 커서 위치를 '|'로 적는다
   const edit = (prev: string, rawWithCaret: string, deleteForward = false) => {
     const caret = rawWithCaret.indexOf('|');
     const raw = rawWithCaret.replace('|', '');
-    const next = editPhoneInput(prev, raw, caret, deleteForward);
+    const next = editDigitInput(PHONE_INPUT_RULES.mobile, prev, raw, caret, deleteForward);
     return `${next.value.slice(0, next.caret)}|${next.value.slice(next.caret)}`;
   };
 
@@ -187,11 +189,11 @@ describe('formatAnyPhoneInput (샵 전화번호 입력 중 모양, #205)', () =>
   });
 });
 
-describe('editPhoneInput any (샵 전화번호 입력칸, #205)', () => {
+describe('샵 전화번호 입력칸 글자가 바뀔 때 (PHONE_INPUT_RULES.any, #205)', () => {
   const edit = (prev: string, rawWithCaret: string) => {
     const caret = rawWithCaret.indexOf('|');
     const raw = rawWithCaret.replace('|', '');
-    const next = editPhoneInput(prev, raw, caret, false, 'any');
+    const next = editDigitInput(PHONE_INPUT_RULES.any, prev, raw, caret, false);
     return `${next.value.slice(0, next.caret)}|${next.value.slice(next.caret)}`;
   };
 
@@ -209,5 +211,18 @@ describe('editPhoneInput any (샵 전화번호 입력칸, #205)', () => {
   it('하이픈 든 번호를 붙여 넣어도 같은 모양', () => {
     expect(edit('', '0507-1234-5678|')).toBe('0507-1234-5678|');
     expect(edit('', '02 123 4567|')).toBe('02-123-4567|');
+  });
+});
+
+describe('maskPhone (운영자 목록, 원장님 예약 상세)', () => {
+  it('휴대폰 번호는 가운데만 가린다', () => {
+    expect(maskPhone('010-1234-5678')).toBe('010-****-5678');
+    expect(maskPhone('011-123-5678')).toBe('011-***-5678');
+  });
+
+  it('하이픈 모양이 아니면 뒷자리 4개만, 번호가 없으면 -', () => {
+    expect(maskPhone('01012345678')).toBe('****5678');
+    expect(maskPhone(null)).toBe('-');
+    expect(maskPhone('')).toBe('-');
   });
 });

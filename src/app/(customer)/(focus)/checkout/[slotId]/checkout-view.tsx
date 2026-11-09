@@ -347,6 +347,8 @@ function BookerInfoConsent({
 export function HoldEnded({ slotId }: { slotId: string }) {
   return (
     <section className="flex flex-1 flex-col gap-4 px-4 pt-2 pb-8">
+      {/* 결제 화면과 같은 화면 제목(화면 읽기 프로그램용) */}
+      <h1 className="sr-only">예약 확인</h1>
       <BackButton fallbackHref={CUSTOMER_HOME} className="-ml-2 self-start" />
       <EmptyState
         title="결제할 수 있는 상태가 아니에요"

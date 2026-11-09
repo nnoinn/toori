@@ -20,23 +20,10 @@ import {
 } from '@/db/schema';
 import { slotStatusIs } from '@/features/slot-status/slot-status-sql';
 
+import { ADMIN_LIST_LIMIT, containsPattern, type ListResult, toListResult } from '../lookup';
 import type { ReservationFilter, SlotFilter } from './format';
 
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
-
-/** 한 번에 보여줄 최대 개수. 입점 승인 목록과 같고, 더 있으면 거르기와 검색으로 좁힌다 */
-export const LOOKUP_LIST_LIMIT = 200;
-
-export type LookupResult<Row> = { rows: Row[]; hasMore: boolean };
-
-function toLookupResult<Row>(rows: Row[]): LookupResult<Row> {
-  return { rows: rows.slice(0, LOOKUP_LIST_LIMIT), hasMore: rows.length > LOOKUP_LIST_LIMIT };
-}
-
-/** 입력한 글자를 그대로 찾도록 % _ \ 를 막는다 */
-function containsPattern(query: string): string {
-  return `%${query.replace(/[\\%_]/g, '\\$&')}%`;
-}
 
 /** 운영자 확인 이유가 남은 환불이 있는 예약(W14, #222) */
 const needsReview = sql<boolean>`exists (
@@ -70,7 +57,7 @@ export type ReservationRow = {
 export async function selectReservations(
   db: DbReader,
   input: { filter: ReservationFilter; query: string },
-): Promise<LookupResult<ReservationRow>> {
+): Promise<ListResult<ReservationRow>> {
   const pattern = containsPattern(input.query);
   const search: SQL | undefined = input.query
     ? or(
@@ -99,9 +86,9 @@ export async function selectReservations(
     .innerJoin(orders, eq(orders.id, reservations.orderId))
     .where(and(RESERVATION_CONDITIONS[input.filter], search))
     .orderBy(desc(slots.startAt), asc(reservations.code))
-    .limit(LOOKUP_LIST_LIMIT + 1);
+    .limit(ADMIN_LIST_LIMIT + 1);
   // DB의 check 제약이 정해 둔 값만 허용한다
-  return toLookupResult(
+  return toListResult(
     rows.map((row) => ({
       ...row,
       status: row.status as ReservationStatus,
@@ -131,7 +118,7 @@ export type SlotRow = {
 export async function selectSlots(
   db: DbReader,
   input: { filter: SlotFilter; query: string; now: Date },
-): Promise<LookupResult<SlotRow>> {
+): Promise<ListResult<SlotRow>> {
   const pattern = containsPattern(input.query);
   const search: SQL | undefined = input.query
     ? or(ilike(shops.name, pattern), ilike(slots.menuName, pattern))
@@ -157,9 +144,9 @@ export async function selectSlots(
     .innerJoin(shops, eq(shops.id, slots.shopId))
     .where(and(status, search))
     .orderBy(desc(slots.startAt), asc(slots.id))
-    .limit(LOOKUP_LIST_LIMIT + 1);
+    .limit(ADMIN_LIST_LIMIT + 1);
   // DB의 check 제약이 6가지 상태만 허용한다
-  return toLookupResult(rows.map((row) => ({ ...row, status: row.status as SlotStatus })));
+  return toListResult(rows.map((row) => ({ ...row, status: row.status as SlotStatus })));
 }
 
 export type RefundRow = {

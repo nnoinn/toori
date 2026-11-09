@@ -20,8 +20,8 @@ import { formatKst } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { ensureAdminPage } from '@/server/auth';
 
+import { ADMIN_LIST_LIMIT, labelReservation, toSearchQuery } from '../lookup';
 import {
-  labelReservation,
   LOOKUP_TABS,
   type LookupTab,
   lookupHref,
@@ -31,10 +31,9 @@ import {
   type SlotFilter,
   toLookupTab,
   toReservationFilter,
-  toSearchQuery,
   toSlotFilter,
 } from './format';
-import { LOOKUP_LIST_LIMIT, selectReservations, selectSlots } from './queries';
+import { selectReservations, selectSlots } from './queries';
 
 export const metadata: Metadata = { title: '매물·예약' };
 
@@ -260,7 +259,7 @@ function MoreNotice({ hasMore }: { hasMore: boolean }) {
   if (!hasMore) return null;
   return (
     <p className="text-sm text-muted-foreground">
-      {LOOKUP_LIST_LIMIT}건까지만 보여 드려요. 상태나 검색으로 좁혀 주세요.
+      {ADMIN_LIST_LIMIT}건까지만 보여 드려요. 상태나 검색으로 좁혀 주세요.
     </p>
   );
 }

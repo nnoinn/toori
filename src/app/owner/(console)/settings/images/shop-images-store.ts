@@ -12,6 +12,7 @@ import { menus, shopImages, shops } from '@/db/schema';
 import type { ShopImageKind } from '@/db/schema/shops';
 import { fail, ok, type Result } from '@/lib/result';
 
+import { moveOneStep } from '../reorder';
 import { SHOP_IMAGE_ERRORS, SHOP_IMAGE_LIMITS, type ShopLinks } from './shop-images';
 
 type Db = ReturnType<typeof getDb>;
@@ -23,6 +24,7 @@ export type ShopImage = {
   menuId: string | null;
 };
 
+/** 그 샵의 그 사진만 고르는 조건. 다른 샵 사진을 건드리지 않게 고치거나 지우는 문장마다 쓴다 */
 const byShopAndId = (shopId: string, imageId: string) =>
   and(eq(shopImages.shopId, shopId), eq(shopImages.id, imageId));
 
@@ -153,13 +155,13 @@ export async function moveStyleImage(
     .from(shopImages)
     .where(and(eq(shopImages.shopId, shopId), eq(shopImages.kind, 'style')))
     .orderBy(asc(shopImages.sortOrder), asc(shopImages.createdAt));
-  const index = styles.findIndex((image) => image.id === imageId);
-  if (index < 0) return false;
-  const target = direction === 'up' ? index - 1 : index + 1;
-  if (target < 0 || target >= styles.length) return true;
-
-  const ordered = styles.map((image) => image.id);
-  [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
+  const ordered = moveOneStep(
+    styles.map((image) => image.id),
+    imageId,
+    direction,
+  );
+  if (ordered === 'not-found') return false;
+  if (ordered === 'edge') return true;
   for (const [sortOrder, id] of ordered.entries()) {
     await db.update(shopImages).set({ sortOrder }).where(byShopAndId(shopId, id));
   }

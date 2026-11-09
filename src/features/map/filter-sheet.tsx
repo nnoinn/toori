@@ -15,7 +15,12 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { PRICE_FILTER_RANGES, SHOP_CATEGORIES, TIME_FILTER_RANGES } from '@/server/policy';
+import {
+  PRICE_FILTER_RANGES,
+  serviceTypesOf,
+  SHOP_CATEGORIES,
+  TIME_FILTER_RANGES,
+} from '@/server/policy';
 
 import {
   applyFiltersToSearch,
@@ -24,7 +29,6 @@ import {
   MIN_DISCOUNT_OPTIONS,
   selectCategory,
   selectMinDiscount,
-  serviceTypesOf,
   togglePrice,
   toggleService,
   toggleTime,

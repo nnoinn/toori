@@ -20,7 +20,7 @@ Claude는 코드를 만들거나 고칠 때 이 문서를 따른다. 1장은 정
 - 서버 함수의 결과 형태를 통일한다: 성공은 `{ ok: true, data }`, 실패는 `{ ok: false, error: { code, message } }`. 화면은 `message`를 사용자에게 보여준다
 - 목록·상세 화면은 **로딩 중, 데이터 없음, 오류** 세 상태를 모두 만든다
 - 이미지는 `next/image`로 표시한다
-- **새 함수를 만들기 전에 이미 있는지 찾는다(11/1).** 날짜·시간은 `src/lib/time.ts`, 금액 표시는 `src/lib/format.ts`, 주소 값은 `src/lib/search-params.ts`, 전화번호는 `src/lib/phone.ts`, 은행·정책 값은 `src/server/policy/`에 있다. 두 화면에서 쓰게 되면 복사하지 말고 공통 파일로 옮긴다
+- **새 함수를 만들기 전에 이미 있는지 찾는다(11/1).** 날짜·시간은 `src/lib/time.ts`, 금액 표시는 `src/lib/format.ts`, 주소 값은 `src/lib/search-params.ts`, 전화번호(모양·가리기 `maskPhone`·오류 문구)는 `src/lib/phone.ts`, id 모양 확인은 `src/lib/uuid.ts`의 `isUuid`, DB 제약 이름은 `src/lib/db-error.ts`, 은행·정책 값과 업종·서비스 이름(`serviceTypesOf`·`serviceTypeLabel`·`categoryLabel`)은 `src/server/policy/`에 있다. 두 화면에서 쓰게 되면 복사하지 말고 공통 파일로 옮긴다
 - 공통 UI(`src/components/ui/`)에 있는 컴포넌트를 먼저 쓴다. 없거나 화면에 맞지 않으면 공통 UI에 추가하거나 고쳐도 된다. PR에 "공통 UI 변경"과 이유를 적고, 기존 사용법은 깨지 않는다(현동훈이 관리하지만 팀원 수정·제안을 막지 않는다)
 
 ### 화면 문구와 디자인

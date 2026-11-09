@@ -1,6 +1,7 @@
 'use client';
 
 // 샵 정보 입력 폼 (O2, S-103). 저장 전에 화면에서 한 번 검사하고, 서버 함수가 다시 검사한다.
+// 영업시간 칸은 business-hours-editor.tsx가 그리고, 값과 오류는 이 폼이 한 곳에서 갖는다.
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
@@ -16,15 +17,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Textarea } from '@/components/ui/textarea';
 import type { GeocodeCandidate } from '@/features/map/geocode';
-import { SHOP_CATEGORIES } from '@/server/policy/catalog';
+import { categoryLabel, SHOP_CATEGORIES } from '@/server/policy/catalog';
 
+import { fieldA11y, FormField } from '../../../form-field';
 import { withDirectionParticle } from '../../../korean';
+import { ChoiceChips } from '../../choice-chips';
 import { getCategoryChangeImpact, saveShopProfile } from './actions';
 import { AddressSearchButton } from './address-search-button';
+import { BusinessHoursEditor } from './business-hours-editor';
 import type { CategoryChangeImpact } from './category-change-store';
 import {
   CATEGORY_CHANGE_BLOCKED_MESSAGE,
@@ -34,7 +37,6 @@ import {
   type ShopProfileFieldErrors,
   type ShopProfileInput,
   validateShopProfile,
-  WEEKDAY_LABELS,
 } from './shop-profile';
 
 type Status =
@@ -61,6 +63,7 @@ export function ShopProfileForm({
 }) {
   const [form, setForm] = useState(initial);
   const [errors, setErrors] = useState<ShopProfileFieldErrors>({});
+  // 서버가 주소를 하나로 정하지 못했을 때 고를 후보
   const [candidates, setCandidates] = useState<GeocodeCandidate[]>([]);
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [pending, startTransition] = useTransition();
@@ -68,11 +71,16 @@ export function ShopProfileForm({
   const [savedCategory, setSavedCategory] = useState(initial.category);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
 
+  /**
+   * 칸 하나를 바꾼다. "저장했어요" 문구는 지금 입력과 헷갈리지 않게 지운다.
+   * 칸 오류는 여기서 지우지 않고, 다시 [저장]할 때 새로 검사해서 바꾼다
+   */
   function update<K extends keyof ShopProfileInput>(key: K, value: ShopProfileInput[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
     setStatus({ kind: 'idle' });
   }
 
+  /** 영업시간 index번째 줄에서 바뀐 값만 덮어쓴다 */
   function updateHours(index: number, row: Partial<HoursRow>) {
     update(
       'hours',
@@ -97,6 +105,10 @@ export function ShopProfileForm({
     submit(next, false);
   }
 
+  /**
+   * 서버에 저장한다. confirmCategoryChange는 업종 변경 확인 창을 거쳤을 때만 true다.
+   * 서버는 이 값 없이 업종이 바뀐 저장을 거절해서, 확인 없이 메뉴가 초기화되는 일을 막는다
+   */
   function submit(next: ShopProfileInput, confirmCategoryChange: boolean) {
     startTransition(async () => {
       const result = await saveShopProfile(shopId, next, { confirmCategoryChange });
@@ -153,17 +165,17 @@ export function ShopProfileForm({
     });
   }
 
+  /**
+   * 서버가 보여준 주소 후보를 골랐을 때. 후보는 저장이 주소 때문에 막혔을 때만 뜨므로
+   * [저장]을 다시 누르지 않게 바로 다시 저장한다. setForm이 아직 반영되지 않아 새 값을 직접 넘긴다
+   */
   function chooseCandidate(roadAddress: string) {
     const next = { ...form, roadAddress };
     setForm(next);
     save(next);
   }
 
-  const fieldProps = (field: ShopProfileField) => ({
-    id: field,
-    'aria-invalid': errors[field] ? true : undefined,
-    'aria-describedby': errors[field] ? `${field}-error` : undefined,
-  });
+  const fieldProps = (field: ShopProfileField) => fieldA11y(field, errors[field]);
 
   return (
     <form
@@ -179,42 +191,26 @@ export function ShopProfileForm({
           <CardTitle>기본 정보</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <Field label="샵 이름" field="name" error={errors.name}>
+          <FormField label="샵 이름" id="name" error={errors.name}>
             <Input
               {...fieldProps('name')}
               value={form.name}
               maxLength={SHOP_PROFILE_LIMITS.name}
               onChange={(event) => update('name', event.target.value)}
             />
-          </Field>
+          </FormField>
 
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-2 text-sm font-medium">업종</legend>
-            <div className="flex gap-2">
-              {SHOP_CATEGORIES.map((category) => (
-                <label
-                  key={category.key}
-                  className={cn(
-                    'flex h-9 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50',
-                    form.category === category.key && 'border-primary bg-primary/10 font-semibold',
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="category"
-                    value={category.key}
-                    checked={form.category === category.key}
-                    onChange={() => update('category', category.key)}
-                    className="sr-only"
-                  />
-                  {category.label}
-                </label>
-              ))}
-            </div>
-            <FieldError field="category" error={errors.category} />
-          </fieldset>
+          <ChoiceChips
+            legend="업종"
+            name="category"
+            options={SHOP_CATEGORIES}
+            value={form.category}
+            onChange={(key) => update('category', key)}
+            errorId="category"
+            error={errors.category}
+          />
 
-          <Field label="전화번호" field="phone" error={errors.phone}>
+          <FormField label="전화번호" id="phone" error={errors.phone}>
             {/* 숫자만 쳐도 앞자리(02·031·0507 등)에 맞춰 하이픈을 넣는다(#205) */}
             <PhoneInput
               {...fieldProps('phone')}
@@ -224,7 +220,7 @@ export function ShopProfileForm({
               onValueChange={(value) => update('phone', value)}
               className="max-w-60"
             />
-          </Field>
+          </FormField>
         </CardContent>
       </Card>
 
@@ -233,7 +229,7 @@ export function ShopProfileForm({
           <CardTitle>주소</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <Field label="도로명 주소" field="roadAddress" error={errors.roadAddress}>
+          <FormField label="도로명 주소" id="roadAddress" error={errors.roadAddress}>
             <div className="flex gap-2">
               <Input
                 {...fieldProps('roadAddress')}
@@ -250,7 +246,7 @@ export function ShopProfileForm({
                 onError={(message) => setErrors((prev) => ({ ...prev, roadAddress: message }))}
               />
             </div>
-          </Field>
+          </FormField>
 
           {candidates.length > 0 ? (
             <div className="flex flex-col gap-2 rounded-lg bg-muted p-3">
@@ -278,7 +274,7 @@ export function ShopProfileForm({
             </div>
           ) : null}
 
-          <Field label="상세 주소" field="addressDetail" error={errors.addressDetail}>
+          <FormField label="상세 주소" id="addressDetail" error={errors.addressDetail}>
             <Input
               {...fieldProps('addressDetail')}
               placeholder="예: 2층 201호"
@@ -286,70 +282,18 @@ export function ShopProfileForm({
               maxLength={SHOP_PROFILE_LIMITS.addressDetail}
               onChange={(event) => update('addressDetail', event.target.value)}
             />
-          </Field>
+          </FormField>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>영업시간</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            비워 둔 요일은 고객에게 &quot;정보 없음&quot;으로 보여요. 자정을 넘기는 시각은 넣을 수
-            없어요.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <ul className="flex flex-col gap-2">
-            {form.hours.map((row, index) => {
-              const field = `hours.${index}` as const;
-              const label = WEEKDAY_LABELS[row.weekday];
-              return (
-                <li key={row.weekday} className="flex flex-col gap-1">
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 font-medium">{label}</span>
-                    <label className="flex w-24 items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={row.closed}
-                        onChange={(event) => updateHours(index, { closed: event.target.checked })}
-                        className="size-4 accent-primary"
-                      />
-                      쉬는 날
-                    </label>
-                    <Input
-                      type="time"
-                      aria-label={`${label}요일 여는 시각`}
-                      aria-invalid={errors[field] ? true : undefined}
-                      value={row.open}
-                      disabled={row.closed}
-                      onChange={(event) => updateHours(index, { open: event.target.value })}
-                      className="w-32"
-                    />
-                    <span aria-hidden>~</span>
-                    <Input
-                      type="time"
-                      aria-label={`${label}요일 닫는 시각`}
-                      aria-invalid={errors[field] ? true : undefined}
-                      value={row.close}
-                      disabled={row.closed}
-                      onChange={(event) => updateHours(index, { close: event.target.value })}
-                      className="w-32"
-                    />
-                  </div>
-                  <FieldError field={field} error={errors[field]} className="pl-9" />
-                </li>
-              );
-            })}
-          </ul>
-        </CardContent>
-      </Card>
+      <BusinessHoursEditor hours={form.hours} errors={errors} onChange={updateHours} />
 
       <Card>
         <CardHeader>
           <CardTitle>서비스 설명</CardTitle>
         </CardHeader>
         <CardContent>
-          <Field label="고객에게 보여줄 샵 소개" field="description" error={errors.description}>
+          <FormField label="고객에게 보여줄 샵 소개" id="description" error={errors.description}>
             <Textarea
               {...fieldProps('description')}
               rows={6}
@@ -361,7 +305,7 @@ export function ShopProfileForm({
             <p className="text-right text-xs text-muted-foreground">
               {form.description.length} / {SHOP_PROFILE_LIMITS.description}
             </p>
-          </Field>
+          </FormField>
         </CardContent>
       </Card>
 
@@ -387,9 +331,7 @@ export function ShopProfileForm({
 
       <CategoryChangeDialog
         state={confirm}
-        nextCategoryLabel={
-          SHOP_CATEGORIES.find((category) => category.key === form.category)?.label ?? ''
-        }
+        nextCategoryLabel={categoryLabel(form.category)}
         pending={pending}
         onCancel={() => setConfirm(null)}
         onConfirmStep1={confirmStep1}
@@ -464,42 +406,5 @@ export function CategoryChangeDialog({
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function Field({
-  label,
-  field,
-  error,
-  children,
-}: {
-  label: string;
-  field: ShopProfileField;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={field}>{label}</Label>
-      {children}
-      <FieldError field={field} error={error} />
-    </div>
-  );
-}
-
-function FieldError({
-  field,
-  error,
-  className,
-}: {
-  field: ShopProfileField;
-  error?: string;
-  className?: string;
-}) {
-  if (!error) return null;
-  return (
-    <p id={`${field}-error`} className={cn('text-sm text-destructive', className)}>
-      {error}
-    </p>
   );
 }

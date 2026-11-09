@@ -1,6 +1,5 @@
 // 매물·예약 조회 화면 표시 모양 (A-103, W18).
 
-import type { ReservationStatus, VisitResult } from '@/db/schema';
 import { SLOT_STATUSES, type SlotStatus } from '@/db/schema/slots';
 
 /** 목록 탭. 주소 ?tab= 값 */
@@ -43,11 +42,6 @@ export function toSlotFilter(value: string | undefined): SlotFilter {
   return SLOT_FILTERS.find((filter) => filter === value) ?? 'all';
 }
 
-/** 검색어를 다듬는다. 없으면 빈 문자열 */
-export function toSearchQuery(value: string | undefined): string {
-  return (value ?? '').trim().slice(0, 50);
-}
-
 /** 목록 주소. 기본값은 주소에 넣지 않는다 */
 export function lookupHref(input: { tab: LookupTab; status?: string; query?: string }): string {
   const params = new URLSearchParams();
@@ -56,14 +50,6 @@ export function lookupHref(input: { tab: LookupTab; status?: string; query?: str
   if (input.query) params.set('q', input.query);
   const search = params.toString();
   return search ? `/admin/reservations?${search}` : '/admin/reservations';
-}
-
-/** 예약 상태 이름. 노쇼는 상태가 아니라 방문 결과로 기록한다(S-405) */
-export function labelReservation(status: ReservationStatus, visitResult: VisitResult | null) {
-  if (visitResult === 'no_show') return '노쇼';
-  if (status === 'cancelled') return '취소';
-  if (status === 'completed') return '이용 완료';
-  return '예정';
 }
 
 const ORDER_STATUS_LABELS: Record<string, string> = {

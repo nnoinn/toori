@@ -244,7 +244,7 @@ describeDb('시드 데이터 (실제 DB)', () => {
       const expected = { reserved: 'confirmed', completed: 'completed', cancelled: 'cancelled' };
       for (const r of rows) {
         expect(r.status).toBe(expected[r.slot_status as keyof typeof expected]);
-        expect(r.code).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
+        expect(r.code).toMatch(/^\d{12}$/);
       }
 
       // 고객 A는 이력 없음, B는 원장님 A 샵 이용 이력(신규 고객 전용 매물이 안 보여야 한다)

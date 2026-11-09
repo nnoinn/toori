@@ -7,15 +7,17 @@ import { getDb } from '@/db';
 import type { BusinessHours } from '@/db/schema/shops';
 import { addMinutes } from '@/lib/time';
 
-import { isServiceTypeOf, MENU_DURATION } from '../../settings/menu/menu';
-import { selectMenus } from '../../settings/menu/menu-store';
-import type { SlotMenuOption } from './slot-create-form';
+import { isServiceTypeOf } from '@/server/policy';
+
+import { MENU_DURATION } from '../settings/menu/menu';
+import { selectMenus } from '../settings/menu/menu-store';
+import type { SlotMenuOption } from './slot-form';
 import { type DraftOptions, selectBusyRanges, selectSlotShop } from './slot-draft-store';
 import { latestStart } from './slot-time';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select'>;
 
-/** SlotCreateForm에 넘길 값(시각은 ISO 문자열) */
+/** SlotForm에 넘길 값(시각은 ISO 문자열) */
 export type SlotFormData = {
   businessHours: BusinessHours;
   /** 고를 수 있는 메뉴: 숨기지 않았고 지금 업종의 서비스 종류. 비어 있으면 화면이 메뉴 등록을 안내한다 */

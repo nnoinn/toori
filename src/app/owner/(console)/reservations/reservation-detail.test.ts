@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  maskPhone,
   reservationView,
   showsFullPhone,
   VISIT_ACTIONS,
@@ -34,13 +33,6 @@ describe('원장님 예약 상세 (O11, S-403)', () => {
     expect(showsFullPhone({ status: 'completed', visitResult: 'visited', startAt })).toBe(false);
     expect(showsFullPhone({ status: 'completed', visitResult: 'no_show', startAt })).toBe(false);
     expect(showsFullPhone({ status: 'cancelled', visitResult: null, startAt })).toBe(false);
-  });
-
-  it('휴대폰 번호는 가운데만 가린다', () => {
-    expect(maskPhone('010-1234-5678')).toBe('010-****-5678');
-    expect(maskPhone('010-123-5678')).toBe('010-***-5678');
-    // 하이픈 모양이 아니면 뒷자리 4개만
-    expect(maskPhone('01012345678')).toBe('****5678');
   });
 });
 

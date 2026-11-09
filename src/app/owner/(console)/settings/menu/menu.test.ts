@@ -2,13 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { MENU_DURATION_STEP_MINUTES } from '@/server/policy';
 
-import {
-  isServiceTypeOf,
-  MENU_DURATION_OPTIONS,
-  type MenuInput,
-  serviceTypeLabel,
-  validateMenu,
-} from './menu';
+import { MENU_DURATION_OPTIONS, type MenuInput, validateMenu } from './menu';
 
 const valid = (overrides: Partial<MenuInput> = {}): MenuInput => ({
   serviceType: 'cut',
@@ -26,18 +20,6 @@ describe('MENU_DURATION_OPTIONS', () => {
     expect(
       MENU_DURATION_OPTIONS.every((minutes) => minutes % MENU_DURATION_STEP_MINUTES === 0),
     ).toBe(true);
-  });
-});
-
-describe('서비스 종류', () => {
-  it('업종 목록에 있는지 본다', () => {
-    expect(isServiceTypeOf('hair', 'cut')).toBe(true);
-    expect(isServiceTypeOf('nail_lash', 'cut')).toBe(false);
-  });
-
-  it('화면 이름을 돌려준다', () => {
-    expect(serviceTypeLabel('gel_nail')).toBe('젤네일');
-    expect(serviceTypeLabel('unknown')).toBe('unknown');
   });
 });
 
