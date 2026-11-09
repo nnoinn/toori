@@ -1,13 +1,8 @@
 // 입점 심사 화면 표시 모양 (A-101). 화면 코드에서만 쓰는 이름 바꾸기라 이 폴더에 둔다.
 
 import type { PgSellerStatus } from '@/db/schema/shops';
-import { SHOP_CATEGORIES } from '@/server/policy';
 
 // 사업자등록번호 모양(formatBusinessNumber)은 원장님 화면과 같이 쓰려고 '@/lib/business-number'로 옮겼다(#205, #213)
-
-export function labelCategory(key: string): string {
-  return SHOP_CATEGORIES.find((category) => category.key === key)?.label ?? key;
-}
 
 const PG_SELLER_STATUS_LABELS: Record<PgSellerStatus, string> = {
   not_registered: '등록 전',

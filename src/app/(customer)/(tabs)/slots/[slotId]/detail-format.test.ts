@@ -10,11 +10,31 @@ import {
   formatDuration,
   kakaoDirectionsLink,
   kakaoMapLink,
+  photoIndexAt,
   refundPolicyLines,
   refundPolicyNotes,
   safeExternalUrl,
   telHref,
 } from './detail-format';
+
+describe('사진 번호', () => {
+  it('스크롤 위치에서 가장 가까운 사진', () => {
+    expect(photoIndexAt(0, 600, 3)).toBe(0);
+    expect(photoIndexAt(600, 600, 3)).toBe(1);
+    expect(photoIndexAt(1190, 600, 3)).toBe(2);
+    expect(photoIndexAt(280, 600, 3)).toBe(0);
+  });
+
+  it('범위를 벗어나지 않는다(화면 끝에서 튕길 때)', () => {
+    expect(photoIndexAt(-30, 600, 3)).toBe(0);
+    expect(photoIndexAt(2000, 600, 3)).toBe(2);
+  });
+
+  it('칸 폭을 못 재거나 사진이 없으면 첫 장', () => {
+    expect(photoIndexAt(300, 0, 3)).toBe(0);
+    expect(photoIndexAt(300, 600, 0)).toBe(0);
+  });
+});
 
 describe('영업시간', () => {
   it('월요일부터 7줄, 입력 안 한 요일은 "정보 없음"', () => {

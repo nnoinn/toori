@@ -18,6 +18,7 @@ export function fitLongSide(
   return { width: Math.round(width * scale), height: Math.round(height * scale) };
 }
 
+/** 줄여서 올릴 수 있는 사진 종류(JPG·PNG·WEBP, 정책값)인지. 사업자등록증 올리기도 같이 쓴다 */
 export function isAllowedImageType(type: string): boolean {
   return (UPLOAD_ALLOWED_TYPES as readonly string[]).includes(type);
 }

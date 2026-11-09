@@ -4,19 +4,18 @@
 
 import 'server-only';
 
-import { DrizzleQueryError } from 'drizzle-orm';
-
 import { getDb } from '@/db';
 import { slots } from '@/db/schema';
 import { fail, ok, type Result } from '@/lib/result';
-import { calcSalePrice } from '@/server/policy';
 
-import { SLOT_DRAFT_ERRORS, validateSlotDraft } from './slot-draft-store';
+import { validateSlotDraft } from './slot-draft-store';
 import { parseSlotPricing, SLOT_PRICING_ERROR } from './slot-pricing';
+import { overlapFailure, slotValuesFrom } from './slot-save';
 
 type Db = Pick<ReturnType<typeof getDb>, 'transaction'>;
 
-export type CreatedSlot = { slotId: string; salePrice: number };
+/** 저장한(등록·수정·재등록) 매물. 할인가는 서버가 계산한 값이라 완료 화면이 이 값을 보여준다 */
+export type SavedSlot = { slotId: string; salePrice: number };
 
 /** 재등록(O13, S-408)으로 만드는 매물이면 원래(취소된) 매물 */
 export type CreateSlotOptions = { relistedFromSlotId?: string };
@@ -33,7 +32,7 @@ export async function createSlotInDb(
   input: unknown,
   now: Date,
   { relistedFromSlotId }: CreateSlotOptions = {},
-): Promise<Result<CreatedSlot>> {
+): Promise<Result<SavedSlot>> {
   const pricing = parseSlotPricing(input);
   if (!pricing) return fail('INVALID_DISCOUNT_RATE', SLOT_PRICING_ERROR);
 
@@ -41,41 +40,21 @@ export async function createSlotInDb(
     return await db.transaction(async (tx) => {
       const draft = await validateSlotDraft(tx, shopId, input, now);
       if (!draft.ok) return draft;
-      const { menu, start, end } = draft.data;
-      const salePrice = calcSalePrice(menu.listPrice, pricing.discountRate);
+      const values = slotValuesFrom(draft.data, pricing);
       const [row] = await tx
         .insert(slots)
         .values({
           shopId,
-          menuId: menu.id,
-          serviceType: menu.serviceType,
-          menuName: menu.name,
-          menuDescription: menu.description,
-          listPrice: menu.listPrice,
-          durationMinutes: menu.durationMinutes,
-          discountRate: pricing.discountRate,
-          salePrice,
-          newCustomerOnly: pricing.newCustomerOnly,
-          startAt: start,
-          endAt: end,
+          ...values,
           publishAt: now,
           status: 'published',
           relistedFromSlotId,
           createdBy,
         })
         .returning({ id: slots.id });
-      return ok({ slotId: row.id, salePrice });
+      return ok({ slotId: row.id, salePrice: values.salePrice });
     });
   } catch (error) {
-    if (violated(error) === 'slots_no_overlap') {
-      return fail('SLOT_OVERLAP', SLOT_DRAFT_ERRORS.SLOT_OVERLAP);
-    }
-    throw error;
+    return overlapFailure(error);
   }
-}
-
-/** 쿼리가 어긴 DB 제약 이름 */
-export function violated(error: unknown): string | undefined {
-  const cause = error instanceof DrizzleQueryError ? error.cause : error;
-  return (cause as { constraint_name?: string } | undefined)?.constraint_name;
 }

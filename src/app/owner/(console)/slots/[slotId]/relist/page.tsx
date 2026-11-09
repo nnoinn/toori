@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { z } from 'zod';
+import { isUuid } from '@/lib/uuid';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,11 +13,11 @@ import { formatDuration } from '@/lib/format';
 import { getRequestNow } from '@/lib/request-time';
 import { formatKst, formatKstTime } from '@/lib/time';
 import { ensureOwnerPage } from '@/server/auth';
-import { calcSalePrice } from '@/server/policy';
+import { calcSalePrice, serviceTypeLabel } from '@/server/policy';
 import { readShopReviewStatus } from '@/server/shops/review-store';
 
-import { serviceTypeLabel } from '../../../settings/menu/menu';
-import { validateSlotDraft } from '../../new/slot-draft-store';
+import { OwnerPage } from '../../../owner-page';
+import { validateSlotDraft } from '../../slot-draft-store';
 import { RELIST_MESSAGES, relistDraftMessage, relistProblem } from '../../relist';
 import { relistInput, selectSlotForRelist } from '../../relist-store';
 import { RelistActions } from './relist-actions';
@@ -32,18 +32,19 @@ type Params = Promise<{ slotId: string }>;
 // 지금 메뉴 값으로 계산한 가격을 보여준다(저장할 때 다시 확인한다). PC 기준
 export default function SlotRelistPage({ params }: { params: Params }) {
   return (
-    <main className="flex w-full max-w-3xl flex-1 flex-col gap-4 p-6">
-      <h1 className="text-xl font-bold">매물 재등록</h1>
+    <OwnerPage title="매물 재등록" width="narrow" backHref="/owner">
       <Suspense fallback={<LoadingCards count={1} />}>
         <RelistContent params={params} />
       </Suspense>
-    </main>
+    </OwnerPage>
   );
 }
 
+/** 입점 승인 → 그 샵의 취소 매물 → 재등록할 수 있는지 → 등록 확인을 차례로 보고, 되면 새 매물 미리보기를 보여준다 */
 async function RelistContent({ params }: { params: Params }) {
   const { slotId } = await params;
-  const validId = z.uuid().safeParse(slotId).success;
+  // 모양이 틀린 id는 로그인 뒤 돌아올 주소에 넣지 않고 대시보드로 돌아오게 한다
+  const validId = isUuid(slotId);
   // 로그인하지 않았으면 로그인 화면, 원장님 가입 전이면 /owner/join 으로 보낸다
   const auth = await ensureOwnerPage(validId ? `/owner/slots/${slotId}/relist` : '/owner');
   const db = getDb();

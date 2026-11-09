@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import {
   ChevronDown,
   Clock,
@@ -30,6 +29,7 @@ import {
   telHref,
 } from './detail-format';
 import { FavoriteButton } from './favorite-button';
+import { SlotPhotos } from './slot-photos';
 import { ReserveButton } from './reserve-button';
 import type { SlotDetail } from './types';
 
@@ -58,7 +58,8 @@ export function SlotDetailView({ slot, serverNow, favorite }: SlotDetailViewProp
   const refundNotes = refundPolicyNotes(OWNER_FAULT_COUPON_AMOUNT);
 
   return (
-    <article className="flex flex-1 flex-col pb-24 md:mx-auto md:grid md:w-full md:max-w-5xl md:grid-cols-[minmax(0,1fr)_380px] md:items-start md:gap-x-8 md:px-6 md:py-6">
+    // PC: 오른쪽 카드가 두 줄에 걸쳐 있다. 둘째 줄(샵 정보)을 1fr로 두어 카드 높이가 첫 줄(사진·안내)을 늘리지 않게 한다
+    <article className="flex flex-1 flex-col pb-24 md:mx-auto md:grid md:w-full md:max-w-5xl md:grid-cols-[minmax(0,1fr)_380px] md:grid-rows-[auto_1fr] md:items-start md:gap-x-8 md:px-6 md:py-6">
       {slot.imageUrls.length > 0 ? (
         <div className="relative md:col-start-1 md:row-start-1 md:overflow-hidden md:rounded-2xl">
           {/* 공유한 주소로 바로 들어와 이전 화면이 없으면 고객 홈으로(#215) */}
@@ -66,20 +67,8 @@ export function SlotDetailView({ slot, serverNow, favorite }: SlotDetailViewProp
             fallbackHref={CUSTOMER_HOME}
             className="absolute top-2 left-2 z-10 bg-background/80"
           />
-          <ul className="flex snap-x snap-mandatory overflow-x-auto" aria-label="스타일 이미지">
-            {slot.imageUrls.map((url, index) => (
-              <li key={url} className="relative aspect-[4/3] w-full shrink-0 snap-center">
-                <Image
-                  src={url}
-                  alt={`${shop.name} 이미지 ${index + 1}`}
-                  fill
-                  sizes="(max-width: 768px) 100vw, 60vw"
-                  className="object-cover"
-                  priority={index === 0}
-                />
-              </li>
-            ))}
-          </ul>
+          {/* 다른 매물로 옮겨도 첫 장부터 보이게 매물마다 새로 시작한다 */}
+          <SlotPhotos key={slot.slotId} urls={slot.imageUrls} shopName={shop.name} />
         </div>
       ) : (
         // 사진이 없으면 큰 회색 칸 대신 뒤로가기와 작은 안내만 두어 샵 정보가 바로 위로 올라오게 한다(#214)

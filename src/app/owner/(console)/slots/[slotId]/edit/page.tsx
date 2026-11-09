@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { z } from 'zod';
+import { isUuid } from '@/lib/uuid';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -11,8 +11,9 @@ import { getRequestNow } from '@/lib/request-time';
 import { ensureOwnerPage } from '@/server/auth';
 import { readShopReviewStatus } from '@/server/shops/review-store';
 
-import { SlotCreateForm } from '../../new/slot-create-form';
-import { selectSlotFormData } from '../../new/slot-form-data';
+import { OwnerPage } from '../../../owner-page';
+import { SlotForm } from '../../slot-form';
+import { selectSlotFormData } from '../../slot-form-data';
 import { SLOT_EDIT_MESSAGES, slotEditProblem } from '../../slot-edit';
 import { selectSlotForEdit } from '../../slot-edit-store';
 
@@ -24,18 +25,19 @@ type Params = Promise<{ slotId: string }>;
 // 등록 3탭 화면을 지금 값으로 채워서 연다. 판매 전이고 결제 중이 아닌 매물만 고칠 수 있다. PC 기준
 export default function SlotEditPage({ params }: { params: Params }) {
   return (
-    <main className="flex w-full max-w-4xl flex-1 flex-col gap-4 p-6">
-      <h1 className="text-xl font-bold">매물 수정</h1>
+    <OwnerPage title="매물 수정" width="narrow" backHref="/owner">
       <Suspense fallback={<LoadingCards count={2} />}>
         <SlotEditContent params={params} />
       </Suspense>
-    </main>
+    </OwnerPage>
   );
 }
 
+/** 입점 승인 → 그 샵 매물 → 지금 고칠 수 있는지 차례로 보고, 되면 등록 3탭 화면을 지금 값으로 채워 연다 */
 async function SlotEditContent({ params }: { params: Params }) {
   const { slotId } = await params;
-  const validId = z.uuid().safeParse(slotId).success;
+  // 모양이 틀린 id는 로그인 뒤 돌아올 주소에 넣지 않고 대시보드로 돌아오게 한다
+  const validId = isUuid(slotId);
   // 로그인하지 않았으면 로그인 화면, 원장님 가입 전이면 /owner/join 으로 보낸다
   const auth = await ensureOwnerPage(validId ? `/owner/slots/${slotId}/edit` : '/owner');
   const db = getDb();
@@ -66,7 +68,7 @@ async function SlotEditContent({ params }: { params: Params }) {
   }
 
   return (
-    <SlotCreateForm
+    <SlotForm
       shopId={auth.shopId}
       nowIso={now.toISOString()}
       {...data}
@@ -82,6 +84,7 @@ async function SlotEditContent({ params }: { params: Params }) {
   );
 }
 
+/** 고칠 수 없을 때 이유와 [대시보드로] */
 function CannotEdit({ message, description }: { message: string; description?: string }) {
   return (
     <Card>

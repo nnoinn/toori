@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ChevronDown, LocateFixed } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/sheet';
 
 import { MY_LOCATION_ENABLED } from './location-config';
+import { withoutRegionParam } from './region-link';
 import { RegionPicker } from './region-picker';
 import { useMyLocation } from './use-my-location';
 
@@ -26,7 +28,15 @@ type LocationSwitcherProps = {
 /** 홈 위쪽의 지금 동네 이름. 누르면 시트에서 '내 위치로'나 동네를 고른다 (C-102) */
 export function LocationSwitcher({ label, selectedCode }: LocationSwitcherProps) {
   const [open, setOpen] = useState(false);
-  const close = () => setOpen(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const close = () => {
+    setOpen(false);
+    // 동네 링크(?region=)로 보던 중에 직접 골랐으면 주소의 동네를 지워 고른 쪽으로 보여준다
+    const next = withoutRegionParam(pathname, searchParams.toString());
+    if (next) router.replace(next, { scroll: false });
+  };
   const { status, message, requestLocation } = useMyLocation(close);
 
   return (

@@ -12,12 +12,13 @@ import { slots, type SlotStatus } from '@/db/schema';
 import { getSlotStatus } from '@/features/slot-status/slot-status';
 import { slotIsOnHold, slotStatusIs } from '@/features/slot-status/slot-status-sql';
 import { fail, ok, type Result } from '@/lib/result';
-import { calcSalePrice, type DiscountRate } from '@/server/policy';
+import type { DiscountRate } from '@/server/policy';
 
-import { type CreatedSlot, violated } from './new/slot-create-store';
-import { SLOT_DRAFT_ERRORS, validateSlotDraft } from './new/slot-draft-store';
-import { parseSlotPricing, SLOT_PRICING_ERROR } from './new/slot-pricing';
+import type { SavedSlot } from './slot-create-store';
+import { validateSlotDraft } from './slot-draft-store';
 import { SLOT_CLOSE_REASON_OPTIONS, SLOT_EDIT_MESSAGES, slotEditProblem } from './slot-edit';
+import { parseSlotPricing, SLOT_PRICING_ERROR } from './slot-pricing';
+import { overlapFailure, slotValuesFrom } from './slot-save';
 
 type Db = ReturnType<typeof getDb>;
 
@@ -47,6 +48,7 @@ function editableNow(now: Date): SQL {
   )!;
 }
 
+/** 막힌 이유(코드)를 원장님에게 보여줄 문구와 함께 돌려준다 */
 function failWith(problem: keyof typeof SLOT_EDIT_MESSAGES): Result<never> {
   return fail(problem, SLOT_EDIT_MESSAGES[problem]);
 }
@@ -139,7 +141,7 @@ export async function updateSlotInDb(
   slotId: string,
   input: unknown,
   now: Date,
-): Promise<Result<CreatedSlot>> {
+): Promise<Result<SavedSlot>> {
   const pricing = parseSlotPricing(input);
   if (!pricing) return fail('INVALID_DISCOUNT_RATE', SLOT_PRICING_ERROR);
 
@@ -151,36 +153,22 @@ export async function updateSlotInDb(
 
       const draft = await validateSlotDraft(tx, shopId, input, now, { excludeSlotId: slotId });
       if (!draft.ok) return draft;
-      const { menu, start, end } = draft.data;
       // 예약대기 매물만 지금 게시한다(미리 게시 S-205는 P1에서 다시 본다)
       const publishNow = getSlotStatus(editable.data, now) === 'scheduled';
-      const salePrice = calcSalePrice(menu.listPrice, pricing.discountRate);
+      const values = slotValuesFrom(draft.data, pricing);
       const [row] = await tx
         .update(slots)
         .set({
-          menuId: menu.id,
-          serviceType: menu.serviceType,
-          menuName: menu.name,
-          menuDescription: menu.description,
-          listPrice: menu.listPrice,
-          durationMinutes: menu.durationMinutes,
-          discountRate: pricing.discountRate,
-          salePrice,
-          newCustomerOnly: pricing.newCustomerOnly,
-          startAt: start,
-          endAt: end,
+          ...values,
           ...(publishNow ? { publishAt: now } : {}),
           status: 'published',
         })
         .where(and(eq(slots.id, slotId), eq(slots.shopId, shopId), editableNow(now)))
         .returning({ id: slots.id });
       if (!row) return blockedReason(tx, shopId, slotId, now);
-      return ok({ slotId: row.id, salePrice });
+      return ok({ slotId: row.id, salePrice: values.salePrice });
     });
   } catch (error) {
-    if (violated(error) === 'slots_no_overlap') {
-      return fail('SLOT_OVERLAP', SLOT_DRAFT_ERRORS.SLOT_OVERLAP);
-    }
-    throw error;
+    return overlapFailure(error);
   }
 }

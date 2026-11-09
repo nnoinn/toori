@@ -5,43 +5,37 @@
 // 검사를 통과하면 정산 계좌 확인 창(#163)에서 계좌번호 전체를 한 번 더 확인받고 신청한다.
 // 성공하면 /owner로 가고 거기서 "입점 신청을 마쳤어요" 안내 상자가 잠깐 뜬다(joined-notice.tsx).
 // 휴대폰·사업자등록번호·샵 전화번호·계좌번호 칸은 숫자만 쳐도 양식대로 맞춘다(#205).
+// 이 파일은 입력값·오류 상태와 검사·저장을 맡고, 칸 묶음 5개는 owner-join-sections.tsx가 그린다.
 
 import { useRef, useState, useTransition } from 'react';
 import { unstable_rethrow, useRouter } from 'next/navigation';
-import { cn } from 'cn';
-import { ChevronRight, FileUp } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DigitInput } from '@/components/ui/digit-input';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { PhoneInput } from '@/components/ui/phone-input';
 import type { GeocodeCandidate } from '@/features/map/geocode';
-import { BUSINESS_NUMBER_INPUT } from '@/lib/business-number';
 import { SITE_NAME } from '@/lib/site';
 import { createOwnerAccount, type CreateOwnerAccountInput } from '@/server/auth/owner-account';
-import { BANKS } from '@/server/policy';
-import { SHOP_CATEGORIES } from '@/server/policy/catalog';
 
-import { AddressSearchButton } from '../(console)/settings/shop/address-search-button';
-import { ACCOUNT_NUMBER_INPUT } from '../business-fields';
 import { PayoutConfirmDialog, payoutKey } from '../payout-confirm-dialog';
-import { BUSINESS_DOC_ACCEPT, uploadBusinessDoc } from './business-doc';
+import { uploadBusinessDoc } from './business-doc';
 import { clearJoinPending, markJoinPending } from './joined-notice';
 import {
   EMPTY_OWNER_JOIN_FORM,
-  OWNER_AGREEMENT_ITEMS,
   OWNER_JOIN_FIELD_ORDER,
-  type OwnerJoinField,
   type OwnerJoinFieldErrors,
   type OwnerJoinForm as OwnerJoinFormValues,
   validateOwnerJoin,
 } from './owner-join';
+import {
+  AgreementsSection,
+  type BusinessDocUpload,
+  BusinessSection,
+  type JoinFormBinding,
+  OwnerInfoSection,
+  PayoutSection,
+  ShopSection,
+} from './owner-join-sections';
 
 const JOIN_FAILED_MESSAGE = '입점 신청을 하지 못했어요. 잠시 후 다시 시도해 주세요.';
-const SELECT_CLASS =
-  'h-9 rounded-lg border bg-card px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive';
 
 export function OwnerJoinForm({ today }: { today: string }) {
   const router = useRouter();
@@ -49,22 +43,22 @@ export function OwnerJoinForm({ today }: { today: string }) {
   const [errors, setErrors] = useState<OwnerJoinFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // 서버가 주소를 하나로 정하지 못했을 때 고를 후보
   const [candidates, setCandidates] = useState<GeocodeCandidate[]>([]);
-  // 올린 등록증 파일 이름과 올리는 중인지
-  const [doc, setDoc] = useState<{ name: string; uploading: boolean } | null>(null);
+  const [doc, setDoc] = useState<BusinessDocUpload | null>(null);
   const [pending, startTransition] = useTransition();
-  const docInput = useRef<HTMLInputElement>(null);
   // 정산 계좌 확인 창에 띄운 신청 값(#163)
   const [confirming, setConfirming] = useState<CreateOwnerAccountInput | null>(null);
   // 확인받은 계좌. 서버 오류(주소 다시 고르기 등) 뒤 다시 신청할 때 계좌가 그대로면 다시 묻지 않는다
   const confirmedPayout = useRef<string | null>(null);
 
+  /** 칸 하나를 바꾼다. 고치기 시작하면 그 칸의 오류 문구는 바로 지운다 */
   function update<K extends keyof OwnerJoinFormValues>(key: K, value: OwnerJoinFormValues[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
     setErrors((prev) => ({ ...prev, [key]: undefined }));
   }
 
-  /** 처음 오류가 난 칸으로 옮긴다 */
+  /** 처음 오류가 난 칸으로 옮긴다. 칸이 많아 오류가 화면 밖에 있으면 모르고 지나치기 쉽다 */
   function focusFirstError(fieldErrors: OwnerJoinFieldErrors) {
     const first = OWNER_JOIN_FIELD_ORDER.find((field) => fieldErrors[field]);
     if (!first) return;
@@ -73,6 +67,10 @@ export function OwnerJoinForm({ today }: { today: string }) {
     element?.focus({ preventScroll: true });
   }
 
+  /**
+   * [입점 신청하기]: 화면에서 검사하고, 통과하면 계좌 확인 창을 띄운다.
+   * values를 따로 받는 까닭: 주소 후보를 고른 직후에는 setForm이 아직 반영되지 않아서 새 값을 직접 넘긴다
+   */
   function submit(values: OwnerJoinFormValues) {
     setFormError(null);
     setNotice(null);
@@ -97,6 +95,7 @@ export function OwnerJoinForm({ today }: { today: string }) {
     save(confirming);
   }
 
+  /** createOwnerAccount를 부르고, 서버 오류는 해당 칸 아래(주소·등록증·약관)나 버튼 위에 보여준다 */
   function save(input: CreateOwnerAccountInput) {
     // 성공하면 저장이 바꾼 쿠키 때문에 이 화면이 다시 그려지면서 바로 /owner로 넘어가서, 여기로 돌아오지 않을 수 있다.
     // 그래서 부르기 전에 표시를 남기고, /owner가 그 표시로 안내 상자를 띄운다
@@ -130,6 +129,7 @@ export function OwnerJoinForm({ today }: { today: string }) {
         setErrors(fieldErrors);
         focusFirstError(fieldErrors);
       } catch (caught) {
+        // 화면 이동(redirect 등) 신호는 Next.js가 처리하도록 다시 던진다
         unstable_rethrow(caught);
         setConfirming(null);
         clearJoinPending();
@@ -138,6 +138,16 @@ export function OwnerJoinForm({ today }: { today: string }) {
     });
   }
 
+  /** [주소 찾기]로 고른 주소. 예전 후보 목록은 더 맞지 않으니 닫는다 */
+  function selectAddress(roadAddress: string) {
+    update('roadAddress', roadAddress);
+    setCandidates([]);
+  }
+
+  /**
+   * 서버가 보여준 주소 후보를 골랐을 때. 후보는 신청이 주소 때문에 막혔을 때만 뜨므로,
+   * 고르는 것이 곧 신청을 이어 가는 것이라 [입점 신청하기]를 다시 누르지 않게 바로 다시 신청한다
+   */
   function chooseCandidate(roadAddress: string) {
     const next = { ...form, roadAddress };
     setForm(next);
@@ -145,6 +155,9 @@ export function OwnerJoinForm({ today }: { today: string }) {
     submit(next);
   }
 
+  /**
+   * 등록증 파일을 고르면 바로 올린다. 실패하면 경로를 비워서 예전 파일 경로로 신청되지 않게 한다
+   */
   async function chooseDoc(file: File | undefined) {
     if (!file) return;
     setDoc({ name: file.name, uploading: true });
@@ -160,26 +173,8 @@ export function OwnerJoinForm({ today }: { today: string }) {
     }
   }
 
-  const fieldProps = (field: OwnerJoinField) => ({
-    id: field,
-    'aria-invalid': errors[field] ? true : undefined,
-    'aria-describedby': errors[field] ? `${field}-error` : undefined,
-  });
-  const text = (field: Exclude<OwnerJoinField, 'agreements' | 'category' | 'bankCode'>) => ({
-    ...fieldProps(field),
-    value: form[field],
-    onChange: (event: React.ChangeEvent<HTMLInputElement>) => update(field, event.target.value),
-  });
-  /** 번호 칸(#205): 숫자만 쳐도 양식대로 맞추는 PhoneInput·DigitInput에 넘긴다 */
-  const digits = (
-    field: 'ownerPhone' | 'businessRegistrationNumber' | 'shopPhone' | 'accountNumber',
-  ) => ({
-    ...fieldProps(field),
-    value: form[field],
-    onValueChange: (value: string) => update(field, value),
-  });
-
-  const allAgreed = Object.values(form.agreements).every(Boolean);
+  const binding: JoinFormBinding = { form, errors, update };
+  // 등록증을 올리는 중에 신청하면 경로가 빠진 채로 검사되므로 같이 막는다
   const busy = pending || doc?.uploading === true;
 
   return (
@@ -199,267 +194,27 @@ export function OwnerJoinForm({ today }: { today: string }) {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>원장님 정보</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
-          <Field label="이름" field="ownerName" error={errors.ownerName}>
-            <Input {...text('ownerName')} autoComplete="name" />
-          </Field>
-          <Field label="휴대폰 번호" field="ownerPhone" error={errors.ownerPhone}>
-            <PhoneInput {...digits('ownerPhone')} />
-          </Field>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>사업자 정보</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            사업자등록증과 같게 입력해 주세요. 입점 심사에 써요.
-          </p>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
-          <Field label="상호" field="businessName" error={errors.businessName}>
-            <Input {...text('businessName')} />
-          </Field>
-          <Field label="대표자명" field="representativeName" error={errors.representativeName}>
-            <Input {...text('representativeName')} />
-          </Field>
-          <Field
-            label="사업자등록번호"
-            field="businessRegistrationNumber"
-            error={errors.businessRegistrationNumber}
-          >
-            <DigitInput
-              {...digits('businessRegistrationNumber')}
-              rule={BUSINESS_NUMBER_INPUT}
-              placeholder="123-45-67890"
-            />
-          </Field>
-          <Field label="개업일자" field="openedOn" error={errors.openedOn}>
-            <Input {...text('openedOn')} type="date" max={today} />
-          </Field>
-          <div className="col-span-2 flex flex-col gap-2">
-            <Label htmlFor="businessDocPath">사업자등록증</Label>
-            <input
-              ref={docInput}
-              type="file"
-              accept={BUSINESS_DOC_ACCEPT}
-              className="hidden"
-              onChange={(event) => {
-                void chooseDoc(event.target.files?.[0]);
-                event.target.value = '';
-              }}
-            />
-            <div className="flex items-center gap-3">
-              <Button
-                {...fieldProps('businessDocPath')}
-                type="button"
-                variant="outline"
-                disabled={busy}
-                onClick={() => docInput.current?.click()}
-              >
-                <FileUp aria-hidden />
-                {form.businessDocPath ? '다시 올리기' : '파일 올리기'}
-              </Button>
-              <span className="text-sm text-muted-foreground" aria-live="polite">
-                {doc?.uploading
-                  ? `${doc.name} 올리는 중…`
-                  : form.businessDocPath && doc
-                    ? `${doc.name} 올렸어요`
-                    : 'JPG·PNG·WEBP 사진이나 PDF'}
-              </span>
-            </div>
-            <FieldError field="businessDocPath" error={errors.businessDocPath} />
-            <p className="text-xs text-muted-foreground">
-              등록증은 입점 심사에만 쓰고 고객에게는 보이지 않아요.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>샵 정보</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
-          <Field label="샵 이름" field="shopName" error={errors.shopName}>
-            <Input {...text('shopName')} placeholder="고객에게 보이는 이름" />
-          </Field>
-          <Field label="업종" field="category" error={errors.category}>
-            <select
-              {...fieldProps('category')}
-              className={SELECT_CLASS}
-              value={form.category}
-              onChange={(event) =>
-                update('category', event.target.value as OwnerJoinFormValues['category'])
-              }
-            >
-              <option value="">골라 주세요</option>
-              {SHOP_CATEGORIES.map((category) => (
-                <option key={category.key} value={category.key}>
-                  {category.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="샵 전화번호" field="shopPhone" error={errors.shopPhone}>
-            <PhoneInput {...digits('shopPhone')} kind="any" autoComplete="off" />
-          </Field>
-          <div className="col-span-2 flex flex-col gap-2">
-            <Label htmlFor="roadAddress">주소</Label>
-            <div className="flex gap-2">
-              <Input
-                {...fieldProps('roadAddress')}
-                value={form.roadAddress}
-                readOnly
-                placeholder="주소 찾기를 눌러 골라 주세요"
-              />
-              <AddressSearchButton
-                onSelect={(roadAddress) => {
-                  update('roadAddress', roadAddress);
-                  setCandidates([]);
-                }}
-                onError={(message) => setErrors((prev) => ({ ...prev, roadAddress: message }))}
-              />
-            </div>
-            <FieldError field="roadAddress" error={errors.roadAddress} />
-            {candidates.length > 0 ? (
-              <div className="flex flex-col gap-2 rounded-lg bg-muted p-3">
-                <p className="text-sm font-medium">아래에서 샵 주소를 골라 주세요</p>
-                <ul className="flex flex-col gap-1">
-                  {candidates.map((candidate) => (
-                    <li key={candidate.roadAddress}>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-auto w-full flex-col items-start py-2 whitespace-normal"
-                        disabled={pending}
-                        onClick={() => chooseCandidate(candidate.roadAddress)}
-                      >
-                        <span>{candidate.roadAddress}</span>
-                        {candidate.jibunAddress ? (
-                          <span className="text-xs text-muted-foreground">
-                            지번 {candidate.jibunAddress}
-                          </span>
-                        ) : null}
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </div>
-          <Field
-            label="상세 주소(선택)"
-            field="addressDetail"
-            error={errors.addressDetail}
-            className="col-span-2"
-          >
-            <Input {...text('addressDetail')} placeholder="예: 2층 201호" />
-          </Field>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>정산 계좌</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            이용이 끝난 예약의 정산금을 받을 계좌예요. 계좌번호는 암호화해서 저장하고, 화면에는
-            뒷자리만 보여요.
-          </p>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
-          <Field label="은행" field="bankCode" error={errors.bankCode}>
-            <select
-              {...fieldProps('bankCode')}
-              className={SELECT_CLASS}
-              value={form.bankCode}
-              onChange={(event) =>
-                update('bankCode', event.target.value as OwnerJoinFormValues['bankCode'])
-              }
-            >
-              <option value="">골라 주세요</option>
-              {BANKS.map((bank) => (
-                <option key={bank.code} value={bank.code}>
-                  {bank.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="예금주" field="accountHolder" error={errors.accountHolder}>
-            <Input {...text('accountHolder')} />
-          </Field>
-          <Field
-            label="계좌번호"
-            field="accountNumber"
-            error={errors.accountNumber}
-            className="col-span-2"
-          >
-            <DigitInput
-              {...digits('accountNumber')}
-              rule={ACCOUNT_NUMBER_INPUT}
-              placeholder="숫자만 입력해 주세요"
-            />
-          </Field>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>약관 동의</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <label className="flex items-center gap-3 rounded-xl border p-4 font-semibold">
-            <input
-              id="agreements"
-              type="checkbox"
-              className="size-5 accent-primary"
-              checked={allAgreed}
-              onChange={() =>
-                update('agreements', {
-                  supplier: !allAgreed,
-                  privacy: !allAgreed,
-                  payoutInfo: !allAgreed,
-                })
-              }
-            />
-            전체 동의
-          </label>
-          <ul className="flex flex-col gap-3 px-1">
-            {OWNER_AGREEMENT_ITEMS.map((item) => (
-              <li key={item.key} className="flex items-center gap-3">
-                <label className="flex flex-1 items-center gap-3 text-sm">
-                  <input
-                    type="checkbox"
-                    className="size-5 accent-primary"
-                    checked={form.agreements[item.key]}
-                    onChange={(event) =>
-                      update('agreements', { ...form.agreements, [item.key]: event.target.checked })
-                    }
-                  />
-                  <span>
-                    <span className="text-primary">[필수]</span> {item.label}
-                  </span>
-                </label>
-                {/* 약관 본문(docs/legal/, 법률 검토 전)은 검토가 끝나면 화면으로 연결한다(#20 R8) */}
-                <button
-                  type="button"
-                  className="flex items-center text-xs text-muted-foreground"
-                  aria-label={`${item.label} 내용 보기`}
-                  onClick={() => setNotice('약관 내용은 준비 중이에요.')}
-                >
-                  보기
-                  <ChevronRight className="size-4" aria-hidden />
-                </button>
-              </li>
-            ))}
-          </ul>
-          <FieldError field="agreements" error={errors.agreements} />
-        </CardContent>
-      </Card>
+      <OwnerInfoSection binding={binding} />
+      <BusinessSection
+        binding={binding}
+        today={today}
+        doc={doc}
+        busy={busy}
+        onChooseDoc={(file) => void chooseDoc(file)}
+      />
+      <ShopSection
+        binding={binding}
+        candidates={candidates}
+        pending={pending}
+        onAddressSelect={selectAddress}
+        onAddressError={(message) => setErrors((prev) => ({ ...prev, roadAddress: message }))}
+        onChooseCandidate={chooseCandidate}
+      />
+      <PayoutSection binding={binding} />
+      <AgreementsSection
+        binding={binding}
+        onShowTerms={() => setNotice('약관 내용은 준비 중이에요.')}
+      />
 
       <div className="flex flex-col gap-2">
         {formError ? (
@@ -489,36 +244,5 @@ export function OwnerJoinForm({ today }: { today: string }) {
         onCancel={() => setConfirming(null)}
       />
     </form>
-  );
-}
-
-function Field({
-  label,
-  field,
-  error,
-  className,
-  children,
-}: {
-  label: string;
-  field: OwnerJoinField;
-  error?: string;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={cn('flex flex-col gap-2', className)}>
-      <Label htmlFor={field}>{label}</Label>
-      {children}
-      <FieldError field={field} error={error} />
-    </div>
-  );
-}
-
-function FieldError({ field, error }: { field: OwnerJoinField; error?: string }) {
-  if (!error) return null;
-  return (
-    <p id={`${field}-error`} className="text-sm text-destructive">
-      {error}
-    </p>
   );
 }

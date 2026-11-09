@@ -73,7 +73,15 @@ export const HOURS_PROBLEM_MESSAGES: Record<HoursProblem, string> = {
   OUTSIDE_HOURS: '영업시간 안에 끝나는 시각을 골라 주세요',
 };
 
+/** 영업시간 "HH:MM"을 자정부터 지난 분으로 바꾼다. 예: "09:30" → 570 */
 const minutesOfDay = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
+
+/** 그 날짜(한국 요일)를 쉬는 날로 입력했으면 true. 날짜 버튼을 잠그고, 처음 보여 줄 날짜를 고를 때 쓴다 */
+export function isClosedDay(date: Date | undefined, hours: BusinessHours): boolean {
+  if (!date) return false;
+  const weekday = utcToKst(date).weekday;
+  return hours.some((item) => item.weekday === weekday && 'closed' in item);
+}
 
 /**
  * 매물 시간이 샵 영업시간(O2) 안이면 null(정민석 결정 10/28). 시작 요일(한국 시간)의 영업시간으로 본다.

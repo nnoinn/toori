@@ -5,11 +5,14 @@ import { cn } from 'cn';
 import { ChevronRight } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { buttonVariants } from '@/components/ui/button';
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import { EmptyState, ErrorState, LoadingCards } from '@/components/ui/state';
 import { formatWon } from '@/lib/format';
 import { getRequestNow } from '@/lib/request-time';
 import { formatKst } from '@/lib/time';
 import { ensureCustomerPage } from '@/server/auth';
+import { CUSTOMER_HOME } from '@/server/auth/paths';
 
 import { getMyReservations } from './queries';
 import {
@@ -75,7 +78,14 @@ async function ReservationsContent({ searchParams }: { searchParams: SearchParam
       {!result.ok ? (
         <ErrorState description={result.error.message} />
       ) : result.data.length === 0 ? (
-        <EmptyState title={EMPTY_TEXT[tab]} />
+        <EmptyState
+          title={EMPTY_TEXT[tab]}
+          action={
+            <Link href={CUSTOMER_HOME} className={buttonVariants()}>
+              매물 보러 가기
+            </Link>
+          }
+        />
       ) : (
         <ul className="flex flex-col divide-y">
           {result.data.map((item) => (
@@ -95,7 +105,7 @@ async function ReservationsContent({ searchParams }: { searchParams: SearchParam
                   <p className="truncate font-semibold">{item.menuName}</p>
                   <p className="text-sm">{formatKst(new Date(item.startAt))}</p>
                   <p className="text-xs text-muted-foreground">
-                    예약번호 {item.code} · {formatWon(item.amount)}
+                    예약번호 {formatReservationCode(item.code)} · {formatWon(item.amount)}
                   </p>
                 </div>
                 <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />

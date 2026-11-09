@@ -14,6 +14,7 @@ import { getCurrentAccount } from '@/server/auth';
 import { parseFilters } from '../filters';
 import { resolveListArea } from '../list-area';
 import { getCustomerLocation, latLngSchema } from '../location';
+import { REGION_PARAM, withLinkedRegion } from '../region-link';
 import type { MapBounds, MapShop } from '../types';
 import { decodeCursor } from './cursor';
 import { countSlots, selectMapShops, selectSlotPage, type HomeSlotQuery } from './queries';
@@ -85,9 +86,12 @@ export async function loadHomeSlots(
   if (!parsed.success) return fail('INVALID_INPUT', LOAD_FAILED);
   const { bounds, search, cursor, shopId } = parsed.data;
   try {
-    const [query, location] = await Promise.all([baseQuery(bounds, search), getCustomerLocation()]);
-    const sort = parseSort(searchToParams(search).sort);
-    // 위치 쿠키가 없으면(쿠키를 지운 직후 등) 지도 가운데를 기준점으로 쓴다
+    const params = searchToParams(search);
+    const [query, saved] = await Promise.all([baseQuery(bounds, search), getCustomerLocation()]);
+    // 가까운 순 기준점: 동네 링크(?region=)로 보는 중이면 그 동네 가운데(지도 화면과 같은 규칙), 아니면 고른 동네·내 위치
+    const location = withLinkedRegion(saved, params[REGION_PARAM]);
+    const sort = parseSort(params.sort);
+    // 위치 쿠키도 링크도 없으면(쿠키를 지운 직후 등) 지도 가운데를 기준점으로 쓴다
     const origin = location?.point ?? {
       lat: (bounds.sw.lat + bounds.ne.lat) / 2,
       lng: (bounds.sw.lng + bounds.ne.lng) / 2,
@@ -125,18 +129,20 @@ export async function loadRegionSlots(
   const parsed = regionInputSchema.safeParse(input);
   if (!parsed.success) return fail('INVALID_INPUT', LOAD_FAILED);
   const { search, cursor } = parsed.data;
+  const params = searchToParams(search);
   try {
-    const location = await getCustomerLocation();
+    // 동네 링크(?region=)로 보는 중이면 그 동네, 아니면 고른 동네·내 위치(목록 화면과 같은 규칙)
+    const location = withLinkedRegion(await getCustomerLocation(), params[REGION_PARAM]);
     const area = location ? await resolveListArea(location) : null;
     if (!area) return fail('NO_LIST_AREA', NO_LIST_AREA);
     const [customerId, now] = await Promise.all([currentCustomerId(), getRequestNow()]);
     const query = {
       sigunguCode: area.sigunguCode,
-      filters: parseFilters(searchToParams(search)),
+      filters: parseFilters(params),
       customerId,
       now,
     };
-    const sort = parseSort(searchToParams(search).sort);
+    const sort = parseSort(params.sort);
     const db = getDb();
     const [page, total] = await Promise.all([
       selectSlotPage(db, {

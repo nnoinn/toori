@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DigitInput } from '@/components/ui/digit-input';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { bankName, BANKS } from '@/server/policy';
 
 import {
@@ -20,13 +19,12 @@ import {
   type PayoutValues,
   validatePayoutInput,
 } from '../../../business-fields';
+import { fieldA11y, FormField, NATIVE_SELECT_CLASS } from '../../../form-field';
 import { PayoutConfirmDialog } from '../../../payout-confirm-dialog';
 import { type PayoutFieldErrors, savePayoutAccount } from './actions';
 import type { PayoutAccountView } from './payout-store';
 
 const EMPTY: PayoutInput = { bankCode: '', accountNumber: '', accountHolder: '' };
-const SELECT_CLASS =
-  'h-9 rounded-lg border bg-card px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive';
 
 /** 등록할 때와 바꿀 때 다른 문구 */
 const MODE_TEXT = {
@@ -75,11 +73,16 @@ export function PayoutForm({
     setErrors({});
   }
 
+  /** 칸 하나를 바꾼다. 고치기 시작하면 그 칸의 오류 문구는 바로 지운다 */
   function update(field: keyof PayoutInput, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: undefined }));
   }
 
+  /**
+   * [계좌 바꾸기]: 빈 칸으로 연다. 화면은 계좌번호 뒷자리만 알아서 지금 계좌를 채워 둘 수 없고,
+   * 새 계좌를 처음부터 받아 확인 창에서 전체 번호를 확인받는다
+   */
   function openEditor() {
     setForm(EMPTY);
     setErrors({});
@@ -97,6 +100,7 @@ export function PayoutForm({
     setConfirming(checked.data);
   }
 
+  /** 확인 창 [맞아요, …]: 저장한다. 실패하면 입력 칸을 연 채로 칸별 오류와 문구를 보여준다 */
   function save() {
     // 저장하면 계좌가 생겨서 문구가 '바꾸기'로 바뀌므로 누른 때의 문구를 쓴다
     const savedText = text.saved;
@@ -114,11 +118,7 @@ export function PayoutForm({
     });
   }
 
-  const fieldProps = (field: keyof PayoutInput) => ({
-    id: field,
-    'aria-invalid': errors[field] ? true : undefined,
-    'aria-describedby': errors[field] ? `${field}-error` : undefined,
-  });
+  const fieldProps = (field: keyof PayoutInput) => fieldA11y(field, errors[field]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -187,10 +187,10 @@ export function PayoutForm({
               </p>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-4">
-              <FieldBox label="은행" field="bankCode" error={errors.bankCode}>
+              <FormField label="은행" id="bankCode" error={errors.bankCode}>
                 <select
                   {...fieldProps('bankCode')}
-                  className={SELECT_CLASS}
+                  className={NATIVE_SELECT_CLASS}
                   value={form.bankCode}
                   onChange={(event) => update('bankCode', event.target.value)}
                 >
@@ -201,17 +201,17 @@ export function PayoutForm({
                     </option>
                   ))}
                 </select>
-              </FieldBox>
-              <FieldBox label="예금주" field="accountHolder" error={errors.accountHolder}>
+              </FormField>
+              <FormField label="예금주" id="accountHolder" error={errors.accountHolder}>
                 <Input
                   {...fieldProps('accountHolder')}
                   value={form.accountHolder}
                   onChange={(event) => update('accountHolder', event.target.value)}
                 />
-              </FieldBox>
-              <FieldBox
+              </FormField>
+              <FormField
                 label="계좌번호"
-                field="accountNumber"
+                id="accountNumber"
                 error={errors.accountNumber}
                 className="col-span-2"
               >
@@ -223,7 +223,7 @@ export function PayoutForm({
                   value={form.accountNumber}
                   onValueChange={(value) => update('accountNumber', value)}
                 />
-              </FieldBox>
+              </FormField>
               <div className="col-span-2 flex items-center justify-end gap-2">
                 {status?.kind === 'error' ? (
                   <span role="alert" className="text-sm text-destructive">
@@ -260,32 +260,6 @@ export function PayoutForm({
         onConfirm={save}
         onCancel={() => setConfirming(null)}
       />
-    </div>
-  );
-}
-
-function FieldBox({
-  label,
-  field,
-  error,
-  className,
-  children,
-}: {
-  label: string;
-  field: keyof PayoutInput;
-  error?: string;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={cn('flex flex-col gap-2', className)}>
-      <Label htmlFor={field}>{label}</Label>
-      {children}
-      {error ? (
-        <p id={`${field}-error`} className="text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }

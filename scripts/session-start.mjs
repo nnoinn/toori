@@ -7,6 +7,8 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { collectWaiting, fetchRepo, renderFor } from './inbox.mjs';
+
 const PRINT = process.argv.includes('--print');
 const cwd = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 
@@ -108,6 +110,13 @@ function briefing() {
     notes.push('gh 로그인 정보를 읽지 못해 PR·Issue 상태를 확인하지 못했다. 필요하면 `gh auth status`로 확인한다.');
   } else {
     const me = login.out;
+    // 나에게 온 요청: 누가 @로 불렀는데 아직 답하지 않은 글, 내 PR 수정 요청, (nnoinn) 리뷰할 PR. 기준은 scripts/inbox.mjs
+    try {
+      const waiting = renderFor(me, collectWaiting(fetchRepo({ cwd, timeout: 15000 })));
+      if (waiting) sections.unshift(['나에게 온 요청 (아직 답하지 않음. 가장 먼저 사용자에게 알리고 하나씩 처리한다)', waiting]);
+    } catch {
+      notes.push('나에게 온 요청(팀 확인 대기 목록)을 불러오지 못했다. `npm run inbox`로 다시 확인한다.');
+    }
     const myPrs = ghJson('pr', 'list', '--author', '@me', '--state', 'open', '--json', 'number,title,reviewDecision,isDraft') || [];
     if (myPrs.length) {
       sections.push(['내 열린 PR', myPrs.map((p) => `- #${p.number} ${p.title} — ${p.isDraft ? '초안' : (REVIEW_LABEL[p.reviewDecision] || '리뷰 대기')}`).join('\n')]);
@@ -153,7 +162,7 @@ function briefing() {
   const header = [
     '[세션 시작 브리핑 — scripts/session-start.mjs가 자동으로 모은 정보]',
     'Claude가 할 일: 사용자의 첫 메시지에 답하기 전에 이 브리핑을 3~6줄로 먼저 알린다.',
-    '우선순위: ① 수정 요청된 내 PR ② 나에게 배정된 Issue와 새 공지의 "할 일" ③ PR이 없는 내 브랜치(기능 하나가 끝났으면 PR부터) ④ 바뀐 규칙·문서는 지금 다시 읽고 무엇이 바뀌었는지 한 줄 ⑤ 현재 브랜치 상태와 오늘의 다음 단계 제안.',
+    '우선순위: ① "나에게 온 요청"(답하거나, 사용자 결정이 필요하면 묻고, 지금 못 하면 "확인했어요, 언제 할게요"라도 남긴다)과 수정 요청된 내 PR ② 나에게 배정된 Issue와 새 공지의 "할 일" ③ PR이 없는 내 브랜치(기능 하나가 끝났으면 PR부터) ④ 바뀐 규칙·문서는 지금 다시 읽고 무엇이 바뀌었는지 한 줄 ⑤ 현재 브랜치 상태와 오늘의 다음 단계 제안.',
     '새 소식이 없으면 "새 소식 없음"이라고 한 줄만 말하고 바로 사용자 요청을 처리한다.',
   ];
   const body = sections.map(([title, text]) => `### ${title}\n${text}`).join('\n\n');

@@ -11,6 +11,7 @@ import { getDb } from '@/db';
 import { menus, shops } from '@/db/schema';
 import type { ShopCategory } from '@/server/policy';
 
+import { moveOneStep } from '../reorder';
 import type { MenuValues } from './menu';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select' | 'insert' | 'update'>;
@@ -25,6 +26,7 @@ export type MenuItem = {
   hidden: boolean;
 };
 
+/** 그 샵의 그 메뉴만 고르는 조건. 다른 샵 메뉴를 건드리지 않게 고치는 문장마다 쓴다 */
 const byShopAndId = (shopId: string, menuId: string) =>
   and(eq(menus.shopId, shopId), eq(menus.id, menuId));
 
@@ -148,13 +150,13 @@ export async function moveMenu(
     .from(menus)
     .where(and(eq(menus.shopId, shopId), isNull(menus.hiddenAt)))
     .orderBy(asc(menus.sortOrder), asc(menus.createdAt));
-  const index = visible.findIndex((menu) => menu.id === menuId);
-  if (index < 0) return false;
-  const target = direction === 'up' ? index - 1 : index + 1;
-  if (target < 0 || target >= visible.length) return true;
-
-  const ordered = visible.map((menu) => menu.id);
-  [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
+  const ordered = moveOneStep(
+    visible.map((menu) => menu.id),
+    menuId,
+    direction,
+  );
+  if (ordered === 'not-found') return false;
+  if (ordered === 'edge') return true;
   for (const [sortOrder, id] of ordered.entries()) {
     await db.update(menus).set({ sortOrder }).where(byShopAndId(shopId, id));
   }

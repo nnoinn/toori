@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { DISCOUNT_RATE_OPTIONS, type DiscountRate } from '@/server/policy';
 
+/** 정책값 할인율 선택지(10~50%) 안의 값인지. 화면 값을 믿지 않고 서버도 이것으로 다시 본다 */
 export function isDiscountRate(value: number): value is DiscountRate {
   return (DISCOUNT_RATE_OPTIONS as readonly number[]).includes(value);
 }
