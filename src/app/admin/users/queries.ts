@@ -22,23 +22,12 @@ import {
 import { normalizePhone } from '@/lib/phone';
 import { type MarketingConsent, readMarketingConsent } from '@/server/auth/account-store';
 
+import { ADMIN_LIST_LIMIT, containsPattern, type ListResult, toListResult } from '../lookup';
+
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 
-/** 한 번에 보여줄 최대 개수. 입점 승인 목록과 같고, 더 있으면 검색으로 좁힌다 */
-export const USER_LIST_LIMIT = 200;
 /** 고객 상세에서 보여줄 최근 예약 수 */
 const RECENT_RESERVATIONS = 20;
-
-export type ListResult<Row> = { rows: Row[]; hasMore: boolean };
-
-function toListResult<Row>(rows: Row[]): ListResult<Row> {
-  return { rows: rows.slice(0, USER_LIST_LIMIT), hasMore: rows.length > USER_LIST_LIMIT };
-}
-
-/** 입력한 글자를 그대로 찾도록 % _ \ 를 막는다 */
-function containsPattern(query: string): string {
-  return `%${query.replace(/[\\%_]/g, '\\$&')}%`;
-}
 
 /** 예약 수·취소 수·노쇼 수. 제재 기능(X-402)이 아직 없어서 제재 이력 대신 보여준다 */
 const reservationCounts = {
@@ -91,7 +80,7 @@ export async function selectCustomers(
     .where(where)
     .groupBy(customers.id)
     .orderBy(desc(customers.createdAt))
-    .limit(USER_LIST_LIMIT + 1);
+    .limit(ADMIN_LIST_LIMIT + 1);
   return toListResult(rows);
 }
 
@@ -139,7 +128,7 @@ export async function selectOwners(db: DbReader, query: string): Promise<ListRes
     .where(where)
     .groupBy(owners.id, shops.id)
     .orderBy(desc(owners.createdAt))
-    .limit(USER_LIST_LIMIT + 1);
+    .limit(ADMIN_LIST_LIMIT + 1);
   // DB의 check 제약이 정해 둔 상태만 허용한다
   return toListResult(rows.map((row) => ({ ...row, shopStatus: row.shopStatus as ShopStatus })));
 }
