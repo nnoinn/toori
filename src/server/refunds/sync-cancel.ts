@@ -8,6 +8,7 @@ import 'server-only';
 
 import type { getDb } from '@/db';
 import { hoursUntil } from '@/lib/time';
+import { notifyReservationCancelled } from '@/server/notifications/alerts';
 import type { FinishedCancellation } from '@/server/payments/portone';
 
 import { calcRefund } from './calc-refund';
@@ -105,7 +106,7 @@ async function recordAdminCancel(
     '[cancel] 앱을 거치지 않은 포트원 취소를 운영자 취소로 기록해요:',
     target.reservationId,
   );
-  return db.transaction((tx) =>
+  const recorded = await db.transaction((tx) =>
     finishAdminCancel(tx, {
       reservationId: target.reservationId,
       orderId: target.orderId,
@@ -118,4 +119,7 @@ async function recordAdminCancel(
       now,
     }),
   );
+  // 원장님이 오지 않을 손님을 기다리지 않게 고객 취소와 같은 알림을 보낸다. 고객에게는 운영자가 직접 연락한다(11/9)
+  if (recorded) notifyReservationCancelled(db, target.reservationId);
+  return recorded;
 }

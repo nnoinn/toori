@@ -12,6 +12,13 @@ const state = vi.hoisted(() => ({
   finished: { refundAmount: 12_250 } as { refundAmount: number } | null,
   adminCancels: [] as unknown[],
   adminFinished: true,
+  cancelAlerts: [] as string[],
+}));
+
+vi.mock('@/server/notifications/alerts', () => ({
+  notifyReservationCancelled: (_db: unknown, reservationId: string) => {
+    state.cancelAlerts.push(reservationId);
+  },
 }));
 
 vi.mock('./refund-store', () => ({
@@ -61,6 +68,7 @@ beforeEach(() => {
   state.finished = { refundAmount: 12_250 };
   state.adminCancels = [];
   state.adminFinished = true;
+  state.cancelAlerts = [];
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -100,6 +108,8 @@ describe('syncUnrecordedCancel', () => {
       },
     ]);
     expect(console.error).toHaveBeenCalled();
+    // 원장님에게 고객 취소와 같은 알림(11/9). 고객 취소 쪽 알림은 finishCancel이 보낸다
+    expect(state.cancelAlerts).toEqual(['reservation-1']);
   });
 
   it('운영자 취소가 일부만 돌려줬으면 확인 이유를 남긴다', async () => {
@@ -118,9 +128,10 @@ describe('syncUnrecordedCancel', () => {
     });
   });
 
-  it('이미 바뀐 예약이면 운영자 취소도 cancel_known', async () => {
+  it('이미 바뀐 예약이면 운영자 취소도 cancel_known이고 알림을 부르지 않는다', async () => {
     state.adminFinished = false;
     expect(await syncUnrecordedCancel(db, 'order-1', CONSOLE, NOW)).toBe('cancel_known');
+    expect(state.cancelAlerts).toEqual([]);
   });
 
   it('진행 중인 취소가 있으면 끝내지 않고 다시 보내게 한다', async () => {

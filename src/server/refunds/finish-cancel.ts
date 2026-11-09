@@ -4,6 +4,7 @@ import 'server-only';
 
 import type { getDb } from '@/db';
 import { hoursUntil } from '@/lib/time';
+import { notifyReservationCancelled } from '@/server/notifications/alerts';
 import { finishedCancellation, getPortOnePayment } from '@/server/payments/portone';
 
 import { skipsPortOne } from './refund-payment';
@@ -53,7 +54,10 @@ export async function finishCancel(
       now,
     }),
   );
-  return finished ? { refundAmount } : null;
+  if (!finished) return null;
+  // 원장님에게 재등록 안내(S-400). 바로 끝난 취소·정리 작업·포트원이 늦게 처리한 취소 모두 여기를 지난다
+  notifyReservationCancelled(db, request.reservationId);
+  return { refundAmount };
 }
 
 /**
