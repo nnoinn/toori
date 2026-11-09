@@ -8,15 +8,16 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/state';
 import { getDb } from '@/db';
+import { maskPhone } from '@/lib/phone';
 import { firstParam, type SearchValue } from '@/lib/search-params';
 import { formatKst } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { ensureAdminPage } from '@/server/auth';
 
+import { ADMIN_LIST_LIMIT, type ListResult, toSearchQuery } from '../lookup';
 import { StatusBadge } from '../shops/status-badge';
-import { toSearchQuery, toUserTab, USER_TABS, type UserTab } from './format';
-import { maskPhone } from '@/lib/phone';
-import { type ListResult, selectCustomers, selectOwners, USER_LIST_LIMIT } from './queries';
+import { toUserTab, USER_TABS, type UserTab } from './format';
+import { selectCustomers, selectOwners } from './queries';
 
 export const metadata: Metadata = { title: '회원' };
 
@@ -188,7 +189,7 @@ function UserTable<Row>({
       </div>
       {result.hasMore ? (
         <p className="text-sm text-muted-foreground">
-          {USER_LIST_LIMIT}명까지만 보여 드려요. 검색으로 좁혀 주세요.
+          {ADMIN_LIST_LIMIT}명까지만 보여 드려요. 검색으로 좁혀 주세요.
         </p>
       ) : null}
     </>
