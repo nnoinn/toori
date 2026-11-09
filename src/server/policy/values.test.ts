@@ -20,6 +20,7 @@ import {
 } from './owner-fault';
 import { NO_SHOW_PENALTY_RATE, REFUND_BANDS } from './refund';
 import {
+  ADVANCE_LISTING_DAYS,
   HOLD_MINUTES,
   ORDER_SWEEP_BATCH,
   IMMINENT_WITHIN_HOURS,
@@ -46,6 +47,10 @@ describe('시간 (#48 1장)', () => {
     expect(HOLD_MINUTES).toBe(10);
     expect(SLOT_START_STEP_MINUTES).toBe(30);
     expect(MENU_DURATION_STEP_MINUTES).toBe(30);
+  });
+
+  it('매물은 14일 뒤까지 미리 올린다(S-205, 11/3)', () => {
+    expect(ADVANCE_LISTING_DAYS).toBe(14);
   });
 
   it('결제 대기 주문은 30분 뒤에 정리하고, 한 번에 20건까지', () => {
