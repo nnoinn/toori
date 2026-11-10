@@ -101,6 +101,35 @@ describeDb('시나리오 명령 (실제 DB)', () => {
     });
   });
 
+  it('my-coupons는 내 쿠폰 3장(기한 넉넉·3일 남음·지남)을 넣고, 다시 실행해도 한 벌, reset이 지운다(#300)', async () => {
+    await withRollbackSql(async (sql) => {
+      const { meId, run } = await setup(sql);
+      const myCoupons = () => sql<
+        { amount: number; expires_at: Date; used_order_id: string | null }[]
+      >`
+        select k.amount, k.expires_at, k.used_order_id from coupons k
+        join customers c on c.id = k.customer_id where c.user_id = ${meId} order by k.expires_at`;
+
+      await run('my-coupons');
+      const lines = await run('my-coupons');
+      expect(lines[0]).toContain('쿠폰 3장');
+      const rows = await myCoupons();
+      expect(rows.map((r) => [r.amount, r.used_order_id])).toEqual([
+        [3000, null],
+        [3000, null],
+        [3000, null],
+      ]);
+      const DAY = 24 * 60 * 60 * 1000;
+      expect(rows.map((r) => Math.round((r.expires_at.getTime() - NOW.getTime()) / DAY))).toEqual([
+        -1, 3, 90,
+      ]);
+      expect((await run('status')).join('\n')).toContain('쓸 수 있는 쿠폰 2장');
+
+      await run('reset');
+      expect(await myCoupons()).toEqual([]);
+    });
+  });
+
   it('원장님 샵을 만들고 입점 상태를 바꾸고, 매물 상태 6가지를 만든 뒤 reset으로 지운다', async () => {
     await withRollbackSql(async (sql) => {
       const { meId, run, counts } = await setup(sql);
