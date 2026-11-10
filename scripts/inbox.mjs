@@ -212,7 +212,8 @@ export function renderBoard(items, now = new Date()) {
   ];
   for (const { login, name } of TEAM) {
     const mine = items.filter((i) => i.login === login);
-    lines.push('', `### ${name} (${login}) · ${mine.length ? `${mine.length}건` : '없음'}`);
+    // 사람마다 가로줄로 나눠서 자기 칸을 바로 찾게 한다(11/10 nnoinn). 가로줄 앞뒤 빈 줄이 없으면 위 글이 제목으로 바뀐다
+    lines.push('', '---', '', `### ${name} (${login}) · ${mine.length ? `${mine.length}건` : '없음'}`);
     if (!mine.length) continue;
     lines.push('', '| 기다린 시간 | 어디 | 무엇 | 내용 |', '| --- | --- | --- | --- |');
     for (const i of mine) {

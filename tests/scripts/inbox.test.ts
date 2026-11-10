@@ -206,4 +206,11 @@ describe('collectWaiting과 목록 글', () => {
     expect(board).toContain('### 현동훈 (nnoinn) · 2건');
     expect(board).toContain('### 정찬형 (chosanai) · 없음');
   });
+
+  it('고정 Issue는 사람마다 가로줄로 칸을 나눈다', () => {
+    const board = renderBoard(collectWaiting(repo), now);
+    // 4명 모두 "빈 줄 · 가로줄 · 빈 줄 · 이름 제목" 순서로 시작한다(빈 줄이 없으면 위 글이 제목으로 바뀐다)
+    expect(board.match(/\n\n---\n\n### /g)).toHaveLength(4);
+    expect(board).toMatch(/\n\n---\n\n### 정민석 \(alstjr62\)/);
+  });
 });
