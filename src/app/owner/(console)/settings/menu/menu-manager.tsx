@@ -123,10 +123,12 @@ export function MenuManager({
           <ul className="divide-y">
             {visible.map((menu, index) => (
               <li key={menu.id} className="flex items-center gap-3 px-4 py-3">
-                <div className="flex flex-col">
+                {/* 순서 버튼은 [수정]·[숨기기]와 같은 크기(32px) 테두리 버튼으로 나란히 둔다(#23 B3).
+                    세로로 쌓으면 줄이 너무 높아진다 */}
+                <div className="flex shrink-0 gap-1">
                   <Button
-                    variant="ghost"
-                    size="icon-xs"
+                    variant="outline"
+                    size="icon"
                     aria-label={`${menu.name} 위로`}
                     disabled={pending || index === 0}
                     onClick={() => run(() => moveMenu(shopId, menu.id, 'up'))}
@@ -134,8 +136,8 @@ export function MenuManager({
                     <ArrowUp />
                   </Button>
                   <Button
-                    variant="ghost"
-                    size="icon-xs"
+                    variant="outline"
+                    size="icon"
                     aria-label={`${menu.name} 아래로`}
                     disabled={pending || index === visible.length - 1}
                     onClick={() => run(() => moveMenu(shopId, menu.id, 'down'))}
