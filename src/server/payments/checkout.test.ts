@@ -47,6 +47,11 @@ const state = vi.hoisted(() => ({
   confirmCalls: [] as unknown[],
   outcomes: [] as { orderId: string; outcome: OrderOutcome }[],
   releaseCalls: [] as { slotId: string; customerId: string }[],
+  /** 쿠폰 id → 쿠폰(메모리 흉내). 고객 id가 다르면 내 쿠폰이 아니다 */
+  coupons: new Map<
+    string,
+    { customerId: string; amount: number; expiresAt: Date; usedOrderId: string | null }
+  >(),
 }));
 
 /** 메모리 흉내: 내 다른 홀딩 → ALREADY_HOLDING, 같은 매물 → 그대로, 아니면 10분 홀딩 */
@@ -87,6 +92,18 @@ vi.mock('@/db', () => ({
 vi.mock('@/lib/request-time', () => ({ getRequestNow: async () => state.now }));
 vi.mock('@/server/auth', () => ({ requireCustomer: async () => state.auth }));
 vi.mock('@/server/customers', () => ({ isNewCustomer: async () => state.isNew }));
+vi.mock('@/server/coupons/coupon-store', () => ({
+  readMyCoupon: async (_db: unknown, input: { couponId: string; customerId: string }) => {
+    const coupon = state.coupons.get(input.couponId);
+    if (!coupon || coupon.customerId !== input.customerId) return null;
+    return {
+      couponId: input.couponId,
+      amount: coupon.amount,
+      expiresAt: coupon.expiresAt,
+      usedOrderId: coupon.usedOrderId,
+    };
+  },
+}));
 vi.mock('./checkout-store', () => ({
   readCheckoutSlot: async (slotId: string) => state.slots.get(slotId) ?? null,
   readCustomerPhone: async () => state.phone,
@@ -207,8 +224,11 @@ vi.mock('./hold-store', () => ({
   },
 }));
 
-const { confirmPayment, getMyHold, holdSlot, releaseHold, startPayment } =
+const { confirmPayment, getMyHold, holdSlot, previewCheckoutAmount, releaseHold, startPayment } =
   await import('./checkout');
+
+const COUPON = '7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d';
+const OTHER_COUPON = '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d';
 
 function slot(id: string, extra: Partial<CheckoutSlot> = {}): CheckoutSlot {
   return {
@@ -254,6 +274,13 @@ beforeEach(() => {
   state.confirmOverride = null;
   state.confirmCalls = [];
   state.outcomes = [];
+  state.coupons = new Map([
+    [COUPON, { customerId: ME, amount: 3000, expiresAt: at(90 * 24 * 60), usedOrderId: null }],
+    [
+      OTHER_COUPON,
+      { customerId: 'customer-2', amount: 3000, expiresAt: at(90 * 24 * 60), usedOrderId: null },
+    ],
+  ]);
   vi.stubEnv('NEXT_PUBLIC_PORTONE_STORE_ID', 'store-test');
   vi.stubEnv('NEXT_PUBLIC_PORTONE_CHANNEL_KEY', 'channel-test');
 });
@@ -385,6 +412,7 @@ describe('startPayment', () => {
         slotId: SLOT,
         customerId: ME,
         salePrice: 23_450,
+        couponId: null,
         couponAmount: 0,
         amount: 23_450,
         agreedAt: at(2),
@@ -455,6 +483,89 @@ describe('startPayment', () => {
     const result = await startPayment({ slotId: SLOT, ...AGREED });
     expect(result.ok === false && result.error.code).toBe('PAYMENT_UNAVAILABLE');
     expect(state.orders).toEqual([]);
+  });
+});
+
+describe('쿠폰 (C-407, #300)', () => {
+  it('previewCheckoutAmount: 고른 쿠폰을 뺀 금액, null이면 쿠폰 없이', async () => {
+    await holdSlot(SLOT);
+    expect(await previewCheckoutAmount({ slotId: SLOT, couponId: COUPON })).toEqual(
+      ok({ salePrice: 23_450, couponAmount: 3000, amount: 20_450 }),
+    );
+    expect(await previewCheckoutAmount({ slotId: SLOT, couponId: null })).toEqual(
+      ok({ salePrice: 23_450, couponAmount: 0, amount: 23_450 }),
+    );
+  });
+
+  it('previewCheckoutAmount: 내 홀딩이 아니면 NOT_HOLDER, 끝났으면 HOLD_EXPIRED', async () => {
+    expect(await previewCheckoutAmount({ slotId: SLOT, couponId: COUPON })).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_HOLDER' },
+    });
+    await holdSlot(SLOT);
+    state.now = at(11);
+    expect(await previewCheckoutAmount({ slotId: SLOT, couponId: COUPON })).toMatchObject({
+      ok: false,
+      error: { code: 'HOLD_EXPIRED' },
+    });
+  });
+
+  it('쿠폰 실패 코드: 남의 쿠폰·모양이 틀린 id는 NOT_FOUND, 쓴 쿠폰 USED, 기한 지남 EXPIRED, 최소 결제 금액 미만 NOT_APPLICABLE', async () => {
+    await holdSlot(SLOT);
+    const codeOf = async (couponId: string) => {
+      const result = await previewCheckoutAmount({ slotId: SLOT, couponId });
+      return result.ok ? null : result.error.code;
+    };
+    expect(await codeOf(OTHER_COUPON)).toBe('COUPON_NOT_FOUND');
+    expect(await codeOf('not-a-uuid')).toBe('COUPON_NOT_FOUND');
+    state.coupons.set(COUPON, { ...state.coupons.get(COUPON)!, usedOrderId: 'order-x' });
+    expect(await codeOf(COUPON)).toBe('COUPON_USED');
+    state.coupons.set(COUPON, {
+      ...state.coupons.get(COUPON)!,
+      usedOrderId: null,
+      expiresAt: at(1),
+    });
+    state.now = at(1);
+    expect(await codeOf(COUPON)).toBe('COUPON_EXPIRED');
+    state.coupons.set(COUPON, { ...state.coupons.get(COUPON)!, expiresAt: at(90 * 24 * 60) });
+    state.slots.set(SLOT, { ...state.slots.get(SLOT)!, salePrice: 3100 });
+    expect(await codeOf(COUPON)).toBe('COUPON_NOT_APPLICABLE');
+  });
+
+  it('startPayment: 쿠폰을 다시 확인하고, 쿠폰을 뺀 금액으로 쿠폰과 같이 주문을 저장한다', async () => {
+    await holdSlot(SLOT);
+    const result = await startPayment({ slotId: SLOT, ...AGREED, couponId: COUPON });
+    expect(result).toMatchObject({ ok: true, data: { totalAmount: 20_450 } });
+    expect(state.orders).toEqual([
+      expect.objectContaining({
+        couponId: COUPON,
+        salePrice: 23_450,
+        couponAmount: 3000,
+        amount: 20_450,
+      }),
+    ]);
+  });
+
+  it('startPayment: 쓸 수 없는 쿠폰이면 주문을 만들지 않고 그 코드', async () => {
+    await holdSlot(SLOT);
+    state.coupons.set(COUPON, { ...state.coupons.get(COUPON)!, usedOrderId: 'order-x' });
+    expect(await startPayment({ slotId: SLOT, ...AGREED, couponId: COUPON })).toMatchObject({
+      ok: false,
+      error: { code: 'COUPON_USED', message: '이미 쓴 쿠폰이에요' },
+    });
+    expect(state.orders).toEqual([]);
+  });
+
+  it('최소 결제 금액 문구는 정책값으로 만든다', async () => {
+    await holdSlot(SLOT);
+    state.slots.set(SLOT, { ...state.slots.get(SLOT)!, salePrice: 3100 });
+    expect(await startPayment({ slotId: SLOT, ...AGREED, couponId: COUPON })).toMatchObject({
+      ok: false,
+      error: {
+        code: 'COUPON_NOT_APPLICABLE',
+        message: '이 매물에는 쿠폰을 쓸 수 없어요(쿠폰을 빼면 결제 금액이 200원보다 작아져요)',
+      },
+    });
   });
 });
 

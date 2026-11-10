@@ -8,7 +8,16 @@ export type HoldInfo = {
   serverNow: string;
 };
 
-/** getMyHold 결과(예약 확인 화면). 금액은 서버가 계산한다. 쿠폰은 3단계(C-407)라 지금은 0 */
+/** 결제 금액(previewCheckoutAmount 결과). 화면은 계산하지 않고 이 값을 그대로 보여준다(C-407) */
+export type CheckoutAmount = {
+  salePrice: number;
+  /** 쿠폰으로 뺀 금액. 쿠폰을 안 쓰면 0 */
+  couponAmount: number;
+  /** 실제 결제액 = 판매가 − 쿠폰 */
+  amount: number;
+};
+
+/** getMyHold 결과(예약 확인 화면). 금액은 서버가 계산한다. 쿠폰 없는 금액이고, 쿠폰을 고르면 previewCheckoutAmount 값을 보여준다(#300) */
 export type MyHold = HoldInfo & {
   salePrice: number;
   couponAmount: number;

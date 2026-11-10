@@ -9,6 +9,7 @@ import { and, eq, or, sql } from 'drizzle-orm';
 import type { getDb } from '@/db';
 import { violatedConstraint } from '@/lib/db-error';
 import { type OrderStatus, orders, refunds, reservations, slots } from '@/db/schema';
+import { markCouponUsed } from '@/server/coupons/coupon-store';
 
 import { ABANDONED_ORDER_CODE, toUnconfirmedCode, type UnconfirmedCode } from './errors';
 import {
@@ -134,6 +135,7 @@ export async function confirmPaidOrder(
       slotId: orders.slotId,
       customerId: orders.customerId,
       failureCode: orders.failureCode,
+      couponId: orders.couponId,
     })
     .from(orders)
     .where(eq(orders.id, input.orderId))
@@ -166,7 +168,7 @@ export async function confirmPaidOrder(
     .for('update');
   if (!slot) throw new Error(`매물이 없어요: ${order.slotId}`);
 
-  const blocked: UnconfirmedCode | null =
+  let blocked: UnconfirmedCode | null =
     slot.status !== 'scheduled' && slot.status !== 'published'
       ? 'SLOT_SOLD'
       : slot.holdCustomerId !== order.customerId ||
@@ -174,6 +176,15 @@ export async function confirmPaidOrder(
           input.paidAt.getTime() > slot.holdExpiresAt.getTime()
         ? 'HOLD_EXPIRED'
         : null;
+  if (!blocked && order.couponId) {
+    // 쿠폰은 예약을 확정할 때 '사용됨'이 된다(#300). 그 사이 다른 결제에 쓰였으면 쿠폰을 뺀 금액이 맞지 않는 결제라 자동 취소한다
+    const marked = await markCouponUsed(tx, {
+      couponId: order.couponId,
+      orderId: input.orderId,
+      usedAt: input.paidAt,
+    });
+    if (!marked) blocked = 'AMOUNT_MISMATCH';
+  }
   const paid = { pgStatus: input.pgStatus, payMethod: input.payMethod, paidAt: input.paidAt };
   if (blocked) {
     await tx
@@ -203,7 +214,7 @@ export async function confirmPaidOrder(
  * 포트원 취소가 끝난 결제 확인(paid) 주문을 자동 취소로 기록하고 환불 기록을 남긴다(C-406). 트랜잭션 안에서 부른다.
  * 예약을 만들기 전의 취소라 예약 칸은 비어 있고, 전액 환불·위약금 0이다. 실패 코드는 화면이 이유를 보여 주도록 그대로 둔다.
  * 주문 줄을 조건부로 바꾸므로 동시에 두 번 불러도 환불 기록은 한 줄이다. 기록했으면 true.
- * TODO(#15 쿠폰 C-407): 쿠폰을 쓴 주문의 자동 취소 때 쿠폰을 돌려줄지 3단계에서 정한다
+ * 쿠폰은 예약을 확정할 때만 '사용됨'이 되므로(#300), 자동 취소한 주문의 쿠폰은 쓰지 않은 그대로 남아 다시 쓸 수 있다
  */
 export async function recordAutoCancel(
   tx: Tx,
