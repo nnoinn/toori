@@ -8,6 +8,7 @@ import { isUuid } from '@/lib/uuid';
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { getCurrentAccount } from '@/server/auth';
+import { getOptionalConsents } from '@/server/auth/customer-account';
 
 import { isFavoriteShop } from '../../home/favorites/store';
 import { selectSlotDetail } from './queries';
@@ -52,8 +53,20 @@ async function DetailContent({ params }: { params: Params }) {
   const loaded = await loadSlot((await params).slotId);
   if (!loaded) notFound();
   const { slot, customerId, now } = loaded;
-  const favorite = customerId ? await isFavoriteShop(getDb(), customerId, slot.shop.shopId) : false;
-  return <SlotDetailView slot={slot} serverNow={now.toISOString()} favorite={favorite} />;
+  const [favorite, consents] = customerId
+    ? await Promise.all([
+        isFavoriteShop(getDb(), customerId, slot.shop.shopId),
+        getOptionalConsents(),
+      ])
+    : [false, null];
+  return (
+    <SlotDetailView
+      slot={slot}
+      serverNow={now.toISOString()}
+      favorite={favorite}
+      interestAlertAgreed={consents?.ok ? consents.data.interest_alert.agreed : false}
+    />
+  );
 }
 
 function DetailSkeleton() {
