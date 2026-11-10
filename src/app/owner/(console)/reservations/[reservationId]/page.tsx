@@ -6,7 +6,7 @@ import { isUuid } from '@/lib/uuid';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { formatReservationCode, ReservationCode } from '@/components/ui/reservation-code';
+import { ReservationCode } from '@/components/ui/reservation-code';
 import { EmptyState, LoadingCards } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
@@ -16,7 +16,7 @@ import { canRecordVisit } from '@/server/visits/rules';
 
 import { OwnerPage } from '../../owner-page';
 import { RESERVATION_VIEW_STYLE } from '../../status-style';
-import { RESERVATION_VIEW_LABELS, reservationView } from '../reservation-detail';
+import { RESERVATION_VIEW_LABELS, reservationView, visitSummary } from '../reservation-detail';
 import { selectOwnerReservation } from '../reservation-detail-store';
 import { BookerCard, HistoryCard, ServiceCard, ViewNotice } from './reservation-cards';
 import { VisitActions } from './visit-actions';
@@ -77,7 +77,7 @@ async function ReservationContent({ params }: { params: Params }) {
         <VisitActions
           reservationId={reservation.id}
           canRecord={canRecordVisit(reservation, now)}
-          summary={`${formatKst(reservation.startAt)} ${reservation.menuName} · 예약번호 ${formatReservationCode(reservation.code)}`}
+          summary={visitSummary(reservation)}
         />
       </Card>
 
