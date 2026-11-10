@@ -391,7 +391,7 @@
 - **레포가 공개라서 누구나 코드·문서·Issue·PR을 볼 수 있다.** Issue·PR·커밋 메시지·코드에 이메일, 전화번호, 계좌번호, API 키를 쓰지 않는다. 테스트 계정 이메일처럼 필요한 개인정보는 단톡방으로 주고받고 nnoinn이 따로 관리한다. 커밋 이메일은 GitHub noreply 주소를 쓴다(온보딩 2-3). 라이선스 파일을 두지 않아서 공개돼도 다른 사람이 코드를 가져다 쓸 권리는 없다
 - **미리보기 주소(팀원마다 다른 주소):** 브랜치를 푸시하면 Vercel이 그 브랜치만의 미리보기를 만든다. 팀원마다 작업 브랜치가 다르니 주소도 서로 다르다.
   - **브랜치 고정 주소:** `https://toori-git-<브랜치>-nnoinns-projects.vercel.app`(브랜치 이름의 `/`는 `-`). 예: `feat/owner-slot-register` → `toori-git-feat-owner-slot-register-nnoinns-projects.vercel.app`. 같은 브랜치에 다시 푸시하면 같은 주소가 최신 내용으로 바뀐다. 브랜치 이름이 30자를 넘으면 Vercel이 주소를 줄여 이 공식이 안 맞을 수 있으니 브랜치 이름은 짧게 짓는다
-  - **주소 찾는 법(Claude가 한다):** ① PR이 있으면 PR의 Vercel 봇 코멘트(빌드가 끝나면 주소가 생긴다) ② PR이 없으면 위 공식으로 주소를 만들고 `curl -s -o /dev/null -w "%{http_code}" <주소>`로 200인지 본다. 페이지 제목이 "Deployment is building"이면 빌드 중이니 1~2분 뒤 다시 본다 ③ 404면 아직 푸시하지 않았거나 주소가 줄어든 것이니 그 브랜치의 마지막 커밋으로 배포를 찾는다: `gh api repos/nnoinn/toori/commits/<브랜치> --jq .sha`로 커밋을 알아낸 뒤 `gh api "repos/nnoinn/toori/deployments?sha=<커밋>"`의 배포 상태에서 `environment_url`을 읽는다(배포 기록의 ref는 브랜치 이름이 아니라 커밋이라서 `ref=<브랜치>`로는 안 나온다) ④ 배포가 아예 없거나 Vercel이 "배포가 막혔다"는 코멘트를 달면 nnoinn에게 알린다
+  - **주소 찾는 법(Claude가 한다):** ① PR이 있으면 PR의 Vercel 봇 코멘트(빌드가 끝나면 주소가 생긴다) ② PR이 없으면 위 공식으로 주소를 만들고 `curl -sL -o /dev/null -w "%{http_code}" <주소>`로 200인지 본다(팀 접속 코드 잠금 중이면 소개 페이지로 넘어가므로 `-L`을 붙인다, #303). 페이지 제목이 "Deployment is building"이면 빌드 중이니 1~2분 뒤 다시 본다 ③ 404면 아직 푸시하지 않았거나 주소가 줄어든 것이니 그 브랜치의 마지막 커밋으로 배포를 찾는다: `gh api repos/nnoinn/toori/commits/<브랜치> --jq .sha`로 커밋을 알아낸 뒤 `gh api "repos/nnoinn/toori/deployments?sha=<커밋>"`의 배포 상태에서 `environment_url`을 읽는다(배포 기록의 ref는 브랜치 이름이 아니라 커밋이라서 `ref=<브랜치>`로는 안 나온다) ④ 배포가 아예 없거나 Vercel이 "배포가 막혔다"는 코멘트를 달면 nnoinn에게 알린다
   - **다른 팀원 작업 보기:** "정찬형 작업 미리보기 보여줘"라고 하면 Claude가 그 사람의 열린 PR(`gh pr list --author <GitHub 아이디>`)과 최근 푸시한 브랜치를 찾아 미리보기 주소를 알려준다. GitHub 아이디: 정찬형 `chosanai`, 정민석 `alstjr62`, 강규민 `poiuyst282-ui`, 현동훈 `nnoinn`
   - **합쳐진 결과:** main에 머지된 것은 운영 주소 `https://toori.kr`에서 본다(옛 주소 `https://toori-ruby.vercel.app`은 여기로 이동한다). 여러 사람 작업이 같이 잘 돌아가는지는 여기서 확인한다
   - **미리보기도 개발용 DB를 같이 쓴다.** 미리보기에서 만든 테스트 데이터는 모두에게 보이니 이름에 자기 이름을 넣는다
@@ -404,6 +404,12 @@
   - 로그인 화면 버튼은 정찬형의 연결 PR이 머지된 뒤에 눌린다
 - **남의 브랜치를 내 컴퓨터에서 실행할 때(필요할 때만):** Claude는 먼저 내 작업을 커밋(필요하면 푸시)해 안전하게 둔 뒤, 그 브랜치를 받아 `npm install` → `npm run dev`로 실행하고, 끝나면 내 브랜치로 돌아온다. 로그인 복귀 주소가 `http://localhost:3000`만 등록돼 있으니 포트 3000으로 실행한다. 남의 브랜치에서는 커밋·푸시하지 않는다
 - **미리보기 보호(Vercel Authentication)는 nnoinn이 꺼 둔다.** 켜져 있으면 Vercel 계정이 없는 팀원은 미리보기를 볼 수 없다. 미리보기에는 테스트 데이터와 테스트 결제만 쓴다.
+- **대신 개발하는 동안 운영 주소와 미리보기 주소는 팀 접속 코드로 잠근다(11/9 결정, #303, #306).** 외부 사람이 진짜 서비스로 알고 개인정보를 넣거나 개발 DB를 어지럽히지 않게 하려고다
+  - 환경변수 `SITE_LOCK_CODE`(팀 접속 코드)가 있는 곳만 잠긴다. nnoinn이 Vercel Production·Preview에만 넣고 코드는 단톡방으로만 전한다. 로컬 `.env.local`에는 넣지 않으므로 로컬 개발과 `npm run screenshot`은 잠기지 않는다
+  - 코드 없이 화면에 들어오면 소개 페이지 `/coming-soon`("투리 준비 중", 카카오톡 채널 링크, 작은 "팀원 입장" 칸)으로 간다. 코드를 넣으면 원래 가려던 화면으로 가고 90일 동안 유지된다. 쿠키는 주소마다, 폰 홈 화면 앱마다 따로라서 `toori.kr`, 미리보기 주소마다, 폰 앱에서 처음 한 번씩 넣는다
+  - `/api`(포트원 웹훅, 예약 작업, 로그인 콜백)와 정적 파일(이미지, `sw.js`, 매니페스트)은 잠그지 않는다(proxy matcher 밖). 잠금 확인은 로그인 세션 갱신보다 먼저 해서 코드 없는 요청은 Supabase까지 가지 않는다
+  - 잠금 중에는 모든 화면에 검색 차단 머리말(`X-Robots-Tag: noindex`)을 붙인다. 코드를 바꾸면 전에 받은 쿠키는 통하지 않아 모두 다시 넣는다. 틀린 코드를 10분 안에 10번 넣으면 10분 동안 막는다(서버 한 대의 메모리에서 세는 간단한 장치)
+  - 규칙은 `src/lib/site-lock.ts`, 확인 순서는 `src/proxy.ts`, 소개 페이지는 `src/app/coming-soon/`. 출시 때 환경변수를 지우면 잠금이 풀린다
 - **Supabase는 개발용·운영용 프로젝트를 따로 둔다.** 로컬과 미리보기는 개발용을 쓴다. 개발 DB는 4명이 같이 쓰므로 남이 만든 데이터를 지우지 않는다. 테이블 구조는 nnoinn이 승인한 마이그레이션으로만 바꾼다.
 - **환경변수:** 로컬은 각자 `.env.local`(nnoinn이 팀원 4명만 있는 단톡방으로 전달, 개발용 키만), Vercel 환경변수는 nnoinn이 관리한다. 운영용 키는 단톡방으로 보내지 않는다. 포트원 API 시크릿, Supabase 서비스 키 같은 비밀 값은 `NEXT_PUBLIC_`을 붙이지 않는다.
 - **외부 서비스의 도메인 등록(10/13 완료, 11/2 `toori.kr` 추가):** Supabase 로그인 복귀 주소에 `http://localhost:3000/**`, `https://toori.kr/**`, `https://toori-ruby.vercel.app/**`, `https://toori-*-nnoinns-projects.vercel.app/**`(모든 미리보기). 카카오 JavaScript SDK 도메인에 `http://localhost:3000`, `https://toori.kr`, `https://toori-ruby.vercel.app`. 새 주소(도메인 구매 등)가 생기면 nnoinn이 두 곳에 추가한다
@@ -429,7 +435,7 @@
 | Supabase | 개발용 프로젝트(서울, 10/12에 이름을 투리로 바꿈. 주소·키는 그대로). 무료 플랜이라 **7일 동안 사용이 없으면 자동으로 일시 정지된다**(10/20 안내 메일). 정지되면 대시보드에서 프로젝트를 열고 Restore를 누르면 몇 분 뒤 그대로 돌아온다(90일 안, 데이터 유지). 이메일 로그인 끔, 카카오·구글 로그인 켬. 로그인 복귀 주소는 로컬·운영·모든 미리보기 주소 등록(위 "외부 서비스의 도메인 등록"). 운영용 프로젝트는 출시 직전에 생성. 멤버: 강규민(Developer) | `.env.local`. 강규민은 대시보드 조회 가능(초대 메일 수락 필요) |
 | 카카오 개발자 | 앱 "투리"(개인 개발자 비즈 앱, 10/12 이름 변경. 아이콘은 임시 글자 아이콘, 로고가 정해지면 교체). 카카오맵 사용 ON(무료 사용량 있는 앱), JavaScript SDK 도메인 `http://localhost:3000`·`https://toori.kr`·`https://toori-ruby.vercel.app`, 로그인 동의항목: 닉네임 필수·프로필 사진 선택·이메일 필수. 멤버: 강규민·정찬형·정민석(Viewer) | `.env.local` (카카오 로그인 키는 Supabase에 들어 있어서 필요 없음). 초대 메일 수락 필요 |
 | 구글 클라우드 | OAuth 동의 화면 **테스트 상태**, 앱 이름 "투리"(10/12 변경), 테스트 사용자 = 팀원 4명 Gmail | 등록된 Gmail로만 구글 로그인 가능 |
-| Vercel | nnoinn 계정(Hobby, GitHub로 가입), 팀 "nnoinn's projects", 프로젝트 `toori`(10/13 연결). 운영 주소 `https://toori.kr`(main, 11/2 연결. 도메인은 가비아, DNS도 가비아에서 A·CNAME으로 연결. `www`와 옛 주소 `https://toori-ruby.vercel.app`은 `toori.kr`로 이동). 레포 공개(10/13, 무료 플랜에서 팀원 커밋을 배포하려고). 서버 함수 지역 서울(icn1, 10/27, 무료 플랜은 한 곳만). 환경변수는 개발용 키(Production·Preview), 미리보기 보호 꺼짐. 출시 전 Pro 전환 | 미리보기 주소 (계정 불필요) |
+| Vercel | nnoinn 계정(Hobby, GitHub로 가입), 팀 "nnoinn's projects", 프로젝트 `toori`(10/13 연결). 운영 주소 `https://toori.kr`(main, 11/2 연결. 도메인은 가비아, DNS도 가비아에서 A·CNAME으로 연결. `www`와 옛 주소 `https://toori-ruby.vercel.app`은 `toori.kr`로 이동). 레포 공개(10/13, 무료 플랜에서 팀원 커밋을 배포하려고). 서버 함수 지역 서울(icn1, 10/27, 무료 플랜은 한 곳만). 환경변수는 개발용 키(Production·Preview), 미리보기 보호 꺼짐(대신 팀 접속 코드 잠금 `SITE_LOCK_CODE`, #303). 출시 전 Pro 전환 | 미리보기 주소 (계정 불필요) |
 | Supabase Storage | 버킷 `shop-images`(공개)·`business-docs`(비공개), 파일당 5MB(10/13 생성). 업로드 권한 정책은 강규민 W3 | 없음 |
 | 네이버 개발자 | 앱 "투리"(nnoinn 계정, 11/9 등록, 개발 중). 사용 API 네이버 로그인, 제공 정보 연락처 이메일 주소(필수)·별명(추가). 서비스 환경 PC 웹·Mobile 웹(서비스 URL `https://toori.kr`, Callback URL은 Supabase 로그인 복귀 주소 `/auth/v1/callback`). 로고는 toori 글자 로고. 개발 중에는 등록자와 멤버관리에 넣은 아이디만 로그인된다. 클라이언트 아이디·시크릿은 W21 때 nnoinn이 Supabase에 넣는다(`.env.local` 필요 없음). 공식 가이드는 developers.naver.com이 자동으로 안 읽히면 GitHub `naver/naver-openapi-guide`의 원문을 본다 | W21 테스트 전에 nnoinn이 팀원 네이버 아이디를 테스터로 넣는다 |
 | 포트원 | 아직 없음 (결제 작업 시작 전에 nnoinn이 설정) | — |
@@ -447,5 +453,6 @@
 | `NEXT_PUBLIC_KAKAO_MAP_JS_KEY` | 브라우저에 보여도 됨 (등록한 도메인에서만 동작) | 카카오 지도 표시 |
 | `KAKAO_REST_API_KEY` | **서버 전용** | 주소→좌표 변환(카카오 로컬 API) |
 | `PAYOUT_ACCOUNT_ENCRYPTION_KEY` | **서버 전용** | 원장님 정산 계좌번호 암호화(AES-256-GCM, 32바이트 base64). 개발용 값은 nnoinn이 만들었고(10/13), 출시 때 운영용을 따로 만든다. 값을 바꾸면 이미 암호화한 계좌를 못 읽으니 바꾸지 않는다 |
+| `SITE_LOCK_CODE` | **서버 전용** | 팀 접속 코드 잠금(#303). Vercel Production·Preview에만 넣고 로컬에는 넣지 않는다. 바꾸면 팀원 모두 코드를 다시 넣는다 |
 
 카카오·구글 로그인의 Client ID·Secret은 Supabase 대시보드에 들어 있어서 우리 코드에는 없다. 새 환경변수가 필요하면 `.env.example`에 이름을 추가하는 PR을 올리고, 값은 nnoinn에게 받는다.
