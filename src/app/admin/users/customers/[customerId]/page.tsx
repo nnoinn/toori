@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
 import { formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';
+import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage, type OptionalConsent } from '@/server/auth';
 
 import { labelReservation } from '../../../lookup';
@@ -40,11 +41,17 @@ function labelConsent(consent: OptionalConsent): string {
 }
 
 async function Detail({ params }: { params: Params }) {
-  await ensureAdminPage();
+  const admin = await ensureAdminPage();
   const { customerId } = await params;
   if (!isUuid(customerId)) notFound();
   const detail = await selectCustomerDetail(getDb(), customerId);
   if (!detail) notFound();
+  await recordAdminAccess(admin.userId, {
+    action: 'view',
+    targetType: 'customer',
+    targetId: customerId,
+    path: `/admin/users/customers/${customerId}`,
+  });
 
   return (
     <div className="flex flex-col gap-4">

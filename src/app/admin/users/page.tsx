@@ -12,6 +12,7 @@ import { maskPhone } from '@/lib/phone';
 import { firstParam, type SearchValue } from '@/lib/search-params';
 import { formatKst } from '@/lib/time';
 import { cn } from '@/lib/utils';
+import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
 
 import { ADMIN_LIST_LIMIT, type ListResult, toSearchQuery } from '../lookup';
@@ -45,10 +46,16 @@ export default function AdminUsersPage({ searchParams }: { searchParams: SearchP
 }
 
 async function UserList({ searchParams }: { searchParams: SearchParams }) {
-  await ensureAdminPage();
+  const admin = await ensureAdminPage();
   const params = await searchParams;
   const tab = toUserTab(firstParam(params.tab));
   const query = toSearchQuery(firstParam(params.q));
+  await recordAdminAccess(admin.userId, {
+    action: 'search',
+    targetType: 'list',
+    path: `/admin/users?tab=${tab}`,
+    query,
+  });
 
   return (
     <div className="flex flex-col gap-4">
