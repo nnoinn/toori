@@ -2,7 +2,8 @@
 
 // 매물 3탭 등록 ① 서비스 ② 시간 (O4) ③ 할인율·확인 (O5). 고를 수 없는 시각(지난 시각·14일 밖·겹침)은 화면에서 막고,
 // [다음]을 누르면 서버가 다시 확인한다. [등록하기]를 누르면 서버가 ①②③을 다시 검증하고 저장한다.
-// 매물 수정(O10, S-206)도 이 화면을 쓴다(edit). 지금 값을 채워서 열고, 고치는 매물 자신은 겹침으로 보지 않는다.
+// 매물 수정(O10, S-206)도 이 화면을 쓴다(edit). 지금 값을 채워서 열고(서버 확인이 되면 ③부터, #23 B2),
+// 고치는 매물 자신은 겹침으로 보지 않는다.
 // 이 파일은 고른 값과 단계 이동·확인·저장을 맡고, 단계 버튼과 ①②③ 카드는 slot-form-steps.tsx,
 // 저장 완료 카드는 slot-saved-card.tsx가 그린다.
 
@@ -53,6 +54,10 @@ export type SlotEditTarget = {
   newCustomerOnly: boolean;
   /** 고를 수 있는 시작 시각 범위. 이미 고객에게 보이는(게시중) 매물이면 48시간 안(editStartWindow) */
   startWindow: StartWindow;
+  /** 처음 열 단계. 열 때 서버가 ①② 값을 확인해서 문제없으면 ③(할인율)부터 연다(#23 B2) */
+  openStep: StepNumber;
+  /** 열 때 ①② 확인에 걸린 이유. 걸린 단계(openStep)에서 보여준다 */
+  problem: string | null;
 };
 
 /** 매물 등록·수정 3탭 화면. edit를 넘기면 수정이다 */
@@ -81,7 +86,7 @@ export function SlotForm({
   const startWindow = edit?.startWindow ?? 'advance';
   const days = useMemo(() => groupByKstDate(startCandidates(now, startWindow)), [now, startWindow]);
 
-  const [step, setStep] = useState<StepNumber>(1);
+  const [step, setStep] = useState<StepNumber>(edit?.openStep ?? 1);
   const [menuId, setMenuId] = useState<string | null>(edit?.menuId ?? null);
   // 달력에서 고른 날짜. 새로 올릴 때는 비워 두고 원장님이 고르면 그 아래에 시작 시각을 보여준다.
   // 수정이면 매물 날짜(지금 고를 수 있는 날짜일 때)
@@ -101,7 +106,7 @@ export function SlotForm({
   const [newCustomerOnly, setNewCustomerOnly] = useState(edit?.newCustomerOnly ?? false);
   // 저장한 매물(완료 카드에 보여준다)
   const [saved, setSaved] = useState<SavedSummary | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(edit?.problem ?? null);
   const [pending, startTransition] = useTransition();
 
   const menu = menus.find((item) => item.id === menuId) ?? null;

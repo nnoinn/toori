@@ -16,7 +16,9 @@ import { formatReservationCode } from '@/components/ui/reservation-code';
 import { SlotBadges, type SlotBadgeKind } from '@/components/ui/slot-badge';
 import type { SlotStatus } from '@/features/slot-status/slot-status';
 import { formatKst, formatKstTime } from '@/lib/time';
+import type { VisitResult } from '@/server/visits/types';
 
+import { VISIT_ACTIONS } from '../reservations/reservation-detail';
 import { canRelist } from '../slots/relist';
 import { SLOT_CLOSE_REASON_LABELS } from '../slots/slot-edit';
 import { SLOT_STATUS_STYLE } from '../status-style';
@@ -144,8 +146,18 @@ function SlotActions({
   );
 }
 
-/** 맨 위 "처리 필요"(#21 Q12). 자동으로 처리하지 않아서 처리할 때까지 계속 보인다 */
-export function NeedsVisitCard({ slots }: { slots: DashboardSlot[] }) {
+/**
+ * 맨 위 "처리 필요"(#21 Q12). 자동으로 처리하지 않아서 처리할 때까지 계속 보인다.
+ * 줄에서 바로 [방문 완료]·[노쇼]를 누를 수 있다(#23 B1). 누르면 대시보드의 확인 창(onVisit)이 열리고,
+ * 거기서 한 번 더 눌러야 처리된다. [상세]는 예약 상세(O11)로 간다
+ */
+export function NeedsVisitCard({
+  slots,
+  onVisit,
+}: {
+  slots: DashboardSlot[];
+  onVisit: (slot: DashboardSlot, result: VisitResult) => void;
+}) {
   return (
     <Card className="border-warning/60">
       <CardHeader>
@@ -170,7 +182,19 @@ export function NeedsVisitCard({ slots }: { slots: DashboardSlot[] }) {
                 </span>
               ) : null}
               {slot.reservationId ? (
-                <DetailButton reservationId={slot.reservationId} label="처리하기" />
+                <div className="flex shrink-0 gap-1">
+                  <Button type="button" onClick={() => onVisit(slot, 'visited')}>
+                    {VISIT_ACTIONS.visited.button}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => onVisit(slot, 'no_show')}
+                  >
+                    {VISIT_ACTIONS.no_show.button}
+                  </Button>
+                  <DetailButton reservationId={slot.reservationId} />
+                </div>
               ) : null}
             </li>
           ))}
@@ -180,17 +204,11 @@ export function NeedsVisitCard({ slots }: { slots: DashboardSlot[] }) {
   );
 }
 
-/** 예약이 있는 매물(예약됨·완료·취소)에서 예약 상세(O11)로 간다 */
-function DetailButton({
-  reservationId,
-  label = '상세',
-}: {
-  reservationId: string;
-  label?: string;
-}) {
+/** 예약이 있는 매물(예약됨·완료·취소)과 "처리 필요" 줄에서 예약 상세(O11)로 간다 */
+function DetailButton({ reservationId }: { reservationId: string }) {
   return (
     <Button asChild variant="outline">
-      <Link href={`/owner/reservations/${reservationId}`}>{label}</Link>
+      <Link href={`/owner/reservations/${reservationId}`}>상세</Link>
     </Button>
   );
 }
