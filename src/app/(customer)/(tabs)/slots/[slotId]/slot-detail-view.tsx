@@ -39,6 +39,8 @@ type SlotDetailViewProps = {
   serverNow: string;
   /** 이 샵을 찜했는지(#215). 고객으로 로그인하지 않았으면 false */
   favorite: boolean;
+  /** 관심 동네·찜한 샵 새 매물 알림에 동의했는지(찜 버튼의 동의 권유) */
+  interestAlertAgreed: boolean;
 };
 
 /**
@@ -46,7 +48,12 @@ type SlotDetailViewProps = {
  * 폰: 사진 → 정보 → 샵 정보 한 줄, 아래 고정 예약 바. 예약하기는 10분 홀딩을 걸고 예약 확인 화면으로 간다(reserve-button.tsx).
  * PC(md 이상): 가운데 최대 1024px 두 칸. 왼쪽 사진·샵 정보, 오른쪽 정보·가격·예약하기 상자(스크롤해도 따라온다)
  */
-export function SlotDetailView({ slot, serverNow, favorite }: SlotDetailViewProps) {
+export function SlotDetailView({
+  slot,
+  serverNow,
+  favorite,
+  interestAlertAgreed,
+}: SlotDetailViewProps) {
   const { menu, shop } = slot;
   const hours = formatBusinessHours(shop.businessHours);
   const links = [
@@ -142,7 +149,12 @@ export function SlotDetailView({ slot, serverNow, favorite }: SlotDetailViewProp
       >
         <div className="flex items-start justify-between gap-3">
           <h2 className="font-semibold">{shop.name}</h2>
-          <FavoriteButton shopId={shop.shopId} slotId={slot.slotId} favorite={favorite} />
+          <FavoriteButton
+            shopId={shop.shopId}
+            slotId={slot.slotId}
+            favorite={favorite}
+            interestAlertAgreed={interestAlertAgreed}
+          />
         </div>
         <p className="flex items-start gap-2 text-sm">
           <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />

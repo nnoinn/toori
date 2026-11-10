@@ -4,9 +4,11 @@
 // - 관심 동네(getInterestAreas, setInterestAreas): '@/server/notifications/interest-areas'
 // 이벤트 알림은 다른 서버 함수가 '@/server/notifications/alerts'에서 가져온다
 
+export { type DigestSummary, sendSlotDigest } from './digest';
 export { NOTIFICATION_ERRORS } from './errors';
 export { type NewNotification, notify } from './notify';
 export { readInterestAreas, replaceInterestAreas } from './interest-store';
+export { type ReminderSummary, sendDueReminders } from './reminders';
 export {
   deleteDevicePushSubscriptions,
   deletePushSubscription,

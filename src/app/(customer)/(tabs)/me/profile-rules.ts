@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { normalizePhone, PHONE_FORMAT_MESSAGE } from '@/lib/phone';
 import { SITE_NAME } from '@/lib/site';
 import { utcToKst } from '@/lib/time';
+import type { OptionalTerms } from '@/server/auth';
 
 /** 닉네임 최대 글자 수 */
 export const NICKNAME_MAX_LENGTH = 20;
@@ -47,10 +48,20 @@ export function formatKstDate(date: Date): string {
   return `${t.year}년 ${t.month}월 ${t.day}일`;
 }
 
+/** 선택 동의 이름(동의 문구 1·6·7장, #267). 가입·내 정보·처리 결과가 같이 쓴다 */
+export const OPTIONAL_CONSENT_NAMES: Record<OptionalTerms, string> = {
+  interest_alert: '관심 동네·찜한 샵 새 매물 알림',
+  marketing: '이벤트·혜택 소식',
+};
+
 /**
- * 광고성 정보 수신 동의·철회 처리 결과 (동의 문구 6-1, docs/legal/consent-texts.md).
- * 예: "투리 · 2026년 10월 28일에 광고성 정보 수신 동의 처리가 끝났어요."
+ * 선택 동의·철회 처리 결과 (동의 문구 6-1, docs/legal/consent-texts.md).
+ * 예: "투리 · 2026년 10월 28일에 이벤트·혜택 소식 수신 동의 처리가 끝났어요."
  */
-export function marketingResultMessage(agreed: boolean, processedAt: Date): string {
-  return `${SITE_NAME} · ${formatKstDate(processedAt)}에 광고성 정보 수신 ${agreed ? '동의' : '거부'} 처리가 끝났어요.`;
+export function consentResultMessage(
+  type: OptionalTerms,
+  agreed: boolean,
+  processedAt: Date,
+): string {
+  return `${SITE_NAME} · ${formatKstDate(processedAt)}에 ${OPTIONAL_CONSENT_NAMES[type]} 수신 ${agreed ? '동의' : '거부'} 처리가 끝났어요.`;
 }

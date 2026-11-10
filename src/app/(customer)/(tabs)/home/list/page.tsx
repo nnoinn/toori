@@ -11,7 +11,7 @@ import { LocationSwitcher } from '@/features/map/location-switcher';
 import { REGION_PARAM, withLinkedRegion } from '@/features/map/region-link';
 import { parseSort } from '@/features/map/slot-list/sort';
 import { getRequestNow } from '@/lib/request-time';
-import { getMarketingConsent } from '@/server/auth/customer-account';
+import { getOptionalConsents } from '@/server/auth/customer-account';
 import { getInterestAreas } from '@/server/notifications/interest-areas';
 
 import { AreaAlert, type AreaAlertState } from './area-alert';
@@ -47,17 +47,17 @@ async function ListContent({ searchParams }: { searchParams: SearchParams }) {
   if (!location) return <LocationIntro />;
 
   // 관심 동네·동의는 고객으로 로그인했을 때만 읽힌다(아니면 실패 → 알림 권유는 로그인부터)
-  const [area, interest, consent] = await Promise.all([
+  const [area, interest, consents] = await Promise.all([
     resolveListArea(location),
     getInterestAreas(),
-    getMarketingConsent(),
+    getOptionalConsents(),
   ]);
   const isRegion = location.kind === 'region';
   const alertState: AreaAlertState | null =
-    area && interest.ok && consent.ok
+    area && interest.ok && consents.ok
       ? {
           watching: interest.data.sigunguCodes.includes(area.sigunguCode),
-          marketingAgreed: consent.data.agreed,
+          interestAlertAgreed: consents.data.interest_alert.agreed,
         }
       : null;
 

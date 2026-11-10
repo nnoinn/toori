@@ -92,6 +92,7 @@ describeDb('입점 심사 조회 (실제 DB)', () => {
           representativeName: '테스트 원장',
           businessRegistrationNumber: '000-00-00000',
           openedOn: '2026-01-01',
+          businessDocPath: 'test/business-doc.pdf',
         },
         owner: { name: '테스트 원장', phone: '000-0000-0000' },
         shop: { name: '테스트 미용실', category: 'hair', sido: '경기', sigungu: '안산시 단원구' },

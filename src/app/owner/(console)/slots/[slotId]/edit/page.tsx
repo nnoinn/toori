@@ -13,6 +13,7 @@ import { readShopReviewStatus } from '@/server/shops/review-store';
 
 import { OwnerPage } from '../../../owner-page';
 import { SlotForm } from '../../slot-form';
+import { validateSlotDraft } from '../../slot-draft-store';
 import { selectSlotFormData } from '../../slot-form-data';
 import { editStartWindow, SLOT_EDIT_MESSAGES, slotEditProblem } from '../../slot-edit';
 import { selectSlotForEdit } from '../../slot-edit-store';
@@ -67,6 +68,22 @@ async function SlotEditContent({ params }: { params: Params }) {
     return <CannotEdit message="고를 수 있는 메뉴가 없어요. 메뉴를 먼저 등록해 주세요" />;
   }
 
+  // 게시중이면 48시간 안, 예약대기면 14일 안의 시각만 보여준다(S-205)
+  const startWindow = editStartWindow(slot, now);
+  // 매물 메뉴를 숨겼거나 업종을 바꿨으면 메뉴부터 다시 고른다
+  const menuId = data.menus.some((menu) => menu.id === slot.menuId) ? slot.menuId : null;
+  // 열 때 지금 메뉴·시각을 서버가 한 번 확인한다(#23 B2). 문제없으면 ③ 할인율부터 열어서 할인율만 고치기가 빨라지고,
+  // 걸리면(예: 영업시간을 바꿔 그 시각이 밖) 그 단계에서 이유와 함께 연다
+  const check = menuId
+    ? await validateSlotDraft(
+        db,
+        auth.shopId,
+        { menuId, startAt: slot.startAt.toISOString() },
+        now,
+        { excludeSlotId: slot.id, window: startWindow },
+      )
+    : null;
+
   return (
     <SlotForm
       shopId={auth.shopId}
@@ -74,17 +91,21 @@ async function SlotEditContent({ params }: { params: Params }) {
       {...data}
       edit={{
         slotId: slot.id,
-        // 매물 메뉴를 숨겼거나 업종을 바꿨으면 메뉴부터 다시 고른다
-        menuId: data.menus.some((menu) => menu.id === slot.menuId) ? slot.menuId : null,
+        menuId,
         startAt: slot.startAt.toISOString(),
         discountRate: slot.discountRate,
         newCustomerOnly: slot.newCustomerOnly,
-        // 게시중이면 48시간 안, 예약대기면 14일 안의 시각만 보여준다(S-205)
-        startWindow: editStartWindow(slot, now),
+        startWindow,
+        openStep: check?.ok ? 3 : menuId ? 2 : 1,
+        problem: !menuId ? MENU_GONE_MESSAGE : check && !check.ok ? check.error.message : null,
       }}
     />
   );
 }
+
+/** 매물의 메뉴를 지금 고를 수 없을 때(숨김·업종 변경) 수정 화면 ①에 보여줄 문구 */
+const MENU_GONE_MESSAGE =
+  '이 매물의 메뉴는 숨겼거나 지금 업종에 없는 메뉴예요. 메뉴부터 다시 골라 주세요';
 
 /** 고칠 수 없을 때 이유와 [대시보드로] */
 function CannotEdit({ message, description }: { message: string; description?: string }) {

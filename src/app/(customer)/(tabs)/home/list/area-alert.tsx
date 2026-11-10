@@ -8,19 +8,19 @@ import { Button } from '@/components/ui/button';
 import { customerJoinPath, loginPath } from '@/server/auth/paths';
 
 import { INTEREST_AREA_NOTE, INTEREST_NEEDS_CONSENT } from '../../me/interest-area-rules';
-import { useMarketingConsent } from '../../me/marketing-switch';
+import { ConsentResult, useOptionalConsent } from '../../me/consent-switch';
 import { watchListArea } from './actions';
 import { AreaDevicePush } from './area-device-push';
 
 const SAVE_FAILED_MESSAGE = '관심 동네로 등록하지 못했어요. 잠시 후 다시 시도해 주세요';
 
 /** 서버가 본 지금 상태. 고객으로 로그인하지 않았으면 null */
-export type AreaAlertState = { watching: boolean; marketingAgreed: boolean };
+export type AreaAlertState = { watching: boolean; interestAlertAgreed: boolean };
 
 /**
  * 매물 없는 동네의 새 매물 알림 권유 (C-208, J15). 매물 목록이 비었을 때 빈 화면 아래에 보여준다.
- * 누르면 그 동네를 바로 관심 동네로 등록한다(내 정보 관심 동네와 같은 저장). 광고성 정보 수신 동의가 없으면
- * 이 자리에서 동의를 받는다(D15, 내 정보와 같은 동의 처리). 동의까지 끝나면 이 기기 알림 켜기를 보여준다.
+ * 누르면 그 동네를 바로 관심 동네로 등록한다(내 정보 관심 동네와 같은 저장). 관심 동네·찜한 샵 알림 동의가 없으면
+ * 이 자리에서 동의를 받는다(D15, #267, 내 정보와 같은 동의 처리). 동의까지 끝나면 이 기기 알림 켜기를 보여준다.
  * 로그인 안 함·원장님 모드면 로그인 뒤 이 목록으로 돌아온다
  */
 export function AreaAlert({
@@ -42,7 +42,7 @@ export function AreaAlert({
     setLastServerWatching(serverWatching);
     setWatching(serverWatching);
   }
-  const consent = useMarketingConsent(state?.marketingAgreed ?? false);
+  const consent = useOptionalConsent('interest_alert', state?.interestAlertAgreed ?? false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   // 지난 실패 문구는 화면을 떠날 때 지운다(Activity)
@@ -112,14 +112,7 @@ export function AreaAlert({
           </Button>
         </>
       )}
-      {consent.message ? (
-        <p
-          role={consent.message.kind === 'error' ? 'alert' : 'status'}
-          className={consent.message.kind === 'error' ? 'text-destructive' : 'text-primary'}
-        >
-          {consent.message.text}
-        </p>
-      ) : null}
+      <ConsentResult message={consent.message} />
       {consent.agreed ? <AreaDevicePush /> : null}
     </div>
   );

@@ -3,10 +3,11 @@
 // 원장님 대시보드 (O9, S-401, #21 Q12). 맨 위 "처리 필요", 오늘/예정 탭, 상태 필터, 매물 목록. PC 기준.
 // 판매 전 매물은 목록에서 [수정]·[마감](O10, S-206). 결제 중(홀딩)이면 버튼을 잠근다("다른 고객이 결제 중" 배지가 같이 보인다).
 // 버튼은 글자만 쓰고 [수정]·[마감] 둘 다 테두리 버튼이다.
-// 예약이 있는 매물(예약됨·완료·취소)은 [상세], "처리 필요" 줄은 [처리하기]로 예약 상세(O11)에 간다.
-// 방문 완료·노쇼(O14)는 예약 상세에서 처리한다. 시작 전 '취소' 매물은 [재등록](O13, S-408)으로 같은 조건의 새 매물을 올리고,
-// 재등록한 매물에는 "재등록함"을 보여준다.
-// 이 파일은 탭·필터·마감 확인 창을 맡고, 매물 줄과 "처리 필요" 카드는 dashboard-rows.tsx가 그린다.
+// 예약이 있는 매물(예약됨·완료·취소)과 "처리 필요" 줄은 [상세]로 예약 상세(O11)에 간다.
+// 방문 완료·노쇼(O14)는 "처리 필요" 줄에서 바로 누르거나(#23 B1) 예약 상세에서 처리한다. 둘 다 같은 확인 창을 거친다.
+// 시작 전 '취소' 매물은 [재등록](O13, S-408)으로 같은 조건의 새 매물을 올리고, 재등록한 매물에는 "재등록함"을 보여준다.
+// 이 파일은 탭·필터와 마감·방문 확인 창을 맡고, 매물 줄과 "처리 필요" 카드는 dashboard-rows.tsx가 그린다.
+// 확인 창을 줄 안이 아니라 여기 두는 까닭: 처리하거나 그 사이 다른 곳에서 처리되면 그 줄이 사라지는데, 창은 결과 문구를 보여줄 때까지 남아야 한다.
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -19,6 +20,8 @@ import { EmptyState } from '@/components/ui/state';
 import type { SlotStatus } from '@/features/slot-status/slot-status';
 import { ADVANCE_LISTING_DAYS, PUBLISH_WINDOW_HOURS } from '@/server/policy';
 
+import { visitSummary } from '../reservations/reservation-detail';
+import { VisitConfirmDialog, type VisitTarget } from '../reservations/visit-confirm-dialog';
 import { CloseSlotDialog } from './close-slot-dialog';
 import {
   countByStatus,
@@ -52,6 +55,8 @@ export function OwnerDashboard({
   const [status, setStatus] = useState<SlotStatus | 'all'>('all');
   // [마감]을 누른 매물(확인 창)
   const [closing, setClosing] = useState<DashboardSlot | null>(null);
+  // "처리 필요" 줄에서 [방문 완료]·[노쇼]를 누른 예약(확인 창)
+  const [visiting, setVisiting] = useState<VisitTarget | null>(null);
 
   const inTab = byDay[tab];
   const counts = useMemo(() => countByStatus(inTab, now), [inTab, now]);
@@ -59,7 +64,22 @@ export function OwnerDashboard({
 
   return (
     <div className="flex flex-col gap-4">
-      {needsVisit.length > 0 ? <NeedsVisitCard slots={needsVisit} /> : null}
+      {needsVisit.length > 0 ? (
+        <NeedsVisitCard
+          slots={needsVisit}
+          onVisit={(slot, result) =>
+            setVisiting({
+              reservationId: slot.reservationId!,
+              summary: visitSummary({
+                startAt: new Date(slot.startAt),
+                menuName: slot.menuName,
+                code: slot.reservationCode ?? '',
+              }),
+              result,
+            })
+          }
+        />
+      ) : null}
 
       <div className="flex items-center justify-between gap-4">
         <div className="flex gap-2" role="tablist" aria-label="날짜">
@@ -131,6 +151,12 @@ export function OwnerDashboard({
       )}
 
       <CloseSlotDialog shopId={shopId} slot={closing} onDone={() => setClosing(null)} />
+      {/* 처리하면 화면이 새로 고쳐져 그 예약이 "처리 필요"에서 빠진다. 빠졌으면 더는 처리할 수 없다 */}
+      <VisitConfirmDialog
+        target={visiting}
+        canRecord={needsVisit.some((slot) => slot.reservationId === visiting?.reservationId)}
+        onDone={() => setVisiting(null)}
+      />
     </div>
   );
 }

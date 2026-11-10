@@ -13,7 +13,7 @@ import {
   INTEREST_NEEDS_CONSENT,
   toggleInterestArea,
 } from './interest-area-rules';
-import type { MarketingConsent } from './marketing-switch';
+import type { OptionalConsentState } from './consent-switch';
 
 const SAVE_FAILED = '관심 동네를 저장하지 못했어요. 잠시 후 다시 시도해 주세요';
 
@@ -21,14 +21,14 @@ const SAVE_FAILED = '관심 동네를 저장하지 못했어요. 잠시 후 다�
  * 관심 동네 고르기 (J14, C-601, 전국 #200). 고른 동네는 칩으로, 더하기는 동네 고르기(시·도 → 시·군·구)로 한다.
  * 누르면 바로 저장한다(setInterestAreas, 강규민 #172).
  * 저장하는 동안에는 다시 누를 수 없다(저장이 겹쳐 화면과 서버 목록이 어긋나지 않게).
- * 동네를 골랐는데 광고성 정보 수신 동의가 없으면 이 자리에서 동의를 받는다(D15). 동네 저장은 동의와 상관없이 된다
+ * 동네를 골랐는데 관심 동네·찜한 샵 알림 동의가 없으면 이 자리에서 동의를 받는다(D15). 동네 저장은 동의와 상관없이 된다
  */
 export function InterestAreas({
   initialCodes,
   consent,
 }: {
   initialCodes: string[];
-  consent: MarketingConsent;
+  consent: OptionalConsentState;
 }) {
   const [codes, setCodes] = useState(initialCodes);
   /** 서버에 저장된 목록. 저장에 실패하면 이 목록으로 되돌린다 */

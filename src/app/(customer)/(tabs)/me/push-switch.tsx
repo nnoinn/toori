@@ -28,8 +28,8 @@ export function PushSwitch() {
             이 기기에서 알림 받기
           </span>
           <span className="text-xs text-muted-foreground">
-            예약 확정과 {formatReminderTimes(REMINDER_MINUTES_BEFORE)} 알림, 관심 동네 새 매물
-            알림을 이 기기로 받아요.
+            예약 확정과 {formatReminderTimes(REMINDER_MINUTES_BEFORE)} 알림, 관심 동네·찜한 샵 새
+            매물 알림을 이 기기로 받아요.
           </span>
         </div>
         {hasSwitch ? (
