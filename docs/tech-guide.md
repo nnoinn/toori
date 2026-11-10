@@ -430,7 +430,7 @@
 | 구글 클라우드 | OAuth 동의 화면 **테스트 상태**, 앱 이름 "투리"(10/12 변경), 테스트 사용자 = 팀원 4명 Gmail | 등록된 Gmail로만 구글 로그인 가능 |
 | Vercel | nnoinn 계정(Hobby, GitHub로 가입), 팀 "nnoinn's projects", 프로젝트 `toori`(10/13 연결). 운영 주소 `https://toori.kr`(main, 11/2 연결. 도메인은 가비아, DNS도 가비아에서 A·CNAME으로 연결. `www`와 옛 주소 `https://toori-ruby.vercel.app`은 `toori.kr`로 이동). 레포 공개(10/13, 무료 플랜에서 팀원 커밋을 배포하려고). 서버 함수 지역 서울(icn1, 10/27, 무료 플랜은 한 곳만). 환경변수는 개발용 키(Production·Preview), 미리보기 보호 꺼짐. 출시 전 Pro 전환 | 미리보기 주소 (계정 불필요) |
 | Supabase Storage | 버킷 `shop-images`(공개)·`business-docs`(비공개), 파일당 5MB(10/13 생성). 업로드 권한 정책은 강규민 W3 | 없음 |
-| 네이버 개발자 | 앱 "투리"(nnoinn 계정, 11/9 등록, 개발 중). 사용 API 네이버 로그인, 제공 정보 연락처 이메일 주소(필수)·별명(추가). 서비스 환경 PC 웹·Mobile 웹(서비스 URL `https://toori.kr`, Callback URL은 Supabase 로그인 복귀 주소 `/auth/v1/callback`). 로고는 toori 글자 로고. 개발 중에는 등록자와 멤버관리에 넣은 아이디만 로그인된다. 클라이언트 아이디·시크릿은 W21 때 nnoinn이 Supabase에 넣는다(`.env.local` 필요 없음). 공식 가이드는 developers.naver.com이 자동으로 안 읽히면 GitHub `naver/naver-openapi-guide`의 원문을 본다 | W21 테스트 전에 nnoinn이 팀원 네이버 아이디를 테스터로 넣는다 |
+| 네이버 개발자 | 앱 "투리"(nnoinn 계정, 11/9 등록, 개발 중). 사용 API 네이버 로그인, 제공 정보 연락처 이메일 주소(필수)·별명(추가). 서비스 환경 PC 웹·Mobile 웹(서비스 URL `https://toori.kr`, Callback URL은 Supabase 로그인 복귀 주소 `/auth/v1/callback`). 로고는 toori 글자 로고. 개발 중에는 등록자와 멤버관리에 넣은 아이디만 로그인된다. 클라이언트 아이디·시크릿은 W21 때 nnoinn이 Supabase에 넣는다(`.env.local` 필요 없음). 공식 가이드는 developers.naver.com이 자동으로 안 읽히면 GitHub `naver/naver-openapi-guide`의 원문을 본다 | 팀원 3명을 테스터로 넣었다(11/10). 그 밖의 아이디는 검수를 통과하기 전까지 네이버로 로그인할 수 없다 |
 | 포트원 | 아직 없음 (결제 작업 시작 전에 nnoinn이 설정) | — |
 
 ### 환경변수
