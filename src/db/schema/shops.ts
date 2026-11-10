@@ -106,6 +106,32 @@ export const payoutAccounts = pgTable(
   ],
 ).enableRLS();
 
+/**
+ * 정산 계좌 변경 기록 (#295, 11/1·11/10 결정). 계좌 바꿔치기 같은 사고가 나면 언제, 누가, 어떤 계좌로 바꿨는지의 근거다.
+ * 전체 계좌번호와 예금주는 남기지 않고 은행·뒷자리만 남긴다. 가입 때 처음 등록하는 계좌와 같은 계좌로 다시 저장한 것은 남기지 않는다.
+ * 고치기·지우기를 막는 트리거는 두지 않는다(회원 탈퇴 뒤 개인정보를 지울 때 같이 지울 수 있어서, #295)
+ */
+export const payoutAccountChanges = pgTable(
+  'payout_account_changes',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    shopId: uuid()
+      .notNull()
+      .references(() => shops.id),
+    // 바꾼 사람(지금은 원장님 본인만)
+    changedBy: uuid()
+      .notNull()
+      .references(() => profiles.id),
+    // 바꾸기 전 계좌. 계좌 없이 만든 원장님(#213)이 매장 설정에서 처음 등록하면 비어 있다
+    previousBankCode: text(),
+    previousAccountLast4: text(),
+    bankCode: text().notNull(),
+    accountLast4: text().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('payout_account_changes_shop_id_created_at_idx').on(t.shopId, t.createdAt)],
+).enableRLS();
+
 /** 메뉴·가격표. 지우지 않고 숨긴다(hidden_at). 숨겨도 이미 올린 매물·예약은 그대로 */
 export const menus = pgTable(
   'menus',

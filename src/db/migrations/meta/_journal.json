@@ -71,6 +71,13 @@
       "when": 1794201241251,
       "tag": "0009_admin_access_logs",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794320602607,
+      "tag": "0010_payout_account_changes",
+      "breakpoints": true
     }
   ]
 }
