@@ -26,6 +26,7 @@ vi.mock('./notify', () => ({
 const {
   notifyNoShow,
   notifyPaymentAutoCancelled,
+  notifyPayoutAccountChanged,
   notifyReservationCancelled,
   notifyReservationConfirmed,
   notifyShopReviewed,
@@ -227,10 +228,31 @@ describe('W16 ② 알림(#131 표 문구·주소)', () => {
     ]);
   });
 
+  it('정산 계좌 변경: 원장님에게 계좌 설정으로, 은행·뒷자리는 넣지 않고 바꿀 때마다 새로 간다(#295)', async () => {
+    state.row = { ownerUserId: 'owner-user' };
+    notifyPayoutAccountChanged(db, { shopId: 'shop-1', changeId: 'change-1' });
+    notifyPayoutAccountChanged(db, { shopId: 'shop-1', changeId: 'change-2' });
+    expect(state.notified).toEqual([]);
+    await runAfterTasks();
+    expect(state.notified).toEqual([
+      {
+        userId: 'owner-user',
+        accountType: 'owner',
+        event: 'payout_account.changed',
+        dedupeKey: 'payout_account.changed:owner:change-1',
+        title: '정산 계좌가 바뀌었어요',
+        body: '직접 바꾸지 않았다면 바로 문의해 주세요',
+        url: '/owner/settings/payout',
+      },
+      expect.objectContaining({ dedupeKey: 'payout_account.changed:owner:change-2' }),
+    ]);
+  });
+
   it('대상을 찾지 못하면 보내지 않고, 보내다 실패해도 던지지 않는다', async () => {
     state.row = null;
     notifyReservationCancelled(db, 'r-x', { by: 'admin', now: new Date() });
     notifyPaymentAutoCancelled(db, 'order-x');
+    notifyPayoutAccountChanged(db, { shopId: 'shop-x', changeId: 'change-x' });
     await runAfterTasks();
     expect(state.notified).toEqual([]);
 

@@ -208,3 +208,28 @@ export function notifyShopReviewed(
     });
   });
 }
+
+/**
+ * 정산 계좌가 바뀌었을 때 원장님에게(#295, 11/1 결정). 직접 바꾸지 않았으면 바로 알아채게 한다.
+ * 은행·뒷자리는 잠금 화면에 보일 수 있어서 넣지 않는다. 바꿀 때마다 보내도록 변경 기록 id를 중복 방지 키에 넣는다
+ */
+export function notifyPayoutAccountChanged(db: Db, input: { shopId: string; changeId: string }) {
+  const event = 'payout_account.changed';
+  sendAfterResponse(event, async () => {
+    const [row] = await db
+      .select({ ownerUserId: owners.userId })
+      .from(shops)
+      .innerJoin(owners, eq(owners.id, shops.ownerId))
+      .where(eq(shops.id, input.shopId));
+    if (!row) return;
+    await notify(db, {
+      userId: row.ownerUserId,
+      accountType: 'owner',
+      event,
+      dedupeKey: `${event}:owner:${input.changeId}`,
+      title: '정산 계좌가 바뀌었어요',
+      body: '직접 바꾸지 않았다면 바로 문의해 주세요',
+      url: '/owner/settings/payout',
+    });
+  });
+}
