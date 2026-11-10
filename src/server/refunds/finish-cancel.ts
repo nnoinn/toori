@@ -56,7 +56,7 @@ export async function finishCancel(
   );
   if (!finished) return null;
   // 원장님에게 재등록 안내(S-400). 바로 끝난 취소·정리 작업·포트원이 늦게 처리한 취소 모두 여기를 지난다
-  notifyReservationCancelled(db, request.reservationId);
+  notifyReservationCancelled(db, request.reservationId, { by: 'customer', now });
   return { refundAmount };
 }
 

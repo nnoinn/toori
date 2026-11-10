@@ -74,24 +74,57 @@ export function notifyReservationConfirmed(db: Db, reservationId: string) {
   });
 }
 
+/** 누가 취소했나. customer: 앱에서 고객이 직접(포트원이 늦게 처리한 것 포함), admin: 앱을 거치지 않은 운영자 취소(#248) */
+export type CancelledBy = 'customer' | 'admin';
+
 /**
- * 예약 취소가 끝났을 때 원장님에게(S-400, S-408). 고객 취소와 앱을 거치지 않은 운영자 취소(#248) 모두 보낸다.
- * 누르면 같은 조건의 매물 재등록 화면(연결 #14, #132)으로 간다. 취소를 끝낸 쪽만 부르므로 한 번만 간다
+ * 예약 취소가 끝났을 때(S-400, S-408). 취소를 끝낸 쪽만 부르므로 한 번만 간다.
+ * - 원장님: 서비스 시작 전이면 같은 조건의 매물 재등록 화면(연결 #14, #132)으로, 시작이 지났으면 재등록할 수 없어서
+ *   "예약이 취소됐어요"만 보내고 예약 상세로 간다(재등록 화면의 START_PASSED와 같은 기준, 11/10 nnoinn #293)
+ * - 고객: 운영자 취소일 때만. 같은 결제가 두 번 됐거나 앱 취소가 실패해서 운영자가 정리하면 고객이 모를 수 있다(11/10 nnoinn #293).
+ *   고객이 직접 한 취소는 화면에서 결과를 봤으므로 보내지 않는다
  */
-export function notifyReservationCancelled(db: Db, reservationId: string) {
+export function notifyReservationCancelled(
+  db: Db,
+  reservationId: string,
+  { by, now }: { by: CancelledBy; now: Date },
+) {
   const event = 'reservation.cancelled';
   sendAfterResponse(event, async () => {
     const alert = await readReservationAlert(db, reservationId);
     if (!alert) return;
-    await notify(db, {
-      userId: alert.ownerUserId,
-      accountType: 'owner',
-      event,
-      dedupeKey: `${event}:owner:${reservationId}`,
-      title: '예약 건이 취소되었습니다',
-      body: '동일한 매물을 재등록하시겠습니까?',
-      url: `/owner/slots/${alert.slotId}/relist`,
-    });
+    const canRelist = alert.startAt.getTime() > now.getTime();
+    const ownerAlert = canRelist
+      ? {
+          title: '예약 건이 취소되었습니다',
+          body: '동일한 매물을 재등록하시겠습니까?',
+          url: `/owner/slots/${alert.slotId}/relist`,
+        }
+      : {
+          title: '예약이 취소됐어요',
+          body: `${alert.menuName} · ${formatKst(alert.startAt)}`,
+          url: `/owner/reservations/${reservationId}`,
+        };
+    await Promise.all([
+      notify(db, {
+        userId: alert.ownerUserId,
+        accountType: 'owner',
+        event,
+        dedupeKey: `${event}:owner:${reservationId}`,
+        ...ownerAlert,
+      }),
+      by === 'admin'
+        ? notify(db, {
+            userId: alert.customerUserId,
+            accountType: 'customer',
+            event,
+            dedupeKey: `${event}:customer:${reservationId}`,
+            title: '예약이 취소됐어요',
+            body: '환불 내용은 예약 상세에서 확인해 주세요',
+            url: `/reservations/${reservationId}`,
+          })
+        : null,
+    ]);
   });
 }
 

@@ -11,12 +11,16 @@ const state = vi.hoisted(() => ({
   finishes: [] as Record<string, unknown>[],
   finished: true,
   cleared: [] as string[],
-  cancelAlerts: [] as string[],
+  cancelAlerts: [] as unknown[],
 }));
 
 vi.mock('@/server/notifications/alerts', () => ({
-  notifyReservationCancelled: (_db: unknown, reservationId: string) => {
-    state.cancelAlerts.push(reservationId);
+  notifyReservationCancelled: (
+    _db: unknown,
+    reservationId: string,
+    options: { by: string; now: Date },
+  ) => {
+    state.cancelAlerts.push({ reservationId, ...options });
   },
 }));
 
@@ -99,8 +103,10 @@ describe('finishCancel', () => {
       },
     ]);
     expect(console.error).not.toHaveBeenCalled();
-    // 원장님에게 재등록 안내(S-400)
-    expect(state.cancelAlerts).toEqual(['reservation-1']);
+    // 고객 취소 알림: 원장님에게 재등록 안내(S-400), 고객에게는 보내지 않는다
+    expect(state.cancelAlerts).toEqual([
+      { reservationId: 'reservation-1', by: 'customer', now: NOW },
+    ]);
   });
 
   it('포트원이 금액을 알려주지 않으면 저장해 둔 금액으로 끝낸다', async () => {

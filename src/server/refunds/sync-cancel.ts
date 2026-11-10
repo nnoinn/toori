@@ -119,7 +119,7 @@ async function recordAdminCancel(
       now,
     }),
   );
-  // 원장님이 오지 않을 손님을 기다리지 않게 고객 취소와 같은 알림을 보낸다. 고객에게는 운영자가 직접 연락한다(11/9)
-  if (recorded) notifyReservationCancelled(db, target.reservationId);
+  // 원장님이 오지 않을 손님을 기다리지 않게 알리고, 고객도 모를 수 있어서 같이 알린다(11/10 nnoinn #293)
+  if (recorded) notifyReservationCancelled(db, target.reservationId, { by: 'admin', now });
   return recorded;
 }

@@ -12,12 +12,16 @@ const state = vi.hoisted(() => ({
   finished: { refundAmount: 12_250 } as { refundAmount: number } | null,
   adminCancels: [] as unknown[],
   adminFinished: true,
-  cancelAlerts: [] as string[],
+  cancelAlerts: [] as unknown[],
 }));
 
 vi.mock('@/server/notifications/alerts', () => ({
-  notifyReservationCancelled: (_db: unknown, reservationId: string) => {
-    state.cancelAlerts.push(reservationId);
+  notifyReservationCancelled: (
+    _db: unknown,
+    reservationId: string,
+    options: { by: string; now: Date },
+  ) => {
+    state.cancelAlerts.push({ reservationId, ...options });
   },
 }));
 
@@ -108,8 +112,8 @@ describe('syncUnrecordedCancel', () => {
       },
     ]);
     expect(console.error).toHaveBeenCalled();
-    // 원장님에게 고객 취소와 같은 알림(11/9). 고객 취소 쪽 알림은 finishCancel이 보낸다
-    expect(state.cancelAlerts).toEqual(['reservation-1']);
+    // 운영자 취소 알림: 원장님과 고객 모두(11/10 #293). 고객 취소 쪽 알림은 finishCancel이 보낸다
+    expect(state.cancelAlerts).toEqual([{ reservationId: 'reservation-1', by: 'admin', now: NOW }]);
   });
 
   it('운영자 취소가 일부만 돌려줬으면 확인 이유를 남긴다', async () => {
