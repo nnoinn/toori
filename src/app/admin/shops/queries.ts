@@ -80,6 +80,8 @@ export type ShopReviewDetail = {
     representativeName: string;
     businessRegistrationNumber: string;
     openedOn: string;
+    /** 사업자등록증 경로(비공개 버킷). 운영자가 등록증을 바꾸지 않고 저장할 때 그대로 넘긴다 */
+    businessDocPath: string;
   };
   owner: { name: string; phone: string };
   shop: {
@@ -118,6 +120,7 @@ export async function selectShopForReview(
       representativeName: shops.representativeName,
       businessRegistrationNumber: shops.businessRegistrationNumber,
       openedOn: shops.openedOn,
+      businessDocPath: shops.businessDocPath,
       ownerName: owners.name,
       ownerPhone: owners.phone,
       name: shops.name,
@@ -160,6 +163,7 @@ export async function selectShopForReview(
       representativeName: row.representativeName,
       businessRegistrationNumber: row.businessRegistrationNumber,
       openedOn: row.openedOn,
+      businessDocPath: row.businessDocPath,
     },
     owner: { name: row.ownerName, phone: row.ownerPhone },
     shop: {
