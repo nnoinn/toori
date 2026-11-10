@@ -11,6 +11,17 @@ const state = vi.hoisted(() => ({
   finishes: [] as Record<string, unknown>[],
   finished: true,
   cleared: [] as string[],
+  cancelAlerts: [] as unknown[],
+}));
+
+vi.mock('@/server/notifications/alerts', () => ({
+  notifyReservationCancelled: (
+    _db: unknown,
+    reservationId: string,
+    options: { by: string; now: Date },
+  ) => {
+    state.cancelAlerts.push({ reservationId, ...options });
+  },
 }));
 
 vi.mock('@/server/payments/portone', async (original) => ({
@@ -62,6 +73,7 @@ beforeEach(() => {
   state.finishes = [];
   state.finished = true;
   state.cleared = [];
+  state.cancelAlerts = [];
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -91,6 +103,10 @@ describe('finishCancel', () => {
       },
     ]);
     expect(console.error).not.toHaveBeenCalled();
+    // 고객 취소 알림: 원장님에게 재등록 안내(S-400), 고객에게는 보내지 않는다
+    expect(state.cancelAlerts).toEqual([
+      { reservationId: 'reservation-1', by: 'customer', now: NOW },
+    ]);
   });
 
   it('포트원이 금액을 알려주지 않으면 저장해 둔 금액으로 끝낸다', async () => {
@@ -122,11 +138,12 @@ describe('finishCancel', () => {
     });
   });
 
-  it('먼저 기록한 요청이 있으면 null', async () => {
+  it('먼저 기록한 요청이 있으면 null이고 원장님 알림을 다시 부르지 않는다', async () => {
     state.finished = false;
     expect(
       await finishCancel(db, request, { cancellationId: 'c-1', amount: 31_500 }, NOW),
     ).toBeNull();
+    expect(state.cancelAlerts).toEqual([]);
   });
 });
 

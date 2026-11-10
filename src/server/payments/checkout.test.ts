@@ -63,7 +63,10 @@ function memoryAcquire({ slotId, customerId, now }: AcquireInput): HoldOutcome {
   return { ok: true, holdExpiresAt };
 }
 
-vi.mock('@/server/notifications/alerts', () => ({ notifyReservationConfirmed: () => {} }));
+vi.mock('@/server/notifications/alerts', () => ({
+  notifyReservationConfirmed: () => {},
+  notifyPaymentAutoCancelled: () => {},
+}));
 vi.mock('next/headers', () => ({
   cookies: async () => ({
     get: (name: string) => {

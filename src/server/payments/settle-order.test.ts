@@ -14,11 +14,16 @@ const state = vi.hoisted(() => ({
   confirm: null as unknown,
   cancel: null as unknown,
   notified: [] as string[],
+  autoCancelAlerts: [] as string[],
+  autoCancelRecorded: true,
 }));
 
 vi.mock('@/server/notifications/alerts', () => ({
   notifyReservationConfirmed: (_db: unknown, reservationId: string) => {
     state.notified.push(reservationId);
+  },
+  notifyPaymentAutoCancelled: (_db: unknown, orderId: string) => {
+    state.autoCancelAlerts.push(orderId);
   },
 }));
 
@@ -33,7 +38,7 @@ vi.mock('./confirm-store', () => ({
   },
   recordAutoCancel: async (tx: unknown, input: unknown) => {
     state.calls.push(['autoCancel', tx, input]);
-    return true;
+    return state.autoCancelRecorded;
   },
 }));
 vi.mock('./portone', () => ({
@@ -66,6 +71,8 @@ const payment = (extra: Partial<PortOnePayment> = {}): PortOnePayment => ({
 const names = () => state.calls.map((call) => call[0]);
 
 beforeEach(() => {
+  state.autoCancelAlerts = [];
+  state.autoCancelRecorded = true;
   state.calls = [];
   state.notified = [];
   state.confirm = {
@@ -156,6 +163,13 @@ describe('autoCancelOrder', () => {
         { orderId: 'order-1', refundAmount: 23_450, pgCancellationId: 'c-1', now: NOW },
       ],
     ]);
+    expect(state.autoCancelAlerts).toEqual(['order-1']);
+  });
+
+  it('다른 쪽이 먼저 자동 취소를 기록했으면 고객 알림을 다시 부르지 않는다', async () => {
+    state.autoCancelRecorded = false;
+    expect(await autoCancelOrder(db, ORDER, NOW)).toBe(true);
+    expect(state.autoCancelAlerts).toEqual([]);
   });
 
   it.each(['pending', 'unavailable'] as const)(

@@ -3,7 +3,9 @@
 // 샵에 연락처를 주는 기간이 "예약한 서비스 이용이 끝날 때까지"라서다(동의 문구 3-1).
 // 방문 완료·노쇼 처리(O14, S-405)는 누른 뒤 확인 창에서 한 번 더 눌러야 하고, 처리한 뒤에는 바꿀 수 없다(#130).
 
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { CancelActor, ReservationStatus, VisitResult } from '@/db/schema';
+import { formatKst } from '@/lib/time';
 import type { VisitErrorCode } from '@/server/visits/errors';
 import { canRecordVisit } from '@/server/visits/rules';
 
@@ -45,6 +47,22 @@ export function showsFullPhone(reservation: ReservationViewInput): boolean {
 }
 
 /** 방문 완료·노쇼 버튼과 확인 창 문구(10/29 nnoinn, #130) */
+/**
+ * 방문 완료·노쇼 확인 창에 보여줄 예약 한 줄. 예: "11/1(토) 14:00 커트 · 예약번호 1234-5678-9012".
+ * 예약 상세와 대시보드 "처리 필요" 줄이 같은 문구를 써서, 어느 쪽에서 눌러도 같은 예약인지 맞춰 볼 수 있다
+ */
+export function visitSummary({
+  startAt,
+  menuName,
+  code,
+}: {
+  startAt: Date;
+  menuName: string;
+  code: string;
+}): string {
+  return `${formatKst(startAt)} ${menuName} · 예약번호 ${formatReservationCode(code)}`;
+}
+
 export const VISIT_ACTIONS: Record<
   VisitResult,
   { button: string; title: string; consequence: string | null; confirm: string }

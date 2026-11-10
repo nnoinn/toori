@@ -6,7 +6,10 @@
 import 'server-only';
 
 import type { getDb } from '@/db';
-import { notifyReservationConfirmed } from '@/server/notifications/alerts';
+import {
+  notifyPaymentAutoCancelled,
+  notifyReservationConfirmed,
+} from '@/server/notifications/alerts';
 
 import { confirmPaidOrder, recordAutoCancel, recordOrderOutcome } from './confirm-store';
 import type { UnconfirmedCode } from './errors';
@@ -85,7 +88,7 @@ export async function autoCancelOrder(
     console.error('[payments] 자동 취소를 끝내지 못했어요:', order.orderId, cancel.reason);
     return false;
   }
-  await db.transaction((tx) =>
+  const recorded = await db.transaction((tx) =>
     recordAutoCancel(tx, {
       orderId: order.orderId,
       refundAmount: cancel.amount,
@@ -93,5 +96,7 @@ export async function autoCancelOrder(
       now,
     }),
   );
+  // 자동 취소를 기록한 쪽만 고객에게 알린다(동시에 두 번 불려도 한 번)
+  if (recorded) notifyPaymentAutoCancelled(db, order.orderId);
   return true;
 }

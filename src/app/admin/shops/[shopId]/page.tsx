@@ -17,6 +17,7 @@ import { bankName, categoryLabel } from '@/server/policy';
 import { labelPgSellerStatus, labelReviewAction } from '../format';
 import { selectShopForReview, type ShopReviewDetail } from '../queries';
 import { StatusBadge } from '../status-badge';
+import { BusinessEdit } from './business-edit';
 import { ReviewActions } from './review-actions';
 
 export const metadata: Metadata = { title: '입점 심사' };
@@ -103,6 +104,9 @@ async function ReviewDetail({ params }: { params: Params }) {
           <p className="text-xs text-muted-foreground">
             등록증 주소는 5분 동안만 열려요. 지나면 화면을 새로 고쳐 주세요.
           </p>
+          {detail.status === 'approved' ? (
+            <BusinessEdit shopId={detail.shopId} current={detail.business} />
+          ) : null}
         </Section>
 
         <Section title="원장님">

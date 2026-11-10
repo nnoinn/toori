@@ -14,6 +14,13 @@ const state = vi.hoisted(() => ({
   auth: null as unknown,
   stored: null as unknown,
   calls: [] as { tx: unknown; input: unknown }[],
+  noShowAlerts: [] as string[],
+}));
+
+vi.mock('@/server/notifications/alerts', () => ({
+  notifyNoShow: (_db: unknown, reservationId: string) => {
+    state.noShowAlerts.push(reservationId);
+  },
 }));
 
 vi.mock('@/lib/request-time', () => ({ getRequestNow: async () => NOW }));
@@ -38,6 +45,7 @@ beforeEach(() => {
     recordedAt: NOW.toISOString(),
   });
   state.calls = [];
+  state.noShowAlerts = [];
 });
 
 describe('recordVisit', () => {
@@ -57,11 +65,14 @@ describe('recordVisit', () => {
         },
       },
     ]);
+    // 노쇼로 처리했으면 고객에게 알린다(reservation.no_show)
+    expect(state.noShowAlerts).toEqual([RESERVATION]);
   });
 
   it('방문 완료도 그대로 넘긴다', async () => {
     await recordVisit({ reservationId: RESERVATION, result: 'visited' });
     expect(state.calls[0].input).toMatchObject({ result: 'visited' });
+    expect(state.noShowAlerts).toEqual([]);
   });
 
   it('원장님 로그인이 아니면 그 실패를 그대로 돌려주고 저장하지 않는다', async () => {
@@ -93,5 +104,11 @@ describe('recordVisit', () => {
     expect(await recordVisit({ reservationId: RESERVATION, result: 'visited' })).toEqual(
       state.stored,
     );
+  });
+
+  it('노쇼 저장이 막히면 고객 알림을 부르지 않는다', async () => {
+    state.stored = fail('ALREADY_RECORDED', VISIT_ERRORS.ALREADY_RECORDED);
+    await recordVisit({ reservationId: RESERVATION, result: 'no_show' });
+    expect(state.noShowAlerts).toEqual([]);
   });
 });
