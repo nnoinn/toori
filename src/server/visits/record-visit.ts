@@ -3,7 +3,7 @@
 // 방문·노쇼 처리 (S-405·S-406, 연결 #11, #130). 원장님 예약 상세의 '방문 완료'·'노쇼' 버튼(정민석 O14)에서 부른다.
 // 화면에서는 '@/server/visits/record-visit'에서 가져온다. 버튼을 보여줄지는 '@/server/visits/rules'의 canRecordVisit.
 // 누르기 전 확인 창("처리하면 바꿀 수 없어요")은 화면에서 띄운다(10/29 결정). 처리한 뒤 원장님은 바꿀 수 없고 운영자가 고친다(A-104).
-// TODO(#15 W16): 노쇼면 고객에게 reservation.no_show 알림. TODO(#15 W15·W20): 정산 내역 한 줄(방문 sale, 노쇼 no_show)
+// 노쇼로 처리하면 고객에게 reservation.no_show 알림(W16). TODO(#15 W15·W20): 정산 내역 한 줄(방문 sale, 노쇼 no_show)
 
 import { z } from 'zod';
 
@@ -12,6 +12,7 @@ import { VISIT_RESULTS } from '@/db/schema';
 import { getRequestNow } from '@/lib/request-time';
 import type { Result } from '@/lib/result';
 import { requireOwner } from '@/server/auth';
+import { notifyNoShow } from '@/server/notifications/alerts';
 
 import { visitFail } from './errors';
 import type { RecordedVisit, VisitResult } from './types';
@@ -32,7 +33,8 @@ export async function recordVisit(input: {
   if (!result.success) return visitFail('INVALID_INPUT');
 
   const now = await getRequestNow();
-  return getDb().transaction((tx) =>
+  const db = getDb();
+  const recorded = await db.transaction((tx) =>
     recordVisitInTx(tx, {
       shopId: auth.data.shopId,
       reservationId: reservationId.data,
@@ -41,4 +43,6 @@ export async function recordVisit(input: {
       now,
     }),
   );
+  if (recorded.ok && result.data === 'no_show') notifyNoShow(db, reservationId.data);
+  return recorded;
 }

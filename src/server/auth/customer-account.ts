@@ -155,7 +155,7 @@ export async function setOptionalConsent(
   const consent = await getDb().transaction((tx) =>
     writeOptionalConsent(tx, auth.data.userId, 'customer', parsed.data.type, parsed.data.agree),
   );
-  // TODO(#15 W16): 푸시를 구독한 고객에게는 처리 결과를 notify로도 알린다
+  // 처리 결과는 화면이 바로 보여준다. 푸시로는 따로 보내지 않는다(11/9 결정)
   return ok(consent);
 }
 

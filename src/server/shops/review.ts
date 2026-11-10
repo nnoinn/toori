@@ -1,13 +1,14 @@
 'use server';
 
 // 입점 심사 (연결 #13, Issue #50 2장, A-101·S-102). 원장님 승인 대기 화면(정민석)과 운영자 입점 승인 화면에서 부른다.
-// 화면에서는 '@/server/shops/review'에서 가져온다. 승인·반려 알림(shop.approved, shop.rejected)은 #15 W16에서 붙인다.
+// 화면에서는 '@/server/shops/review'에서 가져온다. 승인·반려하면 원장님에게 알린다(shop.approved, shop.rejected, W16).
 
 import { z } from 'zod';
 
 import { getDb } from '@/db';
 import { fail, ok, type Result } from '@/lib/result';
 import { requireAdmin, requireShopOwner } from '@/server/auth';
+import { notifyShopReviewed } from '@/server/notifications/alerts';
 
 import {
   readShopReviewStatus,
@@ -45,10 +46,14 @@ export async function approveShop(shopId: string): Promise<Result<null>> {
   const parsed = shopIdSchema.safeParse(shopId);
   if (!parsed.success) return fail('SHOP_NOT_FOUND', SHOP_REVIEW_ERRORS.SHOP_NOT_FOUND);
 
-  // TODO(#15 W16): 원장님에게 shop.approved 알림
-  return getDb().transaction((tx) =>
+  const db = getDb();
+  const reviewed = await db.transaction((tx) =>
     reviewShop(tx, { shopId: parsed.data, adminId: auth.data.userId, decision: 'approve' }),
   );
+  if (reviewed.ok) {
+    notifyShopReviewed(db, { shopId: parsed.data, decision: 'approve', reviewedAt: new Date() });
+  }
+  return reviewed;
 }
 
 const rejectSchema = z.object({ shopId: shopIdSchema, reason: z.string().trim().min(1) });
@@ -64,8 +69,8 @@ export async function rejectShop(shopId: string, reason: string): Promise<Result
       : fail('REASON_REQUIRED', SHOP_REVIEW_ERRORS.REASON_REQUIRED);
   }
 
-  // TODO(#15 W16): 원장님에게 shop.rejected 알림
-  return getDb().transaction((tx) =>
+  const db = getDb();
+  const reviewed = await db.transaction((tx) =>
     reviewShop(tx, {
       shopId: parsed.data.shopId,
       adminId: auth.data.userId,
@@ -73,4 +78,12 @@ export async function rejectShop(shopId: string, reason: string): Promise<Result
       reason: parsed.data.reason,
     }),
   );
+  if (reviewed.ok) {
+    notifyShopReviewed(db, {
+      shopId: parsed.data.shopId,
+      decision: 'reject',
+      reviewedAt: new Date(),
+    });
+  }
+  return reviewed;
 }
