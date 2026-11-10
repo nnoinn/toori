@@ -7,6 +7,7 @@
 export { NOTIFICATION_ERRORS } from './errors';
 export { type NewNotification, notify } from './notify';
 export { readInterestAreas, replaceInterestAreas } from './interest-store';
+export { type ReminderSummary, sendDueReminders } from './reminders';
 export {
   deleteDevicePushSubscriptions,
   deletePushSubscription,
