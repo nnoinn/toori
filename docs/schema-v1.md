@@ -29,6 +29,7 @@ erDiagram
   profiles ||--o| owners : "원장님 계정"
   owners ||--|| shops : "MVP는 1:1"
   shops ||--|| payout_accounts : "정산 계좌"
+  shops ||--o{ payout_account_changes : "계좌 변경 기록"
   shops ||--o{ shop_images : ""
   shops ||--o{ menus : ""
   shops ||--o{ slots : "매물"
@@ -172,6 +173,26 @@ erDiagram
 셀러 등록은 투리가 API로 한다. 원장님이 따로 할 일은 토스페이먼츠 문자로 오는 휴대폰 본인인증 한 번뿐이다. 최근 7일 지급액이 1천만 원 이상이 되면 토스가 서류 확인(KYC)을 요청할 수 있다.
 
 민감 정보라 샵 정보와 테이블을 나눈다. 전체 계좌번호는 운영자 화면에서만 복호화해 보여준다. 로그에 남기지 않는다.
+
+### payout_account_changes — 정산 계좌 변경 기록
+
+계좌가 바뀌면 원장님에게 알림을 보내고 이 기록을 남긴다(#295, 11/1·11/10 결정). 계좌 바꿔치기 같은 사고가 나면 언제, 누가, 어떤 계좌로 바꿨는지의 근거다.
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| id | uuid PK | |
+| shop_id | uuid → shops | |
+| changed_by | uuid → profiles | 바꾼 사람(지금은 원장님 본인만) |
+| previous_bank_code | text, null | 바꾸기 전 은행. 계좌 없이 만든 원장님(#213)이 매장 설정에서 처음 등록하면 비어 있다 |
+| previous_account_last4 | text, null | 바꾸기 전 뒷자리 |
+| bank_code | text | 바꾼 뒤 은행 |
+| account_last4 | text | 바꾼 뒤 뒷자리 |
+| created_at | timestamptz | 바꾼 시각 |
+
+- 전체 계좌번호와 예금주는 남기지 않는다(은행·뒷자리만)
+- 남기지 않는 경우: 가입 때 처음 등록하는 계좌(변경이 아니다), 은행·계좌번호가 같은 저장(예금주만 고친 경우 포함)
+- 같은 계좌인지는 서버가 지금 계좌번호를 복호화해서 비교한다(암호문은 저장할 때마다 달라서 암호문끼리는 비교할 수 없다)
+- 고치기·지우기를 막는 트리거는 두지 않는다. 이 기록을 고치는 코드는 없고, 회원 탈퇴 뒤 개인정보를 지울 때 같이 지울 수 있어서다(#295)
 
 ### shop_images — 대표·스타일 이미지
 
@@ -554,6 +575,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | slots | (status, start_at), (shop_id, start_at), (publish_at), 시간 겹침 EXCLUDE | 목록 조회, 원장님 대시보드, 관심 지역 묶음 알림, S-209 |
 | location_use_logs | (created_at) | 6개월 지난 기록 정리 |
 | admin_access_logs | (created_at), (admin_id, created_at), UPDATE·DELETE·TRUNCATE 막는 트리거 | 보관 기간 확인, 운영자별 월 1회 점검, 기록 위·변조 방지 |
+| payout_account_changes | (shop_id, created_at) | 샵별 계좌 변경 이력 |
 | slots | check: discount_rate 10~50, end_at > start_at | |
 | reservations | unique(code), unique(slot_id), (customer_id), (status) | 예약번호, 매물당 하나, 내 예약 |
 | orders | unique(payment_id), (customer_id), (status) | 결제 검증, 복구 |
@@ -599,3 +621,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 2026-11-03 | `refunds`에 `status`, `review_reason`, `created_at`을 더하고 `processed_at`을 비어 있을 수 있게 바꿨다. 고객 취소는 포트원을 부르기 전에 `requested`로 저장하고, 정리 작업이 마무리한다. 한 예약에 고객 취소 기록은 하나만(unique) (#222) |
 | 2026-11-09 | `terms_agreements.terms_type`에 `interest_alert`(관심 동네·찜한 샵 새 매물 알림 수신 동의, 선택)를 더한다. 관심 동네·찜한 샵 알림은 이벤트·혜택 광고성 동의(`marketing`)와 따로 받는다(#267·#270, 11/8 결정). 이미 있는 `marketing` 기록은 출시 전이라 옮기지 않는다. 마이그레이션 0008 |
 | 2026-11-09 | `admin_access_logs`(운영자 열람 기록)를 더한다. 운영자가 개인정보가 보이는 화면을 볼 때마다 누가·언제·어디서(IP)·누구의 정보를·무엇을(상세 보기·목록 검색) 남기고 1년 이상 보관한다. 기록하지 못하면 화면을 보여주지 않는다(#269, 11/8 결정). DB 트리거로 고치기·지우기·비우기를 막는다(#286 리뷰, 11/9). 마이그레이션 0009 |
+| 2026-11-10 | `payout_account_changes`(정산 계좌 변경 기록)를 더한다. 바꾼 사람, 바꾸기 전·뒤 은행·뒷자리, 시각만 남기고 전체 계좌번호·예금주는 남기지 않는다. 가입 때 첫 등록과 같은 계좌 저장은 남기지 않는다. 트리거는 두지 않는다(#295, 11/10 승인). 마이그레이션 0010 |
