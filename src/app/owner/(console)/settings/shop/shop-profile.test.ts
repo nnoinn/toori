@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   type HoursRow,
+  hoursOrderProblem,
   type ShopProfileInput,
   toHoursRows,
   validateShopProfile,
@@ -26,6 +27,23 @@ const withMonday = (row: Partial<HoursRow>): HoursRow[] => {
   hours[0] = { ...hours[0], ...row };
   return hours;
 };
+
+describe('hoursOrderProblem (고르는 즉시 안내, #311)', () => {
+  it('둘 다 골랐고 닫는 시각이 같거나 빠를 때만 문구', () => {
+    expect(hoursOrderProblem({ open: '23:00', close: '21:00' })).toBe(
+      '닫는 시각은 여는 시각보다 늦어야 해요',
+    );
+    expect(hoursOrderProblem({ open: '10:00', close: '10:00' })).toBe(
+      '닫는 시각은 여는 시각보다 늦어야 해요',
+    );
+    expect(hoursOrderProblem({ open: '10:00', close: '20:00' })).toBeNull();
+  });
+
+  it('하나라도 비었으면 아직 안내하지 않는다(고르는 중)', () => {
+    expect(hoursOrderProblem({ open: '23:00', close: '' })).toBeNull();
+    expect(hoursOrderProblem({ open: '', close: '09:00' })).toBeNull();
+  });
+});
 
 describe('toHoursRows', () => {
   it('저장된 영업시간을 월~일 7줄로 바꾸고, 없는 요일은 빈 줄로 둔다', () => {
