@@ -16,13 +16,16 @@ import {
   refundPolicyLines,
   refundPolicyNotes,
 } from '@/app/(customer)/(tabs)/slots/[slotId]/detail-format';
+import { COUPON_NOT_RETURNED_NOTE } from '@/app/(customer)/(tabs)/reservations/[reservationId]/cancel-texts';
 import type { SlotDetail } from '@/app/(customer)/(tabs)/slots/[slotId]/types';
 import { formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';
 import { CUSTOMER_HOME, loginPath } from '@/server/auth/paths';
-import { releaseHold, startPayment } from '@/server/payments/checkout';
+import type { MyCoupon } from '@/server/coupons';
+import { getMyCoupons } from '@/server/coupons/coupons';
+import { previewCheckoutAmount, releaseHold, startPayment } from '@/server/payments/checkout';
 import { PAYMENT_ERRORS } from '@/server/payments/errors';
-import type { MyHold } from '@/server/payments/types';
+import type { CheckoutAmount, MyHold } from '@/server/payments/types';
 import { NO_SHOW_PENALTY_RATE, OWNER_FAULT_COUPON_AMOUNT, REFUND_BANDS } from '@/server/policy';
 
 import {
@@ -33,27 +36,43 @@ import {
   intermediaryNotice,
   REFUND_CONSENT_LABEL,
 } from './checkout-texts';
+import { CouponPicker } from './coupon-picker';
+import { couponResetText } from './coupon-texts';
 import { paymentResultPath, toPortOneRequest } from './payment-window';
 import { type PhoneAutoSave, usePhoneAutoSave } from './use-phone-auto-save';
 
 const START_FAILED_MESSAGE = '결제를 시작하지 못했어요. 잠시 후 다시 시도해 주세요';
 // 포트원 결제창 스크립트를 못 받았거나 결제창이 요청값을 거절했을 때. 홀딩은 그대로라 다시 누를 수 있다(누를 때마다 새 결제 번호)
 const PAYMENT_WINDOW_FAILED_MESSAGE = '결제창을 열지 못했어요. 잠시 후 다시 시도해 주세요';
+const PRICE_FAILED_MESSAGE = '금액을 다시 계산하지 못했어요. 잠시 후 다시 골라 주세요';
 
 type CheckoutViewProps = {
   slot: SlotDetail;
   hold: MyHold;
   /** 저장된 연락처. 없으면 이 화면에서 받는다(C-401) */
   phone: string | null;
+  /** 이 매물에 쓸 수 있는 쿠폰(할인 큰 순, 못 쓰는 쿠폰은 뒤에). 없으면 쿠폰 칸을 그리지 않는다(C-407) */
+  coupons: MyCoupon[];
+  /** 처음 골라 둘 쿠폰(서버가 정한 기본 쿠폰, 없으면 null)과 그 금액(previewCheckoutAmount) */
+  initialCoupon: { couponId: string | null; amount: CheckoutAmount };
 };
+
+const isCouponFailure = (code: string) => code.startsWith('COUPON_');
 
 /**
  * 예약 확인 (J10, C-401·C-402·C-404).
- * 매물 요약, 결제 금액(서버 계산), 연락처, 전체 환불 규정, 결제 버튼 바로 위 필수 동의 2개(동의 문구 3장).
+ * 매물 요약, 쿠폰 고르기(C-407, 기본 쿠폰을 골라 둔 채로), 결제 금액(서버 계산), 연락처, 전체 환불 규정,
+ * 결제 버튼 바로 위 필수 동의 2개(동의 문구 3장).
  * 오른쪽 위 10분 타이머는 서버가 준 홀딩 만료 시각 기준이고, 끝나면 결제할 수 없다고 안내한다.
  * '취소'는 홀딩을 바로 푼다. 뒤로가기로 나가면 홀딩은 남아서 상세의 '결제 이어서 하기'로 돌아올 수 있다(D12)
  */
-export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProps) {
+export function CheckoutView({
+  slot,
+  hold,
+  phone: savedPhone,
+  coupons: initialCoupons,
+  initialCoupon,
+}: CheckoutViewProps) {
   const router = useRouter();
   const [expired, setExpired] = useState(false);
   const phone = usePhoneAutoSave(savedPhone);
@@ -62,11 +81,65 @@ export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProp
   const [error, setError] = useState<string | null>(null);
   const [paying, startPaying] = useTransition();
   const [cancelling, startCancelling] = useTransition();
+  const [coupons, setCoupons] = useState(initialCoupons);
+  const [couponId, setCouponId] = useState(initialCoupon.couponId);
+  const [amount, setAmount] = useState(initialCoupon.amount);
+  const [couponMessage, setCouponMessage] = useState<string | null>(null);
+  const [pricing, startPricing] = useTransition();
   const { shop, menu } = slot;
   const detailPath = `/slots/${slot.slotId}`;
   const refundNotes = refundPolicyNotes(OWNER_FAULT_COUPON_AMOUNT);
   // 주문은 저장된 연락처를 읽어서, 칸의 번호가 저장된 번호와 같고 저장이 끝났을 때만 결제한다(#183)
-  const canPay = refundAgreed && bookerAgreed && phone.ready && !expired && !paying;
+  const canPay = refundAgreed && bookerAgreed && phone.ready && !expired && !paying && !pricing;
+  const noCouponAmount: CheckoutAmount = {
+    salePrice: hold.salePrice,
+    couponAmount: 0,
+    amount: hold.amount,
+  };
+
+  /** 쿠폰 실패(COUPON_*)면 쿠폰 목록을 다시 불러오고 '쓰지 않음'으로 돌린다(#300) */
+  async function resetCoupons(message: string) {
+    setCouponId(null);
+    const [list, price] = await Promise.all([
+      getMyCoupons({ slotId: slot.slotId }),
+      previewCheckoutAmount({ slotId: slot.slotId, couponId: null }),
+    ]);
+    if (list.ok) setCoupons(list.data.coupons);
+    setAmount(price.ok ? price.data : noCouponAmount);
+    setCouponMessage(couponResetText(message));
+  }
+
+  /** 쿠폰을 고르거나 바꿀 때마다 서버에서 금액을 다시 받는다. 화면은 계산하지 않는다 */
+  function selectCoupon(next: string | null) {
+    const prev = couponId;
+    setCouponId(next);
+    setCouponMessage(null);
+    setError(null);
+    startPricing(async () => {
+      try {
+        const result = await previewCheckoutAmount({ slotId: slot.slotId, couponId: next });
+        if (result.ok) {
+          setAmount(result.data);
+          return;
+        }
+        const { code, message } = result.error;
+        if (code === 'HOLD_EXPIRED' || code === 'NOT_HOLDER') {
+          setExpired(true);
+          return;
+        }
+        if (isCouponFailure(code)) {
+          await resetCoupons(message);
+          return;
+        }
+        setCouponId(prev);
+        setCouponMessage(message);
+      } catch (caught) {
+        unstable_rethrow(caught);
+        setCouponId(prev);
+        setCouponMessage(PRICE_FAILED_MESSAGE);
+      }
+    });
+  }
 
   function pay() {
     setError(null);
@@ -76,6 +149,7 @@ export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProp
           slotId: slot.slotId,
           refundPolicyAgreed: true,
           bookerInfoAgreed: true,
+          couponId,
         });
         if (result.ok) {
           // 토스페이먼츠 결제창(C-403). 폰은 결제 페이지로 이동했다가 포트원이 결과 화면(redirectUrl)으로 보내서 여기 오지 않는다.
@@ -111,6 +185,12 @@ export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProp
           case 'PHONE_REQUIRED':
             phone.markMissing();
             break;
+        }
+        // 그 사이 쿠폰을 못 쓰게 됐으면(기한 지남 등) '쓰지 않음'으로 돌리고 바뀐 금액을 보고 다시 누르게 한다
+        if (isCouponFailure(result.error.code)) {
+          await resetCoupons(result.error.message);
+          setError(couponResetText(result.error.message));
+          return;
         }
         setError(result.error.message);
       } catch (caught) {
@@ -165,20 +245,32 @@ export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProp
         </p>
       </div>
 
-      <dl className="flex flex-col gap-2 text-sm" aria-label="결제 금액">
+      <CouponPicker
+        coupons={coupons}
+        selectedId={couponId}
+        disabled={pricing || paying || expired}
+        message={couponMessage}
+        onSelect={selectCoupon}
+      />
+
+      <dl
+        className="flex flex-col gap-2 text-sm"
+        aria-label="결제 금액"
+        aria-busy={pricing || undefined}
+      >
         <div className="flex justify-between">
           <dt className="text-muted-foreground">판매가 ({slot.discountRate}% 할인)</dt>
-          <dd>{formatWon(hold.salePrice)}</dd>
+          <dd>{formatWon(amount.salePrice)}</dd>
         </div>
-        {hold.couponAmount > 0 ? (
+        {amount.couponAmount > 0 ? (
           <div className="flex justify-between">
             <dt className="text-muted-foreground">쿠폰</dt>
-            <dd>−{formatWon(hold.couponAmount)}</dd>
+            <dd>−{formatWon(amount.couponAmount)}</dd>
           </div>
         ) : null}
         <div className="flex justify-between border-t pt-2 text-base font-bold">
           <dt>결제 금액</dt>
-          <dd>{formatWon(hold.amount)}</dd>
+          <dd>{formatWon(amount.amount)}</dd>
         </div>
       </dl>
 
@@ -198,6 +290,8 @@ export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProp
           ))}
         </ul>
         <p>{refundNotes.after}</p>
+        {/* 쿠폰이 골라진 채로 열릴 수 있어서, 쿠폰이 있으면 결제 동의 쪽에도 늘 보여준다(동의 문구 3장, 11/10 #300) */}
+        {coupons.length > 0 ? <p>{COUPON_NOT_RETURNED_NOTE}</p> : null}
       </section>
 
       {expired ? (
@@ -236,7 +330,7 @@ export function CheckoutView({ slot, hold, phone: savedPhone }: CheckoutViewProp
             disabled={!canPay}
             onClick={pay}
           >
-            {paying ? '결제 준비 중…' : `${formatWon(hold.amount)} 결제하기`}
+            {paying ? '결제 준비 중…' : `${formatWon(amount.amount)} 결제하기`}
           </Button>
           {!phone.ready ? (
             <p className="text-center text-xs text-muted-foreground">

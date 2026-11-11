@@ -7,9 +7,11 @@ import { getDb } from '@/db';
 import { customers } from '@/db/schema';
 import { ensureCustomerPage, getCurrentAccount } from '@/server/auth';
 import { getOptionalConsents } from '@/server/auth/customer-account';
+import { getMyCoupons } from '@/server/coupons/coupons';
 import { getInterestAreas } from '@/server/notifications/interest-areas';
 
 import { AccountActions } from './account-actions';
+import { MyCoupons } from './my-coupons';
 import { selectMyNoShows } from './no-show-history';
 import { NoShowRecord } from './no-show-record';
 import { NotificationSettings } from './notification-settings';
@@ -29,7 +31,7 @@ export default function MyInfoPage() {
 
 async function MyInfoContent() {
   const { customerId } = await ensureCustomerPage('/me');
-  const [account, [customer], noShows, consents, interest] = await Promise.all([
+  const [account, [customer], noShows, consents, interest, coupons] = await Promise.all([
     getCurrentAccount(),
     getDb()
       .select({ nickname: customers.nickname, phone: customers.phone })
@@ -39,6 +41,7 @@ async function MyInfoContent() {
     selectMyNoShows(getDb(), customerId),
     getOptionalConsents(),
     getInterestAreas(),
+    getMyCoupons(),
   ]);
 
   return (
@@ -51,6 +54,8 @@ async function MyInfoContent() {
       <ProfileForm nickname={customer?.nickname ?? ''} phone={customer?.phone ?? ''} />
 
       <NoShowRecord history={noShows} />
+
+      <MyCoupons coupons={coupons.ok ? coupons.data.coupons : null} />
 
       <NotificationSettings
         interestAlertAgreed={consents.ok ? consents.data.interest_alert.agreed : false}
