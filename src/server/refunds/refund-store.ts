@@ -17,8 +17,11 @@ import {
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 type DbWriter = Pick<ReturnType<typeof getDb>, 'insert' | 'update'>;
 
-/** 고객 취소 환불 기록만 가리킨다(unique 인덱스 refunds_customer_cancel_unique의 조건과 같다) */
-const CUSTOMER_CANCEL = sql`reason = 'customer_cancel'`;
+/**
+ * 한 예약에 하나뿐인 취소 환불 기록(고객 취소·합의 후 취소). unique 인덱스 refunds_cancel_unique의 조건과 글자까지 같아야
+ * ON CONFLICT가 그 인덱스를 찾는다(#320)
+ */
+const CANCEL_REFUND = sql`reason in ('customer_cancel', 'agreed_cancel')`;
 
 export type CancelTarget = {
   reservationId: string;
@@ -135,7 +138,7 @@ async function readTargetWhere(db: DbReader, where: SQL | undefined): Promise<Re
 
 /**
  * 포트원을 부르기 전에 고객 취소를 진행 중(requested)으로 저장한다. 중간에 멈춰도 정리 작업이 이 기록을 보고 마무리한다.
- * 이미 고객 취소 기록이 있으면(동시에 누름) 넣지 않고 false
+ * 이미 고객 취소 기록이 있거나(동시에 누름) 합의 후 취소 환불이 진행 중이면 넣지 않고 false
  */
 export async function requestCustomerCancel(
   db: DbWriter,
@@ -154,7 +157,7 @@ export async function requestCustomerCancel(
       penaltyAmount: input.penaltyAmount,
       createdAt: input.requestedAt,
     })
-    .onConflictDoNothing({ target: refunds.reservationId, where: CUSTOMER_CANCEL })
+    .onConflictDoNothing({ target: refunds.reservationId, where: CANCEL_REFUND })
     .returning({ id: refunds.id });
   return inserted.length > 0;
 }
@@ -234,7 +237,13 @@ export async function finishCustomerCancel(
       createdAt: input.requestedAt,
       ...done,
     })
-    .onConflictDoUpdate({ target: refunds.reservationId, targetWhere: CUSTOMER_CANCEL, set: done });
+    .onConflictDoUpdate({
+      target: refunds.reservationId,
+      targetWhere: CANCEL_REFUND,
+      set: done,
+      // 고객 취소 기록만 끝낸다(합의 후 취소 기록을 고객 취소 값으로 덮지 않는다)
+      setWhere: sql`${refunds.reason} = 'customer_cancel'`,
+    });
   if (input.pgCancellationId) {
     await tx
       .update(orders)

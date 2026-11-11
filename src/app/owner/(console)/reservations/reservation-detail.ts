@@ -24,6 +24,7 @@ export const CANCEL_ACTOR_LABELS: Record<CancelActor, string> = {
   owner_fault: '원장님 사정으로 취소',
   system: '자동 취소',
   admin: '운영자 취소',
+  agreed: '합의 후 취소',
 };
 
 export type ReservationViewInput = {

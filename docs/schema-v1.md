@@ -257,7 +257,7 @@ erDiagram
 | hold_customer_id | uuid, null → customers | 10분 홀딩한 고객 |
 | hold_expires_at | timestamptz, null | 홀딩 만료 시각 |
 | closed_at | timestamptz, null | 원장님이 직접 마감한 시각 |
-| close_reason | text, null | `other_channel`(다른 곳 예약) / `mistake`(잘못 올림) / `other`(기타) |
+| close_reason | text, null | `other_channel`(다른 곳 예약) / `mistake`(잘못 올림) / `other`(기타) / `hold_released`(결제 없이 홀딩 끝남: 손님이 시간대 안에 만든 칸을 결제 없이 비움. 원장님이 고르는 사유가 아니고, 원장님 대시보드·예약 현황·운영자 목록·통계에서는 뺀다, #308 ④) |
 | relisted_from_slot_id | uuid, null → slots | 재등록(S-408)으로 만든 매물이면 원래 매물 |
 | window_id | uuid, null → slot_windows | 시간대 매물 안에서 고객이 [예약하기]로 만든 매물이면 그 시간대(#308). 한 시술 매물은 비어 있다 |
 | created_by | uuid → profiles | 등록한 사람 |
@@ -377,7 +377,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | visit_recorded_at | timestamptz, null | 서비스 시작 이후에만 기록 가능 |
 | visit_recorded_by | uuid, null → profiles | |
 | cancelled_at | timestamptz, null | |
-| cancel_actor | text, null | `customer`(고객 취소) / `owner_fault`(원장님 귀책) / `system`(자동) / `admin`(운영자) |
+| cancel_actor | text, null | `customer`(고객 취소) / `owner_fault`(원장님 귀책) / `system`(자동) / `admin`(운영자) / `agreed`(합의 후 취소, X-208) |
 | cancel_reason | text, null | |
 | hours_before_start_at_cancel | numeric, null | 취소할 때 시작까지 남은 시간. 원장님 귀책 취소 제재 기준을 정할 데이터 |
 | created_at | timestamptz | |
@@ -418,7 +418,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | id | uuid PK | |
 | order_id | uuid → orders | |
 | reservation_id | uuid, null → reservations | 예약을 만들기 전에 결제를 취소하는 자동 취소(`auto_cancel`, C-406)에서는 비어 있다. 어떤 결제의 환불인지는 `order_id`로 안다(#64) |
-| reason | text | `customer_cancel` / `owner_fault` / `auto_cancel` / `admin_exception` |
+| reason | text | `customer_cancel` / `owner_fault` / `auto_cancel` / `admin_exception` / `agreed_cancel`(합의 후 취소: 실제 결제액 × 50%, `band`는 비우고 `penalty_rate` 50) |
 | status | text, 기본값 `done` | `requested`(포트원을 부르기 전에 저장한 취소 진행 중) / `done`(끝남) |
 | band | text, null | 적용 구간: `over_24h`(30%) / `6h_to_24h`(50%) / `under_6h`(100%) |
 | penalty_rate | integer | 적용한 위약금 비율(당시 값) |
@@ -429,6 +429,29 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | processed_at | timestamptz, null | 진행 중(`requested`)에는 비어 있고, `done`이면 반드시 있다(check) |
 | processed_by | uuid, null → profiles | 운영자 처리일 때 |
 | created_at | timestamptz | 정리 작업이 오래된 진행 중 기록을 찾을 때 쓴다 |
+
+한 예약에 취소 환불 기록(고객 취소·합의 후 취소)은 하나만 둔다(unique `refunds_cancel_unique`, #320). 손님이 직접 취소하는 순간 합의 후 취소 동의가 같이 들어와도 환불은 한 번만 나간다.
+
+### agreed_cancel_requests — 합의 후 취소 요청 (S-410·C-506·X-208, #320)
+
+원장님이 요청하고 손님이 24시간 안에 앱에서 동의하면 취소된다(11/8 결정). 답을 기다리는 요청은 한 예약에 하나이고, 거절·만료 뒤에는 다시 요청할 수 있다(횟수 제한 없음, 11/10).
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| id | uuid PK | |
+| reservation_id | uuid → reservations | |
+| requested_by | uuid → profiles | 요청한 원장님 |
+| reason | text | `style_mismatch`(원하는 시술이 예약한 서비스와 다름) / `customer_declined`(손님이 시술을 원하지 않음) / `other`(기타). 동의 문구 8-1장 |
+| reason_text | text, null | 기타일 때 내용(100자까지, 서버에서 확인) |
+| status | text | `requested`(답 기다림) / `agreed`(동의) / `declined`(거절) / `expired`(24시간 지남) / `closed`(손님이 답하기 전에 직접 취소했거나 방문·노쇼 처리돼서 끝남) |
+| requested_at | timestamptz | 요청한 시각 |
+| expires_at | timestamptz | 요청 + 24시간(정책값). 상태를 바꾸기 전이라도 이 시각이 지났으면 만료로 본다 |
+| responded_at | timestamptz, null | 동의·거절·만료·끝남을 기록한 시각 |
+
+- 답을 기다리는 요청은 한 예약에 하나: `status = 'requested'`인 줄에만 거는 unique(`reservation_id`)
+- 원장님이 다시 요청할 때 만료 시각이 지난 `requested` 요청은 같은 트랜잭션에서 `expired`로 바꾸고 새 요청을 넣는다. 손님이 만료 시각 뒤에 동의해도 막는다(#320 리뷰)
+- 손님 환불 = 실제 결제액 × 50%(쓴 쿠폰은 돌려주지 않는다), 원장님 기준 금액 = 판매가 × 50%(정산 줄 `agreed_cancel`). 50%는 정책값 `AGREED_CANCEL_REFUND_RATE`
+- 샵별 합의 후 취소 횟수·사유는 이 표를 예약 → 매물 → 샵으로 이어서 센다
 
 ### coupons — 쿠폰
 
@@ -480,7 +503,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | id | uuid PK | |
 | shop_id | uuid → shops | |
 | order_id | uuid → orders | |
-| kind | text | `sale`(이용 완료) / `penalty`(고객 취소 위약금) / `no_show`(노쇼) |
+| kind | text | `sale`(이용 완료) / `penalty`(고객 취소 위약금) / `no_show`(노쇼) / `agreed_cancel`(합의 후 취소, 판매가 × 50%를 기준 금액으로 고객 취소 위약금과 같은 방식) |
 | base_amount | integer | 판매가 기준 남은 금액: 이용 완료·노쇼 = 판매가, 고객 취소 = 판매가 × 위약금 비율(쿠폰과 무관) |
 | fee_rate | integer | 적용한 플랫폼 수수료율(당시 값, %). 오픈 기간은 0 |
 | fee_amount | integer | 플랫폼 수수료(원 미만 버림) |
@@ -631,7 +654,8 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | slots | check: discount_rate 10~50, end_at > start_at | |
 | reservations | unique(code), unique(slot_id), (customer_id), (status) | 예약번호, 매물당 하나, 내 예약 |
 | orders | unique(payment_id), (customer_id), (status) | 결제 검증, 복구 |
-| refunds | unique(reservation_id) where reason = `customer_cancel`, (created_at) where status = `requested` | 한 예약에 고객 취소 기록 하나, 오래된 진행 중 기록 찾기 |
+| refunds | unique(reservation_id) where reason in (`customer_cancel`, `agreed_cancel`), (created_at) where status = `requested` | 한 예약에 취소 환불 기록 하나, 오래된 진행 중 기록 찾기 |
+| agreed_cancel_requests | unique(reservation_id) where status = `requested`, (reservation_id, requested_at), (expires_at) where status = `requested` | 답을 기다리는 요청 하나, 가장 최근 요청, 만료 처리 작업 |
 | coupons | (customer_id, expires_at) | 보유 쿠폰 |
 | settlement_items | (shop_id, settlement_id) | 정산 묶기 |
 | notifications | unique(dedupe_key) | 중복 발송 방지 |
@@ -675,3 +699,4 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | 2026-11-09 | `admin_access_logs`(운영자 열람 기록)를 더한다. 운영자가 개인정보가 보이는 화면을 볼 때마다 누가·언제·어디서(IP)·누구의 정보를·무엇을(상세 보기·목록 검색) 남기고 1년 이상 보관한다. 기록하지 못하면 화면을 보여주지 않는다(#269, 11/8 결정). DB 트리거로 고치기·지우기·비우기를 막는다(#286 리뷰, 11/9). 마이그레이션 0009 |
 | 2026-11-10 | `payout_account_changes`(정산 계좌 변경 기록)를 더한다. 바꾼 사람, 바꾸기 전·뒤 은행·뒷자리, 시각만 남기고 전체 계좌번호·예금주는 남기지 않는다. 가입 때 첫 등록과 같은 계좌 저장은 남기지 않는다. 트리거는 두지 않는다(#295, 11/10 승인). 마이그레이션 0010 |
 | 2026-11-11 | 시간대 매물 `slot_windows`·`slot_window_menus`와 `slots.window_id`를 더한다(#308, 11/10·11/11 nnoinn). 고객이 예약할 때 지금 매물 한 칸으로 바꾼다. 같은 샵의 시간대끼리는 EXCLUDE로, 시간대와 한 시술 매물 사이는 트리거로 겹침을 막는다. 마이그레이션 0011 |
+| 2026-11-11 | 합의 후 취소 요청 `agreed_cancel_requests`를 더하고, `reservations.cancel_actor`에 `agreed`, `refunds.reason`에 `agreed_cancel`, `settlement_items.kind`에 `agreed_cancel`을 더한다. 취소 환불 unique를 고객 취소와 합의 후 취소에 같이 건다(`refunds_cancel_unique`, #320 승인). `slots.close_reason`에 `hold_released`(결제 없이 홀딩 끝남, #308 ④)를 더한다. 마이그레이션 0012 |
