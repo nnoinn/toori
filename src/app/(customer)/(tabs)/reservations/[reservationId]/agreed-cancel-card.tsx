@@ -116,7 +116,7 @@ export function AgreedCancelCard({ request }: { request: PendingAgreedCancel }) 
         href={KAKAO_CHANNEL_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-2 self-start text-sm font-medium"
+        className="flex items-center gap-2 self-start text-sm font-medium max-md:min-h-10"
       >
         <MessageCircle className="size-4 text-muted-foreground" aria-hidden />
         {AGREED_CANCEL_CHANNEL_LABEL}

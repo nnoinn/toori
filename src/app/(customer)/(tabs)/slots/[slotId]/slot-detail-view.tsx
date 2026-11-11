@@ -147,8 +147,9 @@ export function SlotDetailView({
         className="flex flex-col gap-3 border-t px-4 py-4 md:col-start-1 md:row-start-2 md:mt-6 md:px-0"
         aria-label="샵 정보"
       >
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="font-semibold">{shop.name}</h2>
+        {/* 폰에서는 찜 동의 안내가 샵 이름 옆이 아니라 아래 줄을 다 쓰게 줄을 넘긴다(favorite-button.tsx) */}
+        <div className="flex items-start justify-between gap-3 max-md:flex-wrap">
+          <h2 className="font-semibold max-md:min-w-0 max-md:flex-1">{shop.name}</h2>
           <FavoriteButton
             shopId={shop.shopId}
             slotId={slot.slotId}
@@ -169,7 +170,7 @@ export function SlotDetailView({
             href={kakaoDirectionsLink(shop.name, shop.lat, shop.lng)}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 font-medium"
+            className="flex items-center gap-1 font-medium max-md:min-h-10"
           >
             <Navigation className="size-4 text-muted-foreground" aria-hidden />
             카카오맵으로 길찾기
@@ -178,14 +179,14 @@ export function SlotDetailView({
             href={kakaoMapLink(shop.name, shop.lat, shop.lng)}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-muted-foreground"
+            className="flex items-center gap-1 text-muted-foreground max-md:min-h-10"
           >
             카카오맵에서 크게 보기
             <ExternalLink className="size-3.5" aria-hidden />
           </a>
         </div>
         {tel ? (
-          <a href={tel} className="flex items-center gap-2 text-sm">
+          <a href={tel} className="flex items-center gap-2 text-sm max-md:min-h-10">
             <Phone className="size-4 text-muted-foreground" aria-hidden />
             {shop.phone}
           </a>
