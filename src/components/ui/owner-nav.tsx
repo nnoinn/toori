@@ -1,15 +1,12 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { unstable_rethrow, useRouter } from 'next/navigation';
 import { LayoutDashboard, LogOut, SquarePlus, Store, UserRound, Wallet } from 'lucide-react';
 import { cn } from 'cn';
 
 import { Button } from '@/components/ui/button';
 import { SideNav } from '@/components/ui/side-nav';
-import { clearDevicePushSubscriptions } from '@/features/push/subscribe-push';
+import { useSignOut } from '@/components/ui/use-sign-out';
 import { loginPath } from '@/server/auth/paths';
-import { signOut } from '@/server/auth/session';
 
 type OwnerNavProps = {
   /** 입점 승인 전이면 false. '매물 등록'을 잠근다(S-102). 서버에서도 따로 막아야 한다 */
@@ -49,12 +46,9 @@ export function OwnerNav({ canCreateSlot = true }: OwnerNavProps) {
   );
 }
 
-const FAILED_MESSAGE = '로그아웃하지 못했어요. 잠시 후 다시 시도해 주세요';
-
 /**
- * 원장님 로그아웃. 메뉴 아래와 내 계정 화면(#307)이 같이 쓴다. 로그아웃하고 원장님 로그인 화면으로 보낸다(다른 계정으로 들어갈 수 있게).
- * 로그아웃 전에 이 기기의 내 알림 구독(고객·원장님 모두)을 지운다(#131). 로그인이 풀리면 지울 수 없어서 순서가 중요하다.
- * 지우지 못해도 로그아웃은 한다(clearDevicePushSubscriptions가 실패를 삼킨다)
+ * 원장님 로그아웃. 메뉴 아래와 내 계정 화면(#307)이 같이 쓴다. 로그아웃하고 원장님 로그인 화면을 새로 연다(다른 계정으로 들어갈 수 있게).
+ * 순서(이 기기 알림 구독 지우기 → 로그아웃 → 화면 새로 열기)는 고객 로그아웃과 같은 useSignOut이 맡는다
  */
 export function OwnerSignOutButton({
   variant = 'nav',
@@ -62,28 +56,7 @@ export function OwnerSignOutButton({
   /** nav: 왼쪽 메뉴 아래(글자 버튼), page: 내 계정 화면(테두리 버튼) */
   variant?: 'nav' | 'page';
 }) {
-  const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  function logOut() {
-    setError(null);
-    startTransition(async () => {
-      try {
-        await clearDevicePushSubscriptions();
-        const result = await signOut();
-        if (!result.ok) {
-          setError(result.error.message);
-          return;
-        }
-        router.replace(loginPath('owner'));
-        router.refresh();
-      } catch (caught) {
-        unstable_rethrow(caught);
-        setError(FAILED_MESSAGE);
-      }
-    });
-  }
+  const { signOutNow: logOut, pending, error } = useSignOut(loginPath('owner'));
 
   return (
     <div className="flex flex-col gap-1">

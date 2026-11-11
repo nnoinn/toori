@@ -34,8 +34,11 @@ export const SLOT_STATUSES = [
 ] as const;
 export type SlotStatus = (typeof SLOT_STATUSES)[number];
 
-/** 원장님이 직접 마감한 사유: 다른 곳 예약 / 잘못 올림 / 기타 */
-export const SLOT_CLOSE_REASONS = ['other_channel', 'mistake', 'other'] as const;
+/**
+ * 마감 사유: 다른 곳 예약 / 잘못 올림 / 기타(원장님이 직접 고름, S-206) /
+ * 결제 없이 홀딩 끝남(손님이 시간대 안에 만든 칸을 결제 없이 비움, #308 ④ 11/11. 원장님 목록·통계에서는 뺀다)
+ */
+export const SLOT_CLOSE_REASONS = ['other_channel', 'mistake', 'other', 'hold_released'] as const;
 export type SlotCloseReason = (typeof SLOT_CLOSE_REASONS)[number];
 
 /** 시간대 매물의 저장 상태: 예약대기·게시중·마감(#308). 시간이 지나서 마감되는 것은 매물처럼 조회할 때 계산한다 */

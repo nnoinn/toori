@@ -81,7 +81,8 @@ export function FavoriteButton({
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    // 폰에서는 이 묶음을 풀어서(contents) 버튼은 샵 이름 옆에, 실패 문구·동의 안내는 아래 줄 전체에 둔다
+    <div className="flex flex-col items-end gap-1 max-md:contents">
       <Button
         type="button"
         variant="outline"
@@ -89,17 +90,17 @@ export function FavoriteButton({
         aria-pressed={shown}
         disabled={pending}
         onClick={toggle}
-        className="gap-1"
+        className="gap-1 max-md:h-9 max-md:px-3"
       >
         <Heart className={cn('size-4', shown && 'fill-primary text-primary')} aria-hidden />찜
       </Button>
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive max-md:order-last max-md:w-full">
           {error}
         </p>
       ) : null}
       {askConsent && shown ? (
-        <div className="flex w-72 max-w-full flex-col items-start gap-2 rounded-xl border bg-card p-3 text-sm">
+        <div className="flex w-72 max-w-full flex-col items-start gap-2 rounded-xl border bg-card p-3 text-sm max-md:order-last max-md:w-full">
           {consent.agreed ? (
             <AreaDevicePush />
           ) : (

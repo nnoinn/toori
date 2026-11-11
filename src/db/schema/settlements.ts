@@ -19,8 +19,8 @@ import { orders } from './payments';
 import { shops } from './shops';
 import { createdAt, inValues, timestamptz } from './types';
 
-/** 정산 거래 종류: 이용 완료 / 고객 취소 위약금 / 노쇼 */
-export const SETTLEMENT_ITEM_KINDS = ['sale', 'penalty', 'no_show'] as const;
+/** 정산 거래 종류: 이용 완료 / 고객 취소 위약금 / 노쇼 / 합의 후 취소(판매가 × 50%, #320) */
+export const SETTLEMENT_ITEM_KINDS = ['sale', 'penalty', 'no_show', 'agreed_cancel'] as const;
 export type SettlementItemKind = (typeof SETTLEMENT_ITEM_KINDS)[number];
 
 /** 정산 상태: 지급 전 / PG에 지급 요청 / 지급 완료 / 지급 실패(재요청 필요) */
