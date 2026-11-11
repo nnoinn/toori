@@ -31,8 +31,8 @@ export type ReservationStatus = (typeof RESERVATION_STATUSES)[number];
 export const VISIT_RESULTS = ['visited', 'no_show'] as const;
 export type VisitResult = (typeof VISIT_RESULTS)[number];
 
-/** 취소한 쪽: 고객 / 원장님 귀책 / 자동 / 운영자 */
-export const CANCEL_ACTORS = ['customer', 'owner_fault', 'system', 'admin'] as const;
+/** 취소한 쪽: 고객 / 원장님 귀책 / 자동 / 운영자 / 합의 후 취소(X-208, #320) */
+export const CANCEL_ACTORS = ['customer', 'owner_fault', 'system', 'admin', 'agreed'] as const;
 export type CancelActor = (typeof CANCEL_ACTORS)[number];
 
 /** 주문(결제 한 건). 한 매물에 실패한 주문이 여러 개 있을 수 있다 */

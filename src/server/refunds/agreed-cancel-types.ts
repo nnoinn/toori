@@ -1,6 +1,6 @@
 // 합의 후 취소가 주고받는 값 (S-410·C-506·X-208, 연결 #19, #301). 시각은 ISO 문자열이다. 화면과 서버 어디서나 가져올 수 있다.
 
-/** 요청 사유(동의 문구 8-1장). 기타면 내용(reasonText)을 같이 받는다 */
+/** 요청 사유(동의 문구 8-1장). 기타면 내용(reasonText)을 같이 받는다. DB check 제약(agreed_cancel_requests)도 이 값을 쓴다 */
 export const AGREED_CANCEL_REASONS = ['style_mismatch', 'customer_declined', 'other'] as const;
 export type AgreedCancelReason = (typeof AGREED_CANCEL_REASONS)[number];
 
