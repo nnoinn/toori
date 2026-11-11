@@ -170,6 +170,25 @@ describeDb('시간대 매물 겹침 막기 (실제 DB)', () => {
     });
   });
 
+  it('끝이 시작보다 이른 시간대·매물은 트리거가 아니라 시간 순서 check 제약이 막는다', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      await insertWindow(tx, shop, '13:00', '18:00');
+      expect(
+        await violated(tx, (t) => t.insert(slotWindows).values(windowRow(shop, '20:00', '19:00'))),
+      ).toBe('slot_windows_time_order_check');
+      expect(
+        await violated(tx, (t) =>
+          t.insert(slots).values({
+            ...testSlot(shop, '14:00', '15:00'),
+            startAt: at('15:00'),
+            endAt: at('14:00'),
+          }),
+        ),
+      ).toBe('slots_time_order_check');
+    });
+  });
+
   it('시간대에 올린 서비스는 메뉴당 한 번, 할인율 10~50', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });

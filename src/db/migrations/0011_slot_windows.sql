@@ -54,7 +54,8 @@ ALTER TABLE "slot_windows" ADD CONSTRAINT "slot_windows_no_overlap"
 -- 2) 한 시술 매물(window_id 없음)을 예약대기·게시중·예약됨으로 저장할 때, 같은 샵의 예약대기·게시중 시간대와 겹치면 막는다.
 --    표가 달라 EXCLUDE로는 막을 수 없어서 트리거로 막고, 오류는 slots_no_overlap과 같은 이름으로 낸다(원장님 화면의 "같은 시간에 이미 올린 매물" 안내를 그대로 쓴다).
 --    시간대 안에서 만든 매물(window_id 있음)은 그 시간대 안이라 보지 않는다. 시간대 안 매물끼리의 겹침은 slots_no_overlap이 막는다.
---    같은 샵 줄을 먼저 잠가서, 시간대와 매물이 동시에 저장돼도 서로를 보고 겹침을 놓치지 않는다
+--    같은 샵 줄을 먼저 잠가서, 시간대와 매물이 동시에 저장돼도 서로를 보고 겹침을 놓치지 않는다.
+--    끝이 시작보다 이르거나 같은 잘못된 값은 트리거가 보지 않고 시간 순서 check 제약이 막게 둔다(tstzrange가 다른 오류를 내지 않게)
 CREATE FUNCTION "slots_block_window_overlap"() RETURNS trigger
   LANGUAGE plpgsql
   AS $$
@@ -75,7 +76,7 @@ $$;--> statement-breakpoint
 CREATE TRIGGER "slots_no_window_overlap"
   BEFORE INSERT OR UPDATE OF "shop_id", "start_at", "end_at", "status", "window_id" ON "slots"
   FOR EACH ROW
-  WHEN (NEW."window_id" IS NULL AND NEW."status" IN ('scheduled', 'published', 'reserved'))
+  WHEN (NEW."window_id" IS NULL AND NEW."status" IN ('scheduled', 'published', 'reserved') AND NEW."end_at" > NEW."start_at")
   EXECUTE FUNCTION "slots_block_window_overlap"();--> statement-breakpoint
 -- 3) 시간대를 예약대기·게시중으로 저장할 때, 같은 샵의 예약대기·게시중·예약됨 매물과 겹치면 막는다(그 시간대 안에서 만든 매물은 뺀다).
 --    오류는 slot_windows_no_overlap과 같은 이름으로 낸다(시간대 겹침은 한 이름으로 처리한다)
@@ -100,5 +101,5 @@ $$;--> statement-breakpoint
 CREATE TRIGGER "slot_windows_no_slot_overlap"
   BEFORE INSERT OR UPDATE OF "shop_id", "start_at", "end_at", "status" ON "slot_windows"
   FOR EACH ROW
-  WHEN (NEW."status" IN ('scheduled', 'published'))
+  WHEN (NEW."status" IN ('scheduled', 'published') AND NEW."end_at" > NEW."start_at")
   EXECUTE FUNCTION "slot_windows_block_slot_overlap"();
