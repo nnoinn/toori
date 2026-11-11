@@ -136,13 +136,13 @@ async function DetailContent({ params }: { params: Params }) {
           href={kakaoDirectionsLink(r.shop.name, r.shop.lat, r.shop.lng)}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-2 text-sm"
+          className="flex items-center gap-2 text-sm max-md:min-h-10"
         >
           <Navigation className="size-4 text-muted-foreground" aria-hidden />
           카카오맵으로 길찾기
         </a>
         {tel.length >= 8 ? (
-          <a href={`tel:${tel}`} className="flex items-center gap-2 text-sm">
+          <a href={`tel:${tel}`} className="flex items-center gap-2 text-sm max-md:min-h-10">
             <Phone className="size-4 text-muted-foreground" aria-hidden />
             {r.shop.phone}
           </a>
