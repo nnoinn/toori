@@ -40,6 +40,14 @@ export function BusinessHoursEditor({
   /** 7줄을 한 번에 바꾼다(전체 요일에 적용, 초기화) */
   onChangeAll: (rows: HoursRow[]) => void;
 }) {
+  // [초기화]를 누를 때마다 올려서 시각 칸을 새로 그린다. 칸마다 기억하던 오전·오후도 기본값(여는 오전, 닫는 오후)으로 돌아간다
+  const [resetCount, setResetCount] = useState(0);
+
+  function reset() {
+    onChangeAll(emptyRows(hours));
+    setResetCount((count) => count + 1);
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
@@ -50,11 +58,11 @@ export function BusinessHoursEditor({
             없어요.
           </p>
         </div>
-        <Button type="button" variant="outline" onClick={() => onChangeAll(emptyRows(hours))}>
+        <Button type="button" variant="outline" onClick={reset}>
           초기화
         </Button>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      <CardContent key={resetCount} className="flex flex-col gap-4">
         <AllDaysRow
           onApply={(open, close) =>
             onChangeAll(hours.map((row) => (row.closed ? row : { ...row, open, close })))
@@ -120,9 +128,9 @@ function AllDaysRow({ onApply }: { onApply: (open: string, close: string) => voi
   const problem = hoursOrderProblem({ open, close });
   const ready = open !== '' && close !== '' && problem === null;
   return (
-    <div className="flex flex-col gap-1 rounded-lg bg-muted p-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="w-[7.5rem] text-sm font-medium">전체 요일</span>
+    <div className="flex flex-col gap-2 rounded-lg bg-muted p-3">
+      <div className="flex items-center gap-3">
+        <span className="w-[7.5rem] shrink-0 text-sm font-medium">전체 요일</span>
         <TimeSelect
           label="전체 요일 여는 시각"
           value={open}
@@ -138,6 +146,9 @@ function AllDaysRow({ onApply }: { onApply: (open: string, close: string) => voi
           defaultPeriod="pm"
           stepMinutes={SLOT_START_STEP_MINUTES}
         />
+      </div>
+      {/* 버튼과 설명은 시각 칸 아래에 맞춰 둔다(한 줄에 다 넣으면 좁은 폭에서 넘친다) */}
+      <div className="flex items-center gap-3 pl-[8.25rem]">
         <Button
           type="button"
           variant="outline"
@@ -146,10 +157,10 @@ function AllDaysRow({ onApply }: { onApply: (open: string, close: string) => voi
         >
           모든 요일에 적용
         </Button>
+        <p className={problem ? 'text-sm text-destructive' : 'text-xs text-muted-foreground'}>
+          {problem ?? '쉬는 날로 표시한 요일은 그대로 두고 나머지 요일에 넣어요.'}
+        </p>
       </div>
-      <p className={problem ? 'text-sm text-destructive' : 'text-xs text-muted-foreground'}>
-        {problem ?? '쉬는 날로 표시한 요일은 그대로 두고 나머지 요일에 넣어요.'}
-      </p>
     </div>
   );
 }
