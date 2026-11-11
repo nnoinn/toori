@@ -3,7 +3,7 @@
 // 예약·결제 (C-401~C-406, C-404, X-201, X-304, 연결 #8, #121). 매물 상세 '예약하기', 예약 확인 화면(/checkout/[slotId]),
 // 결제 뒤 돌아오는 화면(/payment/result)에서 부른다(정찬형 J10·J11). 화면에서는 '@/server/payments/checkout'에서 가져온다.
 //
-// 모두 진짜다: 10분 홀딩(W10), 결제 대기 주문(W11 ①), 포트원 결제 조회와 예약 확정(W11 ②).
+// 모두 진짜다: 10분 홀딩(W10), 결제 대기 주문(W11 ①), 포트원 결제 조회와 예약 확정(W11 ②), 쿠폰 적용(C-407, #300).
 // 결제는 됐는데 확정할 수 없는 경우(홀딩 시간이 지난 뒤 결제, 금액 다름, 팔림)는 포트원에서 자동 취소한다(W12, autoCancelled: true).
 // 진짜 결제로 만들기 어려운 실패 화면은 로컬에서 DEV_FAKE_PAYMENT_FAILURE로 흉내 낸다
 
@@ -14,16 +14,19 @@ import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { ok } from '@/lib/result';
 import { requireCustomer } from '@/server/auth';
+import { readMyCoupon } from '@/server/coupons/coupon-store';
+import { couponBlockReason } from '@/server/coupons/rules';
 import { isNewCustomer } from '@/server/customers';
 
 import { calcPaymentAmount } from './amount';
 import { isMyActiveHold } from './checkout-rules';
-import { readCheckoutSlot, readCustomerPhone } from './checkout-store';
+import { type CheckoutSlot, readCheckoutSlot, readCustomerPhone } from './checkout-store';
 import { type MyOrder, readMyOrder } from './confirm-store';
 import { devFakeFailure } from './dev-fake-failure';
 import {
   ABANDONED_ORDER_CODE,
   autoCancelFail,
+  type PaymentError,
   type PaymentResult,
   paymentFail,
   toUnconfirmedCode,
@@ -33,9 +36,50 @@ import { acquireHold, releaseMyHold } from './hold-store';
 import { createPendingOrder, newPaymentId } from './order-store';
 import { getPortOnePayment } from './portone';
 import { autoCancelOrder, recordFailedPayment, settlePaidOrder } from './settle-order';
-import type { ConfirmedReservation, HoldInfo, MyHold, PaymentRequest } from './types';
+import type {
+  CheckoutAmount,
+  ConfirmedReservation,
+  HoldInfo,
+  MyHold,
+  PaymentRequest,
+} from './types';
 
 const slotIdSchema = z.uuid();
+const couponIdSchema = z.uuid();
+
+/** 내가 홀딩 중인 매물. 홀딩한 적이 없거나 다른 고객이면 NOT_HOLDER, 내 홀딩이 끝났으면 HOLD_EXPIRED */
+async function readMyHeldSlot(
+  slotId: string,
+  customerId: string,
+  now: Date,
+): Promise<{ ok: true; slot: CheckoutSlot } | { ok: false; error: PaymentError }> {
+  if (!slotIdSchema.safeParse(slotId).success) return paymentFail('NOT_HOLDER');
+  const slot = await readCheckoutSlot(slotId);
+  if (!slot || slot.holdCustomerId !== customerId) return paymentFail('NOT_HOLDER');
+  if (!isMyActiveHold(slot, customerId, now)) return paymentFail('HOLD_EXPIRED');
+  return { ok: true, slot };
+}
+
+/**
+ * 고른 쿠폰을 확인하고 뺄 금액을 정한다(C-407, #300). 안 고르면(null·없음) 0.
+ * 내 쿠폰이 아니면 COUPON_NOT_FOUND, 쓴 쿠폰 COUPON_USED, 기한 지남 COUPON_EXPIRED, 최소 결제 금액 미만 COUPON_NOT_APPLICABLE
+ */
+async function resolveCoupon(
+  couponId: string | null | undefined,
+  input: { customerId: string; salePrice: number; now: Date },
+): Promise<
+  { ok: true; couponId: string | null; couponAmount: number } | { ok: false; error: PaymentError }
+> {
+  if (couponId === null || couponId === undefined) {
+    return { ok: true, couponId: null, couponAmount: 0 };
+  }
+  const coupon = couponIdSchema.safeParse(couponId).success
+    ? await readMyCoupon(getDb(), { couponId, customerId: input.customerId })
+    : null;
+  const blocked = couponBlockReason(coupon, input);
+  if (blocked || !coupon) return paymentFail(blocked ?? 'COUPON_NOT_FOUND');
+  return { ok: true, couponId, couponAmount: coupon.amount };
+}
 
 function holdInfo(slotId: string, holdExpiresAt: Date, now: Date): HoldInfo {
   return { slotId, holdExpiresAt: holdExpiresAt.toISOString(), serverNow: now.toISOString() };
@@ -96,41 +140,69 @@ export async function getMyHold(slotId: string): Promise<PaymentResult<MyHold | 
   });
 }
 
+/**
+ * 예약 확인 화면에서 쿠폰을 고르거나 바꿀 때마다 부른다(C-407, #300). 금액은 화면에서 계산하지 않고 이 값을 그대로 보여준다.
+ * couponId가 null이면 쿠폰 없이. 쿠폰 실패(COUPON_*)면 화면은 쿠폰 목록을 다시 불러오고 '쓰지 않음'으로 돌린다
+ */
+export async function previewCheckoutAmount(input: {
+  slotId: string;
+  couponId: string | null;
+}): Promise<PaymentResult<CheckoutAmount>> {
+  const auth = await requireCustomer();
+  if (!auth.ok) return auth;
+  const switched = devFakeFailure('previewCheckoutAmount', { slotId: input?.slotId });
+  if (switched) return switched;
+
+  const { customerId } = auth.data;
+  const now = await getRequestNow();
+  const held = await readMyHeldSlot(input?.slotId, customerId, now);
+  if (!held.ok) return held;
+  const { salePrice } = held.slot;
+  const coupon = await resolveCoupon(input?.couponId, { customerId, salePrice, now });
+  if (!coupon.ok) return coupon;
+  return ok(calcPaymentAmount({ salePrice, couponAmount: coupon.couponAmount }));
+}
+
 const startSchema = z.object({
   slotId: z.string(),
   refundPolicyAgreed: z.boolean(),
   bookerInfoAgreed: z.boolean(),
+  couponId: z.string().nullable().optional(),
 });
 
 /**
  * '결제하기'(C-402·C-403). 결제 버튼 위 필수 동의 2개를 받고, 결제 대기 주문을 저장한 뒤 PortOne.requestPayment에 넣을 값을 돌려준다.
+ * 쿠폰을 골랐으면 couponId를 같이 보낸다(C-407). 서버가 쿠폰을 다시 확인하고 쿠폰을 뺀 금액으로 주문을 저장한다. 쿠폰은 결제를 확정할 때 '사용됨'이 된다.
  * 같은 홀딩 안에서 다시 불러도 되고(결제창을 닫은 뒤, D12), 부를 때마다 새 결제 번호·새 주문을 만든다
  */
 export async function startPayment(input: {
   slotId: string;
   refundPolicyAgreed: true;
   bookerInfoAgreed: true;
+  /** 고른 쿠폰. 안 쓰면 null 또는 생략 */
+  couponId?: string | null;
 }): Promise<PaymentResult<PaymentRequest>> {
   const auth = await requireCustomer();
   if (!auth.ok) return auth;
   const parsed = startSchema.safeParse(input);
   if (!parsed.success) return paymentFail('INVALID_INPUT');
-  const { slotId, refundPolicyAgreed, bookerInfoAgreed } = parsed.data;
+  const { slotId, refundPolicyAgreed, bookerInfoAgreed, couponId } = parsed.data;
   if (!refundPolicyAgreed || !bookerInfoAgreed) return paymentFail('CONSENT_REQUIRED');
   const switched = devFakeFailure('startPayment', { slotId });
   if (switched) return switched;
-  if (!slotIdSchema.safeParse(slotId).success) return paymentFail('NOT_HOLDER');
 
   const { customerId } = auth.data;
   const now = await getRequestNow();
-  const slot = await readCheckoutSlot(slotId);
-  if (!slot || slot.holdCustomerId !== customerId) return paymentFail('NOT_HOLDER');
-  if (!isMyActiveHold(slot, customerId, now)) return paymentFail('HOLD_EXPIRED');
+  const held = await readMyHeldSlot(slotId, customerId, now);
+  if (!held.ok) return held;
+  const { slot } = held;
   if (!(await readCustomerPhone(customerId))) return paymentFail('PHONE_REQUIRED');
   // 신규 고객 전용은 결제 직전에 다시 확인한다(그 사이 다른 예약으로 이력이 생겼을 수 있다)
   if (slot.newCustomerOnly && !(await isNewCustomer(customerId, slot.shopId))) {
     return paymentFail('NEW_CUSTOMER_ONLY');
   }
+  const coupon = await resolveCoupon(couponId, { customerId, salePrice: slot.salePrice, now });
+  if (!coupon.ok) return coupon;
   const origin = (await headers()).get('origin');
   const storeId = process.env.NEXT_PUBLIC_PORTONE_STORE_ID;
   const channelKey = process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY;
@@ -140,9 +212,19 @@ export async function startPayment(input: {
     return paymentFail('PAYMENT_UNAVAILABLE');
   }
 
-  const amount = calcPaymentAmount({ salePrice: slot.salePrice });
+  const amount = calcPaymentAmount({
+    salePrice: slot.salePrice,
+    couponAmount: coupon.couponAmount,
+  });
   const paymentId = newPaymentId();
-  await createPendingOrder(getDb(), { paymentId, slotId, customerId, ...amount, agreedAt: now });
+  await createPendingOrder(getDb(), {
+    paymentId,
+    slotId,
+    customerId,
+    couponId: coupon.couponId,
+    ...amount,
+    agreedAt: now,
+  });
   return ok({
     storeId,
     channelKey,

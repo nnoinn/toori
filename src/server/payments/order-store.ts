@@ -21,6 +21,8 @@ export type NewPendingOrder = {
   slotId: string;
   customerId: string;
   salePrice: number;
+  /** 고른 쿠폰. 결제를 확정할 때 '사용됨'이 된다(#300). 안 쓰면 null이나 생략 */
+  couponId?: string | null;
   couponAmount: number;
   /** 실제 결제액 = 판매가 − 쿠폰. 포트원 결제 검증 기준 */
   amount: number;

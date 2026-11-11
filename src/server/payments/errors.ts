@@ -2,6 +2,7 @@
 // 화면과 서버 어디서나 가져올 수 있다.
 
 import type { ResultError } from '@/lib/result';
+import { MIN_PAYMENT_AMOUNT } from '@/server/policy/owner-fault';
 import { HOLD_MINUTES } from '@/server/policy/slot-time';
 
 const REFUNDED = '결제한 금액은 모두 환불돼요';
@@ -28,6 +29,11 @@ export const PAYMENT_ERRORS = {
   PAYMENT_PENDING: '결제를 확인하고 있어요. 잠시 후 다시 확인해 주세요',
   /** 포트원에 결제 결과를 물어보지 못함(W11 ②에서 더함). 새로고침하면 다시 확인한다 */
   PAYMENT_CHECK_UNAVAILABLE: '결제 결과를 확인하지 못했어요. 잠시 후 새로고침해 주세요',
+  /** 쿠폰(C-407, #300). 화면은 쿠폰 목록을 다시 불러오고 '쓰지 않음'으로 돌린다 */
+  COUPON_NOT_FOUND: '쿠폰을 찾을 수 없어요',
+  COUPON_EXPIRED: '기한이 지난 쿠폰이에요. 다른 쿠폰을 골라 주세요',
+  COUPON_USED: '이미 쓴 쿠폰이에요',
+  COUPON_NOT_APPLICABLE: `이 매물에는 쿠폰을 쓸 수 없어요(쿠폰을 빼면 결제 금액이 ${MIN_PAYMENT_AMOUNT}원보다 작아져요)`,
 } as const;
 
 /**

@@ -4,7 +4,7 @@
 // 안전장치: .env.local의 개발 DB에서만 돈다(scripts/dev-db.mjs). 이메일로 찾은 내 계정과 이 명령이 만든 데이터만
 // 만들고 지운다. 다른 사람의 데이터, 시드 전체, DB 구조는 건드리지 않는다.
 // 이 명령이 만든 것 표시: 매물 menu_description '[시나리오] <내 id>', 주문 payment_id 'scenario_<내 id>_',
-// 샵 business_doc_path 'scenario/<내 id>/', 계정 이름 '[시나리오] …'
+// 샵 business_doc_path 'scenario/<내 id>/', 계정 이름 '[시나리오] …', 쿠폰은 원인 예약(source_reservation_id)이 빈 내 쿠폰
 
 import { pathToFileURL } from 'node:url';
 
@@ -27,6 +27,7 @@ export const COMMANDS = {
   'customer-existing': '<샵> 그 샵의 기존 고객으로 만들기(이용 완료 이력 하나). 신규 고객 전용 매물이 안 보이게 된다',
   'customer-new': '<샵> 그 샵의 신규 고객으로 되돌리기(이 명령이 만든 이력을 지움)',
   'my-reservations': '내 예약 탭용 예약 만들기: 예정·지난(이용 완료)·취소·노쇼 하나씩',
+  'my-coupons': '내 고객 계정에 쿠폰 3장 넣기: 기한 넉넉·기한 3일 남음·기한 지남(쿠폰 고르기 C-407 확인용)',
   'hold-by-other': '원장님 A 샵 게시중 매물 하나를 다른 고객이 결제 중으로(10분 뒤 풀림)',
   'owner-shop': '<pending|approved|rejected> 내 원장님 샵 만들기와 입점 상태 바꾸기',
   'owner-slots': '내 샵에 매물 상태 6가지와 예약된 매물(시작 전, 시작 지나 처리 필요) 만들기',
@@ -49,6 +50,10 @@ const fmt = (d) =>
   }).format(d);
 
 class ScenarioError extends Error {}
+
+// 쿠폰(C-407, #300). 금액·기한은 정책값 OWNER_FAULT_COUPON_AMOUNT·COUPON_VALID_DAYS와 같게 둔다
+const COUPON_AMOUNT = 3000;
+const COUPON_VALID_DAYS = 90;
 
 async function findMe(sql, email) {
   if (!email) throw new ScenarioError('--email <로그인 이메일>을 넣어 주세요.');
@@ -178,7 +183,7 @@ async function myShop(sql, userId) {
 
 // ── 명령 ────────────────────────────────────────────────────────────────
 
-async function status(sql, me) {
+async function status(sql, me, now) {
   const out = [`계정: ${me.email}`];
   const [customer] = await sql`select id, nickname from customers where user_id = ${me.id}`;
   if (!customer) {
@@ -190,6 +195,10 @@ async function status(sql, me) {
       join slots sl on sl.id = r.slot_id join shops s on s.id = sl.shop_id
       where r.customer_id = ${customer.id} order by sl.start_at`;
     out.push(`  내 예약 ${rows.length}건`);
+    const [coupon] = await sql`
+      select count(*)::int as n from coupons
+      where customer_id = ${customer.id} and used_order_id is null and expires_at > ${now}`;
+    out.push(`  쓸 수 있는 쿠폰 ${coupon.n}장`);
     for (const r of rows) {
       const label = r.status === 'confirmed' ? '예정' : r.status === 'cancelled' ? '취소' : r.visit_result === 'no_show' ? '노쇼' : '이용 완료';
       out.push(`  - ${label} · ${r.shop} · ${fmt(r.start_at)}`);
@@ -284,6 +293,46 @@ async function myReservations(sql, me, now) {
   }
   await insertBookings(sql, bookings);
   return ['내 예약 4건을 만들었어요(내 예약 탭 확인용).', ...out];
+}
+
+/**
+ * 시나리오가 만든 내 쿠폰. 원장님 귀책 보상 쿠폰(X-207)은 원인 예약이 꼭 있어서, 원인 예약이 빈 내 쿠폰을 시나리오가 만든 것으로 본다
+ */
+const scenarioCoupons = (sql, customerId) =>
+  sql`select id from coupons where customer_id = ${customerId} and source_reservation_id is null`;
+
+/** 시나리오 쿠폰을 지우고 남은 장수를 돌려준다. 테스트 결제 주문이 가리키는 쿠폰은 주문이 남아 있어서 지우지 않는다 */
+async function deleteScenarioCoupons(sql, customerId) {
+  await sql`
+    delete from coupons c where c.id in (${scenarioCoupons(sql, customerId)})
+      and not exists (select 1 from orders o where o.coupon_id = c.id)`;
+  const [left] = await sql`select count(*)::int as n from coupons where id in (${scenarioCoupons(sql, customerId)})`;
+  return left.n;
+}
+
+async function myCoupons(sql, me, now) {
+  const customerId = await ensureCustomer(sql, me.id);
+  // 지난번에 만든 쿠폰을 먼저 지운다(다시 실행해도 한 벌만)
+  const kept = await deleteScenarioCoupons(sql, customerId);
+  const plan = [
+    { label: '쓸 수 있음(기한 넉넉)', expiresAt: new Date(now.getTime() + COUPON_VALID_DAYS * DAY) },
+    { label: '쓸 수 있음(기한 3일 남음)', expiresAt: new Date(now.getTime() + 3 * DAY) },
+    { label: '기한 지남', expiresAt: new Date(now.getTime() - DAY) },
+  ];
+  const rows = plan.map((p) => ({
+    customer_id: customerId,
+    amount: COUPON_AMOUNT,
+    reason: 'owner_fault_compensation',
+    issued_at: new Date(p.expiresAt.getTime() - COUPON_VALID_DAYS * DAY),
+    expires_at: p.expiresAt,
+  }));
+  await sql`insert into coupons ${sql(rows)}`;
+  const out = [
+    `내 쿠폰 ${plan.length}장을 넣었어요(쿠폰 고르기 확인용, ${COUPON_AMOUNT.toLocaleString('ko-KR')}원).`,
+    ...plan.map((p) => `- ${p.label} · ${fmt(p.expiresAt)}까지`),
+  ];
+  if (kept > 0) out.push(`테스트 결제에 쓴 시나리오 쿠폰 ${kept}장은 주문이 남아 있어서 그대로 뒀어요.`);
+  return out;
 }
 
 async function holdByOther(sql, now) {
@@ -403,6 +452,11 @@ async function reset(sql, me) {
   const removedShops = await sql`delete from shops where id in (${scenarioShops()}) returning id`;
   const out = ['이 명령이 만든 예약·매물을 지웠어요.'];
   if (removedShops.length > 0) out.push('시나리오가 만든 내 샵을 지웠어요.');
+  const [myCustomer] = await sql`select id from customers where user_id = ${me.id}`;
+  if (myCustomer) {
+    const kept = await deleteScenarioCoupons(sql, myCustomer.id);
+    if (kept > 0) out.push(`테스트 결제에 쓴 시나리오 쿠폰 ${kept}장은 주문이 남아 있어서 그대로 뒀어요.`);
+  }
   // 시나리오가 만든 계정은 다른 데이터가 없을 때만 지운다
   const owners = await sql`
     delete from owners o where o.user_id = ${me.id} and o.name like ${`${TAG}%`}
@@ -429,13 +483,15 @@ export async function runScenario(sql, { email, command, arg, now }) {
   const me = await findMe(sql, email);
   switch (command) {
     case 'status':
-      return status(sql, me);
+      return status(sql, me, now);
     case 'customer-existing':
       return customerExisting(sql, me, arg, now);
     case 'customer-new':
       return customerNew(sql, me, arg);
     case 'my-reservations':
       return myReservations(sql, me, now);
+    case 'my-coupons':
+      return myCoupons(sql, me, now);
     case 'hold-by-other':
       return holdByOther(sql, now);
     case 'owner-shop':
