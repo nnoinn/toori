@@ -17,6 +17,8 @@ export const SLOT_CLOSE_REASON_LABELS: Record<SlotCloseReason, string> = {
   other_channel: '다른 곳 예약',
   mistake: '잘못 올림',
   other: '기타',
+  // 원장님이 고르는 사유가 아니다(아래 SLOT_CLOSE_REASON_OPTIONS에는 넣지 않는다, #308 ④)
+  hold_released: '결제 없이 홀딩 끝남',
 };
 
 /**

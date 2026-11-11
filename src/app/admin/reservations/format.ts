@@ -69,6 +69,7 @@ const CANCEL_ACTOR_LABELS: Record<string, string> = {
   owner_fault: '원장님 귀책',
   system: '자동',
   admin: '운영자',
+  agreed: '합의 후 취소',
 };
 
 export function labelCancelActor(actor: string | null): string {
@@ -81,6 +82,7 @@ const REFUND_REASON_LABELS: Record<string, string> = {
   owner_fault: '원장님 귀책',
   auto_cancel: '자동 취소',
   admin_exception: '운영자 예외',
+  agreed_cancel: '합의 후 취소',
 };
 
 export function labelRefundReason(reason: string): string {

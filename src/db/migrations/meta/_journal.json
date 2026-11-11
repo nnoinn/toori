@@ -85,6 +85,13 @@
       "when": 1794358969541,
       "tag": "0011_slot_windows",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794385988746,
+      "tag": "0012_agreed_cancel_requests",
+      "breakpoints": true
     }
   ]
 }
