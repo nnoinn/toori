@@ -58,7 +58,7 @@ async function MyInfoContent() {
         interestCodes={interest.ok ? interest.data.sigunguCodes : null}
       />
 
-      <AccountActions hasOwnerAccount={Boolean(account?.ownerId)} />
+      <AccountActions />
     </section>
   );
 }
