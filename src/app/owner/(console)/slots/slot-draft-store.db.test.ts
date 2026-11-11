@@ -4,7 +4,7 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
-import { menus, shops, slots } from '@/db/schema';
+import { menus, shops, slots, slotWindows } from '@/db/schema';
 
 import { createTestShop, testSlot } from '../../../../../tests/db/fixtures';
 import { closeTestDb, describeDb, withRollback } from '../../../../../tests/db/test-db';
@@ -66,6 +66,42 @@ describeDb('매물 등록 ①② 검증 (실제 DB)', () => {
       ).toEqual([
         { start: new Date(at('10:00')), end: new Date(at('11:00')) },
         { start: new Date(at('12:00')), end: new Date(at('13:00')) },
+      ]);
+    });
+  });
+
+  it('예약대기·게시중 시간대 매물(#308)과 겹치면 막고, 마감한 시간대와는 겹쳐도 된다', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx);
+      const windowRow = (start: string, end: string, status: string) => ({
+        shopId: shop.shopId,
+        startAt: new Date(at(start)),
+        endAt: new Date(at(end)),
+        publishAt: new Date('2026-10-30T10:00:00+09:00'),
+        status,
+        createdBy: shop.createdBy,
+      });
+      await tx
+        .insert(slotWindows)
+        .values([
+          windowRow('10:00', '12:00', 'published'),
+          windowRow('13:00', '14:00', 'scheduled'),
+          windowRow('15:00', '17:00', 'closed'),
+        ]);
+      await tx.insert(slots).values(testSlot(shop, '12:00', '13:00'));
+      const draft = (startAt: string) =>
+        validateSlotDraft(tx, shop.shopId, { menuId: shop.menuId, startAt }, now);
+
+      expect(await draft(at('11:30'))).toMatchObject({ error: { code: 'SLOT_OVERLAP' } });
+      expect(await draft(at('13:00'))).toMatchObject({ error: { code: 'SLOT_OVERLAP' } });
+      expect((await draft(at('15:00'))).ok).toBe(true);
+      // 매물과 시간대를 시작 순서로 같이 돌려준다
+      expect(
+        await selectBusyRanges(tx, shop.shopId, new Date(at('09:00')), new Date(at('18:00'))),
+      ).toEqual([
+        { start: new Date(at('10:00')), end: new Date(at('12:00')) },
+        { start: new Date(at('12:00')), end: new Date(at('13:00')) },
+        { start: new Date(at('13:00')), end: new Date(at('14:00')) },
       ]);
     });
   });
