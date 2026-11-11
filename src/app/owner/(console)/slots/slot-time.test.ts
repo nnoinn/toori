@@ -13,6 +13,7 @@ import {
   isClosedDay,
   isOnStep,
   latestStart,
+  openSpans,
   publishPlan,
   rangesOverlap,
   slotEnd,
@@ -178,7 +179,7 @@ describe('checkBusinessHours', () => {
     );
   });
 
-  it('자정을 넘기면 막는다', () => {
+  it('자정 마감 영업에서 자정을 넘기면 막는다(다음 날 영업을 입력하지 않음)', () => {
     expect(checkBusinessHours(range('2026-11-03T23:30:00', '2026-11-04T00:30:00'), hours)).toBe(
       'OUTSIDE_HOURS',
     );
@@ -189,6 +190,82 @@ describe('checkBusinessHours', () => {
       checkBusinessHours(range('2026-11-05T03:00:00', '2026-11-05T04:00:00'), hours),
     ).toBeNull();
     expect(checkBusinessHours(range('2026-11-02T03:00:00', '2026-11-02T04:00:00'), [])).toBeNull();
+  });
+});
+
+describe('새벽까지 영업 (11/11 nnoinn)', () => {
+  // 2026-11-02 월, 03 화, 04 수, 05 목, 06 금, 07 토, 08 일
+  const night = [
+    { weekday: 6, open: '20:00', close: '03:00' }, // 토 20:00 ~ 일 03:00
+    { weekday: 0, closed: true as const }, // 일 쉬는 날
+    { weekday: 1, open: '18:00', close: '02:00' }, // 월 18:00 ~ 화 02:00
+    { weekday: 2, open: '10:00', close: '00:00' }, // 화 10:00 ~ 자정
+    { weekday: 3, open: '09:00', close: '09:00' }, // 수 24시간(목 09:00까지)
+    { weekday: 4, closed: true as const }, // 목 쉬는 날
+  ];
+  const range = (start: string, end: string) => ({ start: at(start), end: at(end) });
+  const check = (start: string, end: string) => checkBusinessHours(range(start, end), night);
+
+  it('영업 구간: 그 날 영업과 전날에서 이어진 새벽(그 날 자정부터 지난 분)', () => {
+    expect(openSpans('2026-11-02', night)).toEqual([{ start: 1080, end: 1560 }]);
+    expect(openSpans('2026-11-03', night)).toEqual([
+      { start: 0, end: 120 },
+      { start: 600, end: 1440 },
+    ]);
+    // 전날이 자정 마감이면 이어지는 새벽이 없다. 같은 시각은 24시간
+    expect(openSpans('2026-11-04', night)).toEqual([{ start: 540, end: 1980 }]);
+    // 쉬는 날은 전날에서 이어진 새벽만
+    expect(openSpans('2026-11-05', night)).toEqual([{ start: 0, end: 540 }]);
+    expect(openSpans('2026-11-08', night)).toEqual([{ start: 0, end: 180 }]);
+    expect(openSpans('2026-11-08', [{ weekday: 0, closed: true }])).toEqual([]);
+    // 입력하지 않은 요일은 막지 않는다
+    expect(openSpans('2026-11-06', night)).toBeNull();
+  });
+
+  it('다음 날 새벽까지: 영업 중인 한 구간 안에서 끝나면 된다', () => {
+    expect(check('2026-11-02T23:30:00', '2026-11-03T00:30:00')).toBeNull();
+    expect(check('2026-11-02T18:00:00', '2026-11-03T02:00:00')).toBeNull();
+    expect(check('2026-11-02T17:30:00', '2026-11-02T18:30:00')).toBe('OUTSIDE_HOURS');
+    expect(check('2026-11-02T23:30:00', '2026-11-03T02:30:00')).toBe('OUTSIDE_HOURS');
+  });
+
+  it('매물의 날짜는 시작 날짜: 화요일 새벽은 월요일 영업이 이어진 시간', () => {
+    expect(check('2026-11-03T01:00:00', '2026-11-03T02:00:00')).toBeNull();
+    expect(check('2026-11-03T01:30:00', '2026-11-03T02:30:00')).toBe('OUTSIDE_HOURS');
+    expect(check('2026-11-03T03:00:00', '2026-11-03T04:00:00')).toBe('OUTSIDE_HOURS');
+    // 월요일 새벽은 일요일(쉬는 날)에서 이어지지 않는다
+    expect(check('2026-11-02T01:00:00', '2026-11-02T02:00:00')).toBe('OUTSIDE_HOURS');
+  });
+
+  it('자정 마감: 닫는 시각 00:00은 그 날 밤 12시', () => {
+    expect(check('2026-11-03T23:00:00', '2026-11-04T00:00:00')).toBeNull();
+    expect(check('2026-11-03T23:30:00', '2026-11-04T00:30:00')).toBe('OUTSIDE_HOURS');
+  });
+
+  it('24시간: 여는 시각부터 다음 날 같은 시각까지', () => {
+    expect(check('2026-11-04T23:00:00', '2026-11-05T01:00:00')).toBeNull();
+    expect(check('2026-11-05T08:00:00', '2026-11-05T09:00:00')).toBeNull();
+    expect(check('2026-11-04T08:00:00', '2026-11-04T09:00:00')).toBe('OUTSIDE_HOURS');
+  });
+
+  it('쉬는 날 다음 새벽: 전날에서 이어진 시각만 고를 수 있다', () => {
+    expect(check('2026-11-08T01:00:00', '2026-11-08T02:00:00')).toBeNull();
+    expect(check('2026-11-08T02:30:00', '2026-11-08T03:30:00')).toBe('CLOSED_DAY');
+    expect(check('2026-11-05T09:00:00', '2026-11-05T10:00:00')).toBe('CLOSED_DAY');
+  });
+
+  it('매일 00:00 ~ 00:00(24시간)이면 자정을 넘겨도 된다', () => {
+    const allDay = [
+      { weekday: 5, open: '00:00', close: '00:00' },
+      { weekday: 6, open: '00:00', close: '00:00' },
+    ];
+    expect(
+      checkBusinessHours(range('2026-11-06T23:30:00', '2026-11-07T00:30:00'), allDay),
+    ).toBeNull();
+    // 다음 날 영업을 입력하지 않았으면 자정에 끝난다
+    expect(
+      checkBusinessHours(range('2026-11-06T23:30:00', '2026-11-07T00:30:00'), [allDay[0]]),
+    ).toBe('OUTSIDE_HOURS');
   });
 });
 
@@ -225,5 +302,10 @@ describe('isClosedDay', () => {
 
   it('한국 날짜로 본다(UTC로는 전날이어도 한국 일요일이면 쉬는 날)', () => {
     expect(isClosedDay(at('2026-11-01T08:00:00'), hours)).toBe(true);
+  });
+
+  it('쉬는 날이어도 전날 영업이 새벽까지 이어지면 false(그 새벽은 고를 수 있다)', () => {
+    const night = [{ weekday: 6, open: '20:00', close: '03:00' }, ...hours];
+    expect(isClosedDay(at('2026-11-01T12:00:00'), night)).toBe(false);
   });
 });

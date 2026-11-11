@@ -62,22 +62,16 @@ export function toHoursRows(stored: BusinessHours): HoursRow[] {
 }
 
 /**
- * 여는·닫는 시각을 둘 다 골랐는데 닫는 시각이 같거나 빠르면 그 문구. 아니면 null.
- * 저장할 때(checkHoursRow)와 고르는 즉시(영업시간 칸, #311) 같은 규칙을 쓴다.
- * 자정을 넘기는 영업시간은 받지 않는다(정민석 결정)
+ * 영업시간 한 줄의 문제. 없으면 null. 둘 다 골랐는지만 본다(11/11 nnoinn, #332).
+ * 여는·닫는 시각 순서로는 막지 않는다: 닫는 시각이 여는 시각보다 이르면 다음 날 새벽까지(18:00 ~ 02:00),
+ * 같으면 24시간 영업, 닫는 시각 00:00은 자정 마감이다(매물 등록 계산은 slots/slot-time.ts openSpans)
  */
-export function hoursOrderProblem(row: Pick<HoursRow, 'open' | 'close'>): string | null {
-  if (!TIME.test(row.open) || !TIME.test(row.close)) return null;
-  return row.open >= row.close ? '닫는 시각은 여는 시각보다 늦어야 해요' : null;
-}
-
-/** 영업시간 한 줄의 문제. 없으면 null */
 function checkHoursRow(row: HoursRow): string | null {
   if (row.closed) return null;
   if (!row.open && !row.close) return null;
   if (!TIME.test(row.open) || !TIME.test(row.close))
     return '여는 시각과 닫는 시각을 모두 골라 주세요';
-  return hoursOrderProblem(row);
+  return null;
 }
 
 const textSchema = z.string().transform((value) => value.trim());

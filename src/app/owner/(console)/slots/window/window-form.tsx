@@ -3,6 +3,7 @@
 // 시간대 매물 등록 (#308, S-201 두 번째 방식). ① 날짜·시간대 → ② 서비스(여러 개) → ③ 할인율 → 확인·등록.
 // 지금은 ①까지다. 날짜는 한 시술 매물과 같은 등록 달력을 쓰고, 날짜를 고르면 그 날 시간표를 드래그로 고른다(window-timetable.tsx).
 // 한 번에 하루만 올린다(11/11 정민석). 다른 날짜를 고르면 고른 칸을 비운다.
+// 새벽까지 여는 샵은 그 날 영업이 다음 날 새벽까지 이어진 칸도 이 날 시간표 아래에 붙는다(window-cells.ts).
 // ②③·확인과 저장(강규민 createSlotWindows)은 다음 PR에서 잇는다. 저장할 때 서버가 시각·영업시간·겹침을 다시 확인한다.
 
 import { useMemo, useState } from 'react';
@@ -16,7 +17,7 @@ import { ADVANCE_LISTING_DAYS, PUBLISH_WINDOW_HOURS } from '@/server/policy';
 import { weekdayOfKey } from '../calendar-days';
 import { dateKeyLabel, SlotDateCalendar } from '../slot-date-calendar';
 import { groupByKstDate, startCandidates } from '../slot-time';
-import { dayCells, dayHours, minutesLabel, rangesSummary, selectedRanges } from './window-cells';
+import { dayCells, daySpans, rangesSummary, selectedRanges, spanLabel } from './window-cells';
 import { WindowTimetable } from './window-timetable';
 
 export function WindowForm({
@@ -44,8 +45,8 @@ export function WindowForm({
     [dateKey, businessHours, now, busyRanges],
   );
   const ranges = selectedRanges(cells, selected);
-  const summary = rangesSummary(ranges);
-  const hours = dateKey ? dayHours(dateKey, businessHours) : null;
+  const summary = rangesSummary(ranges, dateKey);
+  const spans = dateKey ? daySpans(dateKey, businessHours) : [];
   // 그 요일 영업시간을 입력했는지(안 했으면 하루 전체를 보여준다)
   const hoursEntered =
     dateKey !== '' && businessHours.some((item) => item.weekday === weekdayOfKey(dateKey));
@@ -77,13 +78,13 @@ export function WindowForm({
             businessHours={businessHours}
             onChoose={chooseDate}
           />
-          {dateKey && hours ? (
+          {dateKey ? (
             <section aria-label="시간대" className="flex flex-col gap-3 border-t pt-4">
               <div className="flex flex-col gap-1">
                 <h3 className="text-sm font-semibold">{dateKeyLabel(dateKey)} 시간대</h3>
                 <p className="text-xs text-muted-foreground">
                   {hoursEntered
-                    ? `매장 설정의 영업시간(${minutesLabel(hours.open)}~${minutesLabel(hours.close)}) 안에서 골라요.`
+                    ? `매장 설정의 영업시간(${spans.map(spanLabel).join(', ') || '쉬는 날'}) 안에서 골라요.`
                     : '영업시간을 입력하지 않은 요일이라 하루 전체를 보여줘요. 매장 설정에서 영업시간을 넣으면 그 시간만 보여요.'}
                 </p>
               </div>
@@ -115,7 +116,12 @@ export function WindowForm({
                     </Button>
                   </div>
                   <p className="text-sm font-medium">드래그해서 원하는 시간들을 선택해 주세요</p>
-                  <WindowTimetable cells={cells} selected={selected} onChange={setSelected} />
+                  <WindowTimetable
+                    dateKey={dateKey}
+                    cells={cells}
+                    selected={selected}
+                    onChange={setSelected}
+                  />
                   <p className="text-xs text-muted-foreground">
                     여러 번 끌어서 점심시간 같은 칸은 빼고 올릴 수 있어요. 켜진 칸을 끌면 꺼져요.
                     이어진 칸 묶음마다 시간대 하나로 올라가고, 고객 예약은 묶음을 넘지 못해요. 회색
