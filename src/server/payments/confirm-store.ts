@@ -4,13 +4,19 @@
 
 import 'server-only';
 
-import { and, DrizzleQueryError, eq, or } from 'drizzle-orm';
+import { and, eq, or, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
+import { violatedConstraint } from '@/lib/db-error';
 import { type OrderStatus, orders, refunds, reservations, slots } from '@/db/schema';
+import { markCouponUsed } from '@/server/coupons/coupon-store';
 
 import { ABANDONED_ORDER_CODE, toUnconfirmedCode, type UnconfirmedCode } from './errors';
-import { newReservationCode } from './reservation-code';
+import {
+  newReservationCode,
+  RESERVATION_CODE_TAIL_LENGTH,
+  reservationCodeTail,
+} from './reservation-code';
 
 type Db = ReturnType<typeof getDb>;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -129,6 +135,7 @@ export async function confirmPaidOrder(
       slotId: orders.slotId,
       customerId: orders.customerId,
       failureCode: orders.failureCode,
+      couponId: orders.couponId,
     })
     .from(orders)
     .where(eq(orders.id, input.orderId))
@@ -151,6 +158,7 @@ export async function confirmPaidOrder(
 
   const [slot] = await tx
     .select({
+      shopId: slots.shopId,
       status: slots.status,
       holdCustomerId: slots.holdCustomerId,
       holdExpiresAt: slots.holdExpiresAt,
@@ -160,7 +168,7 @@ export async function confirmPaidOrder(
     .for('update');
   if (!slot) throw new Error(`매물이 없어요: ${order.slotId}`);
 
-  const blocked: UnconfirmedCode | null =
+  let blocked: UnconfirmedCode | null =
     slot.status !== 'scheduled' && slot.status !== 'published'
       ? 'SLOT_SOLD'
       : slot.holdCustomerId !== order.customerId ||
@@ -168,6 +176,15 @@ export async function confirmPaidOrder(
           input.paidAt.getTime() > slot.holdExpiresAt.getTime()
         ? 'HOLD_EXPIRED'
         : null;
+  if (!blocked && order.couponId) {
+    // 쿠폰은 예약을 확정할 때 '사용됨'이 된다(#300). 그 사이 다른 결제에 쓰였으면 쿠폰을 뺀 금액이 맞지 않는 결제라 자동 취소한다
+    const marked = await markCouponUsed(tx, {
+      couponId: order.couponId,
+      orderId: input.orderId,
+      usedAt: input.paidAt,
+    });
+    if (!marked) blocked = 'AMOUNT_MISMATCH';
+  }
   const paid = { pgStatus: input.pgStatus, payMethod: input.payMethod, paidAt: input.paidAt };
   if (blocked) {
     await tx
@@ -177,7 +194,7 @@ export async function confirmPaidOrder(
     return { ok: false, code: blocked };
   }
 
-  const reservation = await insertReservation(tx, {
+  const reservation = await insertReservation(tx, slot.shopId, {
     slotId: order.slotId,
     orderId: input.orderId,
     customerId: order.customerId,
@@ -197,7 +214,7 @@ export async function confirmPaidOrder(
  * 포트원 취소가 끝난 결제 확인(paid) 주문을 자동 취소로 기록하고 환불 기록을 남긴다(C-406). 트랜잭션 안에서 부른다.
  * 예약을 만들기 전의 취소라 예약 칸은 비어 있고, 전액 환불·위약금 0이다. 실패 코드는 화면이 이유를 보여 주도록 그대로 둔다.
  * 주문 줄을 조건부로 바꾸므로 동시에 두 번 불러도 환불 기록은 한 줄이다. 기록했으면 true.
- * TODO(#15 쿠폰 C-407): 쿠폰을 쓴 주문의 자동 취소 때 쿠폰을 돌려줄지 3단계에서 정한다
+ * 쿠폰은 예약을 확정할 때만 '사용됨'이 되므로(#300), 자동 취소한 주문의 쿠폰은 쓰지 않은 그대로 남아 다시 쓸 수 있다
  */
 export async function recordAutoCancel(
   tx: Tx,
@@ -227,13 +244,20 @@ export async function recordAutoCancel(
   return true;
 }
 
-/** 예약번호가 우연히 겹치면(reservations_code_unique) 새 번호로 다시 넣는다. savepoint라 바깥 트랜잭션은 그대로다 */
+/**
+ * 예약을 넣는다. 예약번호가 우연히 겹치면(reservations_code_unique) 새 번호로 다시 넣는다. savepoint라 바깥 트랜잭션은 그대로다.
+ * 원장님이 끝 4자리로 방문을 확인하므로(#262), 같은 샵의 예정 예약과 끝 4자리가 같아도 새로 뽑는다.
+ * 끝 4자리는 제약으로 막지 않아서, 같은 샵에서 거의 동시에 확정되면 드물게 겹칠 수 있다.
+ * 마지막 시도에서도 겹치면 그대로 넣는다(결제는 끝났으니 예약을 못 만드는 것보다 낫다)
+ */
 async function insertReservation(
   tx: Tx,
+  shopId: string,
   values: { slotId: string; orderId: string; customerId: string },
 ): Promise<{ reservationId: string; reservationCode: string }> {
   for (let attempt = 1; ; attempt++) {
     const code = newReservationCode();
+    if (attempt < RESERVATION_CODE_TRIES && (await isTailTakenInShop(tx, shopId, code))) continue;
     try {
       return await tx.transaction(async (savepoint) => {
         const [row] = await savepoint
@@ -243,10 +267,26 @@ async function insertReservation(
         return row;
       });
     } catch (error) {
-      const cause = error instanceof DrizzleQueryError ? error.cause : error;
-      const constraint = (cause as { constraint_name?: string } | undefined)?.constraint_name;
+      const constraint = violatedConstraint(error);
       if (constraint !== 'reservations_code_unique' || attempt >= RESERVATION_CODE_TRIES)
         throw error;
     }
   }
+}
+
+/** 같은 샵의 예정 예약 중 끝 4자리가 같은 예약이 있는지 */
+async function isTailTakenInShop(tx: Tx, shopId: string, code: string): Promise<boolean> {
+  const [row] = await tx
+    .select({ id: reservations.id })
+    .from(reservations)
+    .innerJoin(slots, eq(slots.id, reservations.slotId))
+    .where(
+      and(
+        eq(slots.shopId, shopId),
+        eq(reservations.status, 'confirmed'),
+        sql`right(${reservations.code}, ${RESERVATION_CODE_TAIL_LENGTH}) = ${reservationCodeTail(code)}`,
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
 }

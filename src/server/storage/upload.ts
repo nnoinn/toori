@@ -12,7 +12,7 @@ import { getDb } from '@/db';
 import { shops } from '@/db/schema';
 import { getRequestNow } from '@/lib/request-time';
 import { fail, ok, type Result } from '@/lib/result';
-import { AUTH_ERRORS, getCurrentAccount, requireShopOwner } from '@/server/auth';
+import { AUTH_ERRORS, getCurrentAccount, requireAdmin, requireShopOwner } from '@/server/auth';
 import {
   BUSINESS_DOC_ALLOWED_TYPES,
   BUSINESS_DOC_URL_TTL_SECONDS,
@@ -100,6 +100,25 @@ export async function createBusinessDocUploadUrl(
   const file = checkFile(input, BUSINESS_DOC_ALLOWED_TYPES, STORAGE_ERRORS.INVALID_DOC_FILE_TYPE);
   if (!file.ok) return file;
   return signUpload(STORAGE_BUCKETS.businessDocs, newBusinessDocPath(owner, file.data));
+}
+
+/**
+ * 운영자: 승인된 샵의 사업자등록증을 바꿀 때 올리는 주소(#50 4장, W18). 원장님 것과 같은 business-docs/shops/{shopId}/… 에 올라간다.
+ * 원장님이 카카오톡 채널로 보낸 새 등록증을 운영자가 올린다. 저장은 updateShopBusinessInfo가 하고, 예전 파일은 지우지 않는다
+ */
+export async function createAdminBusinessDocUploadUrl(
+  input: { shopId: string } & FileInput,
+): Promise<Result<SignedUpload>> {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth;
+  const id = z.uuid().safeParse(input?.shopId);
+  if (!id.success) return fail('SHOP_NOT_FOUND', SHOP_REVIEW_ERRORS.SHOP_NOT_FOUND);
+  const file = checkFile(input, BUSINESS_DOC_ALLOWED_TYPES, STORAGE_ERRORS.INVALID_DOC_FILE_TYPE);
+  if (!file.ok) return file;
+  return signUpload(
+    STORAGE_BUCKETS.businessDocs,
+    newBusinessDocPath({ shopId: id.data }, file.data),
+  );
 }
 
 /**

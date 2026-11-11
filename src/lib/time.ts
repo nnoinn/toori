@@ -93,3 +93,9 @@ export function formatHourLabel(hour: number): string {
 function pad2(value: number): string {
   return String(value).padStart(2, '0');
 }
+
+/** 한국 날짜로 오늘 0시(UTC Date). 예: 원장님 대시보드는 이보다 먼저 시작한 매물을 오늘·예정 탭에 넣지 않는다 */
+export function startOfKstDay(now: Date): Date {
+  const { year, month, day } = utcToKst(now);
+  return kstToUtc({ year, month, day, hour: 0, minute: 0 });
+}

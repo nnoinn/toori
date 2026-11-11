@@ -1,5 +1,5 @@
-// 고객 가입·약관 동의 기록 저장 (#47 4·5장). 광고성 동의 상태 계산은 DB 없이,
-// 실제 저장 모양과 약관 종류 제약(age14, 마이그레이션 0004)은 실제 DB(TEST_DATABASE_URL이 있을 때만)로 확인한다.
+// 고객 가입·약관 동의 기록 저장 (#47 4·5장, #267). 선택 동의 상태 계산은 DB 없이,
+// 실제 저장 모양과 약관 종류 제약(age14 0004, interest_alert 0008)은 실제 DB(TEST_DATABASE_URL이 있을 때만)로 확인한다.
 
 import { asc, eq } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -9,23 +9,35 @@ import { customers, termsAgreements } from '@/db/schema';
 import { createTestCustomer, createTestUser } from '../../../tests/db/fixtures';
 import { closeTestDb, describeDb, type TestTx, withRollback } from '../../../tests/db/test-db';
 import {
+  isOptionalTerms,
   readMarketingConsent,
+  readOptionalConsents,
   saveCustomerAccount,
-  toMarketingConsent,
+  toOptionalConsent,
   writeMarketingConsent,
+  writeOptionalConsent,
 } from './account-store';
 
 const at = (iso: string) => new Date(iso);
 const PHONE = '010-1234-5678';
 
-describe('toMarketingConsent', () => {
+describe('isOptionalTerms', () => {
+  it('선택 동의 두 종류만 true', () => {
+    expect(isOptionalTerms('interest_alert')).toBe(true);
+    expect(isOptionalTerms('marketing')).toBe(true);
+    expect(isOptionalTerms('service')).toBe(false);
+    expect(isOptionalTerms('')).toBe(false);
+  });
+});
+
+describe('toOptionalConsent', () => {
   it('기록이 없으면 동의한 적 없음', () => {
-    expect(toMarketingConsent([])).toEqual({ agreed: false, agreedAt: null, withdrawnAt: null });
+    expect(toOptionalConsent([])).toEqual({ agreed: false, agreedAt: null, withdrawnAt: null });
   });
 
   it('철회하지 않은 기록이 있으면 동의한 상태이고 가장 최근 동의 시각을 쓴다', () => {
     expect(
-      toMarketingConsent([
+      toOptionalConsent([
         { agreedAt: at('2026-10-01T00:00:00Z'), withdrawnAt: at('2026-10-05T00:00:00Z') },
         { agreedAt: at('2026-10-20T00:00:00Z'), withdrawnAt: null },
       ]),
@@ -34,7 +46,7 @@ describe('toMarketingConsent', () => {
 
   it('모두 철회했으면 가장 최근 철회 시각을 쓴다', () => {
     expect(
-      toMarketingConsent([
+      toOptionalConsent([
         { agreedAt: at('2026-10-10T00:00:00Z'), withdrawnAt: at('2026-10-12T00:00:00Z') },
         { agreedAt: at('2026-10-01T00:00:00Z'), withdrawnAt: at('2026-10-03T00:00:00Z') },
       ]),
@@ -57,18 +69,18 @@ const termsOf = (tx: TestTx, userId: string) =>
 describeDb('계정·약관 동의 저장 (실제 DB)', () => {
   afterAll(closeTestDb);
 
-  it('고객 계정과 필수 동의(만 14세 확인 포함)를 저장한다. 광고성 동의는 고른 때만', async () => {
+  it('고객 계정과 필수 동의(만 14세 확인 포함)를 저장한다. 선택 동의는 고른 때만', async () => {
     await withRollback(async (tx) => {
       const userId = await createTestUser(tx);
       const saved = await saveCustomerAccount(tx, {
         userId,
         nickname: '김투리',
         phone: PHONE,
-        marketing: false,
+        optionalTerms: [],
       });
 
       const [customer] = await tx.select().from(customers).where(eq(customers.userId, userId));
-      expect(saved).toEqual({ customerId: customer.id, marketingAgreedAt: null });
+      expect(saved).toEqual({ customerId: customer.id, consentNotices: [] });
       expect(customer).toMatchObject({ nickname: '김투리', phone: PHONE });
       expect(await termsOf(tx, userId)).toEqual(
         ['age14', 'location', 'privacy', 'service'].map((termsType) => ({
@@ -81,19 +93,41 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
     });
   });
 
-  it('광고성 정보 수신에 동의하면 marketing 기록도 남기고 그 동의 시각을 돌려준다', async () => {
+  it('선택 동의를 고르면 그 기록도 남기고 동의마다 시각을 돌려준다(관심 동네·찜한 샵 알림이 먼저)', async () => {
     await withRollback(async (tx) => {
       const userId = await createTestUser(tx);
       const saved = await saveCustomerAccount(tx, {
         userId,
         nickname: '김투리',
         phone: PHONE,
-        marketing: true,
+        optionalTerms: ['marketing', 'interest_alert'],
       });
-      expect((await termsOf(tx, userId)).map((row) => row.termsType)).toContain('marketing');
-      const consent = await readMarketingConsent(tx, userId, 'customer');
-      expect(consent).toMatchObject({ agreed: true });
-      expect(saved?.marketingAgreedAt).toEqual(consent.agreedAt);
+      const terms = await termsOf(tx, userId);
+      expect(terms.find((row) => row.termsType === 'interest_alert')).toMatchObject({
+        version: 'draft-2026-11',
+      });
+      const consents = await readOptionalConsents(tx, userId, 'customer');
+      expect(consents.marketing).toMatchObject({ agreed: true });
+      expect(saved?.consentNotices).toEqual([
+        { type: 'interest_alert', agreedAt: consents.interest_alert.agreedAt },
+        { type: 'marketing', agreedAt: consents.marketing.agreedAt },
+      ]);
+    });
+  });
+
+  it('관심 동네·찜한 샵 알림만 고르면 광고성(marketing) 기록은 남기지 않는다', async () => {
+    await withRollback(async (tx) => {
+      const userId = await createTestUser(tx);
+      await saveCustomerAccount(tx, {
+        userId,
+        nickname: '김투리',
+        phone: PHONE,
+        optionalTerms: ['interest_alert'],
+      });
+      expect(await readOptionalConsents(tx, userId, 'customer')).toMatchObject({
+        interest_alert: { agreed: true },
+        marketing: { agreed: false, agreedAt: null, withdrawnAt: null },
+      });
     });
   });
 
@@ -102,7 +136,12 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
       const { userId } = await createTestCustomer(tx);
       const before = await termsOf(tx, userId);
       expect(
-        await saveCustomerAccount(tx, { userId, nickname: '다시', phone: PHONE, marketing: true }),
+        await saveCustomerAccount(tx, {
+          userId,
+          nickname: '다시',
+          phone: PHONE,
+          optionalTerms: ['marketing'],
+        }),
       ).toBeNull();
       expect(await termsOf(tx, userId)).toEqual(before);
       const [customer] = await tx.select().from(customers).where(eq(customers.userId, userId));
@@ -118,7 +157,7 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
           userId,
           nickname,
           phone: PHONE,
-          marketing: false,
+          optionalTerms: [],
         });
         expect(saved).not.toBeNull();
       }
@@ -150,6 +189,19 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
       const { userId } = await createTestCustomer(tx);
       await writeMarketingConsent(tx, userId, 'customer', true);
       expect(await readMarketingConsent(tx, userId, 'owner')).toMatchObject({ agreed: false });
+    });
+  });
+
+  it('두 선택 동의는 따로 켜고 끈다', async () => {
+    await withRollback(async (tx) => {
+      const { userId } = await createTestCustomer(tx);
+      await writeOptionalConsent(tx, userId, 'customer', 'interest_alert', true);
+      await writeMarketingConsent(tx, userId, 'customer', true);
+      await writeOptionalConsent(tx, userId, 'customer', 'marketing', false);
+      const consents = await readOptionalConsents(tx, userId, 'customer');
+      expect(consents.interest_alert).toMatchObject({ agreed: true, withdrawnAt: null });
+      expect(consents.marketing.agreed).toBe(false);
+      expect(consents.marketing.withdrawnAt).toBeInstanceOf(Date);
     });
   });
 });

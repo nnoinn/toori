@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { z } from 'zod';
+import { isUuid } from '@/lib/uuid';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -11,9 +11,11 @@ import { getRequestNow } from '@/lib/request-time';
 import { ensureOwnerPage } from '@/server/auth';
 import { readShopReviewStatus } from '@/server/shops/review-store';
 
-import { SlotCreateForm } from '../../new/slot-create-form';
-import { selectSlotFormData } from '../../new/slot-form-data';
-import { SLOT_EDIT_MESSAGES, slotEditProblem } from '../../slot-edit';
+import { OwnerPage } from '../../../owner-page';
+import { SlotForm } from '../../slot-form';
+import { validateSlotDraft } from '../../slot-draft-store';
+import { selectSlotFormData } from '../../slot-form-data';
+import { editStartWindow, SLOT_EDIT_MESSAGES, slotEditProblem } from '../../slot-edit';
 import { selectSlotForEdit } from '../../slot-edit-store';
 
 export const metadata: Metadata = { title: '매물 수정' };
@@ -24,18 +26,19 @@ type Params = Promise<{ slotId: string }>;
 // 등록 3탭 화면을 지금 값으로 채워서 연다. 판매 전이고 결제 중이 아닌 매물만 고칠 수 있다. PC 기준
 export default function SlotEditPage({ params }: { params: Params }) {
   return (
-    <main className="flex w-full max-w-4xl flex-1 flex-col gap-4 p-6">
-      <h1 className="text-xl font-bold">매물 수정</h1>
+    <OwnerPage title="매물 수정" width="narrow" backHref="/owner">
       <Suspense fallback={<LoadingCards count={2} />}>
         <SlotEditContent params={params} />
       </Suspense>
-    </main>
+    </OwnerPage>
   );
 }
 
+/** 입점 승인 → 그 샵 매물 → 지금 고칠 수 있는지 차례로 보고, 되면 등록 3탭 화면을 지금 값으로 채워 연다 */
 async function SlotEditContent({ params }: { params: Params }) {
   const { slotId } = await params;
-  const validId = z.uuid().safeParse(slotId).success;
+  // 모양이 틀린 id는 로그인 뒤 돌아올 주소에 넣지 않고 대시보드로 돌아오게 한다
+  const validId = isUuid(slotId);
   // 로그인하지 않았으면 로그인 화면, 원장님 가입 전이면 /owner/join 으로 보낸다
   const auth = await ensureOwnerPage(validId ? `/owner/slots/${slotId}/edit` : '/owner');
   const db = getDb();
@@ -65,23 +68,46 @@ async function SlotEditContent({ params }: { params: Params }) {
     return <CannotEdit message="고를 수 있는 메뉴가 없어요. 메뉴를 먼저 등록해 주세요" />;
   }
 
+  // 게시중이면 48시간 안, 예약대기면 14일 안의 시각만 보여준다(S-205)
+  const startWindow = editStartWindow(slot, now);
+  // 매물 메뉴를 숨겼거나 업종을 바꿨으면 메뉴부터 다시 고른다
+  const menuId = data.menus.some((menu) => menu.id === slot.menuId) ? slot.menuId : null;
+  // 열 때 지금 메뉴·시각을 서버가 한 번 확인한다(#23 B2). 문제없으면 ③ 할인율부터 열어서 할인율만 고치기가 빨라지고,
+  // 걸리면(예: 영업시간을 바꿔 그 시각이 밖) 그 단계에서 이유와 함께 연다
+  const check = menuId
+    ? await validateSlotDraft(
+        db,
+        auth.shopId,
+        { menuId, startAt: slot.startAt.toISOString() },
+        now,
+        { excludeSlotId: slot.id, window: startWindow },
+      )
+    : null;
+
   return (
-    <SlotCreateForm
+    <SlotForm
       shopId={auth.shopId}
       nowIso={now.toISOString()}
       {...data}
       edit={{
         slotId: slot.id,
-        // 매물 메뉴를 숨겼거나 업종을 바꿨으면 메뉴부터 다시 고른다
-        menuId: data.menus.some((menu) => menu.id === slot.menuId) ? slot.menuId : null,
+        menuId,
         startAt: slot.startAt.toISOString(),
         discountRate: slot.discountRate,
         newCustomerOnly: slot.newCustomerOnly,
+        startWindow,
+        openStep: check?.ok ? 3 : menuId ? 2 : 1,
+        problem: !menuId ? MENU_GONE_MESSAGE : check && !check.ok ? check.error.message : null,
       }}
     />
   );
 }
 
+/** 매물의 메뉴를 지금 고를 수 없을 때(숨김·업종 변경) 수정 화면 ①에 보여줄 문구 */
+const MENU_GONE_MESSAGE =
+  '이 매물의 메뉴는 숨겼거나 지금 업종에 없는 메뉴예요. 메뉴부터 다시 골라 주세요';
+
+/** 고칠 수 없을 때 이유와 [대시보드로] */
 function CannotEdit({ message, description }: { message: string; description?: string }) {
   return (
     <Card>

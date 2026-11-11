@@ -9,15 +9,21 @@ import { z } from 'zod';
 
 import { getDb } from '@/db';
 import { slots, type SlotStatus } from '@/db/schema';
-import { getSlotStatus } from '@/features/slot-status/slot-status';
 import { slotIsOnHold, slotStatusIs } from '@/features/slot-status/slot-status-sql';
 import { fail, ok, type Result } from '@/lib/result';
-import { calcSalePrice, type DiscountRate } from '@/server/policy';
+import type { DiscountRate } from '@/server/policy';
 
-import { type CreatedSlot, violated } from './new/slot-create-store';
-import { SLOT_DRAFT_ERRORS, validateSlotDraft } from './new/slot-draft-store';
-import { parseSlotPricing, SLOT_PRICING_ERROR } from './new/slot-pricing';
-import { SLOT_CLOSE_REASON_OPTIONS, SLOT_EDIT_MESSAGES, slotEditProblem } from './slot-edit';
+import { type SavedSlot, scheduledPublishAt } from './slot-create-store';
+import { validateSlotDraft } from './slot-draft-store';
+import {
+  editStartWindow,
+  SLOT_CLOSE_REASON_OPTIONS,
+  SLOT_EDIT_MESSAGES,
+  slotEditProblem,
+} from './slot-edit';
+import { parseSlotPricing, SLOT_PRICING_ERROR } from './slot-pricing';
+import { overlapFailure, slotValuesFrom } from './slot-save';
+import { publishPlan } from './slot-time';
 
 type Db = ReturnType<typeof getDb>;
 
@@ -47,6 +53,7 @@ function editableNow(now: Date): SQL {
   )!;
 }
 
+/** 막힌 이유(코드)를 원장님에게 보여줄 문구와 함께 돌려준다 */
 function failWith(problem: keyof typeof SLOT_EDIT_MESSAGES): Result<never> {
   return fail(problem, SLOT_EDIT_MESSAGES[problem]);
 }
@@ -131,7 +138,8 @@ export async function closeSlotInDb(
  * 판매 전 매물을 ①②③ 고른 값으로 고친다. 등록(createSlotInDb)과 같은 검증을 하고, 겹침에서는 자기 자신을 뺀다.
  * 메뉴 값은 고칠 때의 값을 다시 복사하고 할인가는 서버가 다시 계산한다.
  * 게시 시각: 이미 게시중인 매물은 그대로 둔다. 관심 지역 새 매물 알림(C-601)이 publish_at으로 "그날 새로 올라온 매물"을
- * 모으므로, 고칠 때마다 바꾸면 며칠 전 매물이 새 매물로 다시 알려진다(#169 리뷰). 예약대기 매물은 등록처럼 지금 게시한다
+ * 모으므로, 고칠 때마다 바꾸면 며칠 전 매물이 새 매물로 다시 알려진다(#169 리뷰). 그래서 게시중 매물은 48시간 안으로만
+ * 옮길 수 있다(editStartWindow). 예약대기 매물은 등록처럼 새 시작 시각으로 게시 시각을 다시 정한다(publishPlan, S-205)
  */
 export async function updateSlotInDb(
   db: Pick<Db, 'transaction'>,
@@ -139,7 +147,7 @@ export async function updateSlotInDb(
   slotId: string,
   input: unknown,
   now: Date,
-): Promise<Result<CreatedSlot>> {
+): Promise<Result<SavedSlot>> {
   const pricing = parseSlotPricing(input);
   if (!pricing) return fail('INVALID_DISCOUNT_RATE', SLOT_PRICING_ERROR);
 
@@ -149,38 +157,28 @@ export async function updateSlotInDb(
       const editable = await checkEditable(tx, shopId, slotId, now);
       if (!editable.ok) return editable;
 
-      const draft = await validateSlotDraft(tx, shopId, input, now, { excludeSlotId: slotId });
+      const window = editStartWindow(editable.data, now);
+      const draft = await validateSlotDraft(tx, shopId, input, now, {
+        excludeSlotId: slotId,
+        window,
+      });
       if (!draft.ok) return draft;
-      const { menu, start, end } = draft.data;
-      // 예약대기 매물만 지금 게시한다(미리 게시 S-205는 P1에서 다시 본다)
-      const publishNow = getSlotStatus(editable.data, now) === 'scheduled';
-      const salePrice = calcSalePrice(menu.listPrice, pricing.discountRate);
+      const values = slotValuesFrom(draft.data, pricing);
+      // 게시중이면 게시 시각은 그대로 두고 상태만 게시중으로 적는다(게시 시각이 지나 저절로 게시중이 된 예약대기 매물 포함)
+      const plan = window === 'advance' ? publishPlan(draft.data.start, now) : null;
       const [row] = await tx
         .update(slots)
-        .set({
-          menuId: menu.id,
-          serviceType: menu.serviceType,
-          menuName: menu.name,
-          menuDescription: menu.description,
-          listPrice: menu.listPrice,
-          durationMinutes: menu.durationMinutes,
-          discountRate: pricing.discountRate,
-          salePrice,
-          newCustomerOnly: pricing.newCustomerOnly,
-          startAt: start,
-          endAt: end,
-          ...(publishNow ? { publishAt: now } : {}),
-          status: 'published',
-        })
+        .set({ ...values, ...(plan ?? { status: 'published' }) })
         .where(and(eq(slots.id, slotId), eq(slots.shopId, shopId), editableNow(now)))
         .returning({ id: slots.id });
       if (!row) return blockedReason(tx, shopId, slotId, now);
-      return ok({ slotId: row.id, salePrice });
+      return ok({
+        slotId: row.id,
+        salePrice: values.salePrice,
+        publishAt: plan ? scheduledPublishAt(plan) : null,
+      });
     });
   } catch (error) {
-    if (violated(error) === 'slots_no_overlap') {
-      return fail('SLOT_OVERLAP', SLOT_DRAFT_ERRORS.SLOT_OVERLAP);
-    }
-    throw error;
+    return overlapFailure(error);
   }
 }

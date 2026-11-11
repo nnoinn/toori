@@ -69,6 +69,12 @@ export function kakaoDirectionsLink(name: string, lat: number, lng: number): str
   return `https://map.kakao.com/link/to/${encodeURIComponent(name)},${lat},${lng}`;
 }
 
+/** 사진 줄의 스크롤 위치로 지금 보이는 사진 번호(0부터)를 구한다. 칸 폭을 못 재면 첫 장 */
+export function photoIndexAt(scrollLeft: number, slideWidth: number, count: number): number {
+  if (slideWidth <= 0 || count <= 0) return 0;
+  return Math.min(count - 1, Math.max(0, Math.round(scrollLeft / slideWidth)));
+}
+
 /** 전화 걸기 링크용 숫자만. 예: "031-123-4567" → "tel:0311234567" */
 export function telHref(phone: string): string | null {
   const digits = phone.replace(/[^\d+]/g, '');

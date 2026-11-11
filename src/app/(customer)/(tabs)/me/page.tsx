@@ -6,16 +6,20 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
 import { customers } from '@/db/schema';
 import { ensureCustomerPage, getCurrentAccount } from '@/server/auth';
-import { getMarketingConsent } from '@/server/auth/customer-account';
+import { getOptionalConsents } from '@/server/auth/customer-account';
+import { getMyCoupons } from '@/server/coupons/coupons';
 import { getInterestAreas } from '@/server/notifications/interest-areas';
 
 import { AccountActions } from './account-actions';
+import { MyCoupons } from './my-coupons';
+import { selectMyNoShows } from './no-show-history';
+import { NoShowRecord } from './no-show-record';
 import { NotificationSettings } from './notification-settings';
 import { ProfileForm } from './profile-form';
 
 export const metadata: Metadata = { title: '내 정보' };
 
-// 내 정보 (J9, C-103)와 알림 설정(관심 동네·광고성 알림, J14 C-601). 주소: /me
+// 내 정보 (J9, C-103), 노쇼 기록(C-105)과 알림 설정(관심 동네·선택 동의, J14 C-601). 주소: /me
 // 로그인하지 않았으면 로그인 화면으로, 고객 계정이 없으면 약관 동의(/join)로 보낸다(ensureCustomerPage).
 export default function MyInfoPage() {
   return (
@@ -27,15 +31,17 @@ export default function MyInfoPage() {
 
 async function MyInfoContent() {
   const { customerId } = await ensureCustomerPage('/me');
-  const [account, [customer], consent, interest] = await Promise.all([
+  const [account, [customer], noShows, consents, interest, coupons] = await Promise.all([
     getCurrentAccount(),
     getDb()
       .select({ nickname: customers.nickname, phone: customers.phone })
       .from(customers)
       .where(eq(customers.id, customerId))
       .limit(1),
-    getMarketingConsent(),
+    selectMyNoShows(getDb(), customerId),
+    getOptionalConsents(),
     getInterestAreas(),
+    getMyCoupons(),
   ]);
 
   return (
@@ -47,12 +53,17 @@ async function MyInfoContent() {
 
       <ProfileForm nickname={customer?.nickname ?? ''} phone={customer?.phone ?? ''} />
 
+      <NoShowRecord history={noShows} />
+
+      <MyCoupons coupons={coupons.ok ? coupons.data.coupons : null} />
+
       <NotificationSettings
-        marketingAgreed={consent.ok ? consent.data.agreed : false}
+        interestAlertAgreed={consents.ok ? consents.data.interest_alert.agreed : false}
+        marketingAgreed={consents.ok ? consents.data.marketing.agreed : false}
         interestCodes={interest.ok ? interest.data.sigunguCodes : null}
       />
 
-      <AccountActions hasOwnerAccount={Boolean(account?.ownerId)} />
+      <AccountActions />
     </section>
   );
 }

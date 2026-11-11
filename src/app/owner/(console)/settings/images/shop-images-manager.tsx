@@ -78,6 +78,10 @@ export function ShopImagesManager({
     return saved.ok ? null : `${file.name}: ${saved.error.message}`;
   }
 
+  /**
+   * 고른 사진을 한 장씩 차례로 올리고, 진행 문구에 몇 번째인지 보여준다.
+   * 한 장이 실패해도 나머지는 올리고, 실패한 사진마다 문구를 모아 한 번에 보여준다
+   */
   async function upload(files: File[], kind: ShopImageKind) {
     setMessages([]);
     const errors: string[] = [];
@@ -98,6 +102,7 @@ export function ShopImagesManager({
     setMessages(errors);
   }
 
+  /** 파일 고르기 칸에서 고른 사진. 창을 그냥 닫아 고른 것이 없으면 아무것도 하지 않는다 */
   function choose(kind: ShopImageKind, list: FileList | null) {
     const files = Array.from(list ?? []);
     if (files.length === 0) return;
@@ -150,29 +155,32 @@ export function ShopImagesManager({
       ) : null}
 
       <Card>
-        <CardHeader>
-          <CardTitle>{SHOP_IMAGE_KIND_LABELS.main}</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            매물 목록 카드와 상세 화면 첫 장에 나와요. 1장만 올릴 수 있어요.
-          </p>
+        {/* 올리기 버튼은 스타일 사진 [사진 추가]처럼 카드 제목 오른쪽에 둔다 */}
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div className="flex flex-col gap-1.5">
+            <CardTitle>{SHOP_IMAGE_KIND_LABELS.main}</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              매물 목록 카드와 상세 화면 첫 장에 나와요. 1장만 올릴 수 있어요.
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            {main ? (
+              <Button variant="outline" size="lg" disabled={busy} onClick={() => setDeleting(main)}>
+                지우기
+              </Button>
+            ) : null}
+            <Button size="lg" disabled={busy} onClick={() => mainInput.current?.click()}>
+              <ImagePlus aria-hidden />
+              {main ? '바꾸기' : '올리기'}
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent className="flex items-end gap-4">
+        <CardContent>
           {main ? (
             <Photo url={main.url} alt={SHOP_IMAGE_KIND_LABELS.main} className="w-72" />
           ) : (
             <EmptyPhoto className="w-72" />
           )}
-          <div className="flex gap-2">
-            <Button size="lg" disabled={busy} onClick={() => mainInput.current?.click()}>
-              <ImagePlus aria-hidden />
-              {main ? '바꾸기' : '올리기'}
-            </Button>
-            {main ? (
-              <Button variant="ghost" size="lg" disabled={busy} onClick={() => setDeleting(main)}>
-                지우기
-              </Button>
-            ) : null}
-          </div>
         </CardContent>
       </Card>
 
@@ -311,6 +319,7 @@ function Photo({ url, alt, className }: { url: string; alt: string; className?: 
   );
 }
 
+/** 대표 사진이 아직 없을 때 사진과 같은 비율의 빈 자리를 보여준다 */
 function EmptyPhoto({ className }: { className?: string }) {
   return (
     <div

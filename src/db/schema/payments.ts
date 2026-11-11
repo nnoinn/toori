@@ -31,8 +31,8 @@ export type ReservationStatus = (typeof RESERVATION_STATUSES)[number];
 export const VISIT_RESULTS = ['visited', 'no_show'] as const;
 export type VisitResult = (typeof VISIT_RESULTS)[number];
 
-/** 취소한 쪽: 고객 / 원장님 귀책 / 자동 / 운영자 */
-export const CANCEL_ACTORS = ['customer', 'owner_fault', 'system', 'admin'] as const;
+/** 취소한 쪽: 고객 / 원장님 귀책 / 자동 / 운영자 / 합의 후 취소(X-208, #320) */
+export const CANCEL_ACTORS = ['customer', 'owner_fault', 'system', 'admin', 'agreed'] as const;
 export type CancelActor = (typeof CANCEL_ACTORS)[number];
 
 /** 주문(결제 한 건). 한 매물에 실패한 주문이 여러 개 있을 수 있다 */
@@ -83,7 +83,7 @@ export const reservations = pgTable(
   'reservations',
   {
     id: uuid().primaryKey().defaultRandom(),
-    // 예약번호: 영문 대문자+숫자 8자리, 0/O·1/I 제외. 코드에서 만든다(DB check 없음, #64)
+    // 예약번호: 숫자 12자리(하이픈 없이 저장, #262). 코드에서 만든다(DB check 없음, #64). 11/6 전에 만든 번호는 영문 대문자+숫자 8자리
     code: text().notNull().unique('reservations_code_unique'),
     slotId: uuid()
       .notNull()

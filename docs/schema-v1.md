@@ -29,11 +29,15 @@ erDiagram
   profiles ||--o| owners : "원장님 계정"
   owners ||--|| shops : "MVP는 1:1"
   shops ||--|| payout_accounts : "정산 계좌"
+  shops ||--o{ payout_account_changes : "계좌 변경 기록"
   shops ||--o{ shop_images : ""
   shops ||--o{ menus : ""
   shops ||--o{ slots : "매물"
   menus ||--o{ slots : ""
   slots ||--o| slots : "재등록 원본"
+  shops ||--o{ slot_windows : "시간대 매물"
+  slot_windows ||--o{ slot_window_menus : "올린 서비스"
+  slot_windows ||--o{ slots : "예약할 때 만든 매물"
   slots ||--o| reservations : ""
   customers ||--o{ orders : ""
   slots ||--o{ orders : ""
@@ -92,12 +96,12 @@ erDiagram
 | id | uuid PK | |
 | user_id | uuid → profiles | |
 | account_type | text | `customer` / `owner` |
-| terms_type | text | `service`(이용약관) / `privacy`(개인정보) / `location`(위치정보) / `supplier`(공급자 약관) / `marketing`(광고성 정보 수신, 선택) / `age14`(만 14세 이상 확인, 고객 가입 필수) |
+| terms_type | text | `service`(이용약관) / `privacy`(개인정보) / `location`(위치정보) / `supplier`(공급자 약관) / `marketing`(이벤트·혜택 광고성 정보 수신, 선택) / `age14`(만 14세 이상 확인, 고객 가입 필수) / `interest_alert`(관심 동네·찜한 샵 새 매물 알림 수신, 선택) |
 | version | text | 약관 버전. 예: `2026-10-01` |
 | agreed_at | timestamptz | |
-| withdrawn_at | timestamptz, null | 동의 철회 시각. 선택 동의(`marketing`)만 철회할 수 있다 |
+| withdrawn_at | timestamptz, null | 동의 철회 시각. 선택 동의(`marketing`, `interest_alert`)만 철회할 수 있다 |
 
-- 관심 지역 새 매물 알림(C-601)은 광고성 정보라서 `marketing`에 동의한 고객에게만 보낸다. 동의한 지 2년이 되기 전에 다시 확인하고, 동의·철회 결과를 고객에게 알린다(정보통신망법). 예약 알림(C-602)은 거래 안내라 동의가 필요 없다
+- 관심 동네·찜한 샵 새 매물 알림(C-601, C-209)은 광고성 정보라서 `interest_alert`에 동의한 고객에게만 보낸다. 이벤트·혜택 같은 다른 광고성 정보는 `marketing`에 동의한 고객에게만 보낸다. 두 동의는 따로 받고 따로 철회한다(#267, 11/8). 동의마다 동의한 지 2년이 되기 전에 다시 확인하고, 동의·철회 결과를 고객에게 알린다(정보통신망법). 예약 알림(C-602)은 거래 안내라 동의가 필요 없다
 - 예약자 이름·연락처를 원장님에게 넘기는 것은 예약 이행에 필요한 제공이다. 별도 동의가 필요한지는 약관 법률 검토 때 확인하고, 필요하면 결제 동의(C-402)와 같이 받는다
 
 ### 지금 어느 계정으로 들어왔는지 (계정 모드)
@@ -173,6 +177,26 @@ erDiagram
 
 민감 정보라 샵 정보와 테이블을 나눈다. 전체 계좌번호는 운영자 화면에서만 복호화해 보여준다. 로그에 남기지 않는다.
 
+### payout_account_changes — 정산 계좌 변경 기록
+
+계좌가 바뀌면 원장님에게 알림을 보내고 이 기록을 남긴다(#295, 11/1·11/10 결정). 계좌 바꿔치기 같은 사고가 나면 언제, 누가, 어떤 계좌로 바꿨는지의 근거다.
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| id | uuid PK | |
+| shop_id | uuid → shops | |
+| changed_by | uuid → profiles | 바꾼 사람(지금은 원장님 본인만) |
+| previous_bank_code | text, null | 바꾸기 전 은행. 계좌 없이 만든 원장님(#213)이 매장 설정에서 처음 등록하면 비어 있다 |
+| previous_account_last4 | text, null | 바꾸기 전 뒷자리 |
+| bank_code | text | 바꾼 뒤 은행 |
+| account_last4 | text | 바꾼 뒤 뒷자리 |
+| created_at | timestamptz | 바꾼 시각 |
+
+- 전체 계좌번호와 예금주는 남기지 않는다(은행·뒷자리만)
+- 남기지 않는 경우: 가입 때 처음 등록하는 계좌(변경이 아니다), 은행·계좌번호가 같은 저장(예금주만 고친 경우 포함)
+- 같은 계좌인지는 서버가 지금 계좌번호를 복호화해서 비교한다(암호문은 저장할 때마다 달라서 암호문끼리는 비교할 수 없다)
+- 고치기·지우기를 막는 트리거는 두지 않는다. 이 기록을 고치는 코드는 없고, 회원 탈퇴 뒤 개인정보를 지울 때 같이 지울 수 있어서다(#295)
+
 ### shop_images — 대표·스타일 이미지
 
 | 컬럼 | 타입 | 설명 |
@@ -233,8 +257,9 @@ erDiagram
 | hold_customer_id | uuid, null → customers | 10분 홀딩한 고객 |
 | hold_expires_at | timestamptz, null | 홀딩 만료 시각 |
 | closed_at | timestamptz, null | 원장님이 직접 마감한 시각 |
-| close_reason | text, null | `other_channel`(다른 곳 예약) / `mistake`(잘못 올림) / `other`(기타) |
+| close_reason | text, null | `other_channel`(다른 곳 예약) / `mistake`(잘못 올림) / `other`(기타) / `hold_released`(결제 없이 홀딩 끝남: 손님이 시간대 안에 만든 칸을 결제 없이 비움. 원장님이 고르는 사유가 아니고, 원장님 대시보드·예약 현황·운영자 목록·통계에서는 뺀다, #308 ④) |
 | relisted_from_slot_id | uuid, null → slots | 재등록(S-408)으로 만든 매물이면 원래 매물 |
+| window_id | uuid, null → slot_windows | 시간대 매물 안에서 고객이 [예약하기]로 만든 매물이면 그 시간대(#308). 한 시술 매물은 비어 있다 |
 | created_by | uuid → profiles | 등록한 사람 |
 | created_at, updated_at | timestamptz | |
 
@@ -261,6 +286,52 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 ```
 
 마감·취소·완료 매물은 제약에서 빠지므로, 같은 시간에 다시 올리거나 재등록할 수 있다.
+
+### slot_windows — 시간대 매물 (#308, 11/10·11/11 결정)
+
+S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠 칸이 이어진 묶음 하나가 한 줄이다(10:00~12:00과 13:00~18:00을 켜면 두 줄, 서비스·할인율은 같다). 고객이 [예약하기]를 누르면 고른 서비스·시작 시각으로 `slots` 한 칸을 만들어(`window_id`) 홀딩하고, 그 뒤 결제·예약·취소·환불·정산·노쇼는 지금 매물 흐름 그대로다. 나중에 한 시술 매물을 시간대로 합칠 수 있게, 서비스 하나에 시간대 길이 = 소요 시간인 경우도 담는다(서비스 개수 조건이 없다).
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| id | uuid PK | |
+| shop_id | uuid → shops | |
+| start_at | timestamptz | 시간대 시작. 30분 단위(저장할 때 서버에서 확인) |
+| end_at | timestamptz | 시간대 끝. 예약은 이 시각을 넘을 수 없다 |
+| publish_at | timestamptz | 게시 시각. 시간대 시작 48시간 전보다 이르면 그때까지 '예약대기'(미리 올리기는 14일 안) |
+| status | text | `scheduled`(예약대기) / `published`(게시중) / `closed`(마감). 시간이 지나서 마감되는 것은 조회할 때 계산한다 |
+| new_customer_only | boolean, 기본 false | 시간대 전체에 켠다. 안에서 만든 매물도 같은 값 |
+| closed_at | timestamptz, null | 원장님이 직접 마감한 시각 |
+| close_reason | text, null | 매물과 같은 사유(`other_channel` / `mistake` / `other`) |
+| created_by | uuid → profiles | 올린 사람 |
+| created_at, updated_at | timestamptz | |
+
+- 한 고객이 예약해도 남은 시간은 계속 판다. 남은 빈 시간에 들어가는 서비스가 없거나, 마감하거나, 시간이 지나면 목록에서 내린다(조회할 때 계산)
+- 안의 예약이 취소되면 그 시간은 저절로 다시 열린다(안에서 만든 매물이 '취소'가 되어 겹침 제약에서 빠진다). 홀딩이 결제 없이 끝난 매물이 시간을 막지 않게 비우는 방법은 함수 PR에서 정한다
+
+### slot_window_menus — 시간대에 올린 서비스
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| id | uuid PK | |
+| window_id | uuid → slot_windows | |
+| menu_id | uuid → menus | unique(`window_id`, `menu_id`): 한 시간대에 같은 메뉴는 한 번 |
+| service_type, menu_name, menu_description, list_price, duration_minutes | | 올릴 때 값(매물처럼 나중에 메뉴를 고쳐도 그대로) |
+| discount_rate | integer | 서비스마다 10/20/30/40/50 중 하나(`check`로 10~50) |
+| sale_price | integer | 할인가 = 정가 × (1 − 할인율), 원 미만 버림. 서버가 계산해서 저장 |
+| created_at | timestamptz | |
+
+"마지막에 올린 설정"은 따로 표를 두지 않고, 그 샵이 마지막으로 올린 시간대의 서비스·할인율을 읽는다.
+
+**시간 겹침 막기(S-209를 넓힘, 마이그레이션 0011).**
+
+| 무엇끼리 | 어떻게 | 오류 이름 |
+| --- | --- | --- |
+| 시간대끼리(`scheduled`·`published`) | EXCLUDE 제약(`slots_no_overlap`과 같은 방식) | `slot_windows_no_overlap` |
+| 한 시술 매물(`window_id` 없음, `scheduled`·`published`·`reserved`) → 시간대 | 트리거 `slots_no_window_overlap` | `slots_no_overlap`(지금 원장님 화면 안내를 그대로 쓴다) |
+| 시간대 → 매물(그 시간대 안에서 만든 매물은 뺀다) | 트리거 `slot_windows_no_slot_overlap` | `slot_windows_no_overlap` |
+| 시간대 안에서 만든 매물끼리 | 지금 `slots_no_overlap` | `slots_no_overlap` |
+
+두 트리거는 같은 샵 줄을 먼저 잠가서(`FOR NO KEY UPDATE`), 시간대와 매물이 동시에 저장돼도 서로를 보고 겹침을 놓치지 않는다.
 
 ---
 
@@ -297,7 +368,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | id | uuid PK | |
-| code | text, unique | 예약번호: 영문 대문자+숫자 8자리, 0/O·1/I 제외 |
+| code | text, unique | 예약번호: 숫자 12자리, 하이픈 없이 저장. 같은 샵의 예정 예약끼리 끝 4자리가 겹치지 않게 만든다(#262, 11/8). 11/8 전에 만든 번호는 영문 대문자+숫자 8자리(0/O·1/I 제외) |
 | slot_id | uuid, unique → slots | 매물 하나에 예약 하나(취소되면 재등록은 새 매물) |
 | order_id | uuid, unique → orders | |
 | customer_id | uuid → customers | |
@@ -306,7 +377,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | visit_recorded_at | timestamptz, null | 서비스 시작 이후에만 기록 가능 |
 | visit_recorded_by | uuid, null → profiles | |
 | cancelled_at | timestamptz, null | |
-| cancel_actor | text, null | `customer`(고객 취소) / `owner_fault`(원장님 귀책) / `system`(자동) / `admin`(운영자) |
+| cancel_actor | text, null | `customer`(고객 취소) / `owner_fault`(원장님 귀책) / `system`(자동) / `admin`(운영자) / `agreed`(합의 후 취소, X-208) |
 | cancel_reason | text, null | |
 | hours_before_start_at_cancel | numeric, null | 취소할 때 시작까지 남은 시간. 원장님 귀책 취소 제재 기준을 정할 데이터 |
 | created_at | timestamptz | |
@@ -347,7 +418,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | id | uuid PK | |
 | order_id | uuid → orders | |
 | reservation_id | uuid, null → reservations | 예약을 만들기 전에 결제를 취소하는 자동 취소(`auto_cancel`, C-406)에서는 비어 있다. 어떤 결제의 환불인지는 `order_id`로 안다(#64) |
-| reason | text | `customer_cancel` / `owner_fault` / `auto_cancel` / `admin_exception` |
+| reason | text | `customer_cancel` / `owner_fault` / `auto_cancel` / `admin_exception` / `agreed_cancel`(합의 후 취소: 실제 결제액 × 50%, `band`는 비우고 `penalty_rate` 50) |
 | status | text, 기본값 `done` | `requested`(포트원을 부르기 전에 저장한 취소 진행 중) / `done`(끝남) |
 | band | text, null | 적용 구간: `over_24h`(30%) / `6h_to_24h`(50%) / `under_6h`(100%) |
 | penalty_rate | integer | 적용한 위약금 비율(당시 값) |
@@ -358,6 +429,29 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | processed_at | timestamptz, null | 진행 중(`requested`)에는 비어 있고, `done`이면 반드시 있다(check) |
 | processed_by | uuid, null → profiles | 운영자 처리일 때 |
 | created_at | timestamptz | 정리 작업이 오래된 진행 중 기록을 찾을 때 쓴다 |
+
+한 예약에 취소 환불 기록(고객 취소·합의 후 취소)은 하나만 둔다(unique `refunds_cancel_unique`, #320). 손님이 직접 취소하는 순간 합의 후 취소 동의가 같이 들어와도 환불은 한 번만 나간다.
+
+### agreed_cancel_requests — 합의 후 취소 요청 (S-410·C-506·X-208, #320)
+
+원장님이 요청하고 손님이 24시간 안에 앱에서 동의하면 취소된다(11/8 결정). 답을 기다리는 요청은 한 예약에 하나이고, 거절·만료 뒤에는 다시 요청할 수 있다(횟수 제한 없음, 11/10).
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| id | uuid PK | |
+| reservation_id | uuid → reservations | |
+| requested_by | uuid → profiles | 요청한 원장님 |
+| reason | text | `style_mismatch`(원하는 시술이 예약한 서비스와 다름) / `customer_declined`(손님이 시술을 원하지 않음) / `other`(기타). 동의 문구 8-1장 |
+| reason_text | text, null | 기타일 때 내용(100자까지, 서버에서 확인) |
+| status | text | `requested`(답 기다림) / `agreed`(동의) / `declined`(거절) / `expired`(24시간 지남) / `closed`(손님이 답하기 전에 직접 취소했거나 방문·노쇼 처리돼서 끝남) |
+| requested_at | timestamptz | 요청한 시각 |
+| expires_at | timestamptz | 요청 + 24시간(정책값). 상태를 바꾸기 전이라도 이 시각이 지났으면 만료로 본다 |
+| responded_at | timestamptz, null | 동의·거절·만료·끝남을 기록한 시각 |
+
+- 답을 기다리는 요청은 한 예약에 하나: `status = 'requested'`인 줄에만 거는 unique(`reservation_id`)
+- 원장님이 다시 요청할 때 만료 시각이 지난 `requested` 요청은 같은 트랜잭션에서 `expired`로 바꾸고 새 요청을 넣는다. 손님이 만료 시각 뒤에 동의해도 막는다(#320 리뷰)
+- 손님 환불 = 실제 결제액 × 50%(쓴 쿠폰은 돌려주지 않는다), 원장님 기준 금액 = 판매가 × 50%(정산 줄 `agreed_cancel`). 50%는 정책값 `AGREED_CANCEL_REFUND_RATE`
+- 샵별 합의 후 취소 횟수·사유는 이 표를 예약 → 매물 → 샵으로 이어서 센다
 
 ### coupons — 쿠폰
 
@@ -409,7 +503,7 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | id | uuid PK | |
 | shop_id | uuid → shops | |
 | order_id | uuid → orders | |
-| kind | text | `sale`(이용 완료) / `penalty`(고객 취소 위약금) / `no_show`(노쇼) |
+| kind | text | `sale`(이용 완료) / `penalty`(고객 취소 위약금) / `no_show`(노쇼) / `agreed_cancel`(합의 후 취소, 판매가 × 50%를 기준 금액으로 고객 취소 위약금과 같은 방식) |
 | base_amount | integer | 판매가 기준 남은 금액: 이용 완료·노쇼 = 판매가, 고객 취소 = 판매가 × 위약금 비율(쿠폰과 무관) |
 | fee_rate | integer | 적용한 플랫폼 수수료율(당시 값, %). 오픈 기간은 0 |
 | fee_amount | integer | 플랫폼 수수료(원 미만 버림) |
@@ -525,6 +619,25 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | memo | text, null | |
 | created_at | timestamptz | |
 
+### admin_access_logs — 운영자 열람 기록
+
+운영자가 개인정보가 보이는 화면(회원 목록·상세, 매물·예약 목록·예약 상세, 입점 심사 목록·상세, 앞으로 생길 이의제기·정산)을 볼 때마다 한 줄 남긴다(#269, 11/8 결정). 개인정보 안전성 확보조치 기준의 접속 기록이고, 개인정보 처리방침의 "접속 기록을 보관하고 이상 접근을 점검한다"도 이 기록으로 지킨다. `admin_actions`(작업 기록)와 달리 대상이 없는 목록·검색과 접속 IP·검색어도 남긴다.
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| id | uuid PK | |
+| admin_id | uuid → profiles | 본 운영자 |
+| action | text | `view`(상세 보기) / `search`(목록·검색). 종류가 늘 수 있어서 check를 두지 않는다 |
+| target_type | text | `customer` / `owner` / `shop` / `reservation`, 목록·검색이면 `list` |
+| target_id | uuid, null | 상세면 대상 id, 목록·검색이면 비어 있다 |
+| path | text | 본 화면 주소(검색어는 `query`에 따로) |
+| query | text, null | 목록·검색에서 쓴 검색어. 번호로 찾을 수도 있어서 개인정보로 다룬다 |
+| ip | text, null | 접속 IP(`x-forwarded-for` 첫 값). 모양이 이상해도 기록이 실패하지 않게 글자로 둔다 |
+| created_at | timestamptz | 본 시각 |
+
+- 화면은 관리자 확인(`ensureAdminPage`) 바로 뒤에 기록하고, **기록을 남기지 못하면 화면을 보여주지 않는다**(기록 없이 개인정보가 보이지 않게, 11/9)
+- 1년 이상 보관한다(정보주체 5만 명 이상이 되면 2년 이상). 앱은 넣기만 한다. **DB 트리거가 UPDATE·DELETE·TRUNCATE를 예외 없이 막는다**(위·변조 방지, 11/9 nnoinn). 보관 기간이 지난 기록을 정리하는 작업은 출시 때 보관 기간과 같이 정한다. 월 1회 이상 이상한 접근이 있는지 점검한다(나중에 운영자 화면이나 SQL로)
+
 ---
 
 ## 9. 인덱스·제약 요약
@@ -532,12 +645,17 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 테이블 | 인덱스·제약 | 왜 |
 | --- | --- | --- |
 | shops | GIST(location), (status), (sigungu_code) | 지도·거리 검색, 승인된 샵만, 지역 필터 |
-| slots | (status, start_at), (shop_id, start_at), (publish_at), 시간 겹침 EXCLUDE | 목록 조회, 원장님 대시보드, 관심 지역 묶음 알림, S-209 |
+| slots | (status, start_at), (shop_id, start_at), (publish_at), (window_id), 시간 겹침 EXCLUDE, 시간대와 겹침 트리거 | 목록 조회, 원장님 대시보드, 관심 지역 묶음 알림, 시간대 안 예약 매물, S-209 |
+| slot_windows | (shop_id, start_at), (status, start_at), (publish_at), 시간대끼리 겹침 EXCLUDE, 매물과 겹침 트리거 | 원장님 대시보드, 고객 목록, 새 매물 알림, S-209 |
+| slot_window_menus | unique(window_id, menu_id), check: discount_rate 10~50, duration_minutes > 0 | 한 시간대에 같은 메뉴 한 번 |
 | location_use_logs | (created_at) | 6개월 지난 기록 정리 |
+| admin_access_logs | (created_at), (admin_id, created_at), UPDATE·DELETE·TRUNCATE 막는 트리거 | 보관 기간 확인, 운영자별 월 1회 점검, 기록 위·변조 방지 |
+| payout_account_changes | (shop_id, created_at) | 샵별 계좌 변경 이력 |
 | slots | check: discount_rate 10~50, end_at > start_at | |
 | reservations | unique(code), unique(slot_id), (customer_id), (status) | 예약번호, 매물당 하나, 내 예약 |
 | orders | unique(payment_id), (customer_id), (status) | 결제 검증, 복구 |
-| refunds | unique(reservation_id) where reason = `customer_cancel`, (created_at) where status = `requested` | 한 예약에 고객 취소 기록 하나, 오래된 진행 중 기록 찾기 |
+| refunds | unique(reservation_id) where reason in (`customer_cancel`, `agreed_cancel`), (created_at) where status = `requested` | 한 예약에 취소 환불 기록 하나, 오래된 진행 중 기록 찾기 |
+| agreed_cancel_requests | unique(reservation_id) where status = `requested`, (reservation_id, requested_at), (expires_at) where status = `requested` | 답을 기다리는 요청 하나, 가장 최근 요청, 만료 처리 작업 |
 | coupons | (customer_id, expires_at) | 보유 쿠폰 |
 | settlement_items | (shop_id, settlement_id) | 정산 묶기 |
 | notifications | unique(dedupe_key) | 중복 발송 방지 |
@@ -577,3 +695,8 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 2026-10-29 | 회원 탈퇴(P1) 방향: 샵 상태 `withdrawn`, 마감 사유 `account_withdrawal`, 고객·원장님 계정 unique를 탈퇴하지 않은 계정 기준으로, 같은 사람 표시(해시) 5년. 탈퇴 뒤 30일 되살리기 기간에는 정보를 그대로 두고 30일 뒤 지운다(10장 메모, #148). 예약자 정보 제공 동의 칸은 빈 값 허용(#153) |
 | 2026-11-02 | `push_subscriptions`의 unique를 `endpoint`에서 (`endpoint`, `account_type`)으로 바꾼다(#193). 한 기기에서 켜 둔 계정의 알림을 모두 받는다(11/1 결정, #131). 마이그레이션 0006 |
 | 2026-11-03 | `refunds`에 `status`, `review_reason`, `created_at`을 더하고 `processed_at`을 비어 있을 수 있게 바꿨다. 고객 취소는 포트원을 부르기 전에 `requested`로 저장하고, 정리 작업이 마무리한다. 한 예약에 고객 취소 기록은 하나만(unique) (#222) |
+| 2026-11-09 | `terms_agreements.terms_type`에 `interest_alert`(관심 동네·찜한 샵 새 매물 알림 수신 동의, 선택)를 더한다. 관심 동네·찜한 샵 알림은 이벤트·혜택 광고성 동의(`marketing`)와 따로 받는다(#267·#270, 11/8 결정). 이미 있는 `marketing` 기록은 출시 전이라 옮기지 않는다. 마이그레이션 0008 |
+| 2026-11-09 | `admin_access_logs`(운영자 열람 기록)를 더한다. 운영자가 개인정보가 보이는 화면을 볼 때마다 누가·언제·어디서(IP)·누구의 정보를·무엇을(상세 보기·목록 검색) 남기고 1년 이상 보관한다. 기록하지 못하면 화면을 보여주지 않는다(#269, 11/8 결정). DB 트리거로 고치기·지우기·비우기를 막는다(#286 리뷰, 11/9). 마이그레이션 0009 |
+| 2026-11-10 | `payout_account_changes`(정산 계좌 변경 기록)를 더한다. 바꾼 사람, 바꾸기 전·뒤 은행·뒷자리, 시각만 남기고 전체 계좌번호·예금주는 남기지 않는다. 가입 때 첫 등록과 같은 계좌 저장은 남기지 않는다. 트리거는 두지 않는다(#295, 11/10 승인). 마이그레이션 0010 |
+| 2026-11-11 | 시간대 매물 `slot_windows`·`slot_window_menus`와 `slots.window_id`를 더한다(#308, 11/10·11/11 nnoinn). 고객이 예약할 때 지금 매물 한 칸으로 바꾼다. 같은 샵의 시간대끼리는 EXCLUDE로, 시간대와 한 시술 매물 사이는 트리거로 겹침을 막는다. 마이그레이션 0011 |
+| 2026-11-11 | 합의 후 취소 요청 `agreed_cancel_requests`를 더하고, `reservations.cancel_actor`에 `agreed`, `refunds.reason`에 `agreed_cancel`, `settlement_items.kind`에 `agreed_cancel`을 더한다. 취소 환불 unique를 고객 취소와 합의 후 취소에 같이 건다(`refunds_cancel_unique`, #320 승인). `slots.close_reason`에 `hold_released`(결제 없이 홀딩 끝남, #308 ④)를 더한다. 마이그레이션 0012 |

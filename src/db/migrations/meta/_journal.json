@@ -57,6 +57,41 @@
       "when": 1793669727065,
       "tag": "0007_refunds_cancel_status",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794200313093,
+      "tag": "0008_terms_interest_alert",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794201241251,
+      "tag": "0009_admin_access_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794320602607,
+      "tag": "0010_payout_account_changes",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794358969541,
+      "tag": "0011_slot_windows",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794385988746,
+      "tag": "0012_agreed_cancel_requests",
+      "breakpoints": true
     }
   ]
 }

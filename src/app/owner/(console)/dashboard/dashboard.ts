@@ -2,7 +2,7 @@
 // 상태는 O1의 getSlotStatus로 계산한다(시간이 지나서 바뀌는 상태). "지금"은 서버 시각을 받는다.
 
 import type { SlotCloseReason } from '@/db/schema/slots';
-import { kstToUtc, utcToKst } from '@/lib/time';
+import { startOfKstDay } from '@/lib/time';
 import {
   getSlotStatus,
   isSlotOnHold,
@@ -49,12 +49,6 @@ export { SLOT_STATUS_LABELS };
 
 export type DashboardTab = 'today' | 'upcoming';
 
-/** 한국 날짜로 오늘 0시(UTC Date). 이보다 먼저 시작한 매물은 대시보드 탭에 나오지 않는다 */
-export function startOfKstDay(now: Date): Date {
-  const { year, month, day } = utcToKst(now);
-  return kstToUtc({ year, month, day, hour: 0, minute: 0 });
-}
-
 /** 한국 날짜로 내일 0시 */
 export function startOfKstTomorrow(now: Date): Date {
   return new Date(startOfKstDay(now).getTime() + 24 * 60 * 60 * 1000);
@@ -68,6 +62,7 @@ export function viewStatus(slot: DashboardSlot, now: Date): SlotStatus {
   );
 }
 
+/** 지금 다른 고객이 결제 중(10분 홀딩)인지. 결제 중이면 [수정]·[마감]을 잠근다 */
 export function onHold(slot: DashboardSlot, now: Date): boolean {
   return isSlotOnHold(
     {

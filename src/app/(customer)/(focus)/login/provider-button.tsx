@@ -67,7 +67,8 @@ export function ProviderButton({ provider, disabled, pending, onClick }: Provide
       {isKakao ? (
         <KakaoSymbol className="size-[18px] shrink-0 text-kakao-symbol" />
       ) : (
-        <Image src={googleLogo} alt="" width={18} height={18} className="shrink-0" />
+        // 가로·세로를 CSS로 같이 정한다. 기본 스타일(height: auto)만 바뀌면 Next.js가 비율 경고를 낸다
+        <Image src={googleLogo} alt="" width={18} height={18} className="size-[18px] shrink-0" />
       )}
       <span>{pending ? '로그인 화면으로 이동 중…' : PROVIDER_LABELS[provider]}</span>
     </button>

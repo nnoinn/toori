@@ -11,25 +11,29 @@ import { ensureOwnerPage } from '@/server/auth';
 import { SHOP_STATUS_LABELS } from '@/server/shops/status';
 import { getShopReviewStatus } from '@/server/shops/review';
 
-import { SlotCreateForm } from './slot-create-form';
-import { selectSlotFormData } from './slot-form-data';
+import { OwnerPage } from '../../owner-page';
+import { SlotForm } from '../slot-form';
+import { selectSlotFormData } from '../slot-form-data';
+import { WindowForm } from '../window/window-form';
+import { SlotCreateTabs } from './slot-create-tabs';
 
 export const metadata: Metadata = { title: '매물 등록' };
 
 const PAGE_PATH = '/owner/slots/new';
 
-// 매물 3탭 등록 ① 서비스 ② 시간 (O4, S-201·S-204·S-209). ③ 할인율·저장은 O5. PC 기준
+// 매물 등록 (S-201·S-204·S-209). 맨 위 탭에서 방식을 고른다(#308): 한 시술 매물(3탭 ① 서비스 ② 시간 ③ 할인율, O4·O5)
+// 또는 시간대 매물(① 날짜·시간대 ② 서비스 ③ 할인율, window/window-form.tsx). PC 기준
 export default function SlotCreatePage() {
   return (
-    <main className="flex w-full max-w-4xl flex-1 flex-col gap-4 p-6">
-      <h1 className="text-xl font-bold">매물 등록</h1>
+    <OwnerPage title="매물 등록" width="narrow">
       <Suspense fallback={<LoadingCards count={2} />}>
         <SlotCreateContent />
       </Suspense>
-    </main>
+    </OwnerPage>
   );
 }
 
+/** 입점 승인 → 메뉴가 있는지 차례로 보고 3탭 화면을 연다. 막히면 무엇을 먼저 해야 하는지 안내한다 */
 async function SlotCreateContent() {
   // 로그인하지 않았으면 로그인 화면, 원장님 가입 전이면 /owner/join 으로 보낸다
   const auth = await ensureOwnerPage(PAGE_PATH);
@@ -76,5 +80,16 @@ async function SlotCreateContent() {
     );
   }
 
-  return <SlotCreateForm shopId={auth.shopId} nowIso={now.toISOString()} {...data} />;
+  return (
+    <SlotCreateTabs
+      single={<SlotForm shopId={auth.shopId} nowIso={now.toISOString()} {...data} />}
+      windowForm={
+        <WindowForm
+          nowIso={now.toISOString()}
+          businessHours={data.businessHours}
+          busy={data.busy}
+        />
+      }
+    />
+  );
 }

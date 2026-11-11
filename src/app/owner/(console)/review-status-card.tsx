@@ -14,6 +14,7 @@ const WHILE_WAITING = [
   { href: '/owner/settings/images', label: '사진·링크' },
 ] as const;
 
+/** 반려면 사유와 [사업자 정보 고치고 다시 신청하기], 승인 대기면 기다리는 동안 입력할 설정 바로가기 */
 export function ReviewStatusCard({ review }: { review: ShopReviewStatus }) {
   if (review.status === 'approved') return null;
 

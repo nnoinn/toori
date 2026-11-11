@@ -3,7 +3,6 @@
 // 메뉴 목록·추가·수정·숨김·순서 바꾸기 (O3, S-106). 저장 전에 화면에서 한 번 검사하고, 서버 함수가 다시 검사한다.
 
 import { useState, useTransition } from 'react';
-import { cn } from 'cn';
 import { ArrowDown, ArrowUp, Plus } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -17,12 +16,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { EmptyState } from '@/components/ui/state';
 import { Textarea } from '@/components/ui/textarea';
 import { formatDuration, formatWon } from '@/lib/format';
-import type { ShopCategory } from '@/server/policy';
+import { serviceTypeLabel, serviceTypesOf, type ShopCategory } from '@/server/policy';
 
+import { fieldA11y, FormField, NATIVE_SELECT_CLASS } from '../../../form-field';
+import { ChoiceChips } from '../../choice-chips';
 import { moveMenu, saveMenu, setMenuHidden } from './actions';
 import {
   MENU_DURATION_OPTIONS,
@@ -30,8 +30,6 @@ import {
   type MenuField,
   type MenuFieldErrors,
   type MenuInput,
-  serviceTypeLabel,
-  serviceTypesOf,
   validateMenu,
 } from './menu';
 import type { MenuItem } from './menu-store';
@@ -55,6 +53,7 @@ export function MenuManager({
   const visible = menus.filter((menu) => !menu.hidden);
   const hidden = menus.filter((menu) => menu.hidden);
 
+  /** [메뉴 추가]: 업종의 첫 서비스 종류, 소요 시간 60분으로 빈 창을 연다 */
   function openNew() {
     setMessage(null);
     setEditing({
@@ -70,6 +69,7 @@ export function MenuManager({
     });
   }
 
+  /** [수정]: 저장된 값으로 창을 연다. 정가는 입력 칸 모양(천 단위 쉼표)으로 바꿔 넣는다 */
   function openEdit(menu: MenuItem) {
     setMessage(null);
     setEditing({
@@ -123,10 +123,12 @@ export function MenuManager({
           <ul className="divide-y">
             {visible.map((menu, index) => (
               <li key={menu.id} className="flex items-center gap-3 px-4 py-3">
-                <div className="flex flex-col">
+                {/* 순서 버튼은 [수정]·[숨기기]와 같은 크기(32px) 테두리 버튼으로 나란히 둔다(#23 B3).
+                    세로로 쌓으면 줄이 너무 높아진다 */}
+                <div className="flex shrink-0 gap-1">
                   <Button
-                    variant="ghost"
-                    size="icon-xs"
+                    variant="outline"
+                    size="icon"
                     aria-label={`${menu.name} 위로`}
                     disabled={pending || index === 0}
                     onClick={() => run(() => moveMenu(shopId, menu.id, 'up'))}
@@ -134,8 +136,8 @@ export function MenuManager({
                     <ArrowUp />
                   </Button>
                   <Button
-                    variant="ghost"
-                    size="icon-xs"
+                    variant="outline"
+                    size="icon"
                     aria-label={`${menu.name} 아래로`}
                     disabled={pending || index === visible.length - 1}
                     onClick={() => run(() => moveMenu(shopId, menu.id, 'down'))}
@@ -147,8 +149,9 @@ export function MenuManager({
                 <Button variant="outline" onClick={() => openEdit(menu)} disabled={pending}>
                   수정
                 </Button>
+                {/* 목록 줄 버튼은 테두리 버튼으로 맞춘다(대시보드 [수정]·[마감], 숨긴 메뉴 [다시 보이기]와 같게) */}
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   onClick={() => run(() => setMenuHidden(shopId, menu.id, true))}
                   disabled={pending}
                 >
@@ -232,10 +235,16 @@ function MenuDialog({
   const [errors, setErrors] = useState<MenuFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  /** 칸 하나를 바꾼다. 칸 오류는 여기서 지우지 않고, 다시 [저장]할 때 새로 검사해서 바꾼다 */
   function update<K extends keyof MenuInput>(key: K, value: MenuInput[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  /**
+   * 화면에서 먼저 검사하고 저장한다. 성공하면 창을 닫는다.
+   * 목록은 서버 함수가 화면을 새로 그려(refresh) 바뀐 메뉴가 보인다
+   */
   function save() {
     const checked = validateMenu(category, form);
     if (!checked.ok) {
@@ -255,10 +264,10 @@ function MenuDialog({
     });
   }
 
-  const fieldProps = (field: MenuField) => ({
-    id: `menu-${field}`,
-    'aria-invalid': errors[field] ? true : undefined,
-  });
+  // 칸 id 앞에 menu-를 붙여 샵 정보 칸(name, description)과 겹치지 않게 한다.
+  // 앞서 연 화면이 숨은 채 남아 있을 수 있어서(Activity) id가 겹치면 라벨·오류가 엉뚱한 칸에 이어진다
+  const idOf = (field: MenuField) => `menu-${field}`;
+  const fieldProps = (field: MenuField) => fieldA11y(idOf(field), errors[field]);
 
   return (
     <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
@@ -277,34 +286,17 @@ function MenuDialog({
             save();
           }}
         >
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-2 text-sm font-medium">서비스 종류</legend>
-            <div className="flex flex-wrap gap-2">
-              {serviceTypesOf(category).map((type) => (
-                <label
-                  key={type.key}
-                  className={cn(
-                    'flex h-8 cursor-pointer items-center rounded-lg border px-3 text-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50',
-                    form.serviceType === type.key && 'border-primary bg-primary/10 font-semibold',
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="serviceType"
-                    value={type.key}
-                    checked={form.serviceType === type.key}
-                    onChange={() => update('serviceType', type.key)}
-                    className="sr-only"
-                  />
-                  {type.label}
-                </label>
-              ))}
-            </div>
-            <FieldError error={errors.serviceType} />
-          </fieldset>
+          <ChoiceChips
+            legend="서비스 종류"
+            name="serviceType"
+            options={serviceTypesOf(category)}
+            value={form.serviceType}
+            onChange={(key) => update('serviceType', key)}
+            errorId={idOf('serviceType')}
+            error={errors.serviceType}
+          />
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="menu-name">서비스 이름</Label>
+          <FormField label="서비스 이름" id={idOf('name')} error={errors.name}>
             <Input
               {...fieldProps('name')}
               placeholder="예: 디자인 커트"
@@ -312,12 +304,15 @@ function MenuDialog({
               value={form.name}
               onChange={(event) => update('name', event.target.value)}
             />
-            <FieldError error={errors.name} />
-          </div>
+          </FormField>
 
           <div className="flex gap-4">
-            <div className="flex flex-1 flex-col gap-2">
-              <Label htmlFor="menu-listPrice">정가(원)</Label>
+            <FormField
+              label="정가(원)"
+              id={idOf('listPrice')}
+              error={errors.listPrice}
+              className="flex-1"
+            >
               <Input
                 {...fieldProps('listPrice')}
                 inputMode="numeric"
@@ -325,15 +320,19 @@ function MenuDialog({
                 value={form.listPrice}
                 onChange={(event) => update('listPrice', formatPriceInput(event.target.value))}
               />
-              <FieldError error={errors.listPrice} />
-            </div>
-            <div className="flex flex-1 flex-col gap-2">
-              <Label htmlFor="menu-durationMinutes">소요 시간</Label>
+            </FormField>
+            <FormField
+              label="소요 시간"
+              id={idOf('durationMinutes')}
+              error={errors.durationMinutes}
+              className="flex-1"
+            >
+              {/* 가입·정산 계좌의 고르기 칸과 같은 모양(오류면 빨간 테두리, #23 디자인 A8) */}
               <select
                 {...fieldProps('durationMinutes')}
                 value={form.durationMinutes}
                 onChange={(event) => update('durationMinutes', Number(event.target.value))}
-                className="h-9 rounded-lg border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                className={NATIVE_SELECT_CLASS}
               >
                 {MENU_DURATION_OPTIONS.map((minutes) => (
                   <option key={minutes} value={minutes}>
@@ -341,12 +340,10 @@ function MenuDialog({
                   </option>
                 ))}
               </select>
-              <FieldError error={errors.durationMinutes} />
-            </div>
+            </FormField>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="menu-description">상세 설명 (선택)</Label>
+          <FormField label="상세 설명 (선택)" id={idOf('description')} error={errors.description}>
             <Textarea
               {...fieldProps('description')}
               rows={3}
@@ -355,8 +352,7 @@ function MenuDialog({
               value={form.description}
               onChange={(event) => update('description', event.target.value)}
             />
-            <FieldError error={errors.description} />
-          </div>
+          </FormField>
 
           {formError ? (
             <p role="alert" className="text-sm text-destructive">
@@ -382,9 +378,4 @@ function MenuDialog({
 function formatPriceInput(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 7);
   return digits ? Number(digits).toLocaleString('ko-KR') : '';
-}
-
-function FieldError({ error }: { error?: string }) {
-  if (!error) return null;
-  return <p className="text-sm text-destructive">{error}</p>;
 }

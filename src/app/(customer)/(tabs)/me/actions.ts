@@ -11,7 +11,9 @@ import { customers } from '@/db/schema';
 import { fail, ok, type Result } from '@/lib/result';
 import { requireCustomer } from '@/server/auth';
 
-import { customerPhoneSchema, PHONE_FORMAT_MESSAGE, profileSchema } from './profile-rules';
+import { PHONE_FORMAT_MESSAGE } from '@/lib/phone';
+
+import { customerPhoneSchema, profileSchema } from './profile-rules';
 
 /** 닉네임·연락처를 저장한다. 형식이 틀리면 첫 번째 이유를 돌려준다 */
 export async function updateMyProfile(input: unknown): Promise<Result<null>> {

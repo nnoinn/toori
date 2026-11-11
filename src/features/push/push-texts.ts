@@ -1,7 +1,10 @@
-// 푸시 권한 안내 문구 (J14, C-601·C-602). 예약 완료 화면과 내 정보 > 알림이 같이 쓴다.
+// 푸시 권한 안내 문구 (J14·O12, C-601·C-602·S-404). 예약 완료 화면, 고객 내 정보 > 알림, 원장님 내 계정이 같이 쓴다.
 // 서비스 이름은 SITE_NAME에서 가져온다(conventions "화면 문구와 디자인").
 
 import { SITE_NAME } from '@/lib/site';
+import { REMINDER_MINUTES_BEFORE } from '@/server/policy';
+
+import { formatReminderTimes } from './push-support';
 
 /** 이 브라우저에서는 웹 푸시를 받을 수 없다 */
 export const PUSH_UNSUPPORTED = '이 브라우저에서는 알림을 받을 수 없어요.';
@@ -20,4 +23,18 @@ export const IOS_INSTALL_STEPS = [
   '사파리 아래쪽의 공유 버튼을 눌러요',
   "'홈 화면에 추가'를 눌러요",
   `홈 화면의 ${SITE_NAME}를 열고 내 정보 > 알림에서 알림을 켜요`,
+] as const;
+
+/** 고객 내 정보 > 알림의 스위치 설명. 고객이 받는 알림(예약 확정, 리마인드, 관심 동네·찜한 샵 새 매물) */
+export const CUSTOMER_PUSH_DESCRIPTION = `예약 확정과 ${formatReminderTimes(REMINDER_MINUTES_BEFORE)} 알림, 관심 동네·찜한 샵 새 매물 알림을 이 기기로 받아요.`;
+
+/** 원장님 내 계정의 스위치 설명(O12, S-404, #307). 원장님이 받는 알림(src/server/notifications/alerts.ts의 원장님 알림) */
+export const OWNER_PUSH_DESCRIPTION =
+  '새 예약, 고객 예약 취소(같은 매물 다시 올리기 안내), 입점 승인·반려, 정산 계좌 변경 알림을 이 기기로 받아요.';
+
+/** 원장님 아이폰 홈 화면 추가 방법. 마지막 줄만 알림을 켜는 곳(원장님 내 계정)으로 바꾼다 */
+export const OWNER_IOS_INSTALL_STEPS = [
+  IOS_INSTALL_STEPS[0],
+  IOS_INSTALL_STEPS[1],
+  `홈 화면의 ${SITE_NAME}를 열고 원장님으로 로그인한 뒤 내 계정에서 알림을 켜요`,
 ] as const;

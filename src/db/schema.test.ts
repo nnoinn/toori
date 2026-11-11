@@ -10,10 +10,12 @@ import * as schema from './schema';
 const tables = Object.values(schema).filter((value) => is(value, PgTable)) as unknown as PgTable[];
 
 describe('DB 스키마 (docs/schema-v1.md W1a·W1b)', () => {
-  it('테이블 25개가 모두 있다', () => {
+  it('테이블 30개가 모두 있다(운영자 열람 기록 #269, 정산 계좌 변경 기록 #295, 시간대 매물 #308, 합의 후 취소 요청 #320 포함)', () => {
     expect(tables.map((t) => getTableName(t)).sort()).toEqual(
       [
+        'admin_access_logs',
         'admin_actions',
+        'agreed_cancel_requests',
         'coupons',
         'customers',
         'disputes',
@@ -25,6 +27,7 @@ describe('DB 스키마 (docs/schema-v1.md W1a·W1b)', () => {
         'orders',
         'owner_penalties',
         'owners',
+        'payout_account_changes',
         'payout_accounts',
         'penalty_collections',
         'profiles',
@@ -35,6 +38,8 @@ describe('DB 스키마 (docs/schema-v1.md W1a·W1b)', () => {
         'settlements',
         'shop_images',
         'shops',
+        'slot_window_menus',
+        'slot_windows',
         'slots',
         'terms_agreements',
         'webhook_events',

@@ -1,4 +1,4 @@
-// 환불·쿠폰·패널티 테이블 (docs/schema-v1.md 5장, X-202, X-203, X-207, C-407, S-409).
+// 환불·쿠폰·패널티·합의 후 취소 요청 테이블 (docs/schema-v1.md 5장, X-202, X-203, X-207, X-208, C-407, S-409, S-410).
 
 import { sql } from 'drizzle-orm';
 import {
@@ -12,18 +12,22 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+// 합의 후 취소 사유는 화면에서도 쓰는 값이라 화면에서 가져올 수 있는 파일에 두고 여기서 가져온다(카탈로그 정책값과 같은 방식)
+import { AGREED_CANCEL_REASONS } from '@/server/refunds/agreed-cancel-types';
+
 import { customers, profiles } from './accounts';
 import { orders, reservations } from './payments';
 import { settlements } from './settlements';
 import { shops } from './shops';
 import { createdAt, inValues, timestamptz } from './types';
 
-/** 환불 사유: 고객 취소 / 원장님 귀책 / 자동 취소 / 운영자 예외 */
+/** 환불 사유: 고객 취소 / 원장님 귀책 / 자동 취소 / 운영자 예외 / 합의 후 취소(X-208, #320) */
 export const REFUND_REASONS = [
   'customer_cancel',
   'owner_fault',
   'auto_cancel',
   'admin_exception',
+  'agreed_cancel',
 ] as const;
 export type RefundReason = (typeof REFUND_REASONS)[number];
 
@@ -75,10 +79,10 @@ export const refunds = pgTable(
       sql`${t.status} <> 'done' or ${t.processedAt} is not null`,
     ),
     check('refunds_band_check', sql`${t.band} is null or ${inValues(t.band, REFUND_BANDS_DB)}`),
-    // 한 예약에 고객 취소 환불 기록은 하나만
-    uniqueIndex('refunds_customer_cancel_unique')
+    // 한 예약에 취소 환불 기록(고객 취소·합의 후 취소)은 하나만. 둘이 동시에 처리돼도 환불은 한 번(#320)
+    uniqueIndex('refunds_cancel_unique')
       .on(t.reservationId)
-      .where(sql`${t.reason} = 'customer_cancel'`),
+      .where(sql`${t.reason} in ('customer_cancel', 'agreed_cancel')`),
     // 정리 작업이 오래된 진행 중 기록을 찾을 때
     index('refunds_requested_created_at_idx')
       .on(t.createdAt)
@@ -144,3 +148,65 @@ export const penaltyCollections = pgTable('penalty_collections', {
   amount: integer().notNull(),
   createdAt: createdAt(),
 }).enableRLS();
+
+/**
+ * 합의 후 취소 요청 상태: 손님 답 기다림 / 동의 / 거절 / 24시간 지남 /
+ * 끝남(손님이 답하기 전에 직접 취소했거나 방문·노쇼 처리됨)
+ */
+export const AGREED_CANCEL_REQUEST_STATUSES = [
+  'requested',
+  'agreed',
+  'declined',
+  'expired',
+  'closed',
+] as const;
+export type AgreedCancelRequestStatus = (typeof AGREED_CANCEL_REQUEST_STATUSES)[number];
+
+/**
+ * 합의 후 취소 요청 (S-410·C-506·X-208, #320, 11/8·11/10 결정). 원장님이 요청하고 손님이 24시간 안에 앱에서 동의하면 취소된다.
+ * 답을 기다리는 요청은 한 예약에 하나이고, 거절·만료 뒤에는 다시 요청할 수 있다(횟수 제한 없음).
+ * 샵별 합의 후 취소 횟수·사유는 이 표를 예약 → 매물 → 샵으로 이어서 센다
+ */
+export const agreedCancelRequests = pgTable(
+  'agreed_cancel_requests',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    reservationId: uuid()
+      .notNull()
+      .references((): AnyPgColumn => reservations.id),
+    // 요청한 원장님
+    requestedBy: uuid()
+      .notNull()
+      .references(() => profiles.id),
+    reason: text().notNull(),
+    // 기타일 때 내용(100자까지, 서버에서 확인)
+    reasonText: text(),
+    status: text().notNull(),
+    requestedAt: timestamptz().notNull().defaultNow(),
+    // 요청 + 24시간(정책값). 상태를 바꾸기 전이라도 이 시각이 지났으면 만료로 본다
+    expiresAt: timestamptz().notNull(),
+    // 동의·거절·만료·끝남을 기록한 시각
+    respondedAt: timestamptz(),
+  },
+  (t) => [
+    check('agreed_cancel_requests_reason_check', inValues(t.reason, AGREED_CANCEL_REASONS)),
+    check(
+      'agreed_cancel_requests_status_check',
+      inValues(t.status, AGREED_CANCEL_REQUEST_STATUSES),
+    ),
+    check('agreed_cancel_requests_expires_check', sql`${t.expiresAt} > ${t.requestedAt}`),
+    // 답을 기다리는 요청은 한 예약에 하나
+    uniqueIndex('agreed_cancel_requests_pending_unique')
+      .on(t.reservationId)
+      .where(sql`${t.status} = 'requested'`),
+    // 가장 최근 요청 읽기
+    index('agreed_cancel_requests_reservation_id_requested_at_idx').on(
+      t.reservationId,
+      t.requestedAt,
+    ),
+    // 만료 처리 작업
+    index('agreed_cancel_requests_pending_expires_at_idx')
+      .on(t.expiresAt)
+      .where(sql`${t.status} = 'requested'`),
+  ],
+).enableRLS();

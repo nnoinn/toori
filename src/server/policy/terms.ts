@@ -8,8 +8,11 @@ export const TERMS_VERSIONS = {
   privacy: 'draft-2026-10',
   location: 'draft-2026-10',
   supplier: 'draft-2026-10',
-  marketing: 'draft-2026-10',
+  // 동의 문구 1-2장(이벤트·혜택, #266·#284 리뷰, 11/8)
+  marketing: 'draft-2026-11',
   age14: 'draft-2026-10',
+  // 동의 문구 7장(#266·#274, 11/8)
+  interest_alert: 'draft-2026-11',
 } as const satisfies Record<TermsType, string>;
 
 /**

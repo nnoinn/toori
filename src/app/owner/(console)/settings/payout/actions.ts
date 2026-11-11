@@ -1,18 +1,18 @@
 'use server';
 
 // 매장 설정 > 정산 계좌 저장 (O7 ②, S-107). 화면(payout-form.tsx)에서 부른다.
-// 계좌번호는 강규민님 encryptAccountNumber로 암호화해서 저장하고 뒷자리 4개만 따로 둔다(가입 createOwnerAccount와 같게).
-// 계좌번호는 로그·오류 문구에 넣지 않는다.
+// 저장은 강규민님 changePayoutAccount가 한다(#295): 계좌번호를 암호화해 저장하고, 은행이나 번호가 바뀌었으면
+// 같은 트랜잭션에서 변경 기록(은행·뒷자리)을 남긴 뒤 원장님에게 "정산 계좌가 바뀌었어요" 알림을 보낸다.
+// 여기서는 그 전에 권한(내 샵인지)과 입력을 확인한다. 계좌번호는 로그·오류 문구에 넣지 않는다.
 
 import { refresh } from 'next/cache';
 
 import { getDb } from '@/db';
 import type { ResultError } from '@/lib/result';
 import { requireShopOwner } from '@/server/auth';
-import { encryptAccountNumber } from '@/server/payouts/account-crypto';
+import { changePayoutAccount } from '@/server/payouts/change-account';
 
 import { type PayoutInput, validatePayoutInput } from '../../../business-fields';
-import { upsertPayoutAccount } from './payout-store';
 
 export type PayoutFieldErrors = Partial<Record<keyof PayoutInput, string>>;
 
@@ -39,10 +39,12 @@ export async function savePayoutAccount(
     };
   }
   const { bankCode, accountNumber, accountHolder } = checked.data;
-  await upsertPayoutAccount(getDb(), shopId, {
+  // 계좌번호는 숫자만(validatePayoutInput이 맞춘 값). 바뀐 사람은 로그인한 사용자다
+  await changePayoutAccount(getDb(), {
+    shopId,
+    changedBy: auth.data.userId,
     bankCode,
-    accountNumberEncrypted: encryptAccountNumber(accountNumber),
-    accountLast4: accountNumber.slice(-4),
+    accountNumber,
     accountHolder,
   });
 

@@ -10,21 +10,13 @@ import { redirect } from 'next/navigation';
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { ok, type Result } from '@/lib/result';
-import { requireShopOwner } from '@/server/auth';
-import { assertShopApproved } from '@/server/shops';
 
-import type { CreatedSlot } from './new/slot-create-store';
-import { validateSlotDraft } from './new/slot-draft-store';
 import { relistSlotInDb } from './relist-store';
+import { requireApprovedOwner } from './require-approved-owner';
+import type { SavedSlot } from './slot-create-store';
+import { validateSlotDraft } from './slot-draft-store';
+import { editStartWindow } from './slot-edit';
 import { checkEditable, closeSlotInDb, updateSlotInDb } from './slot-edit-store';
-
-async function allowed(shopId: string): Promise<Result<null>> {
-  const auth = await requireShopOwner(shopId);
-  if (!auth.ok) return auth;
-  const approved = await assertShopApproved(shopId);
-  if (!approved.ok) return approved;
-  return ok(null);
-}
 
 /** 판매 전 매물을 마감한다. 사유: other_channel(다른 곳 예약) / mistake(잘못 올림) / other(기타) */
 export async function closeSlot(
@@ -32,7 +24,7 @@ export async function closeSlot(
   slotId: string,
   reason: unknown,
 ): Promise<Result<null>> {
-  const check = await allowed(shopId);
+  const check = await requireApprovedOwner(shopId);
   if (!check.ok) return check;
 
   const closed = await closeSlotInDb(getDb(), shopId, slotId, reason, await getRequestNow());
@@ -41,20 +33,26 @@ export async function closeSlot(
   return closed;
 }
 
-/** 수정 ①② 고른 메뉴·시작 시각이 올릴 수 있는 것인지 본다. 고치는 매물 자신과는 겹쳐도 된다 */
+/**
+ * 수정 ①② 고른 메뉴·시작 시각이 올릴 수 있는 것인지 본다. 고치는 매물 자신과는 겹쳐도 된다.
+ * 게시중 매물은 48시간 안, 예약대기 매물은 14일 안의 시각만 받는다(editStartWindow)
+ */
 export async function checkSlotEdit(
   shopId: string,
   slotId: string,
   input: unknown,
 ): Promise<Result<{ endAt: string }>> {
-  const check = await allowed(shopId);
+  const check = await requireApprovedOwner(shopId);
   if (!check.ok) return check;
 
   const db = getDb();
   const now = await getRequestNow();
   const editable = await checkEditable(db, shopId, slotId, now);
   if (!editable.ok) return editable;
-  const draft = await validateSlotDraft(db, shopId, input, now, { excludeSlotId: slotId });
+  const draft = await validateSlotDraft(db, shopId, input, now, {
+    excludeSlotId: slotId,
+    window: editStartWindow(editable.data, now),
+  });
   if (!draft.ok) return draft;
   return ok({ endAt: draft.data.end.toISOString() });
 }
@@ -64,8 +62,8 @@ export async function updateSlot(
   shopId: string,
   slotId: string,
   input: unknown,
-): Promise<Result<CreatedSlot>> {
-  const check = await allowed(shopId);
+): Promise<Result<SavedSlot>> {
+  const check = await requireApprovedOwner(shopId);
   if (!check.ok) return check;
 
   const updated = await updateSlotInDb(getDb(), shopId, slotId, input, await getRequestNow());
@@ -77,11 +75,9 @@ export async function updateSlot(
  * 취소된 매물을 같은 조건(메뉴·시간·할인율·신규 고객 전용)의 새 매물로 바로 게시한다(O13). 원래 매물은 '취소'로 남긴다.
  * 성공하면 대시보드로 보낸다. 새 매물(게시중)과 원래 매물의 "재등록함"이 보인다. 막히면 이유를 돌려준다
  */
-export async function relistSlot(shopId: string, slotId: string): Promise<Result<CreatedSlot>> {
-  const auth = await requireShopOwner(shopId);
+export async function relistSlot(shopId: string, slotId: string): Promise<Result<SavedSlot>> {
+  const auth = await requireApprovedOwner(shopId);
   if (!auth.ok) return auth;
-  const approved = await assertShopApproved(shopId);
-  if (!approved.ok) return approved;
 
   const relisted = await relistSlotInDb(
     getDb(),

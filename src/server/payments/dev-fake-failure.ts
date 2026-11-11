@@ -26,6 +26,18 @@ const SWITCHABLE = {
     'PHONE_REQUIRED',
     'NEW_CUSTOMER_ONLY',
     'PAYMENT_UNAVAILABLE',
+    'COUPON_NOT_FOUND',
+    'COUPON_EXPIRED',
+    'COUPON_USED',
+    'COUPON_NOT_APPLICABLE',
+  ],
+  previewCheckoutAmount: [
+    'NOT_HOLDER',
+    'HOLD_EXPIRED',
+    'COUPON_NOT_FOUND',
+    'COUPON_EXPIRED',
+    'COUPON_USED',
+    'COUPON_NOT_APPLICABLE',
   ],
   confirmPayment: [
     'PAYMENT_CANCELLED',

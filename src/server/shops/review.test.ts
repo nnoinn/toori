@@ -16,6 +16,11 @@ const state = vi.hoisted(() => ({
   reviewShop: vi.fn(),
   resubmitShop: vi.fn(),
   readShopReviewStatus: vi.fn(),
+  notifyShopReviewed: vi.fn(),
+}));
+
+vi.mock('@/server/notifications/alerts', () => ({
+  notifyShopReviewed: state.notifyShopReviewed,
 }));
 
 vi.mock('@/db', () => ({
@@ -84,6 +89,19 @@ describe('운영자: approveShop·rejectShop', () => {
       adminId: 'admin-1',
       decision: 'approve',
     });
+    expect(state.notifyShopReviewed).toHaveBeenCalledWith(expect.anything(), {
+      shopId: SHOP_ID,
+      decision: 'approve',
+      reviewedAt: expect.any(Date),
+    });
+  });
+
+  it('승인·반려를 저장하지 못하면(이미 심사함 등) 원장님 알림을 부르지 않는다', async () => {
+    const failed = fail('INVALID_STATUS', '승인 대기 중인 샵만 심사할 수 있어요');
+    state.reviewShop.mockResolvedValue(failed);
+    expect(await approveShop(SHOP_ID)).toEqual(failed);
+    expect(await rejectShop(SHOP_ID, '흐려요')).toEqual(failed);
+    expect(state.notifyShopReviewed).not.toHaveBeenCalled();
   });
 
   it('반려 사유는 앞뒤 공백을 지워서 저장한다', async () => {
@@ -93,6 +111,11 @@ describe('운영자: approveShop·rejectShop', () => {
       adminId: 'admin-1',
       decision: 'reject',
       reason: '등록증이 흐려요',
+    });
+    expect(state.notifyShopReviewed).toHaveBeenCalledWith(expect.anything(), {
+      shopId: SHOP_ID,
+      decision: 'reject',
+      reviewedAt: expect.any(Date),
     });
   });
 

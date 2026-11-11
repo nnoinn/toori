@@ -1,6 +1,8 @@
 // 개발 DB 명령(시드 scripts/seed.mjs, 시나리오 scripts/scenario.mjs)이 같이 쓰는 것.
 // 접속 안전장치, 시드 전용 정책값, 주문·예약·환불 한 벌을 만드는 도우미.
 
+import { randomInt } from 'node:crypto';
+
 import postgres from 'postgres';
 
 export const HOUR = 60 * 60 * 1000;
@@ -16,8 +18,8 @@ export const REFUND_BANDS = [
   { band: '6h_to_24h', minHoursLeft: 6, penaltyRate: 50 },
   { band: 'under_6h', minHoursLeft: 0, penaltyRate: 100 },
 ];
-// 예약번호: 영문 대문자+숫자 8자리, 헷갈리는 0/O·1/I 제외(docs/schema-v1.md reservations.code)
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+// 예약번호: 숫자 12자리, 하이픈 없이 저장(#262, docs/schema-v1.md reservations.code). 앱의 newReservationCode와 같은 모양
+const CODE_LENGTH = 12;
 
 /** 할인가 = 정가 × (1 − 할인율), 원 미만 버림 (S-203) */
 export function salePrice(listPrice, discountRate) {
@@ -25,8 +27,7 @@ export function salePrice(listPrice, discountRate) {
 }
 
 export function reservationCode() {
-  const bytes = crypto.getRandomValues(new Uint8Array(8));
-  return Array.from(bytes, (b) => CODE_CHARS[b % CODE_CHARS.length]).join('');
+  return Array.from({ length: CODE_LENGTH }, () => randomInt(10)).join('');
 }
 
 /**

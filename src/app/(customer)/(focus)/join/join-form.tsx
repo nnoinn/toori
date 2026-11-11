@@ -4,12 +4,11 @@ import { useId, useState, useTransition } from 'react';
 import { unstable_rethrow, useRouter } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 
-import { PHONE_FORMAT_MESSAGE } from '@/app/(customer)/(tabs)/me/profile-rules';
 import { BackButton } from '@/components/ui/back-button';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { PhoneInput } from '@/components/ui/phone-input';
-import { isPhoneInputFull, normalizePhone } from '@/lib/phone';
+import { isPhoneInputFull, normalizePhone, PHONE_FORMAT_MESSAGE } from '@/lib/phone';
 import { SITE_NAME } from '@/lib/site';
 import { createCustomerAccount } from '@/server/auth/customer-account';
 

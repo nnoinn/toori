@@ -6,7 +6,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fail, ok } from '@/lib/result';
 import type { CurrentAccount } from '@/server/auth';
 
-import { createBusinessDocUploadUrl, createShopImageUploadUrl, getBusinessDocUrl } from './upload';
+import {
+  createAdminBusinessDocUploadUrl,
+  createBusinessDocUploadUrl,
+  createShopImageUploadUrl,
+  getBusinessDocUrl,
+} from './upload';
 
 const SHOP = '2b3c4d5e-6f70-4812-9a3b-4c5d6e7f8091';
 const NOW = new Date('2026-10-28T06:00:00Z');
@@ -14,6 +19,7 @@ const NOW = new Date('2026-10-28T06:00:00Z');
 const state = vi.hoisted(() => ({
   account: null as Partial<CurrentAccount> | null,
   ownerAuth: null as unknown,
+  adminAuth: null as unknown,
   reviewStatus: 'pending' as string,
   docRows: [] as { businessDocPath: string }[],
   createSignedUploadUrl: vi.fn(),
@@ -29,6 +35,7 @@ vi.mock('@/server/auth', () => ({
   },
   getCurrentAccount: async () => state.account,
   requireShopOwner: async () => state.ownerAuth,
+  requireAdmin: async () => state.adminAuth,
 }));
 vi.mock('@/server/shops/review-store', async (importOriginal) => ({
   SHOP_REVIEW_ERRORS: (await importOriginal<typeof import('@/server/shops/review-store')>())
@@ -61,6 +68,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, 'error').mockImplementation(() => {});
   state.ownerAuth = ok({ userId: 'user-1', ownerId: 'owner-1', shopId: SHOP });
+  state.adminAuth = ok({ userId: 'admin-1' });
   state.account = { userId: 'user-1', mode: 'owner', ownerId: null, shopId: null, isAdmin: false };
   state.reviewStatus = 'pending';
   state.docRows = [{ businessDocPath: `shops/${SHOP}/doc.jpg` }];
@@ -209,5 +217,39 @@ describe('getBusinessDocUrl', () => {
     state.createSignedUrl.mockResolvedValue({ data: null, error: new Error('Object not found') });
     const noFile = await getBusinessDocUrl(SHOP);
     expect(noFile.ok === false && noFile.error.code).toBe('DOC_NOT_FOUND');
+  });
+});
+
+describe('createAdminBusinessDocUploadUrl', () => {
+  it('운영자는 그 샵 폴더(원장님과 같은 곳)에 등록증 주소를 만든다', async () => {
+    const result = await createAdminBusinessDocUploadUrl({
+      shopId: SHOP,
+      contentType: 'application/pdf',
+      size: 1000,
+    });
+    expect(state.bucket).toHaveBeenCalledWith('business-docs');
+    expect(result.ok && result.data.path).toMatch(
+      new RegExp(`^shops/${SHOP}/[0-9a-f-]{36}\\.pdf$`),
+    );
+  });
+
+  it('운영자가 아니면 권한 실패를 그대로 돌려주고 주소를 만들지 않는다', async () => {
+    state.adminAuth = fail('FORBIDDEN', '접근 권한이 없어요');
+    expect(await createAdminBusinessDocUploadUrl({ shopId: SHOP, ...FILE })).toEqual(
+      state.adminAuth,
+    );
+    expect(state.createSignedUploadUrl).not.toHaveBeenCalled();
+  });
+
+  it('샵 id 모양이 아니거나 허용하지 않는 파일이면 주소를 만들지 않는다', async () => {
+    const badId = await createAdminBusinessDocUploadUrl({ shopId: '../x', ...FILE });
+    expect(badId.ok === false && badId.error.code).toBe('SHOP_NOT_FOUND');
+    const gif = await createAdminBusinessDocUploadUrl({
+      shopId: SHOP,
+      contentType: 'image/gif',
+      size: 1000,
+    });
+    expect(gif.ok === false && gif.error.code).toBe('INVALID_FILE_TYPE');
+    expect(state.createSignedUploadUrl).not.toHaveBeenCalled();
   });
 });

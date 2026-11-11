@@ -3,7 +3,9 @@
 // 샵에 연락처를 주는 기간이 "예약한 서비스 이용이 끝날 때까지"라서다(동의 문구 3-1).
 // 방문 완료·노쇼 처리(O14, S-405)는 누른 뒤 확인 창에서 한 번 더 눌러야 하고, 처리한 뒤에는 바꿀 수 없다(#130).
 
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { CancelActor, ReservationStatus, VisitResult } from '@/db/schema';
+import { formatKst } from '@/lib/time';
 import type { VisitErrorCode } from '@/server/visits/errors';
 import { canRecordVisit } from '@/server/visits/rules';
 
@@ -22,6 +24,7 @@ export const CANCEL_ACTOR_LABELS: Record<CancelActor, string> = {
   owner_fault: '원장님 사정으로 취소',
   system: '자동 취소',
   admin: '운영자 취소',
+  agreed: '합의 후 취소',
 };
 
 export type ReservationViewInput = {
@@ -44,14 +47,23 @@ export function showsFullPhone(reservation: ReservationViewInput): boolean {
   return reservation.status === 'confirmed' && reservation.visitResult === null;
 }
 
-/** 휴대폰 번호 가운데를 가린다. 예: "010-1234-5678" → "010-****-5678" */
-export function maskPhone(phone: string): string {
-  const parts = phone.split('-');
-  if (parts.length === 3) return [parts[0], '*'.repeat(parts[1].length), parts[2]].join('-');
-  return `****${phone.slice(-4)}`;
+/** 방문 완료·노쇼 버튼과 확인 창 문구(10/29 nnoinn, #130) */
+/**
+ * 방문 완료·노쇼 확인 창에 보여줄 예약 한 줄. 예: "11/1(토) 14:00 커트 · 예약번호 1234-5678-9012".
+ * 예약 상세와 대시보드 "처리 필요" 줄이 같은 문구를 써서, 어느 쪽에서 눌러도 같은 예약인지 맞춰 볼 수 있다
+ */
+export function visitSummary({
+  startAt,
+  menuName,
+  code,
+}: {
+  startAt: Date;
+  menuName: string;
+  code: string;
+}): string {
+  return `${formatKst(startAt)} ${menuName} · 예약번호 ${formatReservationCode(code)}`;
 }
 
-/** 방문 완료·노쇼 버튼과 확인 창 문구(10/29 nnoinn, #130) */
 export const VISIT_ACTIONS: Record<
   VisitResult,
   { button: string; title: string; consequence: string | null; confirm: string }

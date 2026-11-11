@@ -7,10 +7,11 @@ import { EmptyState } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { formatKst } from '@/lib/time';
 import { cn } from '@/lib/utils';
+import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
 import { SHOP_STATUS_LABELS } from '@/server/shops/status';
 
-import { labelCategory } from './format';
+import { categoryLabel } from '@/server/policy';
 import { REVIEW_FILTERS, type ReviewFilter, selectShopsForReview } from './queries';
 import { StatusBadge } from './status-badge';
 
@@ -42,8 +43,13 @@ export default function AdminShopsPage({ searchParams }: { searchParams: SearchP
 }
 
 async function ShopList({ searchParams }: { searchParams: SearchParams }) {
-  await ensureAdminPage();
+  const admin = await ensureAdminPage();
   const filter = toFilter((await searchParams).status);
+  await recordAdminAccess(admin.userId, {
+    action: 'search',
+    targetType: 'list',
+    path: `/admin/shops?status=${filter}`,
+  });
   const rows = await selectShopsForReview(getDb(), filter);
 
   return (
@@ -91,7 +97,7 @@ async function ShopList({ searchParams }: { searchParams: SearchParams }) {
                       {row.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-3">{labelCategory(row.category)}</td>
+                  <td className="px-4 py-3">{categoryLabel(row.category)}</td>
                   <td className="px-4 py-3">{row.businessName}</td>
                   <td className="px-4 py-3">{row.sigungu}</td>
                   <td className="px-4 py-3 whitespace-nowrap">{formatKst(row.appliedAt)}</td>

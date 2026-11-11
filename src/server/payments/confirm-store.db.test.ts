@@ -4,7 +4,7 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
-import { orders, refunds, reservations, slots } from '@/db/schema';
+import { coupons, orders, refunds, reservations, slots } from '@/db/schema';
 
 import { createTestCustomer, createTestShop, testSlot } from '../../../tests/db/fixtures';
 import { closeTestDb, describeDb, type TestTx, withRollback } from '../../../tests/db/test-db';
@@ -23,7 +23,11 @@ const MINUTE = 60 * 1000;
 const at = (minutes: number) => new Date(NOW.getTime() + minutes * MINUTE);
 
 /** 승인 샵의 게시중 매물을 이 고객이 10분 홀딩하고 결제 대기 주문을 만든 상태 */
-async function heldAndOrdered(tx: TestTx, slotExtra: Partial<typeof slots.$inferInsert> = {}) {
+async function heldAndOrdered(
+  tx: TestTx,
+  slotExtra: Partial<typeof slots.$inferInsert> = {},
+  withCoupon = false,
+) {
   const shop = await createTestShop(tx, { status: 'approved' });
   const { customerId } = await createTestCustomer(tx);
   const [slot] = await tx
@@ -36,17 +40,34 @@ async function heldAndOrdered(tx: TestTx, slotExtra: Partial<typeof slots.$infer
       }),
     )
     .returning();
+  const couponId = withCoupon ? await insertCoupon(tx, customerId) : null;
   const paymentId = newPaymentId();
   const orderId = await createPendingOrder(tx, {
     paymentId,
     slotId: slot.id,
     customerId,
     salePrice: 14_000,
-    couponAmount: 0,
-    amount: 14_000,
+    couponId,
+    couponAmount: couponId ? 3000 : 0,
+    amount: couponId ? 11_000 : 14_000,
     agreedAt: NOW,
   });
-  return { customerId, slotId: slot.id, paymentId, orderId };
+  return { customerId, slotId: slot.id, paymentId, orderId, couponId };
+}
+
+/** 이 고객의 3,000원 쿠폰(기한 90일) */
+async function insertCoupon(tx: TestTx, customerId: string) {
+  const [row] = await tx
+    .insert(coupons)
+    .values({
+      customerId,
+      amount: 3000,
+      reason: 'owner_fault_compensation',
+      issuedAt: at(-60),
+      expiresAt: at(90 * 24 * 60),
+    })
+    .returning({ id: coupons.id });
+  return row.id;
 }
 
 const paidAt = (minutes: number) => ({
@@ -136,6 +157,42 @@ describeDb('결제 확인 저장 (실제 DB)', () => {
         ok: false,
         code: 'SLOT_SOLD',
       });
+    });
+  });
+
+  it('쿠폰을 쓴 주문을 확정하면 쿠폰을 그 주문에 쓴 것으로 바꾼다(#300)', async () => {
+    await withRollback(async (tx) => {
+      const { orderId, couponId } = await heldAndOrdered(tx, {}, true);
+      const result = await confirmPaidOrder(tx, { orderId, ...paidAt(3) });
+      expect(result.ok).toBe(true);
+      const [coupon] = await tx.select().from(coupons).where(eq(coupons.id, couponId!));
+      expect(coupon).toMatchObject({ usedOrderId: orderId, usedAt: at(3) });
+    });
+  });
+
+  it('그 사이 다른 결제에 쓴 쿠폰이면 확정하지 않고 AMOUNT_MISMATCH로 기록한다(자동 취소 대상)', async () => {
+    await withRollback(async (tx) => {
+      const { customerId, slotId, orderId, couponId } = await heldAndOrdered(tx, {}, true);
+      // 다른 주문이 이 쿠폰을 먼저 썼다(쓴 주문 칸만 채운다)
+      const other = await heldAndOrdered(tx);
+      await tx
+        .update(coupons)
+        .set({ usedOrderId: other.orderId, usedAt: at(1) })
+        .where(eq(coupons.id, couponId!));
+
+      expect(await confirmPaidOrder(tx, { orderId, ...paidAt(3) })).toEqual({
+        ok: false,
+        code: 'AMOUNT_MISMATCH',
+      });
+      const [order] = await tx.select().from(orders).where(eq(orders.id, orderId));
+      expect(order).toMatchObject({ status: 'paid', failureCode: 'AMOUNT_MISMATCH' });
+      const [slot] = await tx.select().from(slots).where(eq(slots.id, slotId));
+      expect(slot.status).toBe('published');
+      expect(
+        await tx.select().from(reservations).where(eq(reservations.customerId, customerId)),
+      ).toEqual([]);
+      const [coupon] = await tx.select().from(coupons).where(eq(coupons.id, couponId!));
+      expect(coupon.usedOrderId).toBe(other.orderId);
     });
   });
 

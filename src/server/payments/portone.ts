@@ -13,6 +13,8 @@ const cancellationSchema = z.object({
   status: z.string(),
   id: z.string().optional(),
   totalAmount: z.number().optional(),
+  /** 취소를 요청할 때 보낸 사유. 앱은 고객 취소에 '고객 예약 취소'를 보낸다(refund-payment.ts) */
+  reason: z.string().optional(),
 });
 
 /** 응답 중 결제 확인에 필요한 칸만 읽는다(나머지는 무시). 결제 상태별로 있는 칸이 달라서 대부분 비어 있을 수 있다 */
@@ -42,7 +44,7 @@ export type PortOnePayment = {
   /** 실패했을 때 결제사 코드(failure.pgCode). 예: 고객이 결제창을 닫으면 PAY_PROCESS_CANCELED(토스페이먼츠) */
   failureCode: string | null;
   /** 끝난 취소 내역(status SUCCEEDED만). 취소된 결제에만 있다 */
-  cancellations: { id: string | null; amount: number | null }[];
+  cancellations: { id: string | null; amount: number | null; reason: string | null }[];
   /** 결제사가 아직 처리 중인 취소(status REQUESTED)가 있는지 */
   cancelInProgress: boolean;
 };
@@ -110,6 +112,7 @@ export async function getPortOnePayment(paymentId: string): Promise<PortOneLooku
         .map((cancellation) => ({
           id: cancellation.id ?? null,
           amount: cancellation.totalAmount ?? null,
+          reason: cancellation.reason ?? null,
         })),
       cancelInProgress: (payment.cancellations ?? []).some(
         (cancellation) => cancellation.status === 'REQUESTED',
@@ -118,10 +121,15 @@ export async function getPortOnePayment(paymentId: string): Promise<PortOneLooku
   };
 }
 
-/** 끝난 취소를 하나로 합친다. 없으면 null. 금액을 모르는 취소가 있으면 금액은 null */
-export function finishedCancellation(
-  payment: PortOnePayment,
-): { cancellationId: string | null; amount: number | null } | null {
+/** 끝난 취소를 하나로 합친 것. 금액을 모르는 취소가 있으면 금액은 null, reasons는 취소마다의 사유 */
+export type FinishedCancellation = {
+  cancellationId: string | null;
+  amount: number | null;
+  reasons: (string | null)[];
+};
+
+/** 끝난 취소를 하나로 합친다. 없으면 null */
+export function finishedCancellation(payment: PortOnePayment): FinishedCancellation | null {
   const { cancellations } = payment;
   if (cancellations.length === 0) return null;
   const amounts = cancellations.map((cancellation) => cancellation.amount);
@@ -130,6 +138,7 @@ export function finishedCancellation(
     amount: amounts.some((amount) => amount === null)
       ? null
       : amounts.reduce<number>((sum, amount) => sum + (amount ?? 0), 0),
+    reasons: cancellations.map((cancellation) => cancellation.reason),
   };
 }
 

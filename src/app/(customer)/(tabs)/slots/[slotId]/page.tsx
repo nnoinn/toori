@@ -1,12 +1,14 @@
-import { Suspense } from 'react';
+import { cache, Suspense } from 'react';
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { Skeleton } from '@/components/ui/skeleton';
-import { z } from 'zod';
+import { isUuid } from '@/lib/uuid';
 
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { getCurrentAccount } from '@/server/auth';
+import { getOptionalConsents } from '@/server/auth/customer-account';
 
 import { isFavoriteShop } from '../../home/favorites/store';
 import { selectSlotDetail } from './queries';
@@ -30,16 +32,41 @@ async function currentCustomerId(): Promise<string | null> {
   return account?.mode === 'customer' ? account.customerId : null;
 }
 
-async function DetailContent({ params }: { params: Params }) {
-  const { slotId } = await params;
+/** 상세 조회. 화면과 탭 제목(generateMetadata)이 같이 써서 한 요청에 한 번만 조회한다. 볼 수 없으면 null */
+const loadSlot = cache(async (slotId: string) => {
   // 매물 ID 모양이 아니면 DB에 묻지 않고 없는 매물로 본다
-  if (!z.uuid().safeParse(slotId).success) notFound();
+  if (!isUuid(slotId)) return null;
   const [customerId, now] = await Promise.all([currentCustomerId(), getRequestNow()]);
-  const db = getDb();
-  const slot = await selectSlotDetail(db, { slotId, customerId, now });
-  if (!slot) notFound();
-  const favorite = customerId ? await isFavoriteShop(db, customerId, slot.shop.shopId) : false;
-  return <SlotDetailView slot={slot} serverNow={now.toISOString()} favorite={favorite} />;
+  const slot = await selectSlotDetail(getDb(), { slotId, customerId, now });
+  return slot ? { slot, customerId, now } : null;
+});
+
+/** 탭 제목: "여성 커트 · 샘플 헤어 중앙역점 | 투리" */
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const loaded = await loadSlot((await params).slotId);
+  return {
+    title: loaded ? `${loaded.slot.menu.name} · ${loaded.slot.shop.name}` : '매물을 찾을 수 없어요',
+  };
+}
+
+async function DetailContent({ params }: { params: Params }) {
+  const loaded = await loadSlot((await params).slotId);
+  if (!loaded) notFound();
+  const { slot, customerId, now } = loaded;
+  const [favorite, consents] = customerId
+    ? await Promise.all([
+        isFavoriteShop(getDb(), customerId, slot.shop.shopId),
+        getOptionalConsents(),
+      ])
+    : [false, null];
+  return (
+    <SlotDetailView
+      slot={slot}
+      serverNow={now.toISOString()}
+      favorite={favorite}
+      interestAlertAgreed={consents?.ok ? consents.data.interest_alert.agreed : false}
+    />
+  );
 }
 
 function DetailSkeleton() {

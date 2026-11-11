@@ -6,7 +6,7 @@
 
 import { TransactionRollbackError } from 'drizzle-orm';
 import { refresh } from 'next/cache';
-import { z } from 'zod';
+import { isUuid } from '@/lib/uuid';
 
 import { getDb } from '@/db';
 import { fail, ok, type Result, type ResultError } from '@/lib/result';
@@ -133,10 +133,6 @@ export async function saveShopLinks(
   }
   refresh();
   return { ok: true };
-}
-
-function isUuid(value: unknown): value is string {
-  return z.uuid().safeParse(value).success;
 }
 
 /**

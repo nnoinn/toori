@@ -8,9 +8,10 @@ import { ensureOwnerPage } from '@/server/auth';
 import { readShopReviewStatus } from '@/server/shops/review-store';
 
 import { JoinedNotice } from '../join/joined-notice';
-import { startOfKstDay } from './dashboard/dashboard';
+import { startOfKstDay } from '@/lib/time';
 import { selectDashboardSlots, selectNeedsVisitRecord } from './dashboard/dashboard-store';
 import { OwnerDashboard } from './dashboard/owner-dashboard';
+import { OwnerPage } from './owner-page';
 import { ReviewStatusCard } from './review-status-card';
 
 export const metadata: Metadata = { title: '대시보드' };
@@ -21,16 +22,16 @@ const PAGE_PATH = '/owner';
 // 입점 신청 직후에는 "입점 신청을 마쳤어요" 안내 상자가 잠깐 뜬다(O7 ①). PC 기준
 export default function OwnerHomePage() {
   return (
-    <main className="flex w-full max-w-4xl flex-1 flex-col gap-4 p-6">
-      <h1 className="text-xl font-bold">대시보드</h1>
+    <OwnerPage title="대시보드" width="wide">
       <Suspense fallback={<LoadingCards count={3} />}>
         <OwnerHomeContent />
       </Suspense>
       <JoinedNotice />
-    </main>
+    </OwnerPage>
   );
 }
 
+/** 입점 승인 전이면 입점 상태 안내, 승인됐으면 오늘 0시 이후 매물과 처리 필요 예약으로 대시보드를 그린다 */
 async function OwnerHomeContent() {
   // 로그인하지 않았으면 로그인 화면, 원장님 가입 전이면 /owner/join 으로 보낸다
   const auth = await ensureOwnerPage(PAGE_PATH);
