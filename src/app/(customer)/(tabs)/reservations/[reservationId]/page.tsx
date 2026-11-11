@@ -11,6 +11,7 @@ import { formatWon } from '@/lib/format';
 import { getRequestNow } from '@/lib/request-time';
 import { formatKst } from '@/lib/time';
 import { ensureCustomerPage } from '@/server/auth';
+import { getDisputeStatus } from '@/server/disputes/dispute';
 import { previewRefund } from '@/server/refunds/cancel';
 import { REFUND_ERRORS } from '@/server/refunds/errors';
 
@@ -20,6 +21,8 @@ import { getMyReservationDetail } from '../queries';
 import { isVisitPending, showsCancelSection, showsCheckInCard } from '../reservation-tabs';
 import { CancelReservation } from './cancel-reservation';
 import { CheckInCard } from './check-in-card';
+import { DisputeSection } from './dispute-section';
+import { NO_SHOW_DISPUTE_BELOW } from './dispute-texts';
 
 export const metadata: Metadata = { title: '예약 상세' };
 
@@ -28,7 +31,7 @@ type Params = Promise<{ reservationId: string }>;
 const STATUS_LABEL = { confirmed: '예정', completed: '이용 완료', cancelled: '취소' } as const;
 
 // 예약 상세 (J12, C-502). 본인 예약만 열린다. 예정 예약은 위쪽에 예약번호를 크게 보여 주는 '방문 확인' 칸이 있고(C-504),
-// 시작 전이면 맨 아래에서 취소할 수 있다(J13, C-503)
+// 시작 전이면 맨 아래에서 취소할 수 있다(J13, C-503). 시작 뒤(취소된 예약은 취소된 뒤)에는 이의제기 칸이 있다(C-507)
 export default function ReservationDetailPage({ params }: { params: Params }) {
   return (
     <main className="flex flex-1 flex-col md:mx-auto md:w-full md:max-w-3xl md:px-6 md:py-6">
@@ -60,9 +63,11 @@ async function DetailContent({ params }: { params: Params }) {
   const visitPending = isVisitPending(r.status, r.startAt, now);
   const checkIn = showsCheckInCard(r.status);
   const tel = r.shop.phone.replace(/[^\d+]/g, '');
-  const refundPreview = showsCancelSection(r.status, r.startAt, now)
-    ? await previewRefund(r.reservationId)
-    : null;
+  const [refundPreview, dispute] = await Promise.all([
+    showsCancelSection(r.status, r.startAt, now) ? previewRefund(r.reservationId) : null,
+    getDisputeStatus(r.reservationId),
+  ]);
+  const disputeShown = dispute.ok && dispute.data.state !== 'not_open';
 
   return (
     <article className="flex flex-col gap-4 pb-6">
@@ -92,7 +97,9 @@ async function DetailContent({ params }: { params: Params }) {
             <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
             <div className="flex flex-col gap-1">
               <p>원장님이 노쇼로 처리한 예약이에요. {noShowRefundNote()}.</p>
-              <p className="text-muted-foreground">{NO_SHOW_DISPUTE_NOTE}.</p>
+              <p className="text-muted-foreground">
+                {disputeShown ? NO_SHOW_DISPUTE_BELOW : NO_SHOW_DISPUTE_NOTE}.
+              </p>
             </div>
           </div>
         ) : null}
@@ -158,6 +165,9 @@ async function DetailContent({ params }: { params: Params }) {
           </dl>
         </section>
       ) : null}
+
+      {/* 다시 읽을 때마다(서버 시각이 바뀌면) 새로 시작한다. 접수 뒤 새로 읽으면 접수함으로 바뀐다 */}
+      {dispute.ok ? <DisputeSection key={dispute.data.serverNow} view={dispute.data} /> : null}
 
       {refundPreview ? (
         <section className="flex flex-col gap-2 border-t px-4 pt-4" aria-label="예약 취소">

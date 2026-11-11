@@ -12,7 +12,7 @@ export function noShowRefundNote(penaltyRate: number = NO_SHOW_PENALTY_RATE): st
 }
 
 /**
- * 노쇼가 잘못 처리됐을 때 알리는 곳. 이의제기 처리 방식(A-104)이 정해지기 전까지
- * 원장님 화면의 문의와 같은 카카오톡 채널로 안내한다(11/4)
+ * 노쇼가 잘못 처리됐을 때 알리는 곳. 예약 상세의 이의제기(C-507)와 카카오톡 채널 둘 다 받는다(11/9).
+ * 예약 상세에서는 바로 아래 이의제기 칸으로 이어 준다(NO_SHOW_DISPUTE_BELOW)
  */
-export const NO_SHOW_DISPUTE_NOTE = `잘못 처리됐다면 예약번호와 함께 ${SITE_NAME} 카카오톡 채널로 알려 주세요`;
+export const NO_SHOW_DISPUTE_NOTE = `잘못 처리됐다면 그 예약 상세의 이의제기나 ${SITE_NAME} 카카오톡 채널로 알려 주세요`;
