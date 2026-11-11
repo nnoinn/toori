@@ -35,6 +35,9 @@ erDiagram
   shops ||--o{ slots : "매물"
   menus ||--o{ slots : ""
   slots ||--o| slots : "재등록 원본"
+  shops ||--o{ slot_windows : "시간대 매물"
+  slot_windows ||--o{ slot_window_menus : "올린 서비스"
+  slot_windows ||--o{ slots : "예약할 때 만든 매물"
   slots ||--o| reservations : ""
   customers ||--o{ orders : ""
   slots ||--o{ orders : ""
@@ -256,6 +259,7 @@ erDiagram
 | closed_at | timestamptz, null | 원장님이 직접 마감한 시각 |
 | close_reason | text, null | `other_channel`(다른 곳 예약) / `mistake`(잘못 올림) / `other`(기타) |
 | relisted_from_slot_id | uuid, null → slots | 재등록(S-408)으로 만든 매물이면 원래 매물 |
+| window_id | uuid, null → slot_windows | 시간대 매물 안에서 고객이 [예약하기]로 만든 매물이면 그 시간대(#308). 한 시술 매물은 비어 있다 |
 | created_by | uuid → profiles | 등록한 사람 |
 | created_at, updated_at | timestamptz | |
 
@@ -282,6 +286,52 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 ```
 
 마감·취소·완료 매물은 제약에서 빠지므로, 같은 시간에 다시 올리거나 재등록할 수 있다.
+
+### slot_windows — 시간대 매물 (#308, 11/10·11/11 결정)
+
+S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠 칸이 이어진 묶음 하나가 한 줄이다(10:00~12:00과 13:00~18:00을 켜면 두 줄, 서비스·할인율은 같다). 고객이 [예약하기]를 누르면 고른 서비스·시작 시각으로 `slots` 한 칸을 만들어(`window_id`) 홀딩하고, 그 뒤 결제·예약·취소·환불·정산·노쇼는 지금 매물 흐름 그대로다. 나중에 한 시술 매물을 시간대로 합칠 수 있게, 서비스 하나에 시간대 길이 = 소요 시간인 경우도 담는다(서비스 개수 조건이 없다).
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| id | uuid PK | |
+| shop_id | uuid → shops | |
+| start_at | timestamptz | 시간대 시작. 30분 단위(저장할 때 서버에서 확인) |
+| end_at | timestamptz | 시간대 끝. 예약은 이 시각을 넘을 수 없다 |
+| publish_at | timestamptz | 게시 시각. 시간대 시작 48시간 전보다 이르면 그때까지 '예약대기'(미리 올리기는 14일 안) |
+| status | text | `scheduled`(예약대기) / `published`(게시중) / `closed`(마감). 시간이 지나서 마감되는 것은 조회할 때 계산한다 |
+| new_customer_only | boolean, 기본 false | 시간대 전체에 켠다. 안에서 만든 매물도 같은 값 |
+| closed_at | timestamptz, null | 원장님이 직접 마감한 시각 |
+| close_reason | text, null | 매물과 같은 사유(`other_channel` / `mistake` / `other`) |
+| created_by | uuid → profiles | 올린 사람 |
+| created_at, updated_at | timestamptz | |
+
+- 한 고객이 예약해도 남은 시간은 계속 판다. 남은 빈 시간에 들어가는 서비스가 없거나, 마감하거나, 시간이 지나면 목록에서 내린다(조회할 때 계산)
+- 안의 예약이 취소되면 그 시간은 저절로 다시 열린다(안에서 만든 매물이 '취소'가 되어 겹침 제약에서 빠진다). 홀딩이 결제 없이 끝난 매물이 시간을 막지 않게 비우는 방법은 함수 PR에서 정한다
+
+### slot_window_menus — 시간대에 올린 서비스
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| id | uuid PK | |
+| window_id | uuid → slot_windows | |
+| menu_id | uuid → menus | unique(`window_id`, `menu_id`): 한 시간대에 같은 메뉴는 한 번 |
+| service_type, menu_name, menu_description, list_price, duration_minutes | | 올릴 때 값(매물처럼 나중에 메뉴를 고쳐도 그대로) |
+| discount_rate | integer | 서비스마다 10/20/30/40/50 중 하나(`check`로 10~50) |
+| sale_price | integer | 할인가 = 정가 × (1 − 할인율), 원 미만 버림. 서버가 계산해서 저장 |
+| created_at | timestamptz | |
+
+"마지막에 올린 설정"은 따로 표를 두지 않고, 그 샵이 마지막으로 올린 시간대의 서비스·할인율을 읽는다.
+
+**시간 겹침 막기(S-209를 넓힘, 마이그레이션 0011).**
+
+| 무엇끼리 | 어떻게 | 오류 이름 |
+| --- | --- | --- |
+| 시간대끼리(`scheduled`·`published`) | EXCLUDE 제약(`slots_no_overlap`과 같은 방식) | `slot_windows_no_overlap` |
+| 한 시술 매물(`window_id` 없음, `scheduled`·`published`·`reserved`) → 시간대 | 트리거 `slots_no_window_overlap` | `slots_no_overlap`(지금 원장님 화면 안내를 그대로 쓴다) |
+| 시간대 → 매물(그 시간대 안에서 만든 매물은 뺀다) | 트리거 `slot_windows_no_slot_overlap` | `slot_windows_no_overlap` |
+| 시간대 안에서 만든 매물끼리 | 지금 `slots_no_overlap` | `slots_no_overlap` |
+
+두 트리거는 같은 샵 줄을 먼저 잠가서(`FOR NO KEY UPDATE`), 시간대와 매물이 동시에 저장돼도 서로를 보고 겹침을 놓치지 않는다.
 
 ---
 
@@ -572,7 +622,9 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 테이블 | 인덱스·제약 | 왜 |
 | --- | --- | --- |
 | shops | GIST(location), (status), (sigungu_code) | 지도·거리 검색, 승인된 샵만, 지역 필터 |
-| slots | (status, start_at), (shop_id, start_at), (publish_at), 시간 겹침 EXCLUDE | 목록 조회, 원장님 대시보드, 관심 지역 묶음 알림, S-209 |
+| slots | (status, start_at), (shop_id, start_at), (publish_at), (window_id), 시간 겹침 EXCLUDE, 시간대와 겹침 트리거 | 목록 조회, 원장님 대시보드, 관심 지역 묶음 알림, 시간대 안 예약 매물, S-209 |
+| slot_windows | (shop_id, start_at), (status, start_at), (publish_at), 시간대끼리 겹침 EXCLUDE, 매물과 겹침 트리거 | 원장님 대시보드, 고객 목록, 새 매물 알림, S-209 |
+| slot_window_menus | unique(window_id, menu_id), check: discount_rate 10~50, duration_minutes > 0 | 한 시간대에 같은 메뉴 한 번 |
 | location_use_logs | (created_at) | 6개월 지난 기록 정리 |
 | admin_access_logs | (created_at), (admin_id, created_at), UPDATE·DELETE·TRUNCATE 막는 트리거 | 보관 기간 확인, 운영자별 월 1회 점검, 기록 위·변조 방지 |
 | payout_account_changes | (shop_id, created_at) | 샵별 계좌 변경 이력 |
@@ -622,3 +674,4 @@ ALTER TABLE slots ADD CONSTRAINT slots_no_overlap
 | 2026-11-09 | `terms_agreements.terms_type`에 `interest_alert`(관심 동네·찜한 샵 새 매물 알림 수신 동의, 선택)를 더한다. 관심 동네·찜한 샵 알림은 이벤트·혜택 광고성 동의(`marketing`)와 따로 받는다(#267·#270, 11/8 결정). 이미 있는 `marketing` 기록은 출시 전이라 옮기지 않는다. 마이그레이션 0008 |
 | 2026-11-09 | `admin_access_logs`(운영자 열람 기록)를 더한다. 운영자가 개인정보가 보이는 화면을 볼 때마다 누가·언제·어디서(IP)·누구의 정보를·무엇을(상세 보기·목록 검색) 남기고 1년 이상 보관한다. 기록하지 못하면 화면을 보여주지 않는다(#269, 11/8 결정). DB 트리거로 고치기·지우기·비우기를 막는다(#286 리뷰, 11/9). 마이그레이션 0009 |
 | 2026-11-10 | `payout_account_changes`(정산 계좌 변경 기록)를 더한다. 바꾼 사람, 바꾸기 전·뒤 은행·뒷자리, 시각만 남기고 전체 계좌번호·예금주는 남기지 않는다. 가입 때 첫 등록과 같은 계좌 저장은 남기지 않는다. 트리거는 두지 않는다(#295, 11/10 승인). 마이그레이션 0010 |
+| 2026-11-11 | 시간대 매물 `slot_windows`·`slot_window_menus`와 `slots.window_id`를 더한다(#308, 11/10·11/11 nnoinn). 고객이 예약할 때 지금 매물 한 칸으로 바꾼다. 같은 샵의 시간대끼리는 EXCLUDE로, 시간대와 한 시술 매물 사이는 트리거로 겹침을 막는다. 마이그레이션 0011 |
