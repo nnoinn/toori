@@ -72,7 +72,7 @@ export function SlotDetailView({
           {/* 공유한 주소로 바로 들어와 이전 화면이 없으면 고객 홈으로(#215) */}
           <BackButton
             fallbackHref={CUSTOMER_HOME}
-            className="absolute top-2 left-2 z-10 bg-background/80"
+            className="absolute top-2 left-2 z-10 bg-background/80 max-md:size-10"
           />
           {/* 다른 매물로 옮겨도 첫 장부터 보이게 매물마다 새로 시작한다 */}
           <SlotPhotos key={slot.slotId} urls={slot.imageUrls} shopName={shop.name} />
@@ -80,7 +80,7 @@ export function SlotDetailView({
       ) : (
         // 사진이 없으면 큰 회색 칸 대신 뒤로가기와 작은 안내만 두어 샵 정보가 바로 위로 올라오게 한다(#214)
         <div className="flex items-center gap-2 px-2 pt-2 md:col-start-1 md:row-start-1 md:px-0 md:pt-0">
-          <BackButton fallbackHref={CUSTOMER_HOME} />
+          <BackButton fallbackHref={CUSTOMER_HOME} className="max-md:size-10" />
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <ImageOff className="size-4" aria-hidden />
             사진이 아직 없어요

@@ -89,7 +89,7 @@ export function CancelReservation({ preview: initialPreview }: { preview: Refund
 
   return (
     <>
-      <Button variant="outline" className="self-start" onClick={openDialog}>
+      <Button variant="outline" className="self-start max-md:h-10" onClick={openDialog}>
         예약 취소
       </Button>
       <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -100,7 +100,7 @@ export function CancelReservation({ preview: initialPreview }: { preview: Refund
                 <DialogTitle>예약을 취소했어요</DialogTitle>
                 <DialogDescription>{cancelDoneText(done.refundAmount)}</DialogDescription>
               </DialogHeader>
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 max-md:*:h-10">
                 <Button variant="outline" onClick={() => handleOpenChange(false)}>
                   닫기
                 </Button>
@@ -138,7 +138,7 @@ export function CancelReservation({ preview: initialPreview }: { preview: Refund
                   {message}
                 </p>
               ) : null}
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 max-md:*:h-10">
                 <Button
                   variant="outline"
                   onClick={() => handleOpenChange(false)}

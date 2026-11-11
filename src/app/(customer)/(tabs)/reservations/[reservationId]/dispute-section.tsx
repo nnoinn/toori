@@ -151,7 +151,11 @@ function DisputeForm({ view }: { view: DisputeView }) {
   return (
     <>
       <p className="text-sm text-muted-foreground">{disputeDeadlineText(view.deadline)}</p>
-      <Button variant="outline" className="self-start" onClick={() => handleOpenChange(true)}>
+      <Button
+        variant="outline"
+        className="self-start max-md:h-10"
+        onClick={() => handleOpenChange(true)}
+      >
         이의제기
       </Button>
       <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -164,7 +168,11 @@ function DisputeForm({ view }: { view: DisputeView }) {
               </DialogHeader>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <ChannelLink />
-                <Button variant="outline" onClick={() => handleOpenChange(false)}>
+                <Button
+                  variant="outline"
+                  className="max-md:h-10"
+                  onClick={() => handleOpenChange(false)}
+                >
                   닫기
                 </Button>
               </div>
@@ -178,7 +186,7 @@ function DisputeForm({ view }: { view: DisputeView }) {
               <fieldset className="flex flex-col gap-2" disabled={pending}>
                 <legend className="mb-1 text-sm font-medium">어떤 문제인가요?</legend>
                 {view.types.map((option) => (
-                  <label key={option} className="flex items-center gap-2 text-sm">
+                  <label key={option} className="flex items-center gap-2 text-sm max-md:min-h-10">
                     <input
                       type="radio"
                       name="dispute-type"
@@ -218,7 +226,7 @@ function DisputeForm({ view }: { view: DisputeView }) {
                   {message}
                 </p>
               ) : null}
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 max-md:*:h-10">
                 <Button
                   variant="outline"
                   onClick={() => handleOpenChange(false)}
