@@ -119,8 +119,9 @@ export function HomeExplorer({ center, myLocation, header, sort, serverNow }: Ho
         style={dragging ? { height: drag.height ?? undefined } : undefined}
         className={cn(
           'flex flex-col rounded-t-2xl border-t bg-background shadow-[0_-4px_12px_rgba(0,0,0,0.06)]',
-          // 내림은 손잡이 높이만(아래 목록을 숨김)
-          dragging || sheet === 'min' ? 'flex-none' : sheet === 'half' ? 'h-1/2' : 'flex-1',
+          // 내림은 손잡이 높이만(아래 목록을 숨김). 크게(flex-1)는 min-h-0이 있어야 화면 높이 안에 머물고
+          // 목록이 그 안에서 스크롤된다(없으면 목록 길이만큼 늘어나 화면 아래로 넘쳐 아래 매물을 못 본다)
+          dragging || sheet === 'min' ? 'flex-none' : sheet === 'half' ? 'h-1/2' : 'min-h-0 flex-1',
           'md:h-auto md:w-[400px] md:flex-none md:rounded-none md:border-t-0 md:border-l md:shadow-none',
         )}
       >
