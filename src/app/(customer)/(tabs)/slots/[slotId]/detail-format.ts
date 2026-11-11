@@ -16,7 +16,9 @@ export type BusinessHourRow = { weekday: number; label: string; text: string };
 
 /**
  * 영업시간을 월~일 순서의 7줄로. 원장님이 입력하지 않은 요일은 "정보 없음".
- * 모양이 틀린 줄은 버린다. 한 줄도 없으면 null(화면에서 영업시간 칸을 숨긴다)
+ * 모양이 틀린 줄은 버린다. 한 줄도 없으면 null(화면에서 영업시간 칸을 숨긴다).
+ * 영업시간 규칙(11/11, 기술 가이드 7장): 닫는 시각이 여는 시각보다 이르면 다음 날 새벽까지라 그대로 "18:00 ~ 02:00",
+ * 둘이 같으면 24시간 영업, 닫는 시각 00:00은 자정 마감이라 그대로 "18:00 ~ 00:00"
  */
 export function formatBusinessHours(raw: unknown): BusinessHourRow[] | null {
   if (!Array.isArray(raw)) return null;
@@ -25,7 +27,7 @@ export function formatBusinessHours(raw: unknown): BusinessHourRow[] | null {
     const parsed = businessHourSchema.safeParse(item);
     if (!parsed.success || byWeekday.has(parsed.data.weekday)) continue;
     const row = parsed.data;
-    byWeekday.set(row.weekday, 'closed' in row ? '휴무' : `${row.open} ~ ${row.close}`);
+    byWeekday.set(row.weekday, 'closed' in row ? '휴무' : hoursText(row.open, row.close));
   }
   if (byWeekday.size === 0) return null;
   // 월요일부터 보여준다
@@ -34,6 +36,10 @@ export function formatBusinessHours(raw: unknown): BusinessHourRow[] | null {
     label: WEEKDAY_LABELS[weekday],
     text: byWeekday.get(weekday) ?? '정보 없음',
   }));
+}
+
+function hoursText(open: string, close: string): string {
+  return open === close ? '24시간 영업' : `${open} ~ ${close}`;
 }
 
 /** 소요 시간. 예: 60 → "1시간", 90 → "1시간 30분", 45 → "45분" */

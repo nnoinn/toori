@@ -67,6 +67,21 @@ describe('영업시간', () => {
     ]);
     expect(rows?.find((row) => row.weekday === 2)?.text).toBe('09:00 ~ 18:00');
   });
+
+  it('새벽 영업은 그대로, 여는·닫는 시각이 같으면 24시간 영업, 00:00 마감은 그대로', () => {
+    const rows = formatBusinessHours([
+      { weekday: 1, open: '18:00', close: '02:00' },
+      { weekday: 2, open: '00:00', close: '00:00' },
+      { weekday: 3, open: '09:00', close: '09:00' },
+      { weekday: 4, open: '18:00', close: '00:00' },
+    ]);
+    expect(rows?.slice(0, 4).map((row) => row.text)).toEqual([
+      '18:00 ~ 02:00',
+      '24시간 영업',
+      '24시간 영업',
+      '18:00 ~ 00:00',
+    ]);
+  });
 });
 
 describe('소요 시간', () => {
