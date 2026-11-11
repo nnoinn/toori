@@ -1,9 +1,11 @@
 'use client';
 
+import { PushSwitch } from '@/features/push/push-switch';
+import { CUSTOMER_PUSH_DESCRIPTION } from '@/features/push/push-texts';
+
 import { ConsentSwitch, useOptionalConsent } from './consent-switch';
 import { InterestAreas } from './interest-areas';
 import { OPTIONAL_CONSENT_NAMES } from './profile-rules';
-import { PushSwitch } from './push-switch';
 
 /**
  * 내 정보 > 알림 설정 (C-103, C-601·C-602·C-603, J14, #267). 이 기기 알림 켜기·끄기, 관심 동네, 관심 동네·찜한 샵 새 매물 알림, 이벤트·혜택 소식.
@@ -25,7 +27,7 @@ export function NotificationSettings({
   return (
     <section className="flex flex-col gap-5 border-t pt-6" aria-label="알림 설정">
       <h2 className="font-semibold">알림</h2>
-      <PushSwitch />
+      <PushSwitch description={CUSTOMER_PUSH_DESCRIPTION} />
       {interestCodes ? (
         <InterestAreas initialCodes={interestCodes} consent={interestAlert} />
       ) : (

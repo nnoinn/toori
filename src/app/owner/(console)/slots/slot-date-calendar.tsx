@@ -98,7 +98,8 @@ function DayCell({
   onChoose: (dateKey: string) => void;
 }) {
   const { month, day } = partsOfKey(dateKey);
-  const note = closed ? '휴무' : isToday ? '오늘' : null;
+  // 오늘이 쉬는 날이어도 "오늘"을 같이 보여준다(#307)
+  const note = [isToday && '오늘', closed && '휴무'].filter(Boolean).join(' · ') || null;
   return (
     <button
       type="button"
@@ -110,7 +111,8 @@ function DayCell({
         'flex h-14 flex-col items-center justify-center gap-0.5 rounded-lg border text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
         'disabled:cursor-not-allowed disabled:border-transparent disabled:text-muted-foreground/50',
         !disabled && !selected && 'bg-card hover:bg-muted',
-        isToday && !selected && 'border-primary',
+        // 오늘은 고를 수 없어도(쉬는 날, 오늘 시작 시각이 다 지남) 초록 테두리를 남긴다(#307)
+        isToday && !selected && 'border-primary disabled:border-primary',
         selected && 'border-primary bg-primary font-semibold text-primary-foreground',
       )}
     >
