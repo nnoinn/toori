@@ -1,6 +1,7 @@
 // 매물 등록 ①② 서버 검증 (DB, O4, S-201·S-204·S-209). 서버에서만 부른다.
 // O5에서 저장할 때도 같은 검증을 트랜잭션 안에서 다시 부른다(tx를 넘긴다). 겹침은 DB 제약(slots_no_overlap)이 마지막으로 막는다.
 // 매물 수정(O10)도 같은 검증을 쓰고, 고치는 매물 자신은 겹침에서 뺀다(excludeSlotId).
+// 시간대 매물(#308)도 같은 시간을 막는다. DB는 트리거(slots_no_window_overlap)로 막고, 화면은 여기서 미리 알려 준다.
 
 import 'server-only';
 
@@ -8,7 +9,7 @@ import { and, eq, gt, inArray, isNull, lt, ne } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
-import { menus, shops, slots } from '@/db/schema';
+import { menus, shops, slots, slotWindows } from '@/db/schema';
 import type { BusinessHours } from '@/db/schema/shops';
 import { fail, ok, type Result } from '@/lib/result';
 import { isServiceTypeOf, type ShopCategory } from '@/server/policy';
@@ -27,6 +28,8 @@ type Db = Pick<ReturnType<typeof getDb>, 'select'>;
 
 /** 겹침을 보는 매물 상태(S-209). 마감·취소·완료는 같은 시간에 다시 올릴 수 있다 */
 const BLOCKING_STATUSES = ['scheduled', 'published', 'reserved'] as const;
+/** 겹침을 보는 시간대 매물 상태(#308, 마이그레이션 0011과 같다). 마감한 시간대는 같은 시간에 다시 올릴 수 있다 */
+const BLOCKING_WINDOW_STATUSES = ['scheduled', 'published'] as const;
 
 export const SLOT_DRAFT_ERRORS = {
   MENU_NOT_FOUND: '메뉴를 다시 골라 주세요',
@@ -66,7 +69,10 @@ export async function selectSlotShop(
   return row ? { ...row, category: row.category as ShopCategory } : null;
 }
 
-/** 그 샵에서 [from, to)와 겹치는 매물 시간(예약대기·게시중·예약됨) */
+/**
+ * 그 샵에서 [from, to)와 겹치는 매물 시간(예약대기·게시중·예약됨)과 시간대 매물 시간(예약대기·게시중), 시작 순서.
+ * 시간대 안에서 만든 매물(window_id)은 그 시간대 안에 있어서 같이 읽어도 결과가 달라지지 않는다
+ */
 export async function selectBusyRanges(
   db: Db,
   shopId: string,
@@ -74,20 +80,32 @@ export async function selectBusyRanges(
   to: Date,
   { excludeSlotId }: DraftOptions = {},
 ): Promise<TimeRange[]> {
-  const rows = await db
-    .select({ start: slots.startAt, end: slots.endAt })
-    .from(slots)
-    .where(
-      and(
-        eq(slots.shopId, shopId),
-        inArray(slots.status, BLOCKING_STATUSES),
-        lt(slots.startAt, to),
-        gt(slots.endAt, from),
-        excludeSlotId ? ne(slots.id, excludeSlotId) : undefined,
+  const [slotRows, windowRows] = await Promise.all([
+    db
+      .select({ start: slots.startAt, end: slots.endAt })
+      .from(slots)
+      .where(
+        and(
+          eq(slots.shopId, shopId),
+          inArray(slots.status, BLOCKING_STATUSES),
+          lt(slots.startAt, to),
+          gt(slots.endAt, from),
+          excludeSlotId ? ne(slots.id, excludeSlotId) : undefined,
+        ),
       ),
-    )
-    .orderBy(slots.startAt);
-  return rows;
+    db
+      .select({ start: slotWindows.startAt, end: slotWindows.endAt })
+      .from(slotWindows)
+      .where(
+        and(
+          eq(slotWindows.shopId, shopId),
+          inArray(slotWindows.status, BLOCKING_WINDOW_STATUSES),
+          lt(slotWindows.startAt, to),
+          gt(slotWindows.endAt, from),
+        ),
+      ),
+  ]);
+  return [...slotRows, ...windowRows].sort((a, b) => a.start.getTime() - b.start.getTime());
 }
 
 /**
