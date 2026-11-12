@@ -17,9 +17,11 @@ import {
   expireDueRequests,
   expireReservationRequests,
   insertAgreedCancelRequest,
+  markAgreedCancelRequest,
   readAgreedCancelRequest,
   readAgreedCancelTarget,
   readLatestAgreedCancelRequest,
+  reopenAgreedRequest,
 } from './agreed-cancel-store';
 
 type Db = Parameters<typeof readAgreedCancelTarget>[0] &
@@ -222,6 +224,46 @@ describeDb('합의 후 취소 예약 값 읽기 (실제 DB)', () => {
       expect(await readLatestAgreedCancelRequest(db, expiring.reservation.id)).toMatchObject({
         status: 'expired',
         respondedAt: NOW,
+      });
+    });
+  });
+
+  it('동의는 답 기다림·만료 전일 때만 한 번, 돈이 안 돌아갔으면 다시 답 기다림(만료 시각이 지났으면 만료)', async () => {
+    await withRollback(async (tx) => {
+      const db = tx as unknown as Db;
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const { customerId } = await createTestCustomer(tx);
+      const { reservation } = await createTestReservation(
+        tx,
+        shop,
+        customerId,
+        '09:00',
+        '10:00',
+        'confirmed',
+      );
+      const { requestId } = await insertAgreedCancelRequest(db, {
+        reservationId: reservation.id,
+        requestedBy: shop.createdBy,
+        reason: 'style_mismatch',
+        reasonText: null,
+        requestedAt: NOW,
+        expiresAt: new Date(NOW.getTime() + 24 * HOUR),
+      });
+      expect(await markAgreedCancelRequest(db, { requestId, now: NOW })).toBe(true);
+      expect(await markAgreedCancelRequest(db, { requestId, now: NOW })).toBe(false);
+
+      await reopenAgreedRequest(db, { reservationId: reservation.id, now: NOW });
+      expect(await readLatestAgreedCancelRequest(db, reservation.id)).toMatchObject({
+        status: 'requested',
+        respondedAt: null,
+      });
+
+      expect(await markAgreedCancelRequest(db, { requestId, now: NOW })).toBe(true);
+      const late = new Date(NOW.getTime() + 25 * HOUR);
+      await reopenAgreedRequest(db, { reservationId: reservation.id, now: late });
+      expect(await readLatestAgreedCancelRequest(db, reservation.id)).toMatchObject({
+        status: 'expired',
+        respondedAt: new Date(NOW.getTime() + 24 * HOUR),
       });
     });
   });

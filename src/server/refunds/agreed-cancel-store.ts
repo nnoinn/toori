@@ -254,3 +254,48 @@ export async function closeChangedRequests(
     .returning({ id: agreedCancelRequests.id });
   return closed.length;
 }
+
+/**
+ * 손님 [동의하고 취소할게요]. 답을 기다리고, 만료 전이고, 예약이 그대로일 때만 '동의'로 바꾼다. 트랜잭션 안에서
+ * 진행 중 환불 기록과 같이 부른다. 바꿨으면 true(동시에 두 번 눌러도 한 번만)
+ */
+export async function markAgreedCancelRequest(
+  tx: Pick<Db, 'update'>,
+  input: { requestId: string; now: Date },
+): Promise<boolean> {
+  const updated = await tx
+    .update(agreedCancelRequests)
+    .set({ status: 'agreed', respondedAt: input.now })
+    .where(
+      and(
+        eq(agreedCancelRequests.id, input.requestId),
+        eq(agreedCancelRequests.status, 'requested'),
+        gt(agreedCancelRequests.expiresAt, input.now),
+        reservationStillTarget,
+      ),
+    )
+    .returning({ id: agreedCancelRequests.id });
+  return updated.length > 0;
+}
+
+/**
+ * 동의했지만 돌려준 돈이 없을 때(결제사 거절 등) 그 예약의 '동의' 요청을 다시 '답 기다림'으로 돌린다.
+ * 그 사이 만료 시각이 지났으면 '만료'로 둔다(응답 시각 = 만료 시각). 손님은 기한 안이면 다시 동의할 수 있다
+ */
+export async function reopenAgreedRequest(
+  db: Pick<Db, 'update'>,
+  input: { reservationId: string; now: Date },
+): Promise<void> {
+  await db
+    .update(agreedCancelRequests)
+    .set({
+      status: sql`case when ${agreedCancelRequests.expiresAt} > ${input.now} then 'requested' else 'expired' end`,
+      respondedAt: sql`case when ${agreedCancelRequests.expiresAt} > ${input.now} then null else ${agreedCancelRequests.expiresAt} end`,
+    })
+    .where(
+      and(
+        eq(agreedCancelRequests.reservationId, input.reservationId),
+        eq(agreedCancelRequests.status, 'agreed'),
+      ),
+    );
+}

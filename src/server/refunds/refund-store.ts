@@ -1,8 +1,10 @@
-// 예약 취소의 DB 읽기·저장 (연결 #9, W14). 서버에서만 부른다.
+// 예약 취소의 DB 읽기·저장 (연결 #9, W14, 합의 후 취소 X-208 #320). 서버에서만 부른다.
+// 고객 취소(customer_cancel)와 합의 후 취소(agreed_cancel)는 같은 방식이다: 포트원을 부르기 전에 진행 중(requested) 기록을 남기고,
+// 환불이 끝나면 예약·매물을 '취소'로 바꾸며 기록을 끝낸다. 한 예약에 취소 환불 기록은 하나다(refunds_cancel_unique).
 
 import 'server-only';
 
-import { and, asc, eq, lt, type SQL, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, lt, type SQL, sql } from 'drizzle-orm';
 
 import { getDb } from '@/db';
 import {
@@ -23,6 +25,10 @@ type DbWriter = Pick<ReturnType<typeof getDb>, 'insert' | 'update'>;
  */
 const CANCEL_REFUND = sql`reason in ('customer_cancel', 'agreed_cancel')`;
 
+/** 진행 중 기록을 남기는 취소 환불 이유: 고객 취소 / 합의 후 취소 */
+export const CANCEL_REFUND_REASONS = ['customer_cancel', 'agreed_cancel'] as const;
+export type CancelRefundReason = (typeof CANCEL_REFUND_REASONS)[number];
+
 export type CancelTarget = {
   reservationId: string;
   orderId: string;
@@ -34,9 +40,11 @@ export type CancelTarget = {
   startAt: Date;
 };
 
-/** 포트원을 부르기 전에 저장해 둔 고객 취소. 다시 처리할 때는 새로 계산하지 않고 이 값을 쓴다 */
+/** 포트원을 부르기 전에 저장해 둔 취소. 다시 처리할 때는 새로 계산하지 않고 이 값을 쓴다 */
 export type RequestedCancel = {
-  band: RefundBand;
+  reason: CancelRefundReason;
+  /** 고객 취소의 위약금 구간. 합의 후 취소는 구간이 없어서 null */
+  band: RefundBand | null;
   penaltyRate: number;
   refundAmount: number;
   penaltyAmount: number;
@@ -48,11 +56,11 @@ export type RefundTarget = CancelTarget & {
   /** 판매가(orders.sale_price, 쿠폰 적용 전) */
   salePrice: number;
   couponAmount: number;
-  /** 진행 중인 고객 취소. 없으면 null */
+  /** 진행 중인 취소(고객 취소 또는 합의 후 취소). 없으면 null */
   requested: RequestedCancel | null;
 };
 
-/** 진행 중으로 남은 고객 취소 하나 */
+/** 진행 중으로 남은 취소 하나 */
 export type CancelRequest = CancelTarget & RequestedCancel;
 
 /** 이 고객의 예약만. 없거나 남의 예약이면 null */
@@ -87,6 +95,7 @@ async function readTargetWhere(db: DbReader, where: SQL | undefined): Promise<Re
       salePrice: orders.salePrice,
       couponAmount: orders.couponAmount,
       startAt: slots.startAt,
+      requestedReason: refunds.reason,
       requestedBand: refunds.band,
       requestedRate: refunds.penaltyRate,
       requestedRefund: refunds.refundAmount,
@@ -100,7 +109,7 @@ async function readTargetWhere(db: DbReader, where: SQL | undefined): Promise<Re
       refunds,
       and(
         eq(refunds.reservationId, reservations.id),
-        eq(refunds.reason, 'customer_cancel'),
+        inArray(refunds.reason, CANCEL_REFUND_REASONS),
         eq(refunds.status, 'requested'),
       ),
     )
@@ -108,6 +117,7 @@ async function readTargetWhere(db: DbReader, where: SQL | undefined): Promise<Re
     .limit(1);
   if (!row) return null;
   const {
+    requestedReason,
     requestedBand,
     requestedRate,
     requestedRefund,
@@ -121,12 +131,14 @@ async function readTargetWhere(db: DbReader, where: SQL | undefined): Promise<Re
     status: target.status as ReservationStatus,
     requested:
       requestedAt !== null &&
+      requestedReason !== null &&
       requestedRate !== null &&
       requestedRefund !== null &&
       requestedPenalty !== null
         ? {
-            // 고객 취소 기록에는 늘 구간이 있다
-            band: requestedBand as RefundBand,
+            // 조인 조건이 두 이유만 고른다
+            reason: requestedReason as CancelRefundReason,
+            band: requestedBand as RefundBand | null,
             penaltyRate: requestedRate,
             refundAmount: requestedRefund,
             penaltyAmount: requestedPenalty,
@@ -137,10 +149,10 @@ async function readTargetWhere(db: DbReader, where: SQL | undefined): Promise<Re
 }
 
 /**
- * 포트원을 부르기 전에 고객 취소를 진행 중(requested)으로 저장한다. 중간에 멈춰도 정리 작업이 이 기록을 보고 마무리한다.
- * 이미 고객 취소 기록이 있거나(동시에 누름) 합의 후 취소 환불이 진행 중이면 넣지 않고 false
+ * 포트원을 부르기 전에 취소(고객 취소·합의 후 취소)를 진행 중(requested)으로 저장한다. 중간에 멈춰도 정리 작업이 이 기록을 보고 마무리한다.
+ * 그 예약에 취소 환불 기록이 이미 있으면(동시에 누름, 고객 취소와 합의 후 취소가 겹침) 넣지 않고 false
  */
-export async function requestCustomerCancel(
+export async function requestCancelRefund(
   db: DbWriter,
   input: { reservationId: string; orderId: string } & RequestedCancel,
 ): Promise<boolean> {
@@ -149,7 +161,7 @@ export async function requestCustomerCancel(
     .values({
       orderId: input.orderId,
       reservationId: input.reservationId,
-      reason: 'customer_cancel',
+      reason: input.reason,
       status: 'requested',
       band: input.band,
       penaltyRate: input.penaltyRate,
@@ -162,7 +174,7 @@ export async function requestCustomerCancel(
   return inserted.length > 0;
 }
 
-/** 진행 중 표시를 지운다. 고객이 다시 취소할 수 있고, 그때는 새로 계산한다. 끝난 기록은 지우지 않는다 */
+/** 진행 중 표시를 지운다(돌려준 돈이 없을 때). 고객이 다시 취소·동의할 수 있고, 그때는 새로 계산한다. 끝난 기록은 지우지 않는다 */
 export async function clearRequestedCancel(
   db: Pick<ReturnType<typeof getDb>, 'delete'>,
   reservationId: string,
@@ -172,25 +184,26 @@ export async function clearRequestedCancel(
     .where(
       and(
         eq(refunds.reservationId, reservationId),
-        eq(refunds.reason, 'customer_cancel'),
+        inArray(refunds.reason, CANCEL_REFUND_REASONS),
         eq(refunds.status, 'requested'),
       ),
     );
 }
 
 /**
- * 환불이 끝난 고객 취소를 기록한다. 트랜잭션 안에서 부른다.
+ * 환불이 끝난 취소(고객 취소·합의 후 취소)를 기록한다. 트랜잭션 안에서 부른다. 취소한 쪽은 고객 취소 customer, 합의 후 취소 agreed.
  * 예약이 아직 '예정'일 때만 바꿔서, 동시에 두 번 불러도 환불 기록은 한 줄이다. 먼저 기록한 요청이 있으면 false.
  * 진행 중 기록이 그 사이 지워졌어도 돈은 이미 돌아갔으므로 새로 넣는다.
  * 쓴 쿠폰은 돌려주지 않는다(C-407). 원장님 알림(W16)과 정산 내역(W15)은 여기서 만들지 않는다
  */
-export async function finishCustomerCancel(
+export async function finishCancelRecord(
   tx: DbWriter,
   input: {
+    reason: CancelRefundReason;
     reservationId: string;
     orderId: string;
     slotId: string;
-    band: RefundBand;
+    band: RefundBand | null;
     penaltyRate: number;
     refundAmount: number;
     penaltyAmount: number;
@@ -210,7 +223,7 @@ export async function finishCustomerCancel(
     .set({
       status: 'cancelled',
       cancelledAt: input.requestedAt,
-      cancelActor: 'customer',
+      cancelActor: input.reason === 'agreed_cancel' ? 'agreed' : 'customer',
       hoursBeforeStartAtCancel: input.hoursBeforeStart,
     })
     .where(and(eq(reservations.id, input.reservationId), eq(reservations.status, 'confirmed')))
@@ -233,7 +246,7 @@ export async function finishCustomerCancel(
     .values({
       orderId: input.orderId,
       reservationId: input.reservationId,
-      reason: 'customer_cancel',
+      reason: input.reason,
       createdAt: input.requestedAt,
       ...done,
     })
@@ -241,8 +254,8 @@ export async function finishCustomerCancel(
       target: refunds.reservationId,
       targetWhere: CANCEL_REFUND,
       set: done,
-      // 고객 취소 기록만 끝낸다(합의 후 취소 기록을 고객 취소 값으로 덮지 않는다)
-      setWhere: sql`${refunds.reason} = 'customer_cancel'`,
+      // 같은 이유의 기록만 끝낸다(고객 취소와 합의 후 취소 기록을 서로의 값으로 덮지 않는다)
+      setWhere: sql`${refunds.reason} = ${input.reason}`,
     });
   if (input.pgCancellationId) {
     await tx
@@ -307,7 +320,7 @@ export async function finishAdminCancel(
   return true;
 }
 
-/** 정리 작업이 볼 오래된 진행 중 고객 취소. 오래된 것부터 */
+/** 정리 작업이 볼 오래된 진행 중 취소(고객 취소·합의 후 취소). 오래된 것부터 */
 export async function readStaleCancels(
   db: DbReader,
   input: { requestedBefore: Date; limit: number },
@@ -320,6 +333,7 @@ export async function readStaleCancels(
       paymentId: orders.paymentId,
       paidAmount: orders.amount,
       startAt: slots.startAt,
+      reason: refunds.reason,
       band: refunds.band,
       penaltyRate: refunds.penaltyRate,
       refundAmount: refunds.refundAmount,
@@ -332,13 +346,17 @@ export async function readStaleCancels(
     .innerJoin(slots, eq(slots.id, reservations.slotId))
     .where(
       and(
-        eq(refunds.reason, 'customer_cancel'),
+        inArray(refunds.reason, CANCEL_REFUND_REASONS),
         eq(refunds.status, 'requested'),
         lt(refunds.createdAt, input.requestedBefore),
       ),
     )
     .orderBy(asc(refunds.createdAt))
     .limit(input.limit);
-  // 고객 취소 기록에는 늘 구간이 있다
-  return rows.map((row) => ({ ...row, band: row.band as RefundBand }));
+  // 조건이 두 이유만 고른다
+  return rows.map((row) => ({
+    ...row,
+    reason: row.reason as CancelRefundReason,
+    band: row.band as RefundBand | null,
+  }));
 }

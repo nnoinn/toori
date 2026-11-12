@@ -4,7 +4,7 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
-import { type VisitResult, reservations, slots } from '@/db/schema';
+import { refunds, type VisitResult, reservations, slots } from '@/db/schema';
 
 import {
   createTestCustomer,
@@ -128,6 +128,28 @@ describeDb('방문·노쇼 처리 저장 (실제 DB)', () => {
       const { reservation, slot } = await reservationOf(tx, made.reservation.id);
       expect(reservation).toMatchObject({ status: 'cancelled', visitResult: null });
       expect(slot.status).toBe('cancelled');
+    });
+  });
+
+  it('취소 환불이 진행 중이면(합의 후 취소 동의 등) CANCEL_IN_PROGRESS이고 바꾸지 않는다(#320)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const { customerId } = await createTestCustomer(tx);
+      const made = await createTestReservation(tx, shop, customerId, '10:00', '11:00', 'confirmed');
+      await tx.insert(refunds).values({
+        orderId: made.order.id,
+        reservationId: made.reservation.id,
+        reason: 'agreed_cancel',
+        status: 'requested',
+        penaltyRate: 50,
+        refundAmount: 7000,
+        penaltyAmount: 7000,
+      });
+
+      const result = await record(tx, shop, made.reservation.id, 'visited');
+      expect(result.ok ? null : result.error.code).toBe('CANCEL_IN_PROGRESS');
+      const { reservation } = await reservationOf(tx, made.reservation.id);
+      expect(reservation).toMatchObject({ status: 'confirmed', visitResult: null });
     });
   });
 });

@@ -5,7 +5,9 @@
 //
 // - 요청·상태 읽기·거절은 진짜다(agreed_cancel_requests, 0012). 만료는 상태를 바꾸기 전이라도 expires_at으로 판단하고,
 //   5분마다 도는 작업이 '만료'로 바꾸고 원장님에게 알린다(agreed-cancel-expiry.ts). 손님이 답하기 전에 예약이 바뀌면 '끝남'으로 본다
-// - 동의(부분 환불·예약 취소)는 다음 PR(X-208 ②)에서 진짜로 바뀐다. 지금은 요청을 확인한 뒤 "곧 열려요"로 답하고 예약은 그대로다
+// - 동의는 고객 취소와 같은 "진행 중 먼저 저장" 방식이다(X-208 ②): 한 트랜잭션에서 요청을 '동의'로 바꾸고 환불 기록을 진행 중으로 남긴 뒤,
+//   포트원에서 결제액의 50%를 돌려주고, 예약·매물을 '취소'(cancel_actor agreed)로 바꾸며 원장님에게 알린다(재등록 안내 없음).
+//   돌려준 돈이 없으면 진행 중 표시를 지우고 요청을 다시 '답 기다림'으로 돌린다. 결과를 모르면 10분 정리 작업이 마무리한다
 // - 실패 화면은 로컬에서 DEV_FAKE_AGREED_CANCEL_FAILURE로 흉내 낸다(agreed-cancel-dev-failure.ts)
 
 import { z } from 'zod';
@@ -19,7 +21,7 @@ import {
   notifyAgreedCancelRequested,
   notifyAgreedCancelResult,
 } from '@/server/notifications/alerts';
-import { AGREED_CANCEL_RESPONSE_HOURS } from '@/server/policy/refund';
+import { AGREED_CANCEL_REFUND_RATE, AGREED_CANCEL_RESPONSE_HOURS } from '@/server/policy/refund';
 
 import { devAgreedCancelFailure } from './agreed-cancel-dev-failure';
 import { type AgreedCancelResult, agreedCancelFail } from './agreed-cancel-errors';
@@ -34,10 +36,20 @@ import {
   declineAgreedCancelRequest,
   expireReservationRequests,
   insertAgreedCancelRequest,
+  markAgreedCancelRequest,
   readAgreedCancelRequest,
   readAgreedCancelTarget,
   readLatestAgreedCancelRequest,
+  reopenAgreedRequest,
 } from './agreed-cancel-store';
+import { finishCancel, lookUpRefund, type RefundLookup } from './finish-cancel';
+import { AGREED_CANCEL_REASON, refundPayment } from './refund-payment';
+import {
+  clearRequestedCancel,
+  readRefundTarget,
+  requestCancelRefund,
+  type RequestedCancel,
+} from './refund-store';
 import {
   AGREED_CANCEL_REASON_TEXT_MAX,
   AGREED_CANCEL_REASONS,
@@ -84,7 +96,8 @@ export async function getAgreedCancelStatus(
   return ok({
     reservationId,
     status,
-    canRequest: isAgreedCancelTarget(target) && status !== 'requested',
+    // 답을 기다리거나 동의한 환불이 진행 중이면 새로 요청할 수 없다
+    canRequest: isAgreedCancelTarget(target) && status !== 'requested' && status !== 'agreed',
     request: latest ? toInfo(latest, status) : null,
     baseAmount: calcAgreedCancel(target).baseAmount,
     serverNow: now.toISOString(),
@@ -203,7 +216,8 @@ const respondSchema = z.object({ requestId: z.uuid(), agree: z.boolean() });
 /**
  * 고객 [동의하고 취소할게요] / [동의하지 않아요](C-506). 만료 시각 뒤에는 막는다(#320 리뷰).
  * 동의하지 않으면 '거절'로 바꾸고 원장님에게 알린다(예약은 그대로). 화면은 [동의하고 취소할게요]에서 확인 창을 한 번 더 띄운다(11/10 Q1).
- * 동의(결제액 50% 환불·예약 취소)는 다음 PR에서 열린다. 지금은 요청을 확인한 뒤 예약은 그대로 두고 REFUND_FAILED로 안내한다
+ * 동의하면 결제액의 50%를 돌려주고 예약을 취소한다(쓴 쿠폰은 돌려주지 않는다). 환불을 못 했으면 REFUND_FAILED(예약 그대로, 다시 누를 수 있다),
+ * 결과를 기다리거나 저장을 못 끝냈으면 CANCEL_FINISHING(정리 작업이 마무리한다, 다시 눌러도 같다)
  */
 export async function respondAgreedCancel(input: {
   requestId: string;
@@ -223,6 +237,10 @@ export async function respondAgreedCancel(input: {
     return agreedCancelFail('REQUEST_NOT_FOUND');
   }
   const now = await getRequestNow();
+  // 동의한 환불이 아직 끝나지 않았다(다시 누름). 정리 작업이 마무리한다
+  if (found.request.status === 'agreed' && found.target.status === 'confirmed') {
+    return agreedCancelFail('CANCEL_FINISHING');
+  }
   const blocked = respondBlockReason(currentRequestStatus(found.request, found.target, now));
   if (blocked) return agreedCancelFail(blocked);
   const reservationId = found.request.reservationId;
@@ -240,12 +258,105 @@ export async function respondAgreedCancel(input: {
     return ok({ agreed: false, reservationId, declinedAt: now.toISOString() });
   }
 
-  // 동의(부분 환불·예약 취소)는 X-208 ② PR에서 진짜로 바뀐다. 그 전까지는 예약을 그대로 둔다
-  return {
-    ok: false,
-    error: {
-      code: 'REFUND_FAILED',
-      message: '합의 후 취소 동의는 곧 열려요. 예약은 그대로예요',
-    },
+  return agreeAndRefund({ requestId, reservationId, customerId: auth.data.customerId, now });
+}
+
+/** 동의 처리 중 다른 취소 환불(손님 직접 취소)이 먼저 들어와 있을 때 트랜잭션을 되돌리는 표시 */
+class OtherCancelInProgress extends Error {}
+
+/** 동의 → 결제액 50% 환불 → 예약 취소. 고객 취소(cancelReservation)와 같은 순서와 실패 처리다 */
+async function agreeAndRefund(input: {
+  requestId: string;
+  reservationId: string;
+  customerId: string;
+  now: Date;
+}): Promise<AgreedCancelResult<AgreedCancelResponse>> {
+  const { requestId, reservationId, now } = input;
+  const db = getDb();
+  const target = await readRefundTarget(reservationId, input.customerId, db);
+  if (!target) return agreedCancelFail('REQUEST_NOT_FOUND');
+  const { refundAmount } = calcAgreedCancel(target);
+  const requested: RequestedCancel = {
+    reason: 'agreed_cancel',
+    band: null,
+    penaltyRate: 100 - AGREED_CANCEL_REFUND_RATE,
+    refundAmount,
+    penaltyAmount: target.paidAmount - refundAmount,
+    requestedAt: now,
   };
+
+  let marked: boolean;
+  try {
+    marked = await db.transaction(async (tx) => {
+      // 예약 줄을 잠근다(방문·노쇼 처리와 손님 직접 취소가 이 줄을 같이 잠근다)
+      await readAgreedCancelTarget(tx, reservationId, { lock: true });
+      if (!(await markAgreedCancelRequest(tx, { requestId, now }))) return false;
+      const started = await requestCancelRefund(tx, {
+        reservationId,
+        orderId: target.orderId,
+        ...requested,
+      });
+      if (!started) throw new OtherCancelInProgress();
+      return true;
+    });
+  } catch (error) {
+    if (error instanceof OtherCancelInProgress) return agreedCancelFail('RESERVATION_CHANGED');
+    logAgreeError('동의 시작 저장 실패:', reservationId, error);
+    return agreedCancelFail('REFUND_FAILED');
+  }
+  if (!marked) {
+    // 그 사이 답했거나 만료됐거나 예약이 바뀌었다
+    const again = await readAgreedCancelRequest(db, requestId);
+    const reason = again
+      ? respondBlockReason(currentRequestStatus(again.request, again.target, now))
+      : null;
+    return agreedCancelFail(reason ?? 'ALREADY_RESPONDED');
+  }
+
+  const refund = await refundPayment({
+    paymentId: target.paymentId,
+    paidAmount: target.paidAmount,
+    refundAmount,
+    reason: AGREED_CANCEL_REASON,
+  });
+  // 결과를 기다리거나 모르면 진행 중으로 두고 정리 작업이 포트원에 물어 정한다
+  if (!refund.ok && refund.reason !== 'rejected') return agreedCancelFail('CANCEL_FINISHING');
+  // 거절 답이 와도 돈이 돌아갔거나 돌아가는 중일 수 있다. 지우기 전에 취소 내역을 본다
+  const found: RefundLookup = refund.ok
+    ? { state: 'refunded', refund }
+    : await lookUpRefund(target.paymentId);
+  if (found.state === 'pending') return agreedCancelFail('CANCEL_FINISHING');
+  if (found.state === 'none') {
+    // 돌려준 돈이 없다. 진행 중 표시를 지우고 요청을 다시 답 기다림으로(못 지워도 정리 작업이 지운다)
+    await clearRequestedCancel(db, reservationId).catch((error: unknown) => {
+      logAgreeError('진행 중 표시 지우기 실패:', reservationId, error);
+    });
+    await reopenAgreedRequest(db, { reservationId, now }).catch((error: unknown) => {
+      logAgreeError('요청 되돌리기 실패:', reservationId, error);
+    });
+    return agreedCancelFail('REFUND_FAILED');
+  }
+
+  try {
+    const finished = await finishCancel(db, { ...target, ...requested }, found.refund, now);
+    if (!finished) return agreedCancelFail('RESERVATION_CHANGED');
+    return ok({
+      agreed: true,
+      reservationId,
+      refundAmount: finished.refundAmount,
+      cancelledAt: now.toISOString(),
+    });
+  } catch (error) {
+    // 환불은 끝났다. 정리 작업이 마무리한다
+    logAgreeError('환불 뒤 저장 실패:', reservationId, error);
+    return agreedCancelFail('CANCEL_FINISHING');
+  }
+}
+
+function logAgreeError(message: string, reservationId: string, error: unknown) {
+  console.error(
+    `[agreed-cancel] ${message}`,
+    reservationId,
+    error instanceof Error ? error.name : 'unknown',
+  );
 }
