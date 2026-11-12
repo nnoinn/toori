@@ -6,7 +6,6 @@ import { cn } from 'cn';
 import { Button } from '@/components/ui/button';
 import { SideNav } from '@/components/ui/side-nav';
 import { useSignOut } from '@/components/ui/use-sign-out';
-import { loginPath } from '@/server/auth/paths';
 
 type OwnerNavProps = {
   /** 입점 승인 전이면 false. '매물 등록'을 잠근다(S-102). 서버에서도 따로 막아야 한다 */
@@ -47,7 +46,8 @@ export function OwnerNav({ canCreateSlot = true }: OwnerNavProps) {
 }
 
 /**
- * 원장님 로그아웃. 메뉴 아래와 내 계정 화면(#307)이 같이 쓴다. 로그아웃하고 원장님 로그인 화면을 새로 연다(다른 계정으로 들어갈 수 있게).
+ * 원장님 로그아웃. 메뉴 아래와 내 계정 화면(#307)이 같이 쓴다. 로그아웃하고 첫 화면(고객/원장님 로그인과 로그인 없이 둘러보기)을
+ * 새로 연다. 고객 로그아웃과 같은 곳이다(11/12 nnoinn, 점검 9-1. 전에는 원장님 로그인 화면 /login?mode=owner였다).
  * 순서(이 기기 알림 구독 지우기 → 로그아웃 → 화면 새로 열기)는 고객 로그아웃과 같은 useSignOut이 맡는다
  */
 export function OwnerSignOutButton({
@@ -56,7 +56,7 @@ export function OwnerSignOutButton({
   /** nav: 왼쪽 메뉴 아래(글자 버튼), page: 내 계정 화면(테두리 버튼) */
   variant?: 'nav' | 'page';
 }) {
-  const { signOutNow: logOut, pending, error } = useSignOut(loginPath('owner'));
+  const { signOutNow: logOut, pending, error } = useSignOut();
 
   return (
     <div className="flex flex-col gap-1">
