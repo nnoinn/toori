@@ -13,5 +13,6 @@ export * from './owner-fault';
 export * from './pricing';
 export * from './refund';
 export * from './slot-time';
+export * from './slot-window';
 export * from './terms';
 export * from './upload';
