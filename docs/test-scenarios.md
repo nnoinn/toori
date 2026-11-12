@@ -190,6 +190,7 @@ PR 검사가 자동으로 막는 것:
 | WINDOW-02 | 시간대는 30분 단위, 지금 뒤·14일 안이고, 같은 샵의 예약대기·게시중·예약됨 매물과 겹치지 않아야 한다 | #308 | ✅ | `src/server/slot-windows/rules.test.ts` 시작·끝은 30분 단위, 시작은 지금 뒤·14일 안<br>`src/db/slot-windows.db.test.ts` 시간대는 예약대기·게시중·예약됨 매물과 겹치면 막힌다 |
 | WINDOW-03 | 진짜 버전 전에는 배포 주소에서 등록·마감이 저장한 것처럼 성공하지 않는다 | #344 | ✅ | `src/server/slot-windows/windows.test.ts` 확인을 통과해도 저장한 것처럼 성공하지 않는다 |
 | WINDOW-04 | [예약하기]로 시간대 안에 매물 한 칸을 만들어 홀딩하고, 결제 없이 끝나면 그 칸은 마감(hold_released)이 된다 | #308 ④ | ⏳ | |
+| WINDOW-05 | 원장님 ② 서비스: 소요 시간이 켜진 가장 긴 묶음보다 긴 서비스는 고를 수 없고, 딱 같으면 고를 수 있다. 짧은 묶음에만 안 들어가는 서비스는 고를 수 있다(그 묶음에서는 고객에게 보이지 않는다) | #308 | ✅ | `src/app/owner/(console)/slots/window/window-draft.test.ts` 소요 시간이 가장 긴 묶음보다 길면 고를 수 없고<br>`src/app/owner/(console)/slots/window/window-draft.test.ts` 짧은 묶음에만 안 들어가는 서비스는 고를 수 있고 |
 
 ## 16. 한 바퀴 흐름 (서버 흐름 ②·브라우저 ③에서 자동으로)
 
