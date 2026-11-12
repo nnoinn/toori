@@ -44,6 +44,10 @@ export function ReservationCard({
             <span className="truncate">{item.shopName}</span>
             {item.noShow ? <Badge variant="destructive">노쇼</Badge> : null}
             {visitPending ? <Badge variant="secondary">방문 확인 중</Badge> : null}
+            {/* 원장님 요청에 답할 곳은 예약 상세 맨 위의 요청 카드(#359 3번) */}
+            {item.agreedCancelPending ? (
+              <Badge className="bg-warning/25 text-warning-foreground">합의 후 취소 요청</Badge>
+            ) : null}
           </p>
           <p className="truncate text-base font-semibold">{item.menuName}</p>
           <p className="md:hidden">
