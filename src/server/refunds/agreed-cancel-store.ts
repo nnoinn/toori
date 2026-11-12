@@ -286,11 +286,13 @@ export async function reopenAgreedRequest(
   db: Pick<Db, 'update'>,
   input: { reservationId: string; now: Date },
 ): Promise<void> {
+  // gt()로 비교해야 시각이 컬럼 형식으로 바뀐다(sql``에 Date를 바로 넣으면 드라이버가 받지 못한다)
+  const stillOpen = gt(agreedCancelRequests.expiresAt, input.now);
   await db
     .update(agreedCancelRequests)
     .set({
-      status: sql`case when ${agreedCancelRequests.expiresAt} > ${input.now} then 'requested' else 'expired' end`,
-      respondedAt: sql`case when ${agreedCancelRequests.expiresAt} > ${input.now} then null else ${agreedCancelRequests.expiresAt} end`,
+      status: sql`case when ${stillOpen} then 'requested' else 'expired' end`,
+      respondedAt: sql`case when ${stillOpen} then null else ${agreedCancelRequests.expiresAt} end`,
     })
     .where(
       and(
