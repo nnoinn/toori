@@ -276,6 +276,8 @@ describeDb('시나리오 명령 (실제 DB)', () => {
           type: 'no_show',
           content: '시나리오 이의제기',
           status: 'open',
+          channel: 'app',
+          received_at: NOW,
         })}`;
         await sql`insert into owner_penalties ${sql({
           shop_id: cancelled.shop_id,
