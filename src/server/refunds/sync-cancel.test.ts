@@ -141,6 +141,7 @@ describe('syncUnrecordedCancel', () => {
   it('진행 중인 취소가 있으면 끝내지 않고 다시 보내게 한다', async () => {
     state.target = target({
       requested: {
+        reason: 'customer_cancel',
         band: 'over_24h',
         penaltyRate: 30,
         refundAmount: 12_250,

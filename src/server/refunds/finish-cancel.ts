@@ -1,14 +1,18 @@
-// 환불이 끝난 고객 취소 기록과, 진행 중으로 남은 취소의 결과 정하기 (X-203, W14, #222). 서버에서만 부른다.
+// 환불이 끝난 취소(고객 취소·합의 후 취소) 기록과, 진행 중으로 남은 취소의 결과 정하기 (X-203, W14, #222, X-208 #320). 서버에서만 부른다.
 
 import 'server-only';
 
 import type { getDb } from '@/db';
 import { hoursUntil } from '@/lib/time';
-import { notifyReservationCancelled } from '@/server/notifications/alerts';
+import {
+  notifyAgreedCancelResult,
+  notifyReservationCancelled,
+} from '@/server/notifications/alerts';
 import { finishedCancellation, getPortOnePayment } from '@/server/payments/portone';
 
 import { skipsPortOne } from './refund-payment';
-import { type CancelRequest, clearRequestedCancel, finishCustomerCancel } from './refund-store';
+import { reopenAgreedRequest } from './agreed-cancel-store';
+import { type CancelRequest, clearRequestedCancel, finishCancelRecord } from './refund-store';
 
 type Db = ReturnType<typeof getDb>;
 
@@ -33,7 +37,8 @@ export async function finishCancel(
     );
   }
   const finished = await db.transaction((tx) =>
-    finishCustomerCancel(tx, {
+    finishCancelRecord(tx, {
+      reason: request.reason,
       reservationId: request.reservationId,
       orderId: request.orderId,
       slotId: request.slotId,
@@ -55,8 +60,18 @@ export async function finishCancel(
     }),
   );
   if (!finished) return null;
-  // 원장님에게 재등록 안내(S-400). 바로 끝난 취소·정리 작업·포트원이 늦게 처리한 취소 모두 여기를 지난다
-  notifyReservationCancelled(db, request.reservationId, { by: 'customer', now });
+  // 바로 끝난 취소·정리 작업·포트원이 늦게 처리한 취소 모두 여기를 지난다
+  if (request.reason === 'agreed_cancel') {
+    // 합의 후 취소: 원장님에게 동의 알림(재등록 안내는 없다). 예약마다 한 번이라 예약 id로 중복을 막는다
+    notifyAgreedCancelResult(db, {
+      reservationId: request.reservationId,
+      requestId: request.reservationId,
+      result: 'agreed',
+    });
+  } else {
+    // 고객 취소: 원장님에게 재등록 안내(S-400)
+    notifyReservationCancelled(db, request.reservationId, { by: 'customer', now });
+  }
   return { refundAmount };
 }
 
@@ -89,10 +104,17 @@ export async function settleRequestedCancel(
   request: CancelRequest,
   now: Date,
 ): Promise<SettleResult> {
+  /** 돌려준 돈이 없어서 진행 중 표시를 지운다. 합의 후 취소면 요청을 다시 답 기다림(만료 시각이 지났으면 만료)으로 돌린다 */
+  const clear = async (): Promise<SettleResult> => {
+    await clearRequestedCancel(db, request.reservationId);
+    if (request.reason === 'agreed_cancel') {
+      await reopenAgreedRequest(db, { reservationId: request.reservationId, now });
+    }
+    return 'cleared';
+  };
   const finish = async (refund: { cancellationId: string | null; amount: number | null }) => {
     if (await finishCancel(db, request, refund, now)) return 'finished';
-    await clearRequestedCancel(db, request.reservationId);
-    return 'cleared';
+    return clear();
   };
 
   if (skipsPortOne(request.paymentId, request.refundAmount)) {
@@ -102,6 +124,5 @@ export async function settleRequestedCancel(
   const found = await lookUpRefund(request.paymentId);
   if (found.state === 'refunded') return finish(found.refund);
   if (found.state === 'pending') return 'left';
-  await clearRequestedCancel(db, request.reservationId);
-  return 'cleared';
+  return clear();
 }

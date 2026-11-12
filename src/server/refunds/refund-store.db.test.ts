@@ -14,11 +14,11 @@ import { closeTestDb, describeDb, withRollback } from '../../../tests/db/test-db
 import {
   clearRequestedCancel,
   finishAdminCancel,
-  finishCustomerCancel,
+  finishCancelRecord,
   readRefundTarget,
   readRefundTargetByOrder,
   readStaleCancels,
-  requestCustomerCancel,
+  requestCancelRefund,
 } from './refund-store';
 
 describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
@@ -167,6 +167,7 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
     const REQUESTED_AT = new Date('2026-11-01T10:00:00+09:00');
     const NOW = new Date('2026-11-01T10:20:00+09:00');
     const amounts = {
+      reason: 'customer_cancel' as const,
       band: 'over_24h' as const,
       penaltyRate: 30,
       refundAmount: 9_800,
@@ -208,7 +209,7 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
     it('진행 중으로 저장하면 읽을 때 저장한 금액이 같이 오고, 환불 내역 칸은 비어 있다', async () => {
       await withRollback(async (tx) => {
         const made = await booking(tx);
-        expect(await requestCustomerCancel(tx, made.request)).toBe(true);
+        expect(await requestCancelRefund(tx, made.request)).toBe(true);
         expect(await rowsOf(tx, made.reservation.id)).toMatchObject([
           { status: 'requested', reason: 'customer_cancel', processedAt: null },
         ]);
@@ -222,8 +223,8 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
     it('이미 고객 취소 기록이 있으면 넣지 않고 false', async () => {
       await withRollback(async (tx) => {
         const made = await booking(tx);
-        expect(await requestCustomerCancel(tx, made.request)).toBe(true);
-        expect(await requestCustomerCancel(tx, { ...made.request, refundAmount: 1 })).toBe(false);
+        expect(await requestCancelRefund(tx, made.request)).toBe(true);
+        expect(await requestCancelRefund(tx, { ...made.request, refundAmount: 1 })).toBe(false);
         expect(await rowsOf(tx, made.reservation.id)).toMatchObject([{ refundAmount: 9_800 }]);
       });
     });
@@ -231,15 +232,15 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
     it('진행 중 표시를 지우면 다시 시작할 수 있고, 끝난 기록은 지우지 않는다', async () => {
       await withRollback(async (tx) => {
         const made = await booking(tx);
-        await requestCustomerCancel(tx, made.request);
+        await requestCancelRefund(tx, made.request);
         await clearRequestedCancel(tx, made.reservation.id);
         expect(await rowsOf(tx, made.reservation.id)).toEqual([]);
         expect(await readRefundTarget(made.reservation.id, made.customerId, tx)).toMatchObject({
           requested: null,
         });
 
-        await requestCustomerCancel(tx, made.request);
-        await finishCustomerCancel(tx, made.finish);
+        await requestCancelRefund(tx, made.request);
+        await finishCancelRecord(tx, made.finish);
         await clearRequestedCancel(tx, made.reservation.id);
         expect(await rowsOf(tx, made.reservation.id)).toHaveLength(1);
       });
@@ -248,8 +249,8 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
     it('기록을 끝내면 예약·매물이 취소되고, 진행 중 기록이 끝남으로 바뀌며 한 줄이다', async () => {
       await withRollback(async (tx) => {
         const made = await booking(tx);
-        await requestCustomerCancel(tx, made.request);
-        expect(await finishCustomerCancel(tx, made.finish)).toBe(true);
+        await requestCancelRefund(tx, made.request);
+        expect(await finishCancelRecord(tx, made.finish)).toBe(true);
 
         const [reservation] = await tx
           .select()
@@ -269,7 +270,6 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
           {
             status: 'done',
             orderId: made.order.id,
-            reason: 'customer_cancel',
             ...amounts,
             pgCancellationId: 'c-1',
             reviewReason: null,
@@ -283,7 +283,7 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
     it('진행 중 기록이 지워졌어도 돈은 돌아갔으므로 새로 넣어 끝낸다', async () => {
       await withRollback(async (tx) => {
         const made = await booking(tx);
-        expect(await finishCustomerCancel(tx, made.finish)).toBe(true);
+        expect(await finishCancelRecord(tx, made.finish)).toBe(true);
         expect(await rowsOf(tx, made.reservation.id)).toMatchObject([{ status: 'done' }]);
       });
     });
@@ -291,8 +291,8 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
     it('실제 금액과 운영자 확인 이유를 남긴다', async () => {
       await withRollback(async (tx) => {
         const made = await booking(tx);
-        await requestCustomerCancel(tx, made.request);
-        await finishCustomerCancel(tx, {
+        await requestCancelRefund(tx, made.request);
+        await finishCancelRecord(tx, {
           ...made.finish,
           refundAmount: 14_000,
           penaltyAmount: 0,
@@ -309,7 +309,7 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
     it('포트원을 부르지 않은 취소는 포트원 상태를 바꾸지 않는다', async () => {
       await withRollback(async (tx) => {
         const made = await booking(tx);
-        await finishCustomerCancel(tx, { ...made.finish, pgCancellationId: null });
+        await finishCancelRecord(tx, { ...made.finish, pgCancellationId: null });
         const [order] = await tx.select().from(orders).where(eq(orders.id, made.order.id));
         expect(order.pgStatus).toBeNull();
       });
@@ -318,12 +318,12 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
     it('두 번째 기록과 이용 완료한 예약은 아무것도 바꾸지 않고 false', async () => {
       await withRollback(async (tx) => {
         const made = await booking(tx);
-        expect(await finishCustomerCancel(tx, made.finish)).toBe(true);
-        expect(await finishCustomerCancel(tx, { ...made.finish, refundAmount: 1 })).toBe(false);
+        expect(await finishCancelRecord(tx, made.finish)).toBe(true);
+        expect(await finishCancelRecord(tx, { ...made.finish, refundAmount: 1 })).toBe(false);
         expect(await rowsOf(tx, made.reservation.id)).toMatchObject([{ refundAmount: 9_800 }]);
 
         const done = await booking(tx, 'completed');
-        expect(await finishCustomerCancel(tx, done.finish)).toBe(false);
+        expect(await finishCancelRecord(tx, done.finish)).toBe(false);
         const [slot] = await tx.select().from(slots).where(eq(slots.id, done.slot.id));
         expect(slot.status).toBe('completed');
       });
@@ -335,14 +335,14 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
         const newer = await booking(tx);
         const fresh = await booking(tx);
         const finished = await booking(tx);
-        await requestCustomerCancel(tx, older.request);
-        await requestCustomerCancel(tx, {
+        await requestCancelRefund(tx, older.request);
+        await requestCancelRefund(tx, {
           ...newer.request,
           requestedAt: new Date(REQUESTED_AT.getTime() + 60_000),
         });
-        await requestCustomerCancel(tx, { ...fresh.request, requestedAt: NOW });
-        await requestCustomerCancel(tx, finished.request);
-        await finishCustomerCancel(tx, finished.finish);
+        await requestCancelRefund(tx, { ...fresh.request, requestedAt: NOW });
+        await requestCancelRefund(tx, finished.request);
+        await finishCancelRecord(tx, finished.finish);
 
         const mine = (await readStaleCancels(tx, { requestedBefore: NOW, limit: 100 })).filter(
           (row) =>
@@ -425,6 +425,77 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
         const done = await booking(tx, 'completed');
         expect(await finishAdminCancel(tx, adminCancel(done, 5_000))).toBe(false);
         expect(await rowsOf(tx, done.reservation.id)).toEqual([]);
+      });
+    });
+  });
+
+  describe('합의 후 취소 저장(#320)', () => {
+    const REQUESTED_AT = new Date('2026-11-01T10:00:00+09:00');
+    const NOW = new Date('2026-11-01T10:20:00+09:00');
+    const agreed = {
+      reason: 'agreed_cancel' as const,
+      band: null,
+      penaltyRate: 50,
+      refundAmount: 7_000,
+      penaltyAmount: 7_000,
+    };
+
+    it('진행 중으로 저장하고 끝내면 취소한 쪽 agreed, 같은 예약의 고객 취소는 함께 들어가지 않는다', async () => {
+      await withRollback(async (tx) => {
+        const shop = await createTestShop(tx, { status: 'approved' });
+        const me = await createTestCustomer(tx);
+        const made = await createTestReservation(
+          tx,
+          shop,
+          me.customerId,
+          '10:00',
+          '11:00',
+          'confirmed',
+        );
+        const base = { reservationId: made.reservation.id, orderId: made.order.id };
+        expect(
+          await requestCancelRefund(tx, { ...base, ...agreed, requestedAt: REQUESTED_AT }),
+        ).toBe(true);
+        // 손님이 같은 순간 직접 취소해도 취소 환불 기록은 하나다
+        expect(
+          await requestCancelRefund(tx, {
+            ...base,
+            reason: 'customer_cancel',
+            band: 'over_24h',
+            penaltyRate: 30,
+            refundAmount: 9_800,
+            penaltyAmount: 4_200,
+            requestedAt: REQUESTED_AT,
+          }),
+        ).toBe(false);
+        expect(await readRefundTarget(made.reservation.id, me.customerId, tx)).toMatchObject({
+          requested: { reason: 'agreed_cancel', band: null, refundAmount: 7_000 },
+        });
+
+        expect(
+          await finishCancelRecord(tx, {
+            ...base,
+            ...agreed,
+            slotId: made.slot.id,
+            pgCancellationId: 'c-1',
+            reviewReason: null,
+            hoursBeforeStart: -1,
+            requestedAt: REQUESTED_AT,
+            now: NOW,
+          }),
+        ).toBe(true);
+        const [reservation] = await tx
+          .select()
+          .from(reservations)
+          .where(eq(reservations.id, made.reservation.id));
+        expect(reservation).toMatchObject({ status: 'cancelled', cancelActor: 'agreed' });
+        const rows = await tx
+          .select()
+          .from(refunds)
+          .where(eq(refunds.reservationId, made.reservation.id));
+        expect(rows).toMatchObject([
+          { reason: 'agreed_cancel', status: 'done', refundAmount: 7_000, band: null },
+        ]);
       });
     });
   });

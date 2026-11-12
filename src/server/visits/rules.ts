@@ -16,7 +16,10 @@ export type VisitTarget = {
 export function visitBlockReason(
   target: VisitTarget,
   now: Date,
-): Exclude<VisitErrorCode, 'INVALID_INPUT' | 'RESERVATION_NOT_FOUND'> | null {
+): Exclude<
+  VisitErrorCode,
+  'INVALID_INPUT' | 'RESERVATION_NOT_FOUND' | 'CANCEL_IN_PROGRESS'
+> | null {
   if (target.status === 'cancelled') return 'NOT_RESERVED';
   if (target.status === 'completed' || target.visitResult !== null) return 'ALREADY_RECORDED';
   // 시작 시각부터 처리할 수 있다(기술 가이드 S-405 "서비스 시작 시각 이후에만")
