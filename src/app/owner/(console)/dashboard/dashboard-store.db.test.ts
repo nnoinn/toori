@@ -60,6 +60,25 @@ describeDb('원장님 대시보드 조회 (실제 DB)', () => {
     });
   });
 
+  it('결제 없이 홀딩이 끝나 마감된 매물(hold_released)은 빼고, 다른 사유로 마감한 매물은 남긴다(#308 ④)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx);
+      await tx
+        .insert(slots)
+        .values([
+          testSlot(shop, '09:00', '10:00', { status: 'closed', closeReason: 'hold_released' }),
+          testSlot(shop, '10:00', '11:00', { status: 'closed', closeReason: 'other_channel' }),
+          testSlot(shop, '11:00', '12:00'),
+        ]);
+
+      const rows = await selectDashboardSlots(tx, shop.shopId, from);
+      expect(rows.map((row) => [row.startAt, row.status, row.closeReason])).toEqual([
+        [new Date('2026-11-01T10:00:00+09:00').toISOString(), 'closed', 'other_channel'],
+        [new Date('2026-11-01T11:00:00+09:00').toISOString(), 'published', null],
+      ]);
+    });
+  });
+
   it('재등록한 취소 매물은 새 매물 id를 같이 주고, 줄은 한 번씩만 나온다(O13)', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
