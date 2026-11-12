@@ -8,7 +8,7 @@ import { IOS_INSTALL_NOTE, IOS_INSTALL_STEPS, PUSH_BLOCKED, PUSH_UNSUPPORTED } f
 import { usePushAlerts } from './use-push-alerts';
 
 /**
- * "이 기기에서 알림 받기" 스위치 (J14·O12, C-601·C-602·S-404, #131·#307). 고객 내 정보 > 알림과 원장님 내 계정이 같이 쓴다.
+ * "이 기기에서 푸시 알림 받기" 스위치 (J14·O12, C-601·C-602·S-404, #131·#307). 고객 내 정보 > 알림과 원장님 내 계정이 같이 쓴다.
  * 지금 들어와 있는 계정(고객·원장님)의 구독을 켜고 끈다. 켜짐 표시는 서버 기록(지금 계정의 구독)으로 한다.
  * 끄면 서버 기록만 지우고 브라우저 구독은 풀지 않는다(이 기기에서 켜 둔 다른 계정의 알림까지 끊기지 않게).
  * 아이폰은 홈 화면에 추가하는 방법을, 알림을 막아 뒀으면 푸는 방법을 보여준다
@@ -31,7 +31,7 @@ export function PushSwitch({
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <span id={labelId} className="text-sm font-medium">
-            이 기기에서 알림 받기
+            이 기기에서 푸시 알림 받기
           </span>
           <span className="text-xs text-muted-foreground">{description}</span>
         </div>

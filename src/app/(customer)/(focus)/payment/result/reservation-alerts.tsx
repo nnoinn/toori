@@ -29,7 +29,7 @@ export function ReservationAlerts() {
     body = (
       <p role="status" className="flex items-center gap-1.5 text-sm font-medium text-primary">
         <Check className="size-4" aria-hidden />
-        예약 알림이 켜져 있어요
+        푸시 알림이 켜져 있어요
       </p>
     );
   } else if (push.state === 'ios-install') {
@@ -51,7 +51,7 @@ export function ReservationAlerts() {
     body = (
       <div className="flex flex-col gap-2">
         <Button type="button" className="self-start" disabled={push.pending} onClick={push.turnOn}>
-          {push.pending ? '알림을 켜는 중…' : '알림 받기'}
+          {push.pending ? '푸시 알림을 켜는 중…' : '푸시 알림 받기'}
         </Button>
         {push.message ? (
           <p
