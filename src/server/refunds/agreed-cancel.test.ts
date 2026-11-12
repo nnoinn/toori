@@ -73,9 +73,6 @@ vi.mock('./agreed-cancel-store', () => ({
     state.steps.push(['mark', tx, input]);
     return state.marked;
   },
-  reopenAgreedRequest: async (_db: unknown, input: unknown) => {
-    state.steps.push(['reopen', input]);
-  },
 }));
 vi.mock('./refund-store', () => ({
   readRefundTarget: async () =>
@@ -95,9 +92,6 @@ vi.mock('./refund-store', () => ({
     state.steps.push(['requestRefund', tx, input]);
     return state.refundStarted;
   },
-  clearRequestedCancel: async (_db: unknown, reservationId: string) => {
-    state.steps.push(['clear', reservationId]);
-  },
 }));
 vi.mock('./refund-payment', () => ({
   AGREED_CANCEL_REASON: '합의 후 취소',
@@ -107,6 +101,9 @@ vi.mock('./refund-payment', () => ({
   },
 }));
 vi.mock('./finish-cancel', () => ({
+  clearUnrefundedCancel: async (_db: unknown, request: unknown, now: Date) => {
+    state.steps.push(['clearUnrefunded', request, now]);
+  },
   lookUpRefund: async () => state.lookup,
   finishCancel: async (_db: unknown, request: unknown, refund: unknown) => {
     state.steps.push(['finish', request, refund]);
@@ -417,9 +414,11 @@ describe('respondAgreedCancel (고객)', () => {
       ok: false,
       error: { code: 'REFUND_FAILED' },
     });
-    expect(state.steps.slice(-2)).toEqual([
-      ['clear', RESERVATION],
-      ['reopen', { reservationId: RESERVATION, now: NOW }],
+    // 지우기와 되돌리기는 한 트랜잭션(clearUnrefundedCancel, finish-cancel.test.ts)
+    expect(state.steps.at(-1)).toEqual([
+      'clearUnrefunded',
+      { reservationId: RESERVATION, reason: 'agreed_cancel' },
+      NOW,
     ]);
   });
 

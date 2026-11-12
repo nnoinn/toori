@@ -93,6 +93,24 @@ export async function lookUpRefund(paymentId: string): Promise<RefundLookup> {
 }
 
 /**
+ * 돌려준 돈이 없는 취소의 진행 중 표시를 지운다. 합의 후 취소면 요청도 다시 답 기다림(만료 시각이 지났으면 만료)으로 돌린다.
+ * 한 트랜잭션이라 하나만 되는 일이 없다. 지우기만 되면 요청이 '동의'로 남아 손님은 계속 CANCEL_FINISHING, 원장님은 다시 요청할 수
+ * 없고, 정리 작업도 그 요청을 다시 찾지 못한다(#346 리뷰). 실패하면 둘 다 그대로 남아 정리 작업이 다시 한다
+ */
+export async function clearUnrefundedCancel(
+  db: Db,
+  request: Pick<CancelRequest, 'reservationId' | 'reason'>,
+  now: Date,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    await clearRequestedCancel(tx, request.reservationId);
+    if (request.reason === 'agreed_cancel') {
+      await reopenAgreedRequest(tx, { reservationId: request.reservationId, now });
+    }
+  });
+}
+
+/**
  * finished: 환불이 있어서 취소를 끝냈다. cleared: 환불이 없어서(또는 예약이 이미 바뀌어서) 진행 중 표시를 지웠다.
  * left: 결제사가 처리 중이거나 포트원에 묻지 못해 그대로 뒀다
  */
@@ -104,12 +122,9 @@ export async function settleRequestedCancel(
   request: CancelRequest,
   now: Date,
 ): Promise<SettleResult> {
-  /** 돌려준 돈이 없어서 진행 중 표시를 지운다. 합의 후 취소면 요청을 다시 답 기다림(만료 시각이 지났으면 만료)으로 돌린다 */
+  /** 돌려준 돈이 없어서 진행 중 표시를 지운다(합의 후 취소면 요청도 되돌린다, 한 트랜잭션) */
   const clear = async (): Promise<SettleResult> => {
-    await clearRequestedCancel(db, request.reservationId);
-    if (request.reason === 'agreed_cancel') {
-      await reopenAgreedRequest(db, { reservationId: request.reservationId, now });
-    }
+    await clearUnrefundedCancel(db, request, now);
     return 'cleared';
   };
   const finish = async (refund: { cancellationId: string | null; amount: number | null }) => {

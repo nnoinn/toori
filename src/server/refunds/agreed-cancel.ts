@@ -40,16 +40,15 @@ import {
   readAgreedCancelRequest,
   readAgreedCancelTarget,
   readLatestAgreedCancelRequest,
-  reopenAgreedRequest,
 } from './agreed-cancel-store';
-import { finishCancel, lookUpRefund, type RefundLookup } from './finish-cancel';
-import { AGREED_CANCEL_REASON, refundPayment } from './refund-payment';
 import {
-  clearRequestedCancel,
-  readRefundTarget,
-  requestCancelRefund,
-  type RequestedCancel,
-} from './refund-store';
+  clearUnrefundedCancel,
+  finishCancel,
+  lookUpRefund,
+  type RefundLookup,
+} from './finish-cancel';
+import { AGREED_CANCEL_REASON, refundPayment } from './refund-payment';
+import { readRefundTarget, requestCancelRefund, type RequestedCancel } from './refund-store';
 import {
   AGREED_CANCEL_REASON_TEXT_MAX,
   AGREED_CANCEL_REASONS,
@@ -327,13 +326,12 @@ async function agreeAndRefund(input: {
     : await lookUpRefund(target.paymentId);
   if (found.state === 'pending') return agreedCancelFail('CANCEL_FINISHING');
   if (found.state === 'none') {
-    // 돌려준 돈이 없다. 진행 중 표시를 지우고 요청을 다시 답 기다림으로(못 지워도 정리 작업이 지운다)
-    await clearRequestedCancel(db, reservationId).catch((error: unknown) => {
-      logAgreeError('진행 중 표시 지우기 실패:', reservationId, error);
-    });
-    await reopenAgreedRequest(db, { reservationId, now }).catch((error: unknown) => {
-      logAgreeError('요청 되돌리기 실패:', reservationId, error);
-    });
+    // 돌려준 돈이 없다. 진행 중 표시를 지우고 요청을 다시 답 기다림으로 한 번에(못 하면 둘 다 남고 정리 작업이 다시 한다)
+    await clearUnrefundedCancel(db, { reservationId, reason: 'agreed_cancel' }, now).catch(
+      (error: unknown) => {
+        logAgreeError('진행 중 표시 지우기·요청 되돌리기 실패:', reservationId, error);
+      },
+    );
     return agreedCancelFail('REFUND_FAILED');
   }
 

@@ -3,7 +3,7 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
-import { agreedCancelRequests, orders, reservations } from '@/db/schema';
+import { agreedCancelRequests, orders, refunds, reservations } from '@/db/schema';
 
 import {
   createTestCustomer,
@@ -23,6 +23,8 @@ import {
   readLatestAgreedCancelRequest,
   reopenAgreedRequest,
 } from './agreed-cancel-store';
+import { clearUnrefundedCancel } from './finish-cancel';
+import { requestCancelRefund } from './refund-store';
 
 type Db = Parameters<typeof readAgreedCancelTarget>[0] &
   Parameters<typeof expireDueRequests>[0] &
@@ -265,6 +267,80 @@ describeDb('합의 후 취소 예약 값 읽기 (실제 DB)', () => {
         status: 'expired',
         respondedAt: new Date(NOW.getTime() + 24 * HOUR),
       });
+    });
+  });
+
+  it('돌려준 돈이 없으면 진행 중 기록 지우기와 요청 되돌리기를 한 번에, 되돌리기가 실패하면 지운 것도 그대로 둔다(#346 리뷰)', async () => {
+    await withRollback(async (tx) => {
+      const db = tx as unknown as Parameters<typeof clearUnrefundedCancel>[0];
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const { customerId } = await createTestCustomer(tx);
+      const { reservation, order } = await createTestReservation(
+        tx,
+        shop,
+        customerId,
+        '09:00',
+        '10:00',
+        'confirmed',
+      );
+      const ask = (requestedAt: Date) =>
+        insertAgreedCancelRequest(db as unknown as Db, {
+          reservationId: reservation.id,
+          requestedBy: shop.createdBy,
+          reason: 'style_mismatch',
+          reasonText: null,
+          requestedAt,
+          expiresAt: new Date(requestedAt.getTime() + 24 * HOUR),
+        });
+      const agree = async (requestId: string) => {
+        expect(await markAgreedCancelRequest(db as unknown as Db, { requestId, now: NOW })).toBe(
+          true,
+        );
+        expect(
+          await requestCancelRefund(tx, {
+            reservationId: reservation.id,
+            orderId: order.id,
+            reason: 'agreed_cancel',
+            band: null,
+            penaltyRate: 50,
+            refundAmount: 7_000,
+            penaltyAmount: 7_000,
+            requestedAt: NOW,
+          }),
+        ).toBe(true);
+      };
+      const refundRows = () =>
+        tx
+          .select({ status: refunds.status })
+          .from(refunds)
+          .where(eq(refunds.reservationId, reservation.id));
+      const statusOf = async (requestId: string) =>
+        (
+          await tx
+            .select({ status: agreedCancelRequests.status })
+            .from(agreedCancelRequests)
+            .where(eq(agreedCancelRequests.id, requestId))
+        )[0]?.status;
+
+      const first = await ask(NOW);
+      await agree(first.requestId);
+      await clearUnrefundedCancel(
+        db,
+        { reservationId: reservation.id, reason: 'agreed_cancel' },
+        NOW,
+      );
+      expect(await refundRows()).toEqual([]);
+      expect(await statusOf(first.requestId)).toBe('requested');
+
+      // 동의 뒤 같은 예약에 답 기다리는 요청이 또 있으면 되돌리기가 unique에 막혀 실패한다. 그래도 지우기만 되지 않는다
+      await agree(first.requestId);
+      const other = await ask(new Date(NOW.getTime() + HOUR));
+      await expect(
+        clearUnrefundedCancel(db, { reservationId: reservation.id, reason: 'agreed_cancel' }, NOW),
+      ).rejects.toThrow();
+      expect(await refundRows()).toEqual([{ status: 'requested' }]);
+      expect(await statusOf(first.requestId)).toBe('agreed');
+      expect(await statusOf(other.requestId)).toBe('requested');
     });
   });
 });

@@ -14,6 +14,9 @@ const state = vi.hoisted(() => ({
   cancelAlerts: [] as unknown[],
   agreedAlerts: [] as unknown[],
   reopened: [] as unknown[],
+  /** 지우기·되돌리기가 받은 DB(트랜잭션이면 'tx') */
+  writers: [] as unknown[],
+  reopenError: null as Error | null,
 }));
 
 vi.mock('@/server/notifications/alerts', () => ({
@@ -29,7 +32,9 @@ vi.mock('@/server/notifications/alerts', () => ({
   },
 }));
 vi.mock('./agreed-cancel-store', () => ({
-  reopenAgreedRequest: async (_db: unknown, input: unknown) => {
+  reopenAgreedRequest: async (db: unknown, input: unknown) => {
+    state.writers.push(['reopen', db]);
+    if (state.reopenError) throw state.reopenError;
     state.reopened.push(input);
   },
 }));
@@ -43,12 +48,14 @@ vi.mock('./refund-store', () => ({
     state.finishes.push(input);
     return state.finished;
   },
-  clearRequestedCancel: async (_db: unknown, reservationId: string) => {
+  clearRequestedCancel: async (db: unknown, reservationId: string) => {
+    state.writers.push(['clear', db]);
     state.cleared.push(reservationId);
   },
 }));
 
-const { finishCancel, lookUpRefund, settleRequestedCancel } = await import('./finish-cancel');
+const { clearUnrefundedCancel, finishCancel, lookUpRefund, settleRequestedCancel } =
+  await import('./finish-cancel');
 
 const db = {
   transaction: (run: (tx: string) => unknown) => run('tx'),
@@ -87,6 +94,8 @@ beforeEach(() => {
   state.cancelAlerts = [];
   state.agreedAlerts = [];
   state.reopened = [];
+  state.writers = [];
+  state.reopenError = null;
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -268,16 +277,30 @@ describe('합의 후 취소(#320)', () => {
     expect(state.cancelAlerts).toEqual([]);
   });
 
-  it('정리 작업이 환불이 없다고 보면 진행 중 표시를 지우고 요청을 다시 답 기다림으로 돌린다', async () => {
+  it('정리 작업이 환불이 없다고 보면 진행 중 표시를 지우고 요청을 다시 답 기다림으로 돌린다(한 트랜잭션)', async () => {
     state.lookup = payment([]);
     expect(await settleRequestedCancel(db, agreed, NOW)).toBe('cleared');
     expect(state.cleared).toEqual(['reservation-1']);
     expect(state.reopened).toEqual([{ reservationId: 'reservation-1', now: NOW }]);
+    expect(state.writers).toEqual([
+      ['clear', 'tx'],
+      ['reopen', 'tx'],
+    ]);
+  });
+
+  it('요청 되돌리기가 실패하면 실패를 그대로 올린다(트랜잭션이 지우기도 되돌린다, 실제 DB는 agreed-cancel-store.db.test.ts)', async () => {
+    state.reopenError = new Error('db down');
+    await expect(clearUnrefundedCancel(db, agreed, NOW)).rejects.toThrow('db down');
+    expect(state.writers).toEqual([
+      ['clear', 'tx'],
+      ['reopen', 'tx'],
+    ]);
   });
 
   it('고객 취소는 지워도 요청을 건드리지 않는다', async () => {
     state.lookup = payment([]);
     expect(await settleRequestedCancel(db, request, NOW)).toBe('cleared');
     expect(state.reopened).toEqual([]);
+    expect(state.writers).toEqual([['clear', 'tx']]);
   });
 });
