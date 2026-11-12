@@ -82,15 +82,18 @@ describe('validateShopProfile', () => {
       { open: '9:00', close: '20:00' },
       '여는 시각과 닫는 시각을 모두 골라 주세요',
     ],
-    [
-      '여는 시각과 닫는 시각이 같음',
-      { open: '10:00', close: '10:00' },
-      '닫는 시각은 여는 시각보다 늦어야 해요',
-    ],
-    ['자정을 넘김', { open: '18:00', close: '02:00' }, '닫는 시각은 여는 시각보다 늦어야 해요'],
   ])('영업시간 오류: %s', (_name, row, message) => {
     const result = validateShopProfile(valid({ hours: withMonday(row) }));
     expect(result).toEqual({ ok: false, fieldErrors: { 'hours.0': message } });
+  });
+
+  it.each([
+    ['새벽까지 영업(닫는 시각이 더 이름)', { open: '18:00', close: '02:00' }],
+    ['24시간 영업(두 시각이 같음)', { open: '10:00', close: '10:00' }],
+    ['자정 마감(닫는 시각 00:00)', { open: '10:00', close: '00:00' }],
+  ])('여는·닫는 시각 순서로 막지 않는다(11/11): %s', (_name, row) => {
+    const result = validateShopProfile(valid({ hours: withMonday(row) }));
+    expect(result.ok && result.data.businessHours).toEqual([{ weekday: 1, ...row }]);
   });
 
   it('같은 요일이 두 번 오면 막는다', () => {

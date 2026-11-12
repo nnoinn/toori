@@ -2,6 +2,7 @@
 
 // 매물 등록 ② 날짜 달력 (S-205). 맨 위에 오늘 날짜를 알려 주고, 일요일부터 토요일까지 7칸 달력에 고를 수 있는 날짜만
 // 누를 수 있게 둔다(오늘부터 14일, 게시중 매물을 고칠 때는 48시간). 쉬는 날은 "휴무"로 잠근다.
+// 다만 전날 영업이 새벽까지 이어지면 그 새벽은 쉬는 날짜의 매물로 올릴 수 있어서 잠그지 않는다(11/11 nnoinn).
 // 날짜를 고르면 달력 아래에 그 날의 시작 시각이 나온다(slot-form-steps.tsx TimeStep).
 
 import { cn } from 'cn';
@@ -62,14 +63,17 @@ export function SlotDateCalendar({
         ))}
         {weeks.flat().map((key) => {
           const firstStart = choosable.get(key);
-          const closed = firstStart ? isClosedDay(firstStart, businessHours) : false;
+          const closed =
+            firstStart !== undefined &&
+            businessHours.some((item) => item.weekday === weekdayOfKey(key) && 'closed' in item);
           return (
             <DayCell
               key={key}
               dateKey={key}
               isToday={key === todayKey}
-              // 고를 수 있는 범위 밖(오늘 전, 14일 뒤)이거나 쉬는 날이면 누를 수 없다
-              disabled={!firstStart || closed}
+              // 고를 수 있는 범위 밖(오늘 전, 14일 뒤)이거나, 쉬는 날이고 전날 영업이 새벽까지 이어지지도 않으면 누를 수 없다.
+              // 전날에서 이어진 새벽이 있는 쉬는 날은 "휴무"를 보여주되 그 새벽을 고를 수 있게 둔다(11/11 nnoinn)
+              disabled={!firstStart || isClosedDay(firstStart, businessHours)}
               closed={closed}
               selected={key === selectedKey}
               onChoose={onChoose}

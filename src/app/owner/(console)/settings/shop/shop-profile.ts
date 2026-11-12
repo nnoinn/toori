@@ -61,14 +61,16 @@ export function toHoursRows(stored: BusinessHours): HoursRow[] {
   });
 }
 
-/** 영업시간 한 줄의 문제. 없으면 null */
+/**
+ * 영업시간 한 줄의 문제. 없으면 null. 둘 다 골랐는지만 본다(11/11 nnoinn, #332).
+ * 여는·닫는 시각 순서로는 막지 않는다: 닫는 시각이 여는 시각보다 이르면 다음 날 새벽까지(18:00 ~ 02:00),
+ * 같으면 24시간 영업, 닫는 시각 00:00은 자정 마감이다(매물 등록 계산은 slots/slot-time.ts openSpans)
+ */
 function checkHoursRow(row: HoursRow): string | null {
   if (row.closed) return null;
   if (!row.open && !row.close) return null;
   if (!TIME.test(row.open) || !TIME.test(row.close))
     return '여는 시각과 닫는 시각을 모두 골라 주세요';
-  // 자정을 넘기는 영업시간은 받지 않는다(정민석 결정)
-  if (row.open >= row.close) return '닫는 시각은 여는 시각보다 늦어야 해요';
   return null;
 }
 
