@@ -32,6 +32,8 @@ describeDb('내 예약 조회', () => {
 
       const upcoming = await selectMyReservations(tx, me.customerId, 'upcoming');
       expect(upcoming.map((item) => new Date(item.startAt).getUTCHours())).toEqual([2, 6]); // 11시, 15시(한국)
+      // 카드의 "~ 끝 시각"(#359 2번): 12시, 16시(한국)
+      expect(upcoming.map((item) => new Date(item.endAt).getUTCHours())).toEqual([3, 7]);
       expect(upcoming.every((item) => !item.noShow)).toBe(true);
 
       const completed = await selectMyReservations(tx, me.customerId, 'completed');
