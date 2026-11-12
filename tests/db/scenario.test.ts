@@ -230,4 +230,123 @@ describeDb('시나리오 명령 (실제 DB)', () => {
       expect(await counts()).toEqual(before);
     });
   });
+
+  it('예약에 달린 기록(합의 후 취소 요청·이의제기·원장님 패널티·쿠폰·정산 전 항목)이 있어도 owner-slots·reset이 지운다(#301)', async () => {
+    await withRollbackSql(async (sql) => {
+      const { meId, run, counts } = await setup(sql);
+      const before = await counts();
+      await run('owner-shop', 'approved');
+
+      /** 시나리오 예약에 실제 화면·서버가 남기는 기록을 붙이고, 붙인 예약·주문 id를 돌려준다 */
+      const attachLinkedRows = async () => {
+        const bookings = await sql<
+          {
+            reservation_id: string;
+            order_id: string;
+            customer_id: string;
+            shop_id: string;
+            slot_status: string;
+          }[]
+        >`
+          select r.id as reservation_id, r.order_id, r.customer_id, sl.shop_id, sl.status as slot_status
+          from reservations r join slots sl on sl.id = r.slot_id
+          join shops s on s.id = sl.shop_id join owners o on o.id = s.owner_id
+          where o.user_id = ${meId} and sl.relisted_from_slot_id is null`;
+        const pick = (status: string) => {
+          const found = bookings.find((b) => b.slot_status === status);
+          if (!found) throw new Error(`시나리오에 ${status} 예약이 없어요`);
+          return found;
+        };
+        const reserved = pick('reserved');
+        const completed = pick('completed');
+        const cancelled = pick('cancelled');
+        const later = (days: number) => new Date(NOW.getTime() + days * 24 * 60 * 60 * 1000);
+
+        await sql`insert into agreed_cancel_requests ${sql({
+          reservation_id: reserved.reservation_id,
+          requested_by: meId,
+          reason: 'style_mismatch',
+          status: 'declined',
+          requested_at: NOW,
+          expires_at: later(1),
+          responded_at: NOW,
+        })}`;
+        await sql`insert into disputes ${sql({
+          reservation_id: completed.reservation_id,
+          type: 'no_show',
+          content: '시나리오 이의제기',
+          status: 'open',
+        })}`;
+        await sql`insert into owner_penalties ${sql({
+          shop_id: cancelled.shop_id,
+          reservation_id: cancelled.reservation_id,
+          amount: 5000,
+        })}`;
+        // 원장님 귀책 보상 쿠폰(원인 예약)과, 시나리오 주문에 쓴 쿠폰(주문과 쿠폰이 서로 가리킨다)
+        await sql`insert into coupons ${sql({
+          customer_id: cancelled.customer_id,
+          amount: 3000,
+          reason: 'owner_fault_compensation',
+          source_reservation_id: cancelled.reservation_id,
+          issued_at: NOW,
+          expires_at: later(90),
+        })}`;
+        const [used] = await sql<{ id: string }[]>`insert into coupons ${sql({
+          customer_id: completed.customer_id,
+          amount: 3000,
+          reason: 'owner_fault_compensation',
+          issued_at: NOW,
+          expires_at: later(90),
+          used_order_id: completed.order_id,
+          used_at: NOW,
+        })} returning id`;
+        await sql`update orders set coupon_id = ${used.id} where id = ${completed.order_id}`;
+        // 정산 전(어느 정산에도 들어가지 않은) 정산 항목
+        await sql`insert into settlement_items ${sql({
+          shop_id: completed.shop_id,
+          order_id: completed.order_id,
+          kind: 'sale',
+          base_amount: 10000,
+          fee_rate: 0,
+          fee_amount: 0,
+          fee_vat: 0,
+          payment_fee_rate: 0,
+          payment_fee: 0,
+          payment_fee_vat: 0,
+          payout_amount: 10000,
+          pg_fee_actual: 0,
+        })}`;
+        return {
+          reservationIds: bookings.map((b) => b.reservation_id),
+          orderIds: bookings.map((b) => b.order_id),
+          couponIds: [used.id],
+        };
+      };
+      const linkedLeft = async (ids: { reservationIds: string[]; orderIds: string[] }) => {
+        const [row] = await sql<{ n: number }[]>`
+          select (select count(*)::int from agreed_cancel_requests where reservation_id in ${sql(ids.reservationIds)})
+            + (select count(*)::int from disputes where reservation_id in ${sql(ids.reservationIds)})
+            + (select count(*)::int from owner_penalties where reservation_id in ${sql(ids.reservationIds)})
+            + (select count(*)::int from settlement_items where order_id in ${sql(ids.orderIds)})
+            + (select count(*)::int from coupons where source_reservation_id in ${sql(ids.reservationIds)}
+                or used_order_id in ${sql(ids.orderIds)}) as n`;
+        return row.n;
+      };
+
+      await run('owner-slots');
+      const first = await attachLinkedRows();
+      // 다시 만들기(owner-slots)는 지난 시나리오 예약을 기록과 함께 지우고 새로 만든다
+      await run('owner-slots');
+      expect(await linkedLeft(first)).toBe(0);
+      // 쓴 쿠폰은 지우지 않고 다시 쓸 수 있게 돌려준다
+      expect(
+        await sql`select used_order_id, used_at from coupons where id in ${sql(first.couponIds)}`,
+      ).toEqual([{ used_order_id: null, used_at: null }]);
+
+      const second = await attachLinkedRows();
+      await run('reset');
+      expect(await linkedLeft(second)).toBe(0);
+      expect(await counts()).toEqual(before);
+    });
+  });
 });
