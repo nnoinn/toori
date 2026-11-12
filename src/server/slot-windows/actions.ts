@@ -5,7 +5,7 @@
 // - 고객(정찬형 시간대 상세 [예약하기]): holdWindowSlot
 //
 // 원장님 함수는 진짜 버전이다(①): 시간대 표에 저장·읽기·마감한다. 실패는 DEV_FAKE_SLOT_WINDOWS_FAILURE로 흉내 낼 수 있다(fake.ts).
-// [예약하기]는 아직 가짜 결과 버전이다. 서비스·시각이 맞는지까지 확인하고 홀딩하지 않는다(진짜 버전 ③에서 매물 한 칸을 만들어 홀딩한다)
+// [예약하기]는 진짜 시간대에서 서비스·시각이 맞는지까지 확인하고 아직 홀딩하지 않는다(진짜 버전 ③에서 매물 한 칸을 만들어 홀딩한다)
 
 import { z } from 'zod';
 
@@ -19,7 +19,8 @@ import type { HoldInfo } from '@/server/payments/types';
 import { assertShopApproved } from '@/server/shops';
 
 import { type SlotWindowResult, slotWindowFail } from './errors';
-import { buildFakeWindow, fakeWindowFailure, fakeWindowsOn } from './fake';
+import { fakeWindowFailure } from './fake';
+import { readWindowView } from './queries';
 import { checkWindowDraft } from './rules';
 import {
   closeWindow,
@@ -163,7 +164,7 @@ const holdSchema = z.object({
 /**
  * 고객 시간대 상세 [예약하기](C-404). 고른 서비스·시작 시각으로 매물 한 칸을 만들어 10분 홀딩하고, 그 뒤로는 받은 slotId로
  * 지금 예약 확인·결제 화면을 그대로 쓴다. 그 사이 다른 고객이 그 시간을 골랐으면 TIME_TAKEN(화면은 getSlotWindow를 다시 불러온다).
- * 가짜 버전은 서비스·시각이 맞는지까지 확인하고 홀딩하지 않는다(진짜 버전에서 열린다)
+ * 지금은 진짜 시간대에서 서비스·시각이 맞는지까지 확인하고 홀딩하지 않는다(진짜 버전 ③에서 열린다)
  */
 export async function holdWindowSlot(input: HoldWindowSlotInput): Promise<PaymentResult<HoldInfo>> {
   const auth = await requireCustomer();
@@ -172,20 +173,21 @@ export async function holdWindowSlot(input: HoldWindowSlotInput): Promise<Paymen
   if (!parsed.success) return paymentFail('SLOT_NOT_AVAILABLE');
   const switched = fakeWindowFailure('holdWindowSlot');
   if (switched) return switched;
-  if (!fakeWindowsOn()) return paymentFail('SLOT_NOT_AVAILABLE');
 
-  const window = await buildFakeWindow(getDb(), parsed.data.windowId, await getRequestNow());
-  const chosen = window?.menus.find((item) => item.menu.menuId === parsed.data.menuId);
+  const view = await readWindowView(getDb(), {
+    windowId: parsed.data.windowId,
+    customerId: auth.data.customerId,
+    now: await getRequestNow(),
+  });
+  const chosen = view?.menus.find((item) => item.menu.menuId === parsed.data.menuId);
   if (!chosen) return paymentFail('SLOT_NOT_AVAILABLE');
   const startAt = new Date(parsed.data.startAt).getTime();
   if (!chosen.startRanges.some((start) => start.start.getTime() === startAt)) {
     return paymentFail('TIME_TAKEN');
   }
+  // 홀딩은 진짜 버전 ③에서 연다. 그 전까지는 고를 수 있는 시각이어도 홀딩하지 않고 안내한다
   return {
     ok: false,
-    error: {
-      code: 'SLOT_NOT_AVAILABLE',
-      message: '시간대 예약은 진짜 버전에서 열려요(가짜 결과 버전)',
-    },
+    error: { code: 'SLOT_NOT_AVAILABLE', message: '시간대 예약은 곧 열려요' },
   };
 }

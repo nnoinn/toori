@@ -189,6 +189,7 @@ PR 검사가 자동으로 막는 것:
 | WINDOW-02 | 시간대는 30분 단위, 지금 뒤·14일 안이고, 같은 샵의 예약대기·게시중·예약됨 매물과 겹치지 않아야 한다 | #308 | ✅ | `src/server/slot-windows/rules.test.ts` 시작·끝은 30분 단위, 시작은 지금 뒤·14일 안<br>`src/db/slot-windows.db.test.ts` 시간대는 예약대기·게시중·예약됨 매물과 겹치면 막힌다 |
 | WINDOW-03 | 등록은 켠 묶음마다 시간대 한 줄과 올릴 때 서비스 값(이름·정가·소요 시간·할인가)을 한 번에 저장한다. 확인 뒤 같은 샵의 매물·시간대가 같은 시간을 먼저 차지하면 "같은 시간에 이미 올린 매물이나 시간대가 있어요"로 막는다. 마감은 사유·시각을 남기고, 이미 마감했거나 끝난 시간대는 막는다(#344의 "진짜 버전 전에는 저장한 것처럼 성공하지 않는다"를 진짜 버전으로 바꿈) | #308 ① | ✅ | `src/server/slot-windows/owner-store.db.test.ts` 묶음마다 시간대 한 줄과 올릴 때 서비스 값을 저장하고<br>`src/server/slot-windows/owner-store.db.test.ts` 같은 샵의 예약대기·게시중·예약됨 매물이나 시간대와 겹치면<br>`src/server/slot-windows/windows.test.ts` 확인 뒤 다른 요청이 같은 시간을 먼저 저장해서 DB가 막으면 WINDOW_OVERLAP<br>`src/server/slot-windows/owner-store.db.test.ts` 마감: 내 샵의 끝나지 않은 시간대만 |
 | WINDOW-04 | [예약하기]로 시간대 안에 매물 한 칸을 만들어 홀딩하고, 결제 없이 끝나면 그 칸은 마감(hold_released)이 된다 | #308 ④ | ⏳ | |
+| WINDOW-05 | 고객 목록·상세에는 게시 시각이 지났고 끝나지 않은 예약대기·게시중 시간대만 보인다(승인된 샵). 서비스마다 그 샵의 예약됨·결제 중인 시간을 뺀 시작 가능 시각을 주고, 남은 시간에 들어가는 서비스가 없으면 목록·상세에서 내린다. 신규 고객 전용 시간대는 그 샵에 이력이 있는 고객에게 보이지 않는다 | #308 ②·C-306 | ✅ | `src/server/slot-windows/store.db.test.ts` 고객에게 보이는 시간대: 게시 시각이 지났고 끝나지 않은 예약대기·게시중 시간대만<br>`src/server/slot-windows/store.db.test.ts` 신규 고객 전용 시간대는 그 샵에 확정·이용 완료 예약이 있는 고객에게 보이지 않는다<br>`src/server/slot-windows/queries.db.test.ts` 예약됨·결제 중 매물을 뺀 시작 가능 시각으로 카드와 상세를 만들고<br>`src/server/slot-windows/view.test.ts` 남은 시간에 들어가는 서비스가 없으면 |
 
 ## 16. 한 바퀴 흐름 (서버 흐름 ②·브라우저 ③에서 자동으로)
 
