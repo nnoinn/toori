@@ -1,28 +1,7 @@
-// 시간대 상세(#308) 표시용 함수. 화면과 서버 어디서나 쓴다. 시각은 서버가 준 ISO 문자열을 한국 시간으로 보여준다.
+// 시간대 상세(#308)의 서비스·시작 시각 고르기 함수. 화면과 서버 어디서나 쓴다.
+// 시간대 범위 글자는 목록 카드와 같이 쓰려고 @/features/map/slot-list/window-range에 둔다.
 
-import { formatKst, formatKstTime, kstDateKey } from '@/lib/time';
 import type { SlotWindowMenu, WindowStart } from '@/server/slot-windows';
-
-/**
- * 끝 시각. 시작과 같은 날이면 "18:00", 다음 날 0시 정각이면 "24:00"(자정까지),
- * 그 밖에 날이 넘어가면 "다음 날 02:00"(새벽까지 영업하는 샵, 영업시간 규칙 11/11)
- */
-function endTimeText(startAt: Date, endAt: Date): string {
-  if (kstDateKey(startAt) === kstDateKey(endAt)) return formatKstTime(endAt);
-  const time = formatKstTime(endAt);
-  return time === '00:00' ? '24:00' : `다음 날 ${time}`;
-}
-
-/** 시간대 범위. 예: "11/14(토) 14:00 ~ 18:00", "11/14(토) 22:00 ~ 다음 날 02:00" */
-export function windowRangeText(startAt: string, endAt: string): string {
-  const start = new Date(startAt);
-  return `${formatKst(start)} ~ ${endTimeText(start, new Date(endAt))}`;
-}
-
-/** 시작 시각 고르기 버튼의 끝 시각. 예: "~ 15:00", "~ 24:00" */
-export function startEndText(start: WindowStart): string {
-  return `~ ${endTimeText(new Date(start.startAt), new Date(start.endAt))}`;
-}
 
 /** 처음 열 때 골라 둘 서비스: 지금 시작할 수 있는 시각이 있는 첫 서비스. 없으면 null */
 export function firstOpenMenuId(menus: SlotWindowMenu[]): string | null {

@@ -2,6 +2,8 @@
 // 지도를 움직일 때마다 핀과 목록을 비우면 깜박이고, 목록 높이가 바뀌어 지도 크기까지 흔들린다(#199, #203).
 // 그래서 새 결과가 올 때까지 이전 결과를 그대로 보여주고, 회색 카드는 처음 불러올 때만 쓴다.
 
+import { type ListItem, listItemKey } from './types';
+
 /** 한 조건(key: 지도 영역·필터·고른 샵)으로 받은 결과 */
 export type Shown<T> = { key: string; data: T };
 
@@ -44,22 +46,22 @@ export type ListPage<I> = { items: I[]; nextCursor: string | null; serverNow: st
  * 이어 불러온 쪽을 지금 목록 뒤에 붙인다(지도 홈 목록과 지도 없는 매물 목록이 같이 쓴다).
  * - 부를 때의 조건(requestKey)과 지금 목록의 조건이 다르면(그사이 지도를 움직이거나 필터를 바꿨으면) 붙이지 않는다.
  *   이전 영역의 목록 뒤에 새 영역 매물이 붙지 않게
- * - 이미 목록에 있는 매물은 다시 붙이지 않는다. 앞 쪽을 받은 뒤 원장님이 할인율·시간을 고치면
- *   같은 매물이 다음 쪽에 또 올 수 있어서다(같은 매물 카드가 두 번 보이지 않게)
+ * - 이미 목록에 있는 매물·시간대는 다시 붙이지 않는다. 앞 쪽을 받은 뒤 원장님이 할인율·시간을 고치거나
+ *   시간이 지나 시간대의 가장 빠른 시작이 바뀌면 같은 줄이 다음 쪽에 또 올 수 있어서다(같은 카드가 두 번 보이지 않게)
  * - 목록에 같이 있는 다른 값(전체 매물 수 등)은 그대로 둔다
  */
-export function appendPage<I extends { slotId: string }, T extends ListPage<I>>(
+export function appendPage<I extends ListItem, T extends ListPage<I>>(
   prev: Shown<T> | null,
   requestKey: string | null,
   page: ListPage<I>,
 ): Shown<T> | null {
   if (!prev || prev.key !== requestKey) return prev;
-  const seen = new Set(prev.data.items.map((item) => item.slotId));
+  const seen = new Set(prev.data.items.map(listItemKey));
   return {
     ...prev,
     data: {
       ...prev.data,
-      items: [...prev.data.items, ...page.items.filter((item) => !seen.has(item.slotId))],
+      items: [...prev.data.items, ...page.items.filter((item) => !seen.has(listItemKey(item)))],
       nextCursor: page.nextCursor,
       serverNow: page.serverNow,
     },
