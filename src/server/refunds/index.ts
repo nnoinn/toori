@@ -9,6 +9,7 @@ export { calcRefund, getPenaltyBand, type RefundCalc } from './calc-refund';
 export { REFUND_ERRORS, type RefundError, type RefundErrorCode, type RefundResult } from './errors';
 export { readRefundTarget, type RefundTarget } from './refund-store';
 export { sweepStaleCancels } from './sweep-cancels';
+export { type AgreedCancelSweepSummary, sweepAgreedCancelRequests } from './agreed-cancel-expiry';
 export type { CancelledReservation, RefundPreview } from './types';
 export {
   AGREED_CANCEL_ERRORS,
