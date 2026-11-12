@@ -6,7 +6,7 @@
 
 import 'server-only';
 
-import { and, eq, exists, inArray, not, or, type SQL, sql } from 'drizzle-orm';
+import { type AnyColumn, and, eq, exists, inArray, not, or, type SQL, sql } from 'drizzle-orm';
 import { alias, QueryBuilder } from 'drizzle-orm/pg-core';
 
 import { getDb } from '@/db';
@@ -39,16 +39,23 @@ const queryBuilder = new QueryBuilder({ casing: 'snake_case' });
 /**
  * 목록·지도 조회의 where에 넣는 조건: 신규 고객 전용이 아니거나, 이 고객이 그 샵 이력이 없는 매물만.
  * 바깥 쿼리의 slots(별칭 없이)를 참조한다. 매물 상태 조건(slotStatusIs, 연결 #16)·customerVisibleShop()과 나란히 넣는다.
- * customerId가 null(로그인 안 함, 원장님 모드로 둘러보기, 고객 계정 없음)이면 아무것도 거르지 않는다(#49 3장)
+ * customerId가 null(로그인 안 함, 원장님 모드로 둘러보기, 고객 계정 없음)이면 아무것도 거르지 않는다(#49 3장).
+ * 매물이 아닌 표(시간대 slot_windows, #308)는 target으로 그 표의 샵·신규 고객 전용 컬럼을 넘긴다
  */
-export function newCustomerOnlyVisible(customerId: string | null): SQL {
+export function newCustomerOnlyVisible(
+  customerId: string | null,
+  target: { shopId: AnyColumn; newCustomerOnly: AnyColumn } = {
+    shopId: slots.shopId,
+    newCustomerOnly: slots.newCustomerOnly,
+  },
+): SQL {
   if (customerId === null) return sql`true`;
   const visitedThisShop = queryBuilder
     .select({ one: sql`1` })
     .from(visitedReservation)
     .innerJoin(visitedSlot, joinVisitedSlot)
-    .where(and(isVisitedBy(customerId), eq(visitedSlot.shopId, slots.shopId)));
-  return or(eq(slots.newCustomerOnly, false), not(exists(visitedThisShop)))!;
+    .where(and(isVisitedBy(customerId), eq(visitedSlot.shopId, target.shopId)));
+  return or(eq(target.newCustomerOnly, false), not(exists(visitedThisShop)))!;
 }
 
 /** 여러 샵 중 이 고객이 이력이 있는 샵 id(지도 마커 묶음). 트랜잭션 안에서 확인하려면 tx를 넘긴다 */
