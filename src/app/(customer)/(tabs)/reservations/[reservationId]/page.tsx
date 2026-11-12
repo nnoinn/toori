@@ -78,7 +78,7 @@ async function DetailContent({ params }: { params: Params }) {
   return (
     <article className="flex flex-col gap-4 pb-6">
       <header className="flex items-center gap-1 px-2 pt-2">
-        <BackButton fallbackHref="/reservations" />
+        <BackButton fallbackHref="/reservations" className="max-md:size-10" />
         <h1 className="text-lg font-bold">예약 상세</h1>
       </header>
 
