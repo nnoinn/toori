@@ -151,7 +151,50 @@ async function insertSlot(sql, row) {
 }
 
 /** 주문 조건(fragment)에 걸린 환불·예약·주문을 지운다 */
+/**
+ * 예약·주문을 지울 때 같이 정리하는 외래 키(표.컬럼)와 처리 방법(#301).
+ * delete: 지운다 / unlink: 연결만 끊는다 / stop: 있으면 아무것도 지우지 않고 멈춘다(정산은 시나리오가 고치지 않는다).
+ * 예약·주문(또는 여기서 지우는 표)을 가리키는 표가 새로 생기면 여기와 deleteBookings에 같이 더한다.
+ * tests/db/scenario.test.ts가 DB의 외래 키와 이 목록이 맞는지 확인해서, 빠뜨리면 PR 검사가 실패한다
+ */
+export const BOOKING_LINKS = {
+  'reservations.order_id': 'delete',
+  'refunds.order_id': 'delete',
+  'refunds.reservation_id': 'delete',
+  'agreed_cancel_requests.reservation_id': 'delete',
+  'disputes.reservation_id': 'delete',
+  'owner_penalties.reservation_id': 'delete',
+  // 정산 전 항목은 지우고, 정산에 들어간 항목이 있으면 멈춘다
+  'settlement_items.order_id': 'delete',
+  // 패널티를 정산에서 뗀 기록은 정산에 들어간 것이라 멈춘다
+  'penalty_collections.penalty_id': 'stop',
+  // 쿠폰은 고객의 것이라 지우지 않는다. 쓴 쿠폰은 다시 쓸 수 있게, 보상 쿠폰은 원인 예약만 비운다
+  'coupons.used_order_id': 'unlink',
+  'coupons.source_reservation_id': 'unlink',
+};
+
+/**
+ * 주문(orderIds가 고르는 주문)과 그 예약을 지운다. 예약·주문을 가리키는 기록을 먼저 정리해야 외래 키에 걸리지 않는다(BOOKING_LINKS).
+ * 정산에 들어간 기록이 있으면 아무것도 지우기 전에 멈춘다. 명령은 트랜잭션 안에서 돌아서 멈추면 그 명령 전체가 되돌려진다
+ */
 async function deleteBookings(sql, orderIds) {
+  const reservationIds = () => sql`select id from reservations where order_id in (${orderIds()})`;
+  const [settled] = await sql`
+    select
+      (select count(*)::int from settlement_items where order_id in (${orderIds()}) and settlement_id is not null)
+      + (select count(*)::int from penalty_collections where penalty_id in (
+          select id from owner_penalties where reservation_id in (${reservationIds()}))) as n`;
+  if (settled.n > 0) {
+    throw new ScenarioError(
+      '정산에 들어간 시나리오 예약이 있어서 아무것도 지우지 않았어요. 정산 기록은 시나리오가 고치지 않아요. 단톡방으로 nnoinn에게 알려 주세요.',
+    );
+  }
+  await sql`delete from agreed_cancel_requests where reservation_id in (${reservationIds()})`;
+  await sql`delete from disputes where reservation_id in (${reservationIds()})`;
+  await sql`delete from owner_penalties where reservation_id in (${reservationIds()})`;
+  await sql`delete from settlement_items where order_id in (${orderIds()})`;
+  await sql`update coupons set used_order_id = null, used_at = null where used_order_id in (${orderIds()})`;
+  await sql`update coupons set source_reservation_id = null where source_reservation_id in (${reservationIds()})`;
   await sql`delete from refunds where order_id in (${orderIds()})`;
   await sql`delete from reservations where order_id in (${orderIds()})`;
   await sql`delete from orders where id in (${orderIds()})`;
