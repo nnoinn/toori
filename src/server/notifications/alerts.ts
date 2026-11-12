@@ -233,3 +233,69 @@ export function notifyPayoutAccountChanged(db: Db, input: { shopId: string; chan
     });
   });
 }
+
+/**
+ * 원장님이 합의 후 취소를 요청했을 때 고객에게(S-410 → C-506, #301). 누르면 내 예약 상세의 요청 카드로 간다.
+ * 다시 요청하면 새로 가도록 요청 id를 중복 방지 키에 넣는다
+ */
+export function notifyAgreedCancelRequested(
+  db: Db,
+  input: { reservationId: string; requestId: string },
+) {
+  const event = 'reservation.agreed_cancel_requested';
+  sendAfterResponse(event, async () => {
+    const alert = await readReservationAlert(db, input.reservationId);
+    if (!alert) return;
+    await notify(db, {
+      userId: alert.customerUserId,
+      accountType: 'customer',
+      event,
+      dedupeKey: `${event}:customer:${input.requestId}`,
+      title: '원장님이 합의 후 취소를 요청했어요',
+      body: `${alert.shopName} · ${formatKst(alert.startAt)}`,
+      url: `/reservations/${input.reservationId}`,
+    });
+  });
+}
+
+/** 합의 후 취소 결과(원장님 알림) */
+export type AgreedCancelResultKind = 'agreed' | 'declined' | 'expired';
+
+const AGREED_CANCEL_RESULT_TITLES: Record<AgreedCancelResultKind, string> = {
+  agreed: '손님이 합의 후 취소에 동의했어요',
+  declined: '손님이 합의 후 취소에 동의하지 않았어요',
+  expired: '합의 후 취소 요청이 만료됐어요',
+};
+
+/**
+ * 합의 후 취소 결과를 원장님에게(#301): 손님이 동의·거절했거나 24시간 안에 답하지 않았을 때. 누르면 원장님 예약 상세로 간다.
+ * 동의해도 재등록 안내는 보내지 않는다(서비스 시간 무렵의 취소라서). 요청마다 한 번만 간다.
+ * 예약 작업(만료)처럼 응답 뒤가 아닌 곳에서는 이 함수를 기다려서 부른다
+ */
+export async function sendAgreedCancelResult(
+  db: Db,
+  input: { reservationId: string; requestId: string; result: AgreedCancelResultKind },
+): Promise<void> {
+  const event = `reservation.agreed_cancel_${input.result}`;
+  const alert = await readReservationAlert(db, input.reservationId);
+  if (!alert) return;
+  await notify(db, {
+    userId: alert.ownerUserId,
+    accountType: 'owner',
+    event,
+    dedupeKey: `${event}:owner:${input.requestId}`,
+    title: AGREED_CANCEL_RESULT_TITLES[input.result],
+    body: `${alert.menuName} · ${formatKst(alert.startAt)}`,
+    url: `/owner/reservations/${input.reservationId}`,
+  });
+}
+
+/** 손님이 답했을 때(서버 함수 안) 응답을 보낸 뒤 원장님에게 결과 알림을 보낸다 */
+export function notifyAgreedCancelResult(
+  db: Db,
+  input: { reservationId: string; requestId: string; result: AgreedCancelResultKind },
+) {
+  sendAfterResponse(`reservation.agreed_cancel_${input.result}`, () =>
+    sendAgreedCancelResult(db, input),
+  );
+}

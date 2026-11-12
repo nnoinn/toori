@@ -4,7 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 import { AGREED_CANCEL_REFUND_RATE } from '@/server/policy/refund';
 
-import { calcAgreedCancel, isAgreedCancelTarget } from './agreed-cancel-rules';
+import {
+  calcAgreedCancel,
+  currentRequestStatus,
+  isAgreedCancelTarget,
+  respondBlockReason,
+} from './agreed-cancel-rules';
 
 describe('calcAgreedCancel', () => {
   it('환불율은 50%이고, 쿠폰이 없으면 손님 환불과 원장님 기준 금액이 같다', () => {
@@ -41,5 +46,31 @@ describe('isAgreedCancelTarget', () => {
     expect(isAgreedCancelTarget({ status: 'cancelled', visitResult: null })).toBe(false);
     expect(isAgreedCancelTarget({ status: 'completed', visitResult: 'visited' })).toBe(false);
     expect(isAgreedCancelTarget({ status: 'completed', visitResult: 'no_show' })).toBe(false);
+  });
+});
+
+describe('currentRequestStatus·respondBlockReason', () => {
+  const NOW = new Date('2026-11-12T03:00:00.000Z');
+  const confirmed = { status: 'confirmed' as const, visitResult: null };
+  const requested = (expiresAt: Date) => ({ status: 'requested' as const, expiresAt });
+  const later = new Date(NOW.getTime() + 1000);
+
+  it('답 기다림이어도 만료 시각이 지났으면 expired, 예약이 바뀌었으면 closed', () => {
+    expect(currentRequestStatus(requested(later), confirmed, NOW)).toBe('requested');
+    expect(currentRequestStatus(requested(NOW), confirmed, NOW)).toBe('expired');
+    expect(
+      currentRequestStatus(requested(later), { status: 'cancelled', visitResult: null }, NOW),
+    ).toBe('closed');
+    expect(currentRequestStatus({ status: 'declined', expiresAt: later }, confirmed, NOW)).toBe(
+      'declined',
+    );
+  });
+
+  it('답할 수 없는 이유', () => {
+    expect(respondBlockReason('requested')).toBeNull();
+    expect(respondBlockReason('expired')).toBe('REQUEST_EXPIRED');
+    expect(respondBlockReason('agreed')).toBe('ALREADY_RESPONDED');
+    expect(respondBlockReason('declined')).toBe('ALREADY_RESPONDED');
+    expect(respondBlockReason('closed')).toBe('RESERVATION_CHANGED');
   });
 });

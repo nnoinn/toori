@@ -24,12 +24,15 @@ vi.mock('./notify', () => ({
 }));
 
 const {
+  notifyAgreedCancelRequested,
+  notifyAgreedCancelResult,
   notifyNoShow,
   notifyPaymentAutoCancelled,
   notifyPayoutAccountChanged,
   notifyReservationCancelled,
   notifyReservationConfirmed,
   notifyShopReviewed,
+  sendAgreedCancelResult,
 } = await import('./alerts');
 
 /** 어떤 조인이든 where에서 state.row를 돌려주는 가짜 */
@@ -245,6 +248,50 @@ describe('W16 ② 알림(#131 표 문구·주소)', () => {
         url: '/owner/settings/payout',
       },
       expect.objectContaining({ dedupeKey: 'payout_account.changed:owner:change-2' }),
+    ]);
+  });
+
+  it('합의 후 취소 요청: 고객에게 내 예약 상세로, 다시 요청하면 새로 간다(#301)', async () => {
+    notifyAgreedCancelRequested(db, { reservationId: 'r-1', requestId: 'q-1' });
+    expect(state.notified).toEqual([]);
+    await runAfterTasks();
+    expect(state.notified).toEqual([
+      {
+        userId: 'customer-user',
+        accountType: 'customer',
+        event: 'reservation.agreed_cancel_requested',
+        dedupeKey: 'reservation.agreed_cancel_requested:customer:q-1',
+        title: '원장님이 합의 후 취소를 요청했어요',
+        body: '샘플 헤어 · 11/5(목) 15:00',
+        url: '/reservations/r-1',
+      },
+    ]);
+  });
+
+  it('합의 후 취소 결과: 원장님에게 원장님 예약 상세로(동의·거절·만료, 재등록 안내 없음)', async () => {
+    notifyAgreedCancelResult(db, { reservationId: 'r-1', requestId: 'q-1', result: 'declined' });
+    await runAfterTasks();
+    await sendAgreedCancelResult(db, { reservationId: 'r-1', requestId: 'q-1', result: 'expired' });
+    await sendAgreedCancelResult(db, { reservationId: 'r-1', requestId: 'q-2', result: 'agreed' });
+    expect(state.notified).toEqual([
+      {
+        userId: 'owner-user',
+        accountType: 'owner',
+        event: 'reservation.agreed_cancel_declined',
+        dedupeKey: 'reservation.agreed_cancel_declined:owner:q-1',
+        title: '손님이 합의 후 취소에 동의하지 않았어요',
+        body: '커트 · 11/5(목) 15:00',
+        url: '/owner/reservations/r-1',
+      },
+      expect.objectContaining({
+        event: 'reservation.agreed_cancel_expired',
+        title: '합의 후 취소 요청이 만료됐어요',
+      }),
+      expect.objectContaining({
+        event: 'reservation.agreed_cancel_agreed',
+        title: '손님이 합의 후 취소에 동의했어요',
+        dedupeKey: 'reservation.agreed_cancel_agreed:owner:q-2',
+      }),
     ]);
   });
 
