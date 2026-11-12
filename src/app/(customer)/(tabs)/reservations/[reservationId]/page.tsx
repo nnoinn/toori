@@ -23,6 +23,7 @@ import { isVisitPending, showsCancelSection, showsCheckInCard } from '../reserva
 import { AgreedCancelCard } from './agreed-cancel-card';
 import { CancelReservation } from './cancel-reservation';
 import { CheckInCard } from './check-in-card';
+import { DetailCard } from './detail-card';
 import { DisputeSection } from './dispute-section';
 import { NO_SHOW_DISPUTE_BELOW } from './dispute-texts';
 
@@ -76,7 +77,7 @@ async function DetailContent({ params }: { params: Params }) {
   const pendingAgreedCancel = agreedCancel?.ok ? agreedCancel.data : null;
 
   return (
-    <article className="flex flex-col gap-4 pb-6">
+    <article className="flex flex-col gap-3 pb-6">
       <header className="flex items-center gap-1 px-2 pt-2">
         <BackButton fallbackHref="/reservations" className="max-md:size-10" />
         <h1 className="text-lg font-bold">예약 상세</h1>
@@ -87,7 +88,7 @@ async function DetailContent({ params }: { params: Params }) {
         <AgreedCancelCard key={pendingAgreedCancel.serverNow} request={pendingAgreedCancel} />
       ) : null}
 
-      <section className="flex flex-col gap-2 px-4">
+      <DetailCard>
         <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <Badge variant={r.status === 'cancelled' ? 'outline' : 'secondary'}>
             {STATUS_LABEL[r.status]}
@@ -104,7 +105,7 @@ async function DetailContent({ params }: { params: Params }) {
         </p>
         {/* 노쇼로 처리된 예약: 환불 안내와 잘못 처리됐을 때 알리는 곳(C-105) */}
         {r.noShow ? (
-          <div className="flex items-start gap-2 rounded-xl border bg-card p-3 text-sm">
+          <div className="flex items-start gap-2 rounded-lg bg-muted p-3 text-sm">
             <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
             <div className="flex flex-col gap-1">
               <p>원장님이 노쇼로 처리한 예약이에요. {noShowRefundNote()}.</p>
@@ -120,11 +121,11 @@ async function DetailContent({ params }: { params: Params }) {
             원장님이 방문을 확인하면 &lsquo;{STATUS_LABEL.completed}&rsquo;로 바뀌어요.
           </p>
         ) : null}
-      </section>
+      </DetailCard>
 
       {checkIn ? <CheckInCard code={r.code} /> : null}
 
-      <section className="flex flex-col gap-2 border-t px-4 pt-4" aria-label="샵 정보">
+      <DetailCard aria-label="샵 정보">
         <h3 className="font-semibold">{r.shop.name}</h3>
         <p className="flex items-start gap-2 text-sm">
           <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
@@ -147,9 +148,9 @@ async function DetailContent({ params }: { params: Params }) {
             {r.shop.phone}
           </a>
         ) : null}
-      </section>
+      </DetailCard>
 
-      <section className="flex flex-col gap-2 border-t px-4 pt-4" aria-label="결제 내역">
+      <DetailCard aria-label="결제 내역">
         <h3 className="font-semibold">결제 내역</h3>
         <dl className="flex flex-col gap-1">
           <Row label="할인가" value={formatWon(r.payment.salePrice)} />
@@ -161,10 +162,10 @@ async function DetailContent({ params }: { params: Params }) {
             <Row label="결제 시각" value={formatKst(new Date(r.payment.paidAt))} />
           ) : null}
         </dl>
-      </section>
+      </DetailCard>
 
       {r.refund ? (
-        <section className="flex flex-col gap-2 border-t px-4 pt-4" aria-label="환불 내역">
+        <DetailCard aria-label="환불 내역">
           <h3 className="font-semibold">환불 내역</h3>
           <dl className="flex flex-col gap-1">
             <Row label="환불 금액" value={<strong>{formatWon(r.refund.refundAmount)}</strong>} />
@@ -174,14 +175,14 @@ async function DetailContent({ params }: { params: Params }) {
             />
             <Row label="환불 처리" value={formatKst(new Date(r.refund.processedAt))} />
           </dl>
-        </section>
+        </DetailCard>
       ) : null}
 
       {/* 다시 읽을 때마다(서버 시각이 바뀌면) 새로 시작한다. 접수 뒤 새로 읽으면 접수함으로 바뀐다 */}
       {dispute.ok ? <DisputeSection key={dispute.data.serverNow} view={dispute.data} /> : null}
 
       {refundPreview ? (
-        <section className="flex flex-col gap-2 border-t px-4 pt-4" aria-label="예약 취소">
+        <DetailCard aria-label="예약 취소">
           {!refundPreview.ok ? (
             <p className="text-sm text-muted-foreground">{refundPreview.error.message}</p>
           ) : refundPreview.data.refundable ? (
@@ -189,12 +190,12 @@ async function DetailContent({ params }: { params: Params }) {
             <CancelReservation key={refundPreview.data.serverNow} preview={refundPreview.data} />
           ) : (
             // 시작까지 6시간 미만이면 취소 버튼 대신 안내만(10/29 결정, #128)
-            <p className="flex items-center gap-2 rounded-xl border bg-card p-3 text-sm">
+            <p className="flex items-center gap-2 rounded-lg bg-muted p-3 text-sm">
               <Info className="size-4 shrink-0 text-muted-foreground" aria-hidden />
               {REFUND_ERRORS.NOT_REFUNDABLE}
             </p>
           )}
-        </section>
+        </DetailCard>
       ) : null}
     </article>
   );
