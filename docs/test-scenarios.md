@@ -159,8 +159,9 @@ PR 검사가 자동으로 막는 것:
 | SETTLE-02 | 법인 전환 뒤 할인율별 수수료(10%→10% … 50%→6%)로 바꾸면 정산 예시 4장 표와 같다. 바꾸는 값은 `PLATFORM_FEE_MODE` 하나다 | X-205 | ✅ | `tests/docs/rule-docs.test.ts` 3장·4장 이용 완료 표<br>`src/server/policy/fees.test.ts` 지금은 오픈 기간 방식(launch)이다 |
 | SETTLE-03 | 고객 취소 정산의 기준 금액은 판매가 × 위약금 비율(원 미만 버림)이고, 정산 예시 3장·4장 취소 표와 같다(오픈 기간 13,055원) | X-205 | ✅ | `tests/docs/rule-docs.test.ts` 3장·4장 고객 취소 표<br>`src/server/settlements/calc-settlement.test.ts` 고객 취소는 판매가 × 위약금 비율 |
 | SETTLE-04 | 원장님 귀책 패널티는 오래된 것부터 떼고, 남은 금액은 다음 정산으로 넘긴다 | X-207 | ✅ | `src/server/settlements/calc-settlement.test.ts` 모자라면 오래된 것부터 떼고, 남은 금액은 다음 정산으로 넘긴다 |
-| SETTLE-05 | 정산은 매주 목요일(공휴일이면 다음 영업일)에 이의제기 기한이 지났고 이의제기 중이 아닌 거래를 묶어 지급한다 | X-206 | ⏳ | |
+| SETTLE-05 | 정산은 매주 목요일(공휴일이면 다음 영업일) 새벽에, 그날 0시(한국 시간)까지 이의제기 접수 기한이 지났고 이의제기 중이 아닌 거래를 샵 하나 × 지급일 하나로 묶는다. 비율은 그날의 정책값을 쓰고, 패널티를 떼고 0원이면 지급 요청 없이 지급 완료(0원)로 끝내며 원장님 정산 내역에 이유가 보인다 | X-206·#353 | ⏳ | |
 | SETTLE-06 | 정산 계좌번호는 암호화해서 저장하고, 화면에는 은행·뒷자리·예금주만 보인다 | S-107 | ✅ | `src/server/payouts/account-crypto.test.ts` 풀면 원래 번호가 나오고, 암호문에는 번호가 보이지 않는다<br>`src/app/owner/(console)/settings/payout/payout-store.db.test.ts` 화면용 조회는 은행·뒷자리·예금주만 돌려준다 |
+| SETTLE-08 | 거래 하나에 정산 줄 하나다. 묶기 작업이 두 번 돌아도 같은 거래로 정산 줄을 두 번 만들 수 없다(DB가 막는다) | #353 | ✅ | `src/db/settlement-items.db.test.ts` 같은 거래로 정산 줄을 두 번 만들 수 없다 |
 
 ## 13. 알림
 
