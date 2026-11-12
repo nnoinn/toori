@@ -3,12 +3,13 @@
 
 import 'server-only';
 
-import { and, asc, eq, gte, isNull, lte, ne, or } from 'drizzle-orm';
+import { and, asc, eq, gte, isNull, lte } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 import { getDb } from '@/db';
 import { reservations, slots } from '@/db/schema';
 import type { SlotCloseReason, SlotStatus } from '@/db/schema/slots';
+import { notHoldReleasedSlot } from '@/server/slots/visibility';
 
 import type { DashboardSlot } from './dashboard';
 
@@ -61,13 +62,9 @@ function toDashboardSlot(row: SlotRow): DashboardSlot {
 }
 
 /**
- * 결제 없이 홀딩이 끝나 마감된 매물(시간대 매물 #308 ④, 11/11 nnoinn)이 아님. 손님이 시간대 안에서 [예약하기]를 눌러
- * 만들어진 칸이라 원장님이 올린 매물이 아니어서 대시보드에서 뺀다. 그 시간대와 시간은 그대로 다시 팔린다.
- * 마감 사유가 없는 매물(null)도 남겨야 해서 ne만 쓰지 않는다(null <> 값은 참이 아니다)
+ * from(오늘 0시) 이후에 시작하는 그 샵 매물(전체·오늘·예정 탭). 시작 시각 순서.
+ * 결제 없이 홀딩이 끝난 시간대 칸(hold_released, #308 ④)은 원장님이 올린 매물이 아니라서 공통 조건으로 뺀다
  */
-const notHoldReleased = or(isNull(slots.closeReason), ne(slots.closeReason, 'hold_released'));
-
-/** from(오늘 0시) 이후에 시작하는 그 샵 매물(오늘·예정 탭). 시작 시각 순서. 결제 없이 홀딩이 끝난 매물은 뺀다 */
 export async function selectDashboardSlots(
   db: Db,
   shopId: string,
@@ -78,7 +75,7 @@ export async function selectDashboardSlots(
     .from(slots)
     .leftJoin(reservations, eq(reservations.slotId, slots.id))
     .leftJoin(relisted, eq(relisted.relistedFromSlotId, slots.id))
-    .where(and(eq(slots.shopId, shopId), gte(slots.startAt, from), notHoldReleased))
+    .where(and(eq(slots.shopId, shopId), gte(slots.startAt, from), notHoldReleasedSlot()))
     .orderBy(asc(slots.startAt));
   return rows.map(toDashboardSlot);
 }
