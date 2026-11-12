@@ -62,7 +62,7 @@ export function RegionBrowser({
       <div className="flex flex-col gap-3">
         <button
           type="button"
-          className="flex items-center gap-1 self-start text-sm font-semibold"
+          className="flex items-center gap-1 self-start text-sm font-semibold max-md:min-h-10"
           onClick={() => setSidoCode(null)}
         >
           <ChevronLeft className="size-4" aria-hidden />

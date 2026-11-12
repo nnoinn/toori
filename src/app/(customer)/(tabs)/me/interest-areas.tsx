@@ -94,7 +94,7 @@ export function InterestAreas({
               <Button
                 key={code}
                 type="button"
-                className="h-9 gap-1 rounded-full pr-2.5 pl-4"
+                className="h-9 gap-1 rounded-full pr-2.5 pl-4 max-md:h-10"
                 aria-label={`${label} 빼기`}
                 disabled={status === 'saving'}
                 onClick={() => toggle(code)}
@@ -108,7 +108,7 @@ export function InterestAreas({
         <Button
           type="button"
           variant="outline"
-          className="h-9 gap-1 rounded-full px-3"
+          className="h-9 gap-1 rounded-full px-3 max-md:h-10"
           aria-expanded={adding}
           onClick={() => setAdding((open) => !open)}
         >
@@ -147,6 +147,7 @@ export function InterestAreas({
           <Button
             type="button"
             size="sm"
+            className="max-md:h-10"
             disabled={consent.pending}
             onClick={() => consent.change(true)}
           >

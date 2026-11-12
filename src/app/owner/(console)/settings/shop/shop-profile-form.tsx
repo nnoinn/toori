@@ -286,7 +286,12 @@ export function ShopProfileForm({
         </CardContent>
       </Card>
 
-      <BusinessHoursEditor hours={form.hours} errors={errors} onChange={updateHours} />
+      <BusinessHoursEditor
+        hours={form.hours}
+        errors={errors}
+        onChange={updateHours}
+        onChangeAll={(rows) => update('hours', rows)}
+      />
 
       <Card>
         <CardHeader>

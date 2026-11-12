@@ -40,7 +40,7 @@ export function NoShowRecord({ history }: { history: NoShowHistory }) {
           </ul>
           <Link
             href={tabHref('completed')}
-            className="self-start text-sm text-muted-foreground underline-offset-4 hover:underline"
+            className="self-start text-sm text-muted-foreground underline-offset-4 hover:underline max-md:inline-flex max-md:min-h-10 max-md:items-center"
           >
             이용 완료 예약 모두 보기
           </Link>

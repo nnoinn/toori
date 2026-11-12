@@ -16,7 +16,13 @@ export function AccountActions() {
     <section className="flex flex-col gap-3 border-t pt-6" aria-label="계정">
       <h2 className="font-semibold">계정</h2>
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" disabled={pending} onClick={signOutNow}>
+        <Button
+          type="button"
+          variant="outline"
+          className="max-md:h-10"
+          disabled={pending}
+          onClick={signOutNow}
+        >
           {pending ? '로그아웃 중…' : '로그아웃'}
         </Button>
       </div>

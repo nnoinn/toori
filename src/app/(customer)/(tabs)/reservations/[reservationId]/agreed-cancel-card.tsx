@@ -142,7 +142,7 @@ export function AgreedCancelCard({ request }: { request: PendingAgreedCancel }) 
           {message}
         </p>
       ) : null}
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2 max-md:*:h-10">
         <Button variant="outline" disabled={locked} onClick={() => respond(false)}>
           동의하지 않아요
         </Button>
@@ -165,7 +165,7 @@ export function AgreedCancelCard({ request }: { request: PendingAgreedCancel }) 
                 <DialogTitle>예약을 취소했어요</DialogTitle>
                 <DialogDescription>{cancelDoneText(done.refundAmount)}</DialogDescription>
               </DialogHeader>
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 max-md:*:h-10">
                 <Button variant="outline" onClick={closeConfirm}>
                   닫기
                 </Button>
@@ -187,7 +187,7 @@ export function AgreedCancelCard({ request }: { request: PendingAgreedCancel }) 
                   {message}
                 </p>
               ) : null}
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 max-md:*:h-10">
                 <Button variant="outline" onClick={closeConfirm} disabled={pending}>
                   닫기
                 </Button>

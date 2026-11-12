@@ -7,13 +7,16 @@
 //   select-none으로 글자가 선택되지 않는다. 포인터를 잡아 두고(setPointerCapture) 손가락 아래 칸은 elementFromPoint로 찾는다
 // - 키보드: 위·아래 화살표로 칸을 옮기고, Space·Enter로 켜고 끈다. Shift를 누른 채 누르면 마지막에 누른 칸부터 범위를 켠다
 // - 잠긴 칸(지난 시각, 14일 밖, 이미 올린 매물·시간대)은 회색이고, 끌어도 켜지지 않는다
-// 칸이 24개(12시간)보다 많으면(영업시간을 입력하지 않은 요일) 두 줄로 나눠 한눈에 보이게 한다.
+// 칸이 24개(12시간)보다 많으면(영업시간을 입력하지 않은 요일, 긴 새벽 영업) 두 줄로 나눠 한눈에 보이게 한다.
+// 새벽까지 여는 샵(11/11 nnoinn)은 전날에서 이어진 새벽 칸과 그 날 영업 칸 사이를 띄우고, 다음 날 새벽 칸 위에 날짜를 적는다.
 
-import { useRef, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { cn } from 'cn';
 
 import { formatKstTime } from '@/lib/time';
 
+import { addDaysToKey } from '../calendar-days';
+import { dateKeyLabel } from '../slot-date-calendar';
 import {
   CELL_LOCK_LABELS,
   lockLabelAt,
@@ -29,10 +32,13 @@ const ONE_COLUMN_MAX_CELLS = 24;
 type Drag = { anchor: number; on: boolean; base: ReadonlySet<number>; last: number };
 
 export function WindowTimetable({
+  dateKey,
   cells,
   selected,
   onChange,
 }: {
+  /** 고른 날짜. 다음 날 새벽 칸에 "다음 날"을 붙일 때 쓴다 */
+  dateKey: string;
   cells: WindowCell[];
   /** 켜진 칸(cells의 번호) */
   selected: ReadonlySet<number>;
@@ -51,7 +57,7 @@ export function WindowTimetable({
   const rangeStarts = new Map(
     selectedRanges(cells, selected).map((range) => [
       cells.findIndex((cell) => cell.start.getTime() === range.start.getTime()),
-      rangeLabel(range),
+      rangeLabel(range, dateKey),
     ]),
   );
 
@@ -133,69 +139,105 @@ export function WindowTimetable({
     }
   }
 
+  /**
+   * 칸 묶음이 index 칸 앞에서 끊기면 true: 줄의 첫 칸, 앞 칸과 시간이 이어지지 않음(전날에서 이어진 새벽과 그 날 영업 사이),
+   * 다음 날 새벽이 시작함. 끊긴 곳은 칸 모서리를 둥글게 하고 사이를 띄운다
+   */
+  function breaksBefore(index: number): boolean {
+    const previous = cells[index - 1];
+    return (
+      index % rowsPerColumn === 0 ||
+      previous.end.getTime() !== cells[index].start.getTime() ||
+      (cells[index].nextDay && !previous.nextDay)
+    );
+  }
+
+  const columnIndexes = Array.from({ length: columns }, (_, column) =>
+    cells.map((_, index) => index).slice(column * rowsPerColumn, (column + 1) * rowsPerColumn),
+  );
+
   return (
     <div
       role="group"
       aria-label="시간표"
-      className="grid touch-none gap-x-4 select-none"
-      style={{
-        gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-        gridTemplateRows: `repeat(${rowsPerColumn}, auto)`,
-        gridAutoFlow: 'column',
-      }}
+      className="grid touch-none items-start gap-x-4 select-none"
+      style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
     >
-      {cells.map((cell, index) => {
-        const on = selected.has(index) && !cell.lock;
-        const time = formatKstTime(cell.start);
-        const onHour = time.endsWith(':00');
-        // 정각에서 끝나는 칸 아래에 진한 줄을 그어 한 시간씩 나눠 보이게 한다
-        const endsOnHour = formatKstTime(cell.end).endsWith(':00');
-        const label = cell.lock ? lockLabelAt(cells, index) : (rangeStarts.get(index) ?? null);
-        return (
-          <div
-            key={cell.start.toISOString()}
-            className="grid grid-cols-[3.25rem_1fr] items-stretch"
-          >
-            <span
-              className={cn(
-                'pr-2 text-right text-xs leading-7 tabular-nums',
-                onHour ? 'font-medium text-foreground' : 'text-muted-foreground',
-              )}
-              aria-hidden
-            >
-              {time}
-            </span>
-            <button
-              ref={(element) => {
-                cellRefs.current[index] = element;
-              }}
-              type="button"
-              data-cell={index}
-              disabled={cell.lock !== null}
-              aria-pressed={cell.lock ? undefined : on}
-              aria-label={`${rangeLabel(cell)}${cell.lock ? ` · ${CELL_LOCK_LABELS[cell.lock]}` : ''}`}
-              tabIndex={index === activeIndex ? 0 : -1}
-              onKeyDown={(event) => onKeyDown(event, index)}
-              className={cn(
-                'relative h-7 cursor-pointer truncate border-x border-b px-2 text-left text-xs outline-none focus-visible:z-10 focus-visible:ring-3 focus-visible:ring-ring/50',
-                endsOnHour && 'border-b-foreground/25',
-                (index === 0 || index === rowsPerColumn) && 'rounded-t-md border-t',
-                (index === cells.length - 1 || index === rowsPerColumn - 1) && 'rounded-b-md',
-                on
-                  ? 'border-x-primary bg-primary font-semibold text-primary-foreground'
-                  : 'bg-card hover:bg-primary/10',
-                cell.lock && 'cursor-not-allowed bg-muted text-muted-foreground hover:bg-muted',
-              )}
-            >
-              {label}
-            </button>
-          </div>
-        );
-      })}
+      {columnIndexes.map((indexes, column) => (
+        <div key={column} className="flex flex-col">
+          {indexes.map((index) => {
+            const cell = cells[index];
+            const on = selected.has(index) && !cell.lock;
+            const time = formatKstTime(cell.start);
+            const onHour = time.endsWith(':00');
+            // 정각에서 끝나는 칸 아래에 진한 줄을 그어 한 시간씩 나눠 보이게 한다
+            const endsOnHour = formatKstTime(cell.end).endsWith(':00');
+            const label = cell.lock ? lockLabelAt(cells, index) : (rangeStarts.get(index) ?? null);
+            const segmentStart = breaksBefore(index);
+            const segmentEnd = index === cells.length - 1 || breaksBefore(index + 1);
+            const columnTop = index % rowsPerColumn === 0;
+            // 다음 날 새벽이 시작하는 칸 위에는 날짜를 적는다(칸 이름에도 "다음 날"이 붙는다)
+            const dayChange = cell.nextDay && (index === 0 || !cells[index - 1].nextDay);
+            return (
+              <Fragment key={cell.start.toISOString()}>
+                {dayChange ? (
+                  <p
+                    aria-hidden
+                    className={cn(
+                      'pb-1 pl-[3.25rem] text-xs font-medium text-muted-foreground',
+                      !columnTop && 'pt-3',
+                    )}
+                  >
+                    다음 날 · {dateKeyLabel(addDaysToKey(dateKey, 1))}
+                  </p>
+                ) : segmentStart && !columnTop ? (
+                  <div aria-hidden className="h-3" />
+                ) : null}
+                <div className="grid grid-cols-[3.25rem_1fr] items-stretch">
+                  <span
+                    className={cn(
+                      'pr-2 text-right text-xs leading-7 tabular-nums',
+                      onHour ? 'font-medium text-foreground' : 'text-muted-foreground',
+                    )}
+                    aria-hidden
+                  >
+                    {time}
+                  </span>
+                  <button
+                    ref={(element) => {
+                      cellRefs.current[index] = element;
+                    }}
+                    type="button"
+                    data-cell={index}
+                    disabled={cell.lock !== null}
+                    aria-pressed={cell.lock ? undefined : on}
+                    aria-label={`${rangeLabel(cell, dateKey)}${cell.lock ? ` · ${CELL_LOCK_LABELS[cell.lock]}` : ''}`}
+                    tabIndex={index === activeIndex ? 0 : -1}
+                    onKeyDown={(event) => onKeyDown(event, index)}
+                    className={cn(
+                      'relative h-7 cursor-pointer truncate border-x border-b px-2 text-left text-xs outline-none focus-visible:z-10 focus-visible:ring-3 focus-visible:ring-ring/50',
+                      endsOnHour && 'border-b-foreground/25',
+                      segmentStart && 'rounded-t-md border-t',
+                      segmentEnd && 'rounded-b-md',
+                      on
+                        ? 'border-x-primary bg-primary font-semibold text-primary-foreground'
+                        : 'bg-card hover:bg-primary/10',
+                      cell.lock &&
+                        'cursor-not-allowed bg-muted text-muted-foreground hover:bg-muted',
+                    )}
+                  >
+                    {label}
+                  </button>
+                </div>
+              </Fragment>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }

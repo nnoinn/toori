@@ -64,7 +64,7 @@ async function ReservationsContent({ searchParams }: { searchParams: SearchParam
             scroll={false}
             aria-current={item.key === tab ? 'page' : undefined}
             className={cn(
-              '-mb-px border-b-2 px-3 py-2 text-sm',
+              '-mb-px border-b-2 px-3 py-2 text-sm max-md:py-2.5',
               item.key === tab
                 ? 'border-foreground font-semibold'
                 : 'border-transparent text-muted-foreground',
