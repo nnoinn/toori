@@ -159,6 +159,7 @@ PR 검사가 자동으로 막는 것:
 | SETTLE-04 | 원장님 귀책 패널티는 오래된 것부터 떼고, 남은 금액은 다음 정산으로 넘긴다 | X-207 | ✅ | `src/server/settlements/calc-settlement.test.ts` 모자라면 오래된 것부터 떼고, 남은 금액은 다음 정산으로 넘긴다 |
 | SETTLE-05 | 정산은 매주 목요일(공휴일이면 다음 영업일)에 이의제기 기한이 지났고 이의제기 중이 아닌 거래를 묶어 지급한다 | X-206 | ⏳ | |
 | SETTLE-06 | 정산 계좌번호는 암호화해서 저장하고, 화면에는 은행·뒷자리·예금주만 보인다 | S-107 | ✅ | `src/server/payouts/account-crypto.test.ts` 풀면 원래 번호가 나오고, 암호문에는 번호가 보이지 않는다<br>`src/app/owner/(console)/settings/payout/payout-store.db.test.ts` 화면용 조회는 은행·뒷자리·예금주만 돌려준다 |
+| SETTLE-07 | 지급일은 매주 목요일이고 공휴일이면 다음 영업일이다. 이의제기 접수 기한이 지급일 0시까지 지난 거래가 그날 지급에 들어가서 원장님은 보통 서비스 뒤 4~8일 안에 받는다(일요일 15시 → 4일 뒤 목요일, 금요일 15시 → 6일 뒤 목요일, 수요일 18시 → 8일 뒤 목요일). 방문·노쇼 처리가 늦으면 처리한 때부터 세고, 이의제기 중이면 보류한다 | X-206·기술 가이드 7장 "정산 주기"·#353 | ✅ | `src/server/settlements/settle-rules.test.ts` 기술 가이드 예시<br>`src/server/settlements/settle-rules.test.ts` 방문 처리가 늦으면 처리한 때부터 센다<br>`src/server/settlements/settle-rules.test.ts` 확인 중 이의제기가 있으면 보류하고 지급일이 없다<br>`src/server/settlements/payout-date.test.ts` 목요일이 공휴일이면 다음 영업일(금요일)에 지급하고 |
 
 ## 13. 알림
 
