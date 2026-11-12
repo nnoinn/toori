@@ -109,6 +109,7 @@ export function BusinessHoursEditor({
                     onChange={(close) => onChange(index, { close })}
                     stepMinutes={SLOT_START_STEP_MINUTES}
                     closing
+                    openValue={row.open}
                     disabled={row.closed}
                     a11y={errorA11y(field, error)}
                   />
@@ -148,6 +149,7 @@ function AllDaysRow({ onApply }: { onApply: (open: string, close: string) => voi
           onChange={setClose}
           stepMinutes={SLOT_START_STEP_MINUTES}
           closing
+          openValue={open}
         />
       </div>
       {/* 버튼과 설명은 시각 칸 아래에 맞춰 둔다(한 줄에 다 넣으면 좁은 폭에서 넘친다) */}

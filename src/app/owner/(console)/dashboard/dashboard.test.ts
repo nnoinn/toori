@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { countByStatus, type DashboardSlot, onHold, splitByDay, viewStatus } from './dashboard';
+import {
+  allTabSections,
+  countByStatus,
+  type DashboardSlot,
+  onHold,
+  splitByDay,
+  viewStatus,
+} from './dashboard';
 import { startOfKstDay } from '@/lib/time';
 
 // 한국 시간 10/31 낮 12시
@@ -99,5 +106,49 @@ describe('대시보드 상태 (O1 getSlotStatus)', () => {
     });
     expect(onHold(held, now)).toBe(true);
     expect(onHold({ ...held, holdExpiresAt: kst('2026-10-31T11:59:00') }, now)).toBe(false);
+  });
+});
+
+/** 그날 from 시각부터 30분 간격으로 count개 매물(시작 시각이 id) */
+const series = (day: string, from: string, count: number, extra: Partial<DashboardSlot> = {}) =>
+  Array.from({ length: count }, (_, i) => {
+    const start = new Date(`${day}T${from}:00+09:00`).getTime() + i * 30 * 60 * 1000;
+    const iso = new Date(start + 9 * 60 * 60 * 1000).toISOString().slice(0, 19);
+    return slot(iso, extra);
+  });
+
+describe('대시보드 [전체] 탭 구역 (#358)', () => {
+  it('오늘·예정 구역마다 7개까지 시작 순서로 보이고, 남은 수는 [더보기]로 넘긴다', () => {
+    const today = series('2026-10-31', '13:00', 9);
+    const upcoming = series('2026-11-01', '10:00', 7);
+    const sections = allTabSections(splitByDay([...today, ...upcoming], now), 'all', now);
+
+    expect(sections.map((s) => [s.day, s.total, s.shown.length, s.more])).toEqual([
+      ['today', 9, 7, 2],
+      // 딱 7개면 남는 것이 없다([더보기] 없음)
+      ['upcoming', 7, 7, 0],
+    ]);
+    expect(sections[0].shown.map((s) => s.id)).toEqual(today.slice(0, 7).map((s) => s.id));
+    expect(sections[0].shown.at(-1)?.id).toBe('2026-10-31T16:00:00');
+  });
+
+  it('상태 필터로 거른 뒤에 7개를 세고, 매물이 없는 구역도 빈 구역으로 돌려준다', () => {
+    const reserved = slot('2026-10-31T12:30:00', { status: 'reserved' });
+    const published = series('2026-10-31', '13:00', 8);
+    const byDay = splitByDay([reserved, ...published, ...series('2026-11-01', '10:00', 2)], now);
+
+    // 앞의 예약됨 매물을 빼고 게시중 8개 중 7개
+    const publishedOnly = allTabSections(byDay, 'published', now);
+    expect(publishedOnly.map((s) => [s.day, s.total, s.shown.length, s.more])).toEqual([
+      ['today', 8, 7, 1],
+      ['upcoming', 2, 2, 0],
+    ]);
+    expect(publishedOnly[0].shown.every((s) => s.status === 'published')).toBe(true);
+
+    const reservedOnly = allTabSections(byDay, 'reserved', now);
+    expect(reservedOnly.map((s) => [s.day, s.total, s.shown.map((x) => x.id), s.more])).toEqual([
+      ['today', 1, ['2026-10-31T12:30:00'], 0],
+      ['upcoming', 0, [], 0],
+    ]);
   });
 });

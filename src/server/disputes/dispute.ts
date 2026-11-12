@@ -112,7 +112,7 @@ export async function submitDispute(input: {
     if (reason) return disputeFail(reason);
     if (!disputeTypes(target).includes(type)) return disputeFail('INVALID_INPUT');
 
-    const saved = await insertDispute(tx, { reservationId, type, content });
+    const saved = await insertDispute(tx, { reservationId, type, content, receivedAt: now });
     return ok({ disputeId: saved.id, createdAt: saved.createdAt.toISOString() });
   });
 }

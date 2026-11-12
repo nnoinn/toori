@@ -92,6 +92,13 @@
       "when": 1794385988746,
       "tag": "0012_agreed_cancel_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794494950035,
+      "tag": "0013_dispute_channel_outcome",
+      "breakpoints": true
     }
   ]
 }

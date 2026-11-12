@@ -4,7 +4,9 @@ import { cn } from 'cn';
 
 // 시각 고르기: 24시간 표기 칸 하나(#311, 11/11 nnoinn). 누르면 00:00, 00:30, … 23:30 목록에서 한 번에 시각 전체를 고른다.
 // 값은 "HH:MM"(빈 값은 ''). 비어 있으면 "선택"으로 둔다.
-// 닫는 시각 칸(closing)은 00:00을 "00:00(자정)"으로 보여준다(닫는 시각 00:00은 그 날 밤 12시에 닫는다는 뜻).
+// 닫는 시각 칸(closing)은 다음 날에 닫는 시각에 "(익일)"을 붙인다(11/12 nnoinn, 점검 1-6. 예전 "00:00(자정)"을 바꿨다).
+// 짝인 여는 시각(openValue)을 알면 그보다 이르거나 같은 시각이 다음 날이다(18:00에 열면 02:00·18:00, 같으면 24시간 영업).
+// 여는 시각을 모르면 00:00에만 붙인다(닫는 시각 00:00은 그 날 밤 12시, 곧 다음 날 0시에 닫는다는 뜻).
 // 분 단위(stepMinutes)에 맞지 않는 예전 값(예: 10:15)도 지우지 않고 목록에 넣어 그대로 보여준다.
 
 const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -22,9 +24,11 @@ export function timeOptions(stepMinutes: number, extra?: string): string[] {
     : options;
 }
 
-/** 목록에 보이는 이름. 닫는 시각 칸의 00:00은 "00:00(자정)" */
-export function timeOptionLabel(value: string, closing = false): string {
-  return closing && value === '00:00' ? '00:00(자정)' : value;
+/** 목록에 보이는 이름. 닫는 시각 칸에서 다음 날에 닫는 시각이면 "02:00(익일)" */
+export function timeOptionLabel(value: string, closing = false, openValue?: string): string {
+  if (!closing) return value;
+  const nextDay = openValue && TIME.test(openValue) ? value <= openValue : value === '00:00';
+  return nextDay ? `${value}(익일)` : value;
 }
 
 const SELECT_CLASS =
@@ -36,8 +40,10 @@ type TimeSelectProps = {
   onChange: (value: string) => void;
   /** 분 단위. 기본 30분 */
   stepMinutes?: number;
-  /** 닫는 시각 칸이면 true. 00:00을 "00:00(자정)"으로 보여준다 */
+  /** 닫는 시각 칸이면 true. 다음 날에 닫는 시각에 "(익일)"을 붙인다 */
   closing?: boolean;
+  /** 닫는 시각 칸과 짝인 여는 시각("HH:MM"). 주면 그보다 이르거나 같은 시각에 "(익일)"을 붙이고, 없으면 00:00에만 붙인다 */
+  openValue?: string;
   /** 칸 이름(읽기 프로그램용). 예: "월요일 여는 시각" */
   label: string;
   disabled?: boolean;
@@ -51,6 +57,7 @@ export function TimeSelect({
   onChange,
   stepMinutes = 30,
   closing = false,
+  openValue,
   label,
   disabled,
   a11y,
@@ -68,7 +75,7 @@ export function TimeSelect({
       <option value="">선택</option>
       {timeOptions(stepMinutes, value).map((option) => (
         <option key={option} value={option}>
-          {timeOptionLabel(option, closing)}
+          {timeOptionLabel(option, closing, openValue)}
         </option>
       ))}
     </select>
