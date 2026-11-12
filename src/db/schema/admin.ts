@@ -1,6 +1,7 @@
 // 운영자 테이블 (docs/schema-v1.md 8장, A-104, A-101~A-105).
 
-import { check, index, pgTable, text, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { check, index, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
 
 import { profiles } from './accounts';
 import { reservations } from './payments';
@@ -14,6 +15,25 @@ export type DisputeType = (typeof DISPUTE_TYPES)[number];
 export const DISPUTE_STATUSES = ['open', 'resolved'] as const;
 export type DisputeStatus = (typeof DISPUTE_STATUSES)[number];
 
+/** 이의제기 접수 경로: 고객이 앱에서 접수 / 카카오톡 채널로 받아 운영자가 등록 (#350) */
+export const DISPUTE_CHANNELS = ['app', 'kakao'] as const;
+export type DisputeChannel = (typeof DISPUTE_CHANNELS)[number];
+
+/**
+ * 이의제기 결론 종류 (#350, 11/12 승인). 노쇼 확정 / 노쇼 취소(방문으로 바꿈) / 환불 예외 / 무효(A-108) /
+ * 원장님 귀책 취소로 바꿈(X-207) / 바꿀 것 없음. 돈이 오가는 셋(환불 예외·무효·원장님 귀책 취소)은
+ * 처리 기능이 생길 때까지 서버가 고르지 못하게 막는다. DB 목록에는 미리 넣어 두고 마이그레이션 없이 하나씩 연다
+ */
+export const DISPUTE_OUTCOMES = [
+  'no_show_confirmed',
+  'no_show_reversed',
+  'refund_exception',
+  'voided',
+  'owner_fault_cancel',
+  'no_change',
+] as const;
+export type DisputeOutcome = (typeof DISPUTE_OUTCOMES)[number];
+
 /** 이의제기 (A-104) */
 export const disputes = pgTable(
   'disputes',
@@ -25,7 +45,17 @@ export const disputes = pgTable(
     type: text().notNull(),
     content: text().notNull(),
     status: text().notNull(),
+    // 접수 경로(app / kakao)
+    channel: text().notNull(),
+    // 접수 시각. 앱은 접수한 순간, 카카오톡 채널은 채널에서 받은 시각(운영자가 입력). 접수 기한은 이 시각으로 본다
+    receivedAt: timestamptz().notNull(),
+    // 카카오톡 채널 건을 등록한 운영자. 앱 접수는 비어 있다
+    registeredBy: uuid().references(() => profiles.id),
+    // 결론 종류. 확인 중(open)이면 비어 있고, 결론이 나면(resolved) 꼭 있다
+    outcome: text(),
+    // 결론 메모
     result: text(),
+    // 결론을 기록한 운영자와 시각
     handledBy: uuid().references(() => profiles.id),
     handledAt: timestamptz(),
     createdAt: createdAt(),
@@ -33,6 +63,23 @@ export const disputes = pgTable(
   (t) => [
     check('disputes_type_check', inValues(t.type, DISPUTE_TYPES)),
     check('disputes_status_check', inValues(t.status, DISPUTE_STATUSES)),
+    check('disputes_channel_check', inValues(t.channel, DISPUTE_CHANNELS)),
+    // 카카오톡 채널 건이면 등록한 운영자가 꼭 있고, 앱 접수면 비어 있다(양쪽, #350 리뷰)
+    check(
+      'disputes_registered_by_check',
+      sql`(${t.channel} = 'kakao') = (${t.registeredBy} is not null)`,
+    ),
+    check(
+      'disputes_outcome_check',
+      sql`${t.outcome} is null or ${inValues(t.outcome, DISPUTE_OUTCOMES)}`,
+    ),
+    // 결론(resolved)이면 결론 종류가 꼭 있고, 확인 중(open)이면 비어 있다
+    check(
+      'disputes_outcome_status_check',
+      sql`(${t.status} = 'resolved') = (${t.outcome} is not null)`,
+    ),
+    // 한 예약에 이의제기 하나. 앱으로 접수한 예약에 카카오톡 채널로 이어서 연락이 오면 그 기록에서 처리한다
+    unique('disputes_reservation_id_unique').on(t.reservationId),
   ],
 ).enableRLS();
 

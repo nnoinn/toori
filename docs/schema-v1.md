@@ -595,17 +595,27 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 
 ### disputes — 이의제기 (A-104)
 
+고객이 앱에서 접수한 건(C-507)과 운영자가 등록하는 카카오톡 채널 건을 같은 기록으로 저장한다(11/9 결정, #350).
+
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | id | uuid PK | |
-| reservation_id | uuid → reservations | |
+| reservation_id | uuid → reservations | unique: 한 예약에 이의제기 하나. 앱으로 접수한 예약에 카카오톡 채널로 이어서 연락이 오면 새로 등록하지 않고 그 기록에서 처리한다 |
 | type | text | `no_show`(노쇼 이의) / `refund_exception`(환불 예외) / `after_start`(시작 후 문제) |
 | content | text | |
-| status | text | `open` / `resolved` |
-| result | text, null | |
-| handled_by | uuid, null → profiles | |
-| handled_at | timestamptz, null | |
+| status | text | `open`(확인 중) / `resolved`(결론) |
+| channel | text | `app`(고객이 앱에서 접수) / `kakao`(카카오톡 채널로 받아 운영자가 등록) |
+| received_at | timestamptz | 접수 시각. 앱은 접수한 순간, 카카오톡 채널은 채널에서 받은 시각(운영자가 입력). 접수 기한은 이 시각으로 판단하고, 기한이 지난 카카오톡 문의는 등록하지 않고 일반 문의로 응대한다 |
+| registered_by | uuid, null → profiles | 카카오톡 채널 건을 등록한 운영자. check: `kakao`면 꼭 있고 `app`이면 비어 있다 |
+| outcome | text, null | 결론 종류. check: `resolved`면 꼭 있고 `open`이면 비어 있다. `no_show_confirmed`(노쇼 확정) / `no_show_reversed`(노쇼 취소, 방문으로 바꿈) / `refund_exception`(환불 예외) / `voided`(무효, A-108) / `owner_fault_cancel`(원장님 귀책 취소로 바꿈, X-207) / `no_change`(바꿀 것 없음). 돈이 오가는 셋(`refund_exception`·`voided`·`owner_fault_cancel`)은 처리 기능이 생길 때까지 서버가 고르지 못하게 막고(화면은 "준비 중"), 그동안 이의제기는 `open`으로 남는다. DB 목록에는 6개를 다 넣어 두고 마이그레이션 없이 하나씩 연다 |
+| result | text, null | 결론 메모 |
+| handled_by | uuid, null → profiles | 결론을 기록한 운영자 |
+| handled_at | timestamptz, null | 결론을 기록한 시각 |
 | created_at | timestamptz | |
+
+- **정산 보류는 칸을 따로 두지 않는다.** 그 예약에 `open` 이의제기가 있으면 정산하지 않고, 결론을 기록하면(`resolved`) 보류가 저절로 풀린다. 이 조건은 서버 함수 하나로 두고 목요일 정산 묶기와 원장님 정산 내역(S-501)이 같이 쓴다
+- 접수·결론 알림은 보내지 않는다(11/12). 고객에게는 카카오톡 채널 대화로, 원장님에게는 필요하면 운영자가 따로 연락한다
+- 운영자 작업 기록(`admin_actions`): 카카오톡 채널 건 등록 `dispute.register`, 결론 기록 `dispute.resolve`(메모에 결론 종류). 노쇼 취소로 결론이 나면 `visit.override`도 같이 남긴다
 
 ### admin_actions — 운영자 작업 기록
 
@@ -613,7 +623,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | --- | --- | --- |
 | id | uuid PK | |
 | admin_id | uuid → profiles | |
-| action | text | 예: `shop.approve`, `shop.reject`, `visit.override`, `refund.exception`, `settlement.payout_request`, `settlement.payout_retry` |
+| action | text | 예: `shop.approve`, `shop.reject`, `visit.override`, `refund.exception`, `dispute.register`, `dispute.resolve`, `settlement.payout_request`, `settlement.payout_retry` |
 | target_type | text | 예: `shop`, `reservation`, `settlement` |
 | target_id | uuid | |
 | memo | text, null | |
@@ -656,6 +666,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | orders | unique(payment_id), (customer_id), (status) | 결제 검증, 복구 |
 | refunds | unique(reservation_id) where reason in (`customer_cancel`, `agreed_cancel`), (created_at) where status = `requested` | 한 예약에 취소 환불 기록 하나, 오래된 진행 중 기록 찾기 |
 | agreed_cancel_requests | unique(reservation_id) where status = `requested`, (reservation_id, requested_at), (expires_at) where status = `requested` | 답을 기다리는 요청 하나, 가장 최근 요청, 만료 처리 작업 |
+| disputes | unique(reservation_id), check: `kakao` ⇔ registered_by 있음, `resolved` ⇔ outcome 있음 | 한 예약에 이의제기 하나, 등록한 운영자·결론 종류 빠뜨리지 않기 |
 | coupons | (customer_id, expires_at) | 보유 쿠폰 |
 | settlement_items | (shop_id, settlement_id) | 정산 묶기 |
 | notifications | unique(dedupe_key) | 중복 발송 방지 |
@@ -700,3 +711,4 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | 2026-11-10 | `payout_account_changes`(정산 계좌 변경 기록)를 더한다. 바꾼 사람, 바꾸기 전·뒤 은행·뒷자리, 시각만 남기고 전체 계좌번호·예금주는 남기지 않는다. 가입 때 첫 등록과 같은 계좌 저장은 남기지 않는다. 트리거는 두지 않는다(#295, 11/10 승인). 마이그레이션 0010 |
 | 2026-11-11 | 시간대 매물 `slot_windows`·`slot_window_menus`와 `slots.window_id`를 더한다(#308, 11/10·11/11 nnoinn). 고객이 예약할 때 지금 매물 한 칸으로 바꾼다. 같은 샵의 시간대끼리는 EXCLUDE로, 시간대와 한 시술 매물 사이는 트리거로 겹침을 막는다. 마이그레이션 0011 |
 | 2026-11-11 | 합의 후 취소 요청 `agreed_cancel_requests`를 더하고, `reservations.cancel_actor`에 `agreed`, `refunds.reason`에 `agreed_cancel`, `settlement_items.kind`에 `agreed_cancel`을 더한다. 취소 환불 unique를 고객 취소와 합의 후 취소에 같이 건다(`refunds_cancel_unique`, #320 승인). `slots.close_reason`에 `hold_released`(결제 없이 홀딩 끝남, #308 ④)를 더한다. 마이그레이션 0012 |
+| 2026-11-12 | `disputes`에 `channel`(접수 경로)·`received_at`(접수 시각)·`registered_by`(카카오톡 채널 건을 등록한 운영자)·`outcome`(결론 종류 6개)을 더하고 unique(`reservation_id`)를 건다. 지금 있는 기록은 `app`, `created_at`으로 채운다. check는 양쪽으로: `kakao` ⇔ 등록한 운영자 있음, `resolved` ⇔ 결론 종류 있음. 돈이 오가는 결론 셋은 처리 기능이 생길 때까지 서버가 막는다. 정산 보류는 칸 없이 "`open` 이의제기가 있으면"으로 본다(#350, 11/12 nnoinn). 마이그레이션 0013 |

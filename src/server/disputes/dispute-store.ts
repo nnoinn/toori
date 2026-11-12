@@ -62,14 +62,17 @@ export async function readDisputeTarget(
   };
 }
 
-/** 고객이 앱에서 접수한 이의제기를 '확인 중'(open)으로 저장한다 */
+/**
+ * 고객이 앱에서 접수한 이의제기를 '확인 중'(open)으로 저장한다. 접수 경로는 앱(`app`)이고,
+ * 접수 시각(receivedAt)은 기한을 확인한 그 시각이다(#350)
+ */
 export async function insertDispute(
   tx: Tx,
-  input: { reservationId: string; type: DisputeType; content: string },
+  input: { reservationId: string; type: DisputeType; content: string; receivedAt: Date },
 ): Promise<{ id: string; createdAt: Date }> {
   const [saved] = await tx
     .insert(disputes)
-    .values({ ...input, status: 'open' })
+    .values({ ...input, status: 'open', channel: 'app' })
     .returning({ id: disputes.id, createdAt: disputes.createdAt });
   return saved;
 }

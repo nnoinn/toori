@@ -31,6 +31,12 @@ export type MyReservationItem = {
   cancelledAt: string | null;
 };
 
+/** 내 예약 목록 한 줄. 카드에 끝나는 시각도 보여준다(원장님 대시보드 매물 줄처럼, #359 2번) */
+export type MyReservationListItem = MyReservationItem & {
+  /** 서비스 끝 시각(ISO) */
+  endAt: string;
+};
+
 export type MyReservationDetail = MyReservationItem & {
   status: 'confirmed' | 'completed' | 'cancelled';
   shop: {
@@ -67,7 +73,7 @@ export async function selectMyReservations(
   db: DbReader,
   customerId: string,
   tab: ReservationTab,
-): Promise<MyReservationItem[]> {
+): Promise<MyReservationListItem[]> {
   const order =
     tab === 'upcoming'
       ? [asc(slots.startAt)]
@@ -84,6 +90,7 @@ export async function selectMyReservations(
       shopName: shops.name,
       menuName: slots.menuName,
       startAt: slots.startAt,
+      endAt: slots.endAt,
       amount: orders.amount,
     })
     .from(reservations)
@@ -99,6 +106,7 @@ export async function selectMyReservations(
     shopName: row.shopName,
     menuName: row.menuName,
     startAt: row.startAt.toISOString(),
+    endAt: row.endAt.toISOString(),
     amount: row.amount,
     noShow: row.visitResult === 'no_show',
     cancelledAt: iso(row.cancelledAt),
@@ -192,7 +200,9 @@ export async function selectMyReservationDetail(
 }
 
 /** 화면용: 지금 들어온 고객의 한 탭 예약 */
-export async function getMyReservations(tab: ReservationTab): Promise<Result<MyReservationItem[]>> {
+export async function getMyReservations(
+  tab: ReservationTab,
+): Promise<Result<MyReservationListItem[]>> {
   const auth = await requireCustomer();
   if (!auth.ok) return auth;
   return ok(await selectMyReservations(getDb(), auth.data.customerId, tab));

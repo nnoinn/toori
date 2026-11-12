@@ -47,7 +47,17 @@ export const DASHBOARD_STATUSES: readonly SlotStatus[] = [
 
 export { SLOT_STATUS_LABELS };
 
-export type DashboardTab = 'today' | 'upcoming';
+/** 매물을 나누는 날: 오늘(한국 날짜)과 내일 이후(예정) */
+export type DashboardDay = 'today' | 'upcoming';
+
+/** 탭: [전체]는 오늘·예정 두 구역을 한 화면에, [오늘]·[예정]은 그날 매물만 다 보여준다(#358) */
+export type DashboardTab = 'all' | DashboardDay;
+
+/** [전체] 탭의 구역마다 보여주는 매물 수. 넘으면 구역 아래 [더보기]로 그 탭에 간다(#358, 11/12 nnoinn) */
+export const ALL_TAB_SECTION_LIMIT = 7;
+
+/** 상태 필터 값: 상태 하나, 또는 모든 상태('all') */
+export type StatusFilter = SlotStatus | 'all';
 
 /** 한국 날짜로 내일 0시 */
 export function startOfKstTomorrow(now: Date): Date {
@@ -77,10 +87,10 @@ export function onHold(slot: DashboardSlot, now: Date): boolean {
 export function splitByDay(
   slots: DashboardSlot[],
   now: Date,
-): Record<DashboardTab, DashboardSlot[]> {
+): Record<DashboardDay, DashboardSlot[]> {
   const today = startOfKstDay(now).getTime();
   const tomorrow = startOfKstTomorrow(now).getTime();
-  const result: Record<DashboardTab, DashboardSlot[]> = { today: [], upcoming: [] };
+  const result: Record<DashboardDay, DashboardSlot[]> = { today: [], upcoming: [] };
   for (const slot of slots) {
     const start = new Date(slot.startAt).getTime();
     if (start < today) continue;
@@ -97,4 +107,42 @@ export function countByStatus(slots: DashboardSlot[], now: Date): Record<SlotSta
   >;
   for (const slot of slots) counts[viewStatus(slot, now)] += 1;
   return counts;
+}
+
+/** 상태 필터로 거른 매물. 'all'이면 그대로 */
+export function filterByStatus(
+  slots: DashboardSlot[],
+  status: StatusFilter,
+  now: Date,
+): DashboardSlot[] {
+  return status === 'all' ? slots : slots.filter((slot) => viewStatus(slot, now) === status);
+}
+
+/** [전체] 탭의 구역 하나: 상태 필터로 거른 그날 매물 수, 보여줄 앞쪽 매물, [더보기]로 넘길 남은 수 */
+export type AllTabSection = {
+  day: DashboardDay;
+  total: number;
+  shown: DashboardSlot[];
+  more: number;
+};
+
+/**
+ * [전체] 탭(#358): 오늘·예정 순서로 구역을 나누고, 구역마다 상태 필터로 거른 뒤 앞에서부터 limit개만 보여준다.
+ * 비어 있는 구역도 돌려준다(화면이 "오늘 시작하는 매물이 없어요" 한 줄을 그린다)
+ */
+export function allTabSections(
+  byDay: Record<DashboardDay, DashboardSlot[]>,
+  status: StatusFilter,
+  now: Date,
+  limit: number = ALL_TAB_SECTION_LIMIT,
+): AllTabSection[] {
+  return (['today', 'upcoming'] as const).map((day) => {
+    const matched = filterByStatus(byDay[day], status, now);
+    return {
+      day,
+      total: matched.length,
+      shown: matched.slice(0, limit),
+      more: Math.max(matched.length - limit, 0),
+    };
+  });
 }

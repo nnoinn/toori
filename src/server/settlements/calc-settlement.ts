@@ -43,17 +43,22 @@ function vatOf(amount: number): number {
   return Math.floor((amount * VAT_RATE) / 100);
 }
 
+/** 판매가 × 비율로 기준 금액을 정하는 정산 종류: 고객 취소 위약금, 합의 후 취소 */
+type RatedKind = Extract<SettlementItemKind, 'penalty' | 'agreed_cancel'>;
+
 /**
- * 기준 금액(남은 금액): 이용 완료·노쇼 = 판매가, 고객 취소 = 판매가 × 위약금 비율(원 미만 버림).
- * 고객 취소는 환불 계산(calcRefund)의 원장님 기준 금액과 같은 값이다. 원장님 귀책 취소는 0이라 정산 줄을 만들지 않는다
+ * 기준 금액(남은 금액): 이용 완료·노쇼 = 판매가, 고객 취소·합의 후 취소 = 판매가 × 위약금 비율(원 미만 버림).
+ * 위약금 비율은 환불 기록에 저장한 그때 값(refunds.penalty_rate)을 넘긴다. 합의 후 취소는 100 − 손님 환불율(지금 50)이다.
+ * 고객 취소·합의 후 취소는 환불 계산(calcRefund, calcAgreedCancel)의 원장님 기준 금액과 같은 값이다.
+ * 원장님 귀책 취소는 0이라 정산 줄을 만들지 않는다
  */
 export function settlementBaseAmount(
   input:
-    | { kind: Exclude<SettlementItemKind, 'penalty'>; salePrice: number }
-    | { kind: 'penalty'; salePrice: number; penaltyRate: number },
+    | { kind: Exclude<SettlementItemKind, RatedKind>; salePrice: number }
+    | { kind: RatedKind; salePrice: number; penaltyRate: number },
 ): number {
   assertAmount('판매가', input.salePrice, { positive: true });
-  if (input.kind !== 'penalty') return input.salePrice;
+  if (input.kind !== 'penalty' && input.kind !== 'agreed_cancel') return input.salePrice;
   const { penaltyRate } = input;
   if (!Number.isInteger(penaltyRate) || penaltyRate < 0 || penaltyRate > 100) {
     throw new RangeError(`위약금 비율이 올바르지 않아요: ${penaltyRate}`);

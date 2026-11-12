@@ -26,6 +26,8 @@ type Row = {
   paidAmount: number;
   refundAmount: number;
   penaltyRate?: number;
+  /** 위약금 비율이 있는 줄의 종류. 비우면 고객 취소(penalty) */
+  kind?: 'penalty' | 'agreed_cancel';
   /** 문서 표의 숫자 */
   expected: {
     pgHeld: number;
@@ -70,6 +72,19 @@ const cancel = (
   paidAmount: 45_000 - coupon,
   refundAmount,
   penaltyRate: 30,
+  expected,
+});
+
+/** 3장 합의 후 취소 표: 손님 환불 = 카드 결제액 × 50%, 원장님 기준 금액 = 판매가 × 50% */
+const agreed = (coupon: number, refundAmount: number, expected: Row['expected']): Row => ({
+  name: `3장 합의 후 취소(손님 50% 환불, 10% 할인), 쿠폰 ${coupon}원`,
+  mode: 'launch',
+  discountRate: 10,
+  salePrice: 45_000,
+  paidAmount: 45_000 - coupon,
+  refundAmount,
+  penaltyRate: 50,
+  kind: 'agreed_cancel',
   expected,
 });
 
@@ -134,6 +149,26 @@ const ROWS: Row[] = [
     payoutAmount: 13_055,
     turiRemaining: -870,
     turiProfit: -873,
+  }),
+  agreed(0, 22_500, {
+    pgHeld: 21_758,
+    feeAmount: 0,
+    feeVat: 0,
+    paymentFee: 675,
+    paymentFeeVat: 67,
+    payoutAmount: 21_758,
+    turiRemaining: 0,
+    turiProfit: 0,
+  }),
+  agreed(3_000, 21_000, {
+    pgHeld: 20_307,
+    feeAmount: 0,
+    feeVat: 0,
+    paymentFee: 675,
+    paymentFeeVat: 67,
+    payoutAmount: 21_758,
+    turiRemaining: -1_451,
+    turiProfit: -1_455,
   }),
   // 4장 법인 전환 뒤(할인율별 플랫폼 수수료)
   sale('tiered', 10, 0, {
@@ -203,7 +238,7 @@ describe('settlement-examples.md 표 숫자', () => {
     const baseAmount = settlementBaseAmount(
       row.penaltyRate === undefined
         ? { kind: 'sale', salePrice: row.salePrice }
-        : { kind: 'penalty', salePrice: row.salePrice, penaltyRate: row.penaltyRate },
+        : { kind: row.kind ?? 'penalty', salePrice: row.salePrice, penaltyRate: row.penaltyRate },
     );
     const fees = calcSettlementFees({
       baseAmount,
@@ -258,11 +293,21 @@ describe('settlementBaseAmount: 기준 금액', () => {
     );
   });
 
+  it('합의 후 취소는 판매가 × 50%(판매가 전액이 아니다, 정산 예시 3장 45,000원 → 22,500원)', () => {
+    expect(
+      settlementBaseAmount({ kind: 'agreed_cancel', salePrice: 45_000, penaltyRate: 50 }),
+    ).toBe(22_500);
+    expect(
+      settlementBaseAmount({ kind: 'agreed_cancel', salePrice: 23_457, penaltyRate: 50 }),
+    ).toBe(11_728);
+  });
+
   it.each([
     ['판매가가 소수', { kind: 'sale', salePrice: 100.5 }],
     ['판매가 0', { kind: 'sale', salePrice: 0 }],
     ['위약금 비율 없음', { kind: 'penalty', salePrice: 10_000 }],
     ['위약금 비율 100 초과', { kind: 'penalty', salePrice: 10_000, penaltyRate: 101 }],
+    ['합의 후 취소에 비율 없음', { kind: 'agreed_cancel', salePrice: 10_000 }],
   ] as const)('%s → 에러', (_, input) => {
     expect(() => settlementBaseAmount(input as never)).toThrow(RangeError);
   });
