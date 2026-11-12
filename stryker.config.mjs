@@ -19,6 +19,7 @@ const config = {
     'src/server/refunds/calc-refund.ts',
     'src/server/refunds/agreed-cancel-rules.ts',
     'src/server/settlements/calc-settlement.ts',
+    'src/server/settlements/payout-date.ts',
     'src/server/coupons/rules.ts',
     'src/server/disputes/rules.ts',
     'src/server/visits/rules.ts',
