@@ -1,0 +1,45 @@
+name: 돌연변이 테스트
+
+# 핵심 규칙 코드를 일부러 조금씩 틀리게 바꿔서(돌연변이) 테스트가 잡는지 본다(stryker.config.mjs, docs/test-scenarios.md).
+# 느려서 PR 검사에 넣지 않고 매주 한 번 돌린다. 한국 시간 일요일 0시(UTC 토요일 15시)라 일요일 주간 점검 때 결과를 본다.
+# 결과는 실행 요약(살아남은 돌연변이 목록)과 보고서 파일(mutation-report)로 남는다. 점수로 실패시키지 않는다.
+on:
+  schedule:
+    - cron: '0 15 * * 6'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation
+  cancel-in-progress: false
+
+jobs:
+  mutation:
+    name: mutation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: 돌연변이 테스트
+        run: npm run mutation
+      - name: 결과 요약
+        if: always()
+        run: |
+          if [ -f reports/mutation/mutation.json ]; then
+            node scripts/mutation-summary.mjs >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: 보고서 파일 남기기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: reports/mutation/
+          retention-days: 30
+          if-no-files-found: ignore
