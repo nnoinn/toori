@@ -17,6 +17,8 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
     environment: 'node',
+    // 검사(expect)가 하나도 없는 테스트는 실패로 본다. 아무것도 확인하지 않고 늘 통과하는 테스트를 막는다(docs/test-scenarios.md)
+    expect: { requireAssertions: true },
     // 테스트 DB에 Supabase 흉내와 마이그레이션을 적용한다(TEST_DATABASE_URL이 없으면 아무것도 안 한다)
     globalSetup: ['tests/db/global-setup.ts'],
     env: {
