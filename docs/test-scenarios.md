@@ -112,7 +112,7 @@ PR 검사가 자동으로 막는 것:
 | AGREED-04 | 예정 예약일 때만 요청한다(서비스 시작 뒤 포함, 방문·노쇼 처리 전) | X-208 | ✅ | `src/server/refunds/agreed-cancel-rules.test.ts` 예정 예약이고 방문·노쇼 처리 전일 때만 |
 | AGREED-05 | 동의했는데 환불이 안 되면 요청은 다시 답 기다림으로 돌아간다. 손님 직접 취소와 겹쳐도 환불은 한 번이다 | #346·#348 | ✅ | `src/server/refunds/agreed-cancel.test.ts` 결제사가 거절했고 돌아간 돈이 없으면<br>`src/server/refunds/agreed-cancel.test.ts` 손님 직접 취소 환불이 먼저 들어와 있으면 RESERVATION_CHANGED(환불은 한 번)<br>`src/server/refunds/agreed-cancel-store.db.test.ts` 진행 중 기록 지우기와 요청 되돌리기를 한 번에 |
 | AGREED-07 | 결제액이 홀수라 50%에 원 미만이 생기면 고객 취소처럼 손님 쪽으로 맞춘다(위약금 쪽에서 버림). 23,457원 → 위약금 11,728원, 손님 환불 11,729원 | 11/12 nnoinn·정산 예시 3장 | ⏳ | |
-| AGREED-06 | 정산 줄을 만들 때 합의 후 취소의 기준 금액은 판매가 × 50%다(지금 `settlementBaseAmount`는 `agreed_cancel`을 판매가 그대로 계산해서 W20 전에 고친다) | X-208·W20 | ⏳ | |
+| AGREED-06 | 정산 줄을 만들 때 합의 후 취소의 기준 금액은 판매가 × 50%다(판매가 45,000원 → 22,500원, 원장님 정산 21,758원) | X-208·W20·정산 예시 3장 | ✅ | `src/server/settlements/calc-settlement.test.ts` 합의 후 취소는 판매가 × 50% |
 
 ## 8. 원장님 귀책 취소 (P1, 준비 중)
 
