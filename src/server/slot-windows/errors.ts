@@ -21,6 +21,8 @@ export const SLOT_WINDOW_ERRORS = {
   WINDOW_NOT_FOUND: '시간대를 찾을 수 없어요',
   /** 마감: 이미 마감했거나 시간이 지남 */
   WINDOW_CLOSED: '이미 마감한 시간대예요',
+  /** 등록·마감: 진짜 버전 전이라 배포 주소에서는 저장하지 않는다(가짜 성공을 돌려주지 않는다) */
+  NOT_OPEN: '시간대 매물은 곧 열려요',
   ...START_PROBLEM_MESSAGES,
   ...HOURS_PROBLEM_MESSAGES,
 } as const;

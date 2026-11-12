@@ -118,7 +118,8 @@ describe('createSlotWindows (원장님)', () => {
     newCustomerOnly: false,
   };
 
-  it('확인을 통과하면 묶음마다 시간대 결과(가짜 버전은 저장하지 않는다)', async () => {
+  it('스위치를 켜면 확인을 통과했을 때 묶음마다 시간대 결과(가짜 버전은 저장하지 않는다)', async () => {
+    fakeOn();
     const result = await createSlotWindows(SHOP, input);
     expect(result).toMatchObject({
       ok: true,
@@ -137,7 +138,14 @@ describe('createSlotWindows (원장님)', () => {
     });
   });
 
-  it('확인 실패는 코드와 문구로: 겹침, 긴 메뉴, 모양이 틀린 입력', async () => {
+  it('스위치가 꺼진 곳(배포 주소)에서는 확인을 통과해도 저장한 것처럼 성공하지 않는다', async () => {
+    expect(await createSlotWindows(SHOP, input)).toEqual({
+      ok: false,
+      error: { code: 'NOT_OPEN', message: '시간대 매물은 곧 열려요' },
+    });
+  });
+
+  it('확인 실패는 스위치와 상관없이 코드와 문구로: 겹침, 긴 메뉴, 모양이 틀린 입력', async () => {
     state.busy = [{ start: at('17:00', 13), end: at('19:00', 13) }];
     expect(await createSlotWindows(SHOP, input)).toEqual({
       ok: false,
@@ -191,8 +199,13 @@ describe('getLastWindowSettings·closeSlotWindow (원장님)', () => {
     );
   });
 
-  it('마감은 마감 시각을 주고, 원장님이 고르지 않는 사유(hold_released)는 받지 않는다', async () => {
+  it('마감: 스위치를 켜면 마감 시각, 꺼져 있으면 NOT_OPEN. 원장님이 고르지 않는 사유(hold_released)는 받지 않는다', async () => {
     const windowId = '99999999-9999-4999-8999-999999999999';
+    expect(await closeSlotWindow(SHOP, { windowId, reason: 'mistake' })).toEqual({
+      ok: false,
+      error: { code: 'NOT_OPEN', message: '시간대 매물은 곧 열려요' },
+    });
+    fakeOn();
     expect(await closeSlotWindow(SHOP, { windowId, reason: 'mistake' })).toEqual(
       ok({ closedAt: NOW.toISOString() }),
     );

@@ -3,7 +3,21 @@
 
 import 'server-only';
 
-import { and, asc, eq, gt, inArray, isNotNull, lt, not, or, type SQL, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  not,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { menus, shopImages, shops, slots, slotWindows } from '@/db/schema';
@@ -99,7 +113,8 @@ export async function readOccupiedRanges(
   const releasedHold: SQL = and(
     isNotNull(slots.windowId),
     eq(slots.status, 'published'),
-    or(sql`${slots.holdExpiresAt} is null`, sql`${slots.holdExpiresAt} <= ${input.now}`),
+    // lte()로 비교해야 시각이 컬럼 형식으로 바뀐다(sql``에 Date를 바로 넣으면 드라이버가 받지 못한다)
+    or(isNull(slots.holdExpiresAt), lte(slots.holdExpiresAt, input.now)),
   )!;
   return db
     .select({ start: slots.startAt, end: slots.endAt })

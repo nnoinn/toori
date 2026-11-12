@@ -5,8 +5,9 @@
 // - 고객(정찬형 시간대 상세 [예약하기]): holdWindowSlot
 //
 // 지금은 가짜 결과 버전이다. 로그인·내 샵·입점 승인 확인과 입력 확인(rules.ts, 매물 등록과 같은 계산)은 진짜이고,
-// 저장·마감·홀딩은 하지 않는다. 원장님 등록은 확인을 통과하면 저장한 것처럼 결과만 돌려준다.
-// DEV_FAKE_SLOT_WINDOWS=on(로컬 개발)이면 지난 설정과 고객 쪽 가짜 시간대가 보이고, 실패는 DEV_FAKE_SLOT_WINDOWS_FAILURE로 흉내 낸다(fake.ts).
+// 저장·마감·홀딩은 하지 않는다. DEV_FAKE_SLOT_WINDOWS=on(로컬 개발)이면 원장님 등록·마감은 확인을 통과했을 때 저장한 것처럼
+// 결과만 돌려주고, 지난 설정과 고객 쪽 가짜 시간대가 보인다. 실패는 DEV_FAKE_SLOT_WINDOWS_FAILURE로 흉내 낸다(fake.ts).
+// 스위치가 꺼진 곳(배포 주소)에서는 확인까지만 하고 NOT_OPEN "시간대 매물은 곧 열려요"로 끝난다. 저장하지 않으면서 성공을 돌려주지 않는다
 // 진짜 버전은 slot_windows에 저장하고 [예약하기]에서 매물 한 칸을 만들어 홀딩한다(결과 모양은 그대로)
 
 import { z } from 'zod';
@@ -45,7 +46,7 @@ const createSchema = z.object({
 
 /**
  * 원장님 ③ 확인 → [등록하기]. 켜진 묶음마다 시간대 하나로 저장한다(전부 저장하거나 하나도 저장하지 않는다).
- * 가짜 버전은 확인만 하고 저장하지 않는다(시간대 id는 새로 만든 값)
+ * 가짜 버전은 확인만 하고 저장하지 않는다. 스위치가 켜져 있으면 결과(시간대 id는 새로 만든 값), 꺼져 있으면 NOT_OPEN
  */
 export async function createSlotWindows(
   shopId: string,
@@ -79,6 +80,7 @@ export async function createSlotWindows(
     now,
   });
   if (!checked.ok) return slotWindowFail(checked.code);
+  if (!fakeWindowsOn()) return slotWindowFail('NOT_OPEN');
 
   return ok({
     windows: checked.windows.map((window) => ({
@@ -116,7 +118,10 @@ const closeSchema = z.object({
   reason: z.enum(['other_channel', 'mistake', 'other']),
 });
 
-/** 원장님 시간대 [마감](사유 기록). 안의 결제가 끝난 예약은 그대로다. 가짜 버전은 저장하지 않고 마감 시각만 준다 */
+/**
+ * 원장님 시간대 [마감](사유 기록). 안의 결제가 끝난 예약은 그대로다.
+ * 가짜 버전은 저장하지 않는다. 스위치가 켜져 있으면 마감 시각, 꺼져 있으면 NOT_OPEN
+ */
 export async function closeSlotWindow(
   shopId: string,
   input: { windowId: string; reason: string },
@@ -127,6 +132,7 @@ export async function closeSlotWindow(
   if (!parsed.success) return slotWindowFail('INVALID_INPUT');
   const switched = fakeWindowFailure('closeSlotWindow');
   if (switched) return switched;
+  if (!fakeWindowsOn()) return slotWindowFail('NOT_OPEN');
   return ok({ closedAt: (await getRequestNow()).toISOString() });
 }
 
