@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     'out/**',
     'build/**',
     'next-env.d.ts',
+    // 돌연변이 테스트(Stryker)가 만드는 작업 폴더와 보고서
+    '.stryker-tmp/**',
+    'reports/**',
   ]),
 ]);
 
