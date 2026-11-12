@@ -155,6 +155,25 @@ describeDb('매물·예약 조회 (실제 DB)', () => {
     });
   });
 
+  it('결제 없이 비운 시간대 칸(hold_released)은 어느 상태로 걸러도 보이지 않고, 다른 사유로 마감한 매물은 보인다(#308 ④)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const menuName = unique('메뉴');
+      const closed = { menuName, status: 'closed' as const, closedAt: BEFORE_START };
+      const [, mistake] = await tx
+        .insert(slots)
+        .values([
+          testSlot(shop, '10:00', '11:00', { ...closed, closeReason: 'hold_released' }),
+          testSlot(shop, '12:00', '13:00', { ...closed, closeReason: 'mistake' }),
+        ])
+        .returning();
+      for (const filter of ['all', 'closed'] as const) {
+        const { rows } = await selectSlots(tx, { filter, query: menuName, now: BEFORE_START });
+        expect(rows.map((row) => row.slotId)).toEqual([mistake.id]);
+      }
+    });
+  });
+
   it('예약 상세는 결제와 환불 기록을 읽고, 없는 예약은 null', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
