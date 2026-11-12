@@ -200,12 +200,17 @@ describeDb('원장님 정산 내역 읽기 (실제 DB)', () => {
           type: 'after_start',
           content: '테스트 이의제기 내용이에요',
           status: 'open',
+          channel: 'app',
+          receivedAt: new Date(),
         },
         {
           reservationId: resolvedDispute.reservation.id,
           type: 'after_start',
           content: '테스트 이의제기 내용이에요',
           status: 'resolved',
+          channel: 'app',
+          receivedAt: new Date(),
+          outcome: 'no_change',
         },
       ]);
 
