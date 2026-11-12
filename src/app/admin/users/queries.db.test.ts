@@ -4,12 +4,13 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
-import { customers, owners, profiles, shops, termsAgreements } from '@/db/schema';
+import { customers, owners, profiles, shops, slots, termsAgreements } from '@/db/schema';
 
 import {
   createTestCustomer,
   createTestReservation,
   createTestShop,
+  testSlot,
 } from '../../../../tests/db/fixtures';
 import { closeTestDb, describeDb, type TestTx, withRollback } from '../../../../tests/db/test-db';
 import { selectCustomerDetail, selectCustomers, selectOwners } from './queries';
@@ -114,6 +115,28 @@ describeDb('회원 조회 (실제 DB)', () => {
         });
       }
       expect((await selectOwners(tx, unique('없는원장'))).rows).toEqual([]);
+    });
+  });
+
+  it('매물 수는 결제 없이 비운 시간대 칸(hold_released)을 세지 않고, 그런 칸만 있는 원장님도 목록에 남는다(#308 ④)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const shopName = unique('비운칸샵');
+      await tx.update(shops).set({ name: shopName }).where(eq(shops.id, shop.shopId));
+      const closed = { status: 'closed' as const };
+      await tx
+        .insert(slots)
+        .values(testSlot(shop, '10:00', '11:00', { ...closed, closeReason: 'hold_released' }));
+      expect((await selectOwners(tx, shopName)).rows).toMatchObject([
+        { shopId: shop.shopId, slotCount: 0 },
+      ]);
+
+      await tx
+        .insert(slots)
+        .values(testSlot(shop, '12:00', '13:00', { ...closed, closeReason: 'mistake' }));
+      expect((await selectOwners(tx, shopName)).rows).toMatchObject([
+        { shopId: shop.shopId, slotCount: 1 },
+      ]);
     });
   });
 
