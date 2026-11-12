@@ -1,6 +1,7 @@
-// 시간대 매물 가짜 결과 버전의 데이터와 스위치 (#308). 서버에서만 부른다. 진짜 버전이 오면 이 파일을 지운다.
+// 시간대 매물 가짜 결과 버전의 데이터와 스위치 (#308). 서버에서만 부른다. 진짜 버전 ②③이 오면 가짜 데이터를 지운다.
+// 원장님 등록·지난 설정·마감은 진짜 버전이라(①) 가짜 데이터를 쓰지 않고, 실패 흉내 스위치만 쓴다.
 //
-// - DEV_FAKE_SLOT_WINDOWS=on: 로컬 개발(NODE_ENV=development)에서만 켜진다. 켜면 범위 안 진짜 승인된 샵마다
+// - DEV_FAKE_SLOT_WINDOWS=on: 고객 목록·상세·[예약하기]에만 쓴다. 로컬 개발(NODE_ENV=development)에서만 켜진다. 켜면 범위 안 진짜 승인된 샵마다
 //   "내일 13:00~18:00(한국 시간), 그 샵의 숨기지 않은 진짜 메뉴, 할인 30%" 시간대가 하나씩 있는 것처럼 보인다.
 //   시간대 id는 샵 id와 같다. 시작 가능 시각은 그 샵의 진짜 매물 시간과 겹치지 않게 진짜 계산(windowStarts)으로 만든다.
 //   꺼져 있으면(배포 주소·테스트 포함) 시간대가 하나도 없는 것처럼 보인다
@@ -22,7 +23,7 @@ import type { SlotWindowMenu } from './types';
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 
 /** 가짜 시간대의 할인율 */
-export const FAKE_DISCOUNT_RATE = 30;
+const FAKE_DISCOUNT_RATE = 30;
 
 /** 가짜 시간대 데이터를 켰는지 */
 export function fakeWindowsOn(): boolean {
