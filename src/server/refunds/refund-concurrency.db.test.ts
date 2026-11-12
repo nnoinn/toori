@@ -28,7 +28,7 @@ import {
   type TestShop,
 } from '../../../tests/db/fixtures';
 import { assertLocalTestDb, describeDb } from '../../../tests/db/test-db';
-import { finishCustomerCancel, requestCustomerCancel } from './refund-store';
+import { finishCancelRecord, requestCancelRefund } from './refund-store';
 
 const NOW = new Date('2026-11-01T08:00:00+09:00');
 const REPEAT = 5;
@@ -98,15 +98,16 @@ describeDb('예약을 동시에 두 번 취소 (실제 DB, 연결 여러 개)', 
       const amounts = {
         reservationId: booking.reservation.id,
         orderId: booking.order.id,
+        reason: 'customer_cancel' as const,
         band: 'over_24h' as const,
         penaltyRate: 30,
         refundAmount: 9_800,
         penaltyAmount: 4_200,
       };
-      const start = () => requestCustomerCancel(db, { ...amounts, requestedAt: NOW });
+      const start = () => requestCancelRefund(db, { ...amounts, requestedAt: NOW });
       const finish = () =>
         db.transaction((tx) =>
-          finishCustomerCancel(tx, {
+          finishCancelRecord(tx, {
             ...amounts,
             slotId: booking.slot.id,
             pgCancellationId: 'c-1',

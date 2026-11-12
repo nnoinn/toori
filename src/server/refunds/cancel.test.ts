@@ -47,7 +47,7 @@ vi.mock('./refund-store', () => ({
     state.reads.push([reservationId, customerId]);
     return state.target;
   },
-  requestCustomerCancel: async (_db: unknown, input: Record<string, unknown>) => {
+  requestCancelRefund: async (_db: unknown, input: Record<string, unknown>) => {
     state.steps.push('request');
     state.requests.push(input);
     if (state.started instanceof Error) throw state.started;
@@ -205,6 +205,7 @@ describe('previewRefund (진행 중인 취소가 있을 때)', () => {
     state.now = before(10); // 지금 계산하면 50% 구간이다
     state.target = target({
       requested: {
+        reason: 'customer_cancel',
         band: 'over_24h',
         penaltyRate: 30,
         refundAmount: 31_500,
@@ -226,6 +227,7 @@ describe('cancelReservation', () => {
   const codeOf = (result: Awaited<ReturnType<typeof cancelReservation>>) =>
     result.ok ? null : result.error.code;
   const requested = {
+    reason: 'customer_cancel' as const,
     band: 'over_24h' as const,
     penaltyRate: 30,
     refundAmount: 31_500,
@@ -346,6 +348,22 @@ describe('cancelReservation', () => {
     expect(codeOf(await cancel())).toBe('REFUND_FAILED');
     expect(state.pgCalls).toEqual([]);
     expect(console.error).toHaveBeenCalled();
+  });
+
+  it('합의 후 취소 환불이 진행 중이면(손님이 같은 순간 동의함) 포트원을 부르지 않고 CANCEL_FINISHING', async () => {
+    state.target = target({
+      requested: {
+        reason: 'agreed_cancel',
+        band: null,
+        penaltyRate: 50,
+        refundAmount: 22_500,
+        penaltyAmount: 22_500,
+        requestedAt: before(30),
+      },
+    });
+    expect(codeOf(await cancel())).toBe('CANCEL_FINISHING');
+    expect(state.pgCalls).toEqual([]);
+    expect(state.requests).toEqual([]);
   });
 
   describe('진행 중인 취소를 다시 누를 때', () => {

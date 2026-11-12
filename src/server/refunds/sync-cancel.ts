@@ -76,6 +76,7 @@ async function recordLateCustomerCancel(
     db,
     {
       ...target,
+      reason: 'customer_cancel',
       band: calc.band,
       penaltyRate: calc.penaltyRate,
       refundAmount: calc.refundAmount,

@@ -13,6 +13,8 @@ export const VISIT_ERRORS = {
   ALREADY_RECORDED: '이미 처리한 예약이에요',
   /** 서비스 시작 전(서버 시각 기준) */
   TOO_EARLY: '서비스 시작 시각이 지나야 처리할 수 있어요',
+  /** 손님 취소·합의 후 취소의 환불이 진행 중(#320). 끝나면 예약이 '취소'가 된다 */
+  CANCEL_IN_PROGRESS: '환불이 진행 중인 예약이에요. 잠시 뒤 다시 확인해 주세요',
 } as const;
 
 export type VisitErrorCode = keyof typeof VISIT_ERRORS;

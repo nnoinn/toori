@@ -1,4 +1,4 @@
-// 환불이 끝난 취소 기록과 진행 중 취소의 결과 정하기 (W14, #222). 포트원·DB 저장은 가짜로 바꾼다. 저장 내용은 refund-store.db.test.ts가 본다.
+// 환불이 끝난 취소 기록과 진행 중 취소의 결과 정하기 (W14, #222, 합의 후 취소 #320). 포트원·DB 저장은 가짜로 바꾼다. 저장 내용은 refund-store.db.test.ts가 본다.
 
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,6 +12,8 @@ const state = vi.hoisted(() => ({
   finished: true,
   cleared: [] as string[],
   cancelAlerts: [] as unknown[],
+  agreedAlerts: [] as unknown[],
+  reopened: [] as unknown[],
 }));
 
 vi.mock('@/server/notifications/alerts', () => ({
@@ -22,6 +24,14 @@ vi.mock('@/server/notifications/alerts', () => ({
   ) => {
     state.cancelAlerts.push({ reservationId, ...options });
   },
+  notifyAgreedCancelResult: (_db: unknown, input: unknown) => {
+    state.agreedAlerts.push(input);
+  },
+}));
+vi.mock('./agreed-cancel-store', () => ({
+  reopenAgreedRequest: async (_db: unknown, input: unknown) => {
+    state.reopened.push(input);
+  },
 }));
 
 vi.mock('@/server/payments/portone', async (original) => ({
@@ -29,7 +39,7 @@ vi.mock('@/server/payments/portone', async (original) => ({
   getPortOnePayment: async () => state.lookup,
 }));
 vi.mock('./refund-store', () => ({
-  finishCustomerCancel: async (_tx: unknown, input: Record<string, unknown>) => {
+  finishCancelRecord: async (_tx: unknown, input: Record<string, unknown>) => {
     state.finishes.push(input);
     return state.finished;
   },
@@ -54,6 +64,7 @@ const request: CancelRequest = {
   paymentId: 'toori-1',
   paidAmount: 45_000,
   startAt: START,
+  reason: 'customer_cancel',
   band: 'over_24h',
   penaltyRate: 30,
   refundAmount: 31_500,
@@ -74,6 +85,8 @@ beforeEach(() => {
   state.finished = true;
   state.cleared = [];
   state.cancelAlerts = [];
+  state.agreedAlerts = [];
+  state.reopened = [];
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -88,6 +101,7 @@ describe('finishCancel', () => {
     );
     expect(state.finishes).toEqual([
       {
+        reason: 'customer_cancel',
         reservationId: 'reservation-1',
         orderId: 'order-1',
         slotId: 'slot-1',
@@ -226,5 +240,44 @@ describe('settleRequestedCancel', () => {
     state.lookup = { ok: false, reason: 'unavailable' };
     expect(await settleRequestedCancel(db, { ...request, ...extra }, NOW)).toBe('finished');
     expect(state.finishes[0]).toMatchObject({ refundAmount, pgCancellationId: null });
+  });
+});
+
+describe('합의 후 취소(#320)', () => {
+  const agreed: CancelRequest = {
+    ...request,
+    reason: 'agreed_cancel',
+    band: null,
+    penaltyRate: 50,
+    refundAmount: 22_500,
+    penaltyAmount: 22_500,
+  };
+
+  it('끝내면 취소한 쪽 agreed로 기록하고 원장님에게 동의 알림(재등록 안내 없음)', async () => {
+    expect(await finishCancel(db, agreed, { cancellationId: 'c-1', amount: 22_500 }, NOW)).toEqual({
+      refundAmount: 22_500,
+    });
+    expect(state.finishes[0]).toMatchObject({
+      reason: 'agreed_cancel',
+      band: null,
+      penaltyRate: 50,
+    });
+    expect(state.agreedAlerts).toEqual([
+      { reservationId: 'reservation-1', requestId: 'reservation-1', result: 'agreed' },
+    ]);
+    expect(state.cancelAlerts).toEqual([]);
+  });
+
+  it('정리 작업이 환불이 없다고 보면 진행 중 표시를 지우고 요청을 다시 답 기다림으로 돌린다', async () => {
+    state.lookup = payment([]);
+    expect(await settleRequestedCancel(db, agreed, NOW)).toBe('cleared');
+    expect(state.cleared).toEqual(['reservation-1']);
+    expect(state.reopened).toEqual([{ reservationId: 'reservation-1', now: NOW }]);
+  });
+
+  it('고객 취소는 지워도 요청을 건드리지 않는다', async () => {
+    state.lookup = payment([]);
+    expect(await settleRequestedCancel(db, request, NOW)).toBe('cleared');
+    expect(state.reopened).toEqual([]);
   });
 });

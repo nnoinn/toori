@@ -7,6 +7,9 @@ import { cancelPortOnePayment, type PortOneCancel } from '@/server/payments/port
 /** 고객 취소 때 포트원에 보내는 사유. 웹훅이 포트원 취소 내역에서 이 사유를 보고 앱이 보낸 고객 취소인지 가른다(sync-cancel.ts) */
 export const CUSTOMER_CANCEL_REASON = '고객 예약 취소';
 
+/** 합의 후 취소(X-208) 때 포트원에 보내는 사유. 웹훅은 진행 중 기록이 있으면 정리 작업에 맡긴다(sync-cancel.ts) */
+export const AGREED_CANCEL_REASON = '합의 후 취소';
+
 /**
  * 시드·시나리오가 만든 주문의 결제 번호 앞부분(scripts/dev-db.mjs). 포트원에 결제가 없어서 부를 수 없다.
  * 진짜 주문은 toori-로 시작해서(newPaymentId) 여기에 걸리지 않고, 모르는 번호는 포트원에 물어 실패하게 둔다
@@ -20,17 +23,18 @@ export function skipsPortOne(paymentId: string, refundAmount: number): boolean {
   );
 }
 
-/** 결제액 중 환불액만 돌려준다 */
+/** 결제액 중 환불액만 돌려준다. 사유는 고객 취소가 기본이고, 합의 후 취소는 AGREED_CANCEL_REASON을 넘긴다 */
 export async function refundPayment(input: {
   paymentId: string;
   paidAmount: number;
   refundAmount: number;
+  reason?: string;
 }): Promise<PortOneCancel> {
-  const { paymentId, paidAmount, refundAmount } = input;
+  const { paymentId, paidAmount, refundAmount, reason = CUSTOMER_CANCEL_REASON } = input;
   if (skipsPortOne(paymentId, refundAmount)) {
     return { ok: true, cancellationId: null, amount: refundAmount };
   }
-  return cancelPortOnePayment(paymentId, CUSTOMER_CANCEL_REASON, {
+  return cancelPortOnePayment(paymentId, reason, {
     amount: refundAmount,
     currentCancellableAmount: paidAmount,
   });

@@ -4,6 +4,7 @@
 // - 요청은 예정 예약(방문·노쇼 처리 전, 서비스 시작 뒤 포함)에만, 답을 기다리는 요청은 한 번에 하나
 
 import type { ReservationStatus, VisitResult } from '@/db/schema/payments';
+import type { AgreedCancelRequestStatus } from '@/db/schema/refunds';
 import { AGREED_CANCEL_REFUND_RATE } from '@/server/policy/refund';
 
 /** 손님 환불액과 원장님 기준 금액 */
@@ -32,4 +33,29 @@ export function isAgreedCancelTarget(reservation: {
   visitResult: VisitResult | null;
 }): boolean {
   return reservation.status === 'confirmed' && reservation.visitResult === null;
+}
+
+/**
+ * 저장된 요청의 지금 상태. 상태를 바꾸기 전이라도 만료 시각이 지났으면 expired(#320 리뷰),
+ * 손님이 답하기 전에 예약이 바뀌었으면(취소, 방문·노쇼 처리) closed로 본다
+ */
+export function currentRequestStatus(
+  request: { status: AgreedCancelRequestStatus; expiresAt: Date },
+  reservation: { status: ReservationStatus; visitResult: VisitResult | null },
+  now: Date,
+): AgreedCancelRequestStatus {
+  if (request.status !== 'requested') return request.status;
+  if (request.expiresAt.getTime() <= now.getTime()) return 'expired';
+  if (!isAgreedCancelTarget(reservation)) return 'closed';
+  return 'requested';
+}
+
+/** 손님이 답할 수 없는 이유. 답할 수 있으면 null */
+export function respondBlockReason(
+  status: AgreedCancelRequestStatus,
+): 'REQUEST_EXPIRED' | 'ALREADY_RESPONDED' | 'RESERVATION_CHANGED' | null {
+  if (status === 'expired') return 'REQUEST_EXPIRED';
+  if (status === 'agreed' || status === 'declined') return 'ALREADY_RESPONDED';
+  if (status === 'closed') return 'RESERVATION_CHANGED';
+  return null;
 }

@@ -23,15 +23,19 @@ import {
   clearRequestedCancel,
   readRefundTarget,
   type RefundTarget,
-  requestCustomerCancel,
+  requestCancelRefund,
 } from './refund-store';
 import type { CancelledReservation, RefundPreview } from './types';
 
 const reservationIdSchema = z.uuid();
 
 function toPreview(target: RefundTarget, now: Date): RefundPreview {
-  // 진행 중인 취소가 있으면 새로 계산하지 않는다. 그 사이 구간이 바뀌어도 금액이 어긋나지 않는다
-  if (target.requested && target.status === 'confirmed') {
+  // 진행 중인 고객 취소가 있으면 새로 계산하지 않는다. 그 사이 구간이 바뀌어도 금액이 어긋나지 않는다
+  if (
+    target.requested?.reason === 'customer_cancel' &&
+    target.requested.band &&
+    target.status === 'confirmed'
+  ) {
     const { band, penaltyRate, refundAmount, penaltyAmount } = target.requested;
     return {
       reservationId: target.reservationId,
@@ -111,8 +115,13 @@ export async function cancelReservation(input: {
     return refundFail('REFUND_CHANGED', { preview });
   }
 
+  // 합의 후 취소 환불이 진행 중이다(손님이 같은 순간 동의함). 한 예약에 취소 환불은 하나라 그쪽이 끝낸다
+  if (target.requested && target.requested.reason !== 'customer_cancel') {
+    return refundFail('CANCEL_FINISHING');
+  }
   const db = getDb();
   const requested = target.requested ?? {
+    reason: 'customer_cancel' as const,
     band: preview.band,
     penaltyRate: preview.penaltyRate,
     refundAmount: preview.refundAmount,
@@ -121,7 +130,7 @@ export async function cancelReservation(input: {
   };
   if (!target.requested) {
     try {
-      const started = await requestCustomerCancel(db, {
+      const started = await requestCancelRefund(db, {
         reservationId,
         orderId: target.orderId,
         ...requested,
