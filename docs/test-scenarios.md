@@ -112,7 +112,7 @@ PR 검사가 자동으로 막는 것:
 | AGREED-04 | 예정 예약일 때만 요청한다(서비스 시작 뒤 포함, 방문·노쇼 처리 전) | X-208 | ✅ | `src/server/refunds/agreed-cancel-rules.test.ts` 예정 예약이고 방문·노쇼 처리 전일 때만 |
 | AGREED-05 | 동의했는데 환불이 안 되면 요청은 다시 답 기다림으로 돌아간다. 손님 직접 취소와 겹쳐도 환불은 한 번이다 | #346·#348 | ✅ | `src/server/refunds/agreed-cancel.test.ts` 결제사가 거절했고 돌아간 돈이 없으면<br>`src/server/refunds/agreed-cancel.test.ts` 손님 직접 취소 환불이 먼저 들어와 있으면 RESERVATION_CHANGED(환불은 한 번)<br>`src/server/refunds/agreed-cancel-store.db.test.ts` 진행 중 기록 지우기와 요청 되돌리기를 한 번에 |
 | AGREED-07 | 결제액이 홀수라 50%에 원 미만이 생기면 고객 취소처럼 손님 쪽으로 맞춘다(위약금 쪽에서 버림). 23,457원 → 위약금 11,728원, 손님 환불 11,729원 | 11/12 nnoinn·정산 예시 3장 | ⏳ | |
-| AGREED-06 | 정산 줄을 만들 때 합의 후 취소의 기준 금액은 판매가 × 50%다(지금 `settlementBaseAmount`는 `agreed_cancel`을 판매가 그대로 계산해서 W20 전에 고친다) | X-208·W20 | ⏳ | |
+| AGREED-06 | 정산 줄을 만들 때 합의 후 취소의 기준 금액은 판매가 × 50%다(판매가 45,000원 → 22,500원, 원장님 정산 21,758원) | X-208·W20·정산 예시 3장 | ✅ | `src/server/settlements/calc-settlement.test.ts` 합의 후 취소는 판매가 × 50% |
 
 ## 8. 원장님 귀책 취소 (P1, 준비 중)
 
@@ -159,6 +159,7 @@ PR 검사가 자동으로 막는 것:
 | SETTLE-04 | 원장님 귀책 패널티는 오래된 것부터 떼고, 남은 금액은 다음 정산으로 넘긴다 | X-207 | ✅ | `src/server/settlements/calc-settlement.test.ts` 모자라면 오래된 것부터 떼고, 남은 금액은 다음 정산으로 넘긴다 |
 | SETTLE-05 | 정산은 매주 목요일(공휴일이면 다음 영업일)에 이의제기 기한이 지났고 이의제기 중이 아닌 거래를 묶어 지급한다 | X-206 | ⏳ | |
 | SETTLE-06 | 정산 계좌번호는 암호화해서 저장하고, 화면에는 은행·뒷자리·예금주만 보인다 | S-107 | ✅ | `src/server/payouts/account-crypto.test.ts` 풀면 원래 번호가 나오고, 암호문에는 번호가 보이지 않는다<br>`src/app/owner/(console)/settings/payout/payout-store.db.test.ts` 화면용 조회는 은행·뒷자리·예금주만 돌려준다 |
+| SETTLE-07 | 지급일은 매주 목요일이고 공휴일이면 다음 영업일이다. 이의제기 접수 기한이 지급일 0시까지 지난 거래가 그날 지급에 들어가서 원장님은 보통 서비스 뒤 4~8일 안에 받는다(일요일 15시 → 4일 뒤 목요일, 금요일 15시 → 6일 뒤 목요일, 수요일 18시 → 8일 뒤 목요일). 방문·노쇼 처리가 늦으면 처리한 때부터 세고, 이의제기 중이면 보류한다 | X-206·기술 가이드 7장 "정산 주기"·#353 | ✅ | `src/server/settlements/settle-rules.test.ts` 기술 가이드 예시<br>`src/server/settlements/settle-rules.test.ts` 방문 처리가 늦으면 처리한 때부터 센다<br>`src/server/settlements/settle-rules.test.ts` 확인 중 이의제기가 있으면 보류하고 지급일이 없다<br>`src/server/settlements/payout-date.test.ts` 목요일이 공휴일이면 다음 영업일(금요일)에 지급하고 |
 
 ## 13. 알림
 

@@ -12,6 +12,7 @@ export * from './notifications';
 export * from './owner-fault';
 export * from './pricing';
 export * from './refund';
+export * from './settlement';
 export * from './slot-time';
 export * from './slot-window';
 export * from './terms';
