@@ -4,16 +4,14 @@
 // - 원장님(정민석 ①②③ 화면): createSlotWindows, getLastWindowSettings, closeSlotWindow
 // - 고객(정찬형 시간대 상세 [예약하기]): holdWindowSlot
 //
-// 지금은 가짜 결과 버전이다. 로그인·내 샵·입점 승인 확인과 입력 확인(rules.ts, 매물 등록과 같은 계산)은 진짜이고,
-// 저장·마감·홀딩은 하지 않는다. DEV_FAKE_SLOT_WINDOWS=on(로컬 개발)이면 원장님 등록·마감은 확인을 통과했을 때 저장한 것처럼
-// 결과만 돌려주고, 지난 설정과 고객 쪽 가짜 시간대가 보인다. 실패는 DEV_FAKE_SLOT_WINDOWS_FAILURE로 흉내 낸다(fake.ts).
-// 스위치가 꺼진 곳(배포 주소)에서는 확인까지만 하고 NOT_OPEN "시간대 매물은 곧 열려요"로 끝난다. 저장하지 않으면서 성공을 돌려주지 않는다
-// 진짜 버전은 slot_windows에 저장하고 [예약하기]에서 매물 한 칸을 만들어 홀딩한다(결과 모양은 그대로)
+// 원장님 함수는 진짜 버전이다(①): 시간대 표에 저장·읽기·마감한다. 실패는 DEV_FAKE_SLOT_WINDOWS_FAILURE로 흉내 낼 수 있다(fake.ts).
+// [예약하기]는 아직 가짜 결과 버전이다. 서비스·시각이 맞는지까지 확인하고 홀딩하지 않는다(진짜 버전 ③에서 매물 한 칸을 만들어 홀딩한다)
 
 import { z } from 'zod';
 
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
+import { violatedConstraint } from '@/lib/db-error';
 import { ok } from '@/lib/result';
 import { requireCustomer, requireShopOwner } from '@/server/auth';
 import { paymentFail, type PaymentResult } from '@/server/payments/errors';
@@ -21,9 +19,15 @@ import type { HoldInfo } from '@/server/payments/types';
 import { assertShopApproved } from '@/server/shops';
 
 import { type SlotWindowResult, slotWindowFail } from './errors';
-import { buildFakeWindow, FAKE_DISCOUNT_RATE, fakeWindowFailure, fakeWindowsOn } from './fake';
+import { buildFakeWindow, fakeWindowFailure, fakeWindowsOn } from './fake';
 import { checkWindowDraft } from './rules';
-import { readShopBusyRanges, readWindowShop } from './store';
+import {
+  closeWindow,
+  insertSlotWindows,
+  readLastWindowSettings,
+  readShopBusyRanges,
+  readWindowShop,
+} from './store';
 import type {
   CreatedSlotWindow,
   CreateSlotWindowsInput,
@@ -46,7 +50,7 @@ const createSchema = z.object({
 
 /**
  * 원장님 ③ 확인 → [등록하기]. 켜진 묶음마다 시간대 하나로 저장한다(전부 저장하거나 하나도 저장하지 않는다).
- * 가짜 버전은 확인만 하고 저장하지 않는다. 스위치가 켜져 있으면 결과(시간대 id는 새로 만든 값), 꺼져 있으면 NOT_OPEN
+ * 확인(rules.ts) 뒤에 다른 요청이 같은 시간을 먼저 저장했으면 DB 제약이 막고 WINDOW_OVERLAP
  */
 export async function createSlotWindows(
   shopId: string,
@@ -80,36 +84,44 @@ export async function createSlotWindows(
     now,
   });
   if (!checked.ok) return slotWindowFail(checked.code);
-  if (!fakeWindowsOn()) return slotWindowFail('NOT_OPEN');
 
-  return ok({
-    windows: checked.windows.map((window) => ({
-      windowId: crypto.randomUUID(),
-      startAt: window.start.toISOString(),
-      endAt: window.end.toISOString(),
-      publishAt: window.publishAt.toISOString(),
-      status: window.status,
-    })),
-  });
+  try {
+    const saved = await db.transaction((tx) =>
+      insertSlotWindows(tx, {
+        shopId,
+        createdBy: auth.data.userId,
+        newCustomerOnly: parsed.data.newCustomerOnly,
+        windows: checked.windows,
+        menus: checked.menus,
+      }),
+    );
+    return ok({
+      windows: saved.map((window) => ({
+        windowId: window.id,
+        startAt: window.startAt.toISOString(),
+        endAt: window.endAt.toISOString(),
+        publishAt: window.publishAt.toISOString(),
+        status: window.status,
+      })),
+    });
+  } catch (error) {
+    if (violatedConstraint(error) === 'slot_windows_no_overlap') {
+      return slotWindowFail('WINDOW_OVERLAP');
+    }
+    throw error;
+  }
 }
 
 /**
- * 원장님 ① 처음 열 때 채워 둘 설정: 그 샵이 마지막으로 올린 시간대의 서비스·할인율(지금 숨긴 메뉴는 뺀다). 올린 적 없으면 null.
- * 가짜 버전은 DEV_FAKE_SLOT_WINDOWS=on이면 내 샵의 숨기지 않은 메뉴 두 개를 30%로 준다
+ * 원장님 ① 처음 열 때 채워 둘 설정: 그 샵이 마지막으로 올린 시간대의 서비스·할인율(지금 숨긴 메뉴는 뺀다).
+ * 올린 적 없거나 남은 서비스가 없으면 null
  */
 export async function getLastWindowSettings(
   shopId: string,
 ): Promise<SlotWindowResult<LastWindowSettings | null>> {
   const auth = await requireShopOwner(shopId);
   if (!auth.ok) return auth;
-  if (!fakeWindowsOn()) return ok(null);
-  const shop = await readWindowShop(getDb(), shopId);
-  const visible = shop?.menus.filter((menu) => !menu.hidden).slice(0, 2) ?? [];
-  if (visible.length === 0) return ok(null);
-  return ok({
-    menus: visible.map((menu) => ({ menuId: menu.id, discountRate: FAKE_DISCOUNT_RATE })),
-    newCustomerOnly: false,
-  });
+  return ok(await readLastWindowSettings(getDb(), shopId));
 }
 
 const closeSchema = z.object({
@@ -119,8 +131,8 @@ const closeSchema = z.object({
 });
 
 /**
- * 원장님 시간대 [마감](사유 기록). 안의 결제가 끝난 예약은 그대로다.
- * 가짜 버전은 저장하지 않는다. 스위치가 켜져 있으면 마감 시각, 꺼져 있으면 NOT_OPEN
+ * 원장님 시간대 [마감](사유 기록). 안에서 결제가 끝난 예약과 지금 결제 중인 칸은 그대로다(#308 질문 1, 추천안).
+ * 없거나 남의 시간대면 WINDOW_NOT_FOUND, 이미 마감했거나 시간이 지났으면 WINDOW_CLOSED
  */
 export async function closeSlotWindow(
   shopId: string,
@@ -132,8 +144,14 @@ export async function closeSlotWindow(
   if (!parsed.success) return slotWindowFail('INVALID_INPUT');
   const switched = fakeWindowFailure('closeSlotWindow');
   if (switched) return switched;
-  if (!fakeWindowsOn()) return slotWindowFail('NOT_OPEN');
-  return ok({ closedAt: (await getRequestNow()).toISOString() });
+  const closed = await closeWindow(getDb(), {
+    shopId,
+    windowId: parsed.data.windowId,
+    reason: parsed.data.reason,
+    now: await getRequestNow(),
+  });
+  if (!closed.ok) return slotWindowFail(closed.code);
+  return ok({ closedAt: closed.closedAt.toISOString() });
 }
 
 const holdSchema = z.object({
