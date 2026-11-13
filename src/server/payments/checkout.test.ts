@@ -222,7 +222,7 @@ vi.mock('./hold-store', () => ({
     state.acquireCalls.push({ tx, input });
     return state.acquireOverride ?? memoryAcquire(input);
   },
-  releaseMyHold: async (_db: unknown, input: { slotId: string; customerId: string }) => {
+  releaseMyHold: async (_db: unknown, input: { slotId: string; customerId: string; now: Date }) => {
     state.releaseCalls.push(input);
     const slot = state.slots.get(input.slotId);
     if (slot?.holdCustomerId !== input.customerId) return false;
@@ -361,7 +361,7 @@ describe('releaseHold', () => {
   it('내 홀딩을 바로 풀고, 이미 풀렸어도 성공', async () => {
     await holdSlot(SLOT);
     expect(await releaseHold(SLOT)).toEqual(ok(null));
-    expect(state.releaseCalls).toEqual([{ slotId: SLOT, customerId: ME }]);
+    expect(state.releaseCalls).toEqual([{ slotId: SLOT, customerId: ME, now: NOW }]);
     expect(await getMyHold(SLOT)).toEqual(ok(null));
     expect(await releaseHold(SLOT)).toEqual(ok(null));
     expect((await holdSlot(OTHER_SLOT)).ok).toBe(true);

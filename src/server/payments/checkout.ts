@@ -110,14 +110,21 @@ export async function holdSlot(slotId: string): Promise<PaymentResult<HoldInfo>>
   return ok(holdInfo(id.data, outcome.holdExpiresAt, now));
 }
 
-/** 예약 확인 화면의 '취소'. 내 홀딩을 바로 푼다. 이미 풀렸거나 내 홀딩이 아니어도 성공(두 번 눌러도 된다) */
+/**
+ * 예약 확인 화면의 '취소'. 내 홀딩을 바로 푼다. 이미 풀렸거나 내 홀딩이 아니어도 성공(두 번 눌러도 된다).
+ * 시간대 안에서 만든 칸은 바로 닫혀서 그 시간이 다시 열린다(#308 ③)
+ */
 export async function releaseHold(slotId: string): Promise<PaymentResult<null>> {
   const auth = await requireCustomer();
   if (!auth.ok) return auth;
   const id = slotIdSchema.safeParse(slotId);
   if (!id.success) return ok(null);
 
-  await releaseMyHold(getDb(), { slotId: id.data, customerId: auth.data.customerId });
+  await releaseMyHold(getDb(), {
+    slotId: id.data,
+    customerId: auth.data.customerId,
+    now: await getRequestNow(),
+  });
   return ok(null);
 }
 

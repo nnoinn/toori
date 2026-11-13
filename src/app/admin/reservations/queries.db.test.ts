@@ -4,7 +4,7 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
-import { customers, disputes, refunds, shops, slots } from '@/db/schema';
+import { customers, disputes, refunds, shops, slots, slotWindows } from '@/db/schema';
 
 import {
   createTestCustomer,
@@ -171,6 +171,33 @@ describeDb('매물·예약 조회 (실제 DB)', () => {
         const { rows } = await selectSlots(tx, { filter, query: menuName, now: BEFORE_START });
         expect(rows.map((row) => row.slotId)).toEqual([mistake.id]);
       }
+    });
+  });
+
+  it('손님이 결제 중인 시간대 칸(아직 예약 전)은 보이지 않고, 결제가 끝난 시간대 칸은 보인다(#308 ③)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const menuName = unique('시간대');
+      const [window] = await tx
+        .insert(slotWindows)
+        .values({
+          shopId: shop.shopId,
+          startAt: new Date('2026-11-01T13:00:00+09:00'),
+          endAt: new Date('2026-11-01T18:00:00+09:00'),
+          publishAt: new Date('2026-10-30T10:00:00+09:00'),
+          status: 'published',
+          createdBy: shop.createdBy,
+        })
+        .returning({ id: slotWindows.id });
+      const [, reserved] = await tx
+        .insert(slots)
+        .values([
+          testSlot(shop, '13:00', '14:00', { menuName, windowId: window.id }),
+          testSlot(shop, '14:00', '15:00', { menuName, windowId: window.id, status: 'reserved' }),
+        ])
+        .returning();
+      const { rows } = await selectSlots(tx, { filter: 'all', query: menuName, now: BEFORE_START });
+      expect(rows.map((row) => row.slotId)).toEqual([reserved.id]);
     });
   });
 

@@ -9,8 +9,7 @@ import { kstToUtc } from '@/lib/time';
 
 import type { ShopMenu } from './rules';
 import type { Range } from './starts';
-import type { OpenWindow } from './store';
-import type { WindowMenuRow } from './view';
+import type { WindowHoldOutcome } from './hold-store';
 
 const SHOP = '5d6e7f80-9a1b-4c2d-8e3f-405162738495';
 const WINDOW_ID = '6e7f8091-a2b3-4c4d-9e5f-60718293a4b5';
@@ -48,9 +47,9 @@ const state = vi.hoisted(() => ({
   menus: [] as ShopMenu[],
   busy: [] as Range[],
   occupied: [] as Range[],
-  openWindow: null as OpenWindow | null,
-  openReads: [] as unknown[],
-  windowMenus: [] as WindowMenuRow[],
+  holdCalls: [] as unknown[],
+  holdOutcome: null as WindowHoldOutcome | null,
+  holdError: null as unknown,
   inserted: [] as unknown[],
   insertError: null as unknown,
   closed: [] as unknown[],
@@ -70,11 +69,6 @@ vi.mock('./store', () => ({
   readWindowShop: async () => ({ businessHours: [], menus: state.menus }),
   readShopBusyRanges: async () => state.busy,
   readOccupiedRanges: async () => state.occupied,
-  readOpenWindow: async (_db: unknown, input: unknown) => {
-    state.openReads.push(input);
-    return state.openWindow;
-  },
-  readWindowMenus: async () => new Map([[WINDOW_ID, state.windowMenus]]),
   // 목록·상세 읽기는 queries.db.test.ts가 실제 DB로 본다
   readAreaWindows: async () => [],
   readOccupiedRangesByShop: async () => new Map(),
@@ -99,6 +93,15 @@ vi.mock('./store', () => ({
   },
 }));
 
+vi.mock('./hold-store', () => ({
+  // 홀딩 저장(칸 만들기·한 사람 한 개·결제 없이 끝난 칸 닫기)은 hold-store.db.test.ts가 실제 DB로 본다
+  acquireWindowHold: async (tx: unknown, input: unknown) => {
+    state.holdCalls.push({ tx, input });
+    if (state.holdError) throw state.holdError;
+    return state.holdOutcome;
+  },
+}));
+
 const { closeSlotWindow, createSlotWindows, getLastWindowSettings, holdWindowSlot } =
   await import('./actions');
 
@@ -114,24 +117,9 @@ beforeEach(() => {
   state.menus = [CUT, PERM];
   state.busy = [];
   state.occupied = [];
-  state.openWindow = {
-    windowId: WINDOW_ID,
-    shopId: SHOP,
-    startAt: at('13:00', 13),
-    endAt: at('18:00', 13),
-    newCustomerOnly: false,
-  };
-  state.openReads = [];
-  state.windowMenus = [CUT, PERM].map((menu) => ({
-    menuId: menu.id,
-    serviceType: menu.serviceType,
-    name: menu.name,
-    description: menu.description,
-    durationMinutes: menu.durationMinutes,
-    listPrice: menu.listPrice,
-    discountRate: 30,
-    salePrice: menu.listPrice * 0.7,
-  }));
+  state.holdCalls = [];
+  state.holdOutcome = { ok: true, slotId: 'slot-1', holdExpiresAt: at('12:10') };
+  state.holdError = null;
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
@@ -288,50 +276,71 @@ describe('getLastWindowSettings·closeSlotWindow (원장님)', () => {
 });
 
 describe('holdWindowSlot (고객)', () => {
-  const hold = (startAt: string, menuId = CUT.id) =>
+  const hold = (startAt = at('14:00', 13).toISOString(), menuId = CUT.id) =>
     holdWindowSlot({ windowId: WINDOW_ID, menuId, startAt });
 
-  it('그 고객 계정으로 볼 수 있는 시간대인지 확인하고, 볼 수 없으면(없음·마감·기존 고객에게 신규 고객 전용) SLOT_NOT_AVAILABLE', async () => {
-    state.openWindow = null;
-    expect(await hold(at('14:00', 13).toISOString())).toMatchObject({
-      ok: false,
-      error: { code: 'SLOT_NOT_AVAILABLE' },
-    });
-    expect(state.openReads).toEqual([{ windowId: WINDOW_ID, customerId: 'customer-1', now: NOW }]);
+  it('그 고객 계정·서버 시각으로 한 트랜잭션에서 홀딩하고, 매물 id·만료 시각·서버 시각을 준다', async () => {
+    expect(await hold()).toEqual(
+      ok({
+        slotId: 'slot-1',
+        holdExpiresAt: at('12:10').toISOString(),
+        serverNow: NOW.toISOString(),
+      }),
+    );
+    expect(state.holdCalls).toEqual([
+      {
+        tx: 'tx',
+        input: {
+          windowId: WINDOW_ID,
+          menuId: CUT.id,
+          startAt: at('14:00', 13),
+          customerId: 'customer-1',
+          now: NOW,
+        },
+      },
+    ]);
   });
 
-  it('고를 수 없는 시각이면 TIME_TAKEN, 시간대에 없는 서비스면 SLOT_NOT_AVAILABLE', async () => {
-    state.occupied = [{ start: at('13:00', 13), end: at('14:00', 13) }];
-    expect(await hold(at('13:00', 13).toISOString())).toMatchObject({
+  it('홀딩하지 못한 이유를 실패 코드로: 한 사람 한 개는 홀딩 중인 매물 id를 같이 준다', async () => {
+    state.holdOutcome = { ok: false, code: 'ALREADY_HOLDING', heldSlotId: 'slot-9' };
+    expect(await hold()).toMatchObject({
+      ok: false,
+      error: { code: 'ALREADY_HOLDING', heldSlotId: 'slot-9' },
+    });
+    for (const code of ['SLOT_NOT_AVAILABLE', 'NEW_CUSTOMER_ONLY', 'TIME_TAKEN'] as const) {
+      state.holdOutcome = { ok: false, code };
+      expect(await hold(), code).toMatchObject({ ok: false, error: { code } });
+    }
+  });
+
+  it('확인 뒤 다른 손님이 같은 시간을 먼저 홀딩해서 DB가 막으면(slots_no_overlap) TIME_TAKEN, 다른 오류는 그대로 던진다', async () => {
+    state.holdError = Object.assign(new Error('겹침'), { constraint_name: 'slots_no_overlap' });
+    expect(await hold()).toMatchObject({
       ok: false,
       error: {
         code: 'TIME_TAKEN',
         message: '방금 다른 고객이 그 시간을 골랐어요. 다른 시각을 골라 주세요',
       },
     });
-    // 펌 3시간은 16:00에 시작하면 시간대 끝(18:00)을 넘는다
-    expect(await hold(at('16:00', 13).toISOString(), PERM.id)).toMatchObject({
-      ok: false,
-      error: { code: 'TIME_TAKEN' },
-    });
-    expect(
-      await hold(at('14:00', 13).toISOString(), '44444444-4444-4444-8444-444444444444'),
-    ).toMatchObject({ ok: false, error: { code: 'SLOT_NOT_AVAILABLE' } });
+    state.holdError = new Error('연결 끊김');
+    await expect(hold()).rejects.toThrow('연결 끊김');
   });
 
-  it('고를 수 있는 시각이어도 아직 홀딩하지 않고 곧 열린다고 안내한다(진짜 버전 ③ 전)', async () => {
-    expect(await hold(at('14:00', 13).toISOString())).toEqual({
+  it('입력 모양이 틀리면 홀딩하지 않고 SLOT_NOT_AVAILABLE, 로그인 실패는 그대로', async () => {
+    expect(await hold('어제')).toMatchObject({ ok: false, error: { code: 'SLOT_NOT_AVAILABLE' } });
+    expect(await hold(undefined, 'menu')).toMatchObject({
       ok: false,
-      error: { code: 'SLOT_NOT_AVAILABLE', message: '시간대 예약은 곧 열려요' },
+      error: { code: 'SLOT_NOT_AVAILABLE' },
     });
+    state.customer = fail('WRONG_MODE', '고객 계정으로 바꿔서 이용해 주세요');
+    expect(await hold()).toMatchObject({ ok: false, error: { code: 'WRONG_MODE' } });
+    expect(state.holdCalls).toEqual([]);
   });
 
   it('실패 흉내 스위치: ALREADY_HOLDING', async () => {
     vi.stubEnv('NODE_ENV', 'development');
     vi.stubEnv('DEV_FAKE_SLOT_WINDOWS_FAILURE', 'holdWindowSlot:ALREADY_HOLDING');
-    expect(await hold(at('14:00', 13).toISOString())).toMatchObject({
-      ok: false,
-      error: { code: 'ALREADY_HOLDING' },
-    });
+    expect(await hold()).toMatchObject({ ok: false, error: { code: 'ALREADY_HOLDING' } });
+    expect(state.holdCalls).toEqual([]);
   });
 });

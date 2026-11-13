@@ -3,22 +3,7 @@
 
 import 'server-only';
 
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  gt,
-  inArray,
-  isNotNull,
-  isNull,
-  lt,
-  lte,
-  not,
-  or,
-  type SQL,
-  sql,
-} from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, lt, lte, not, type SQL, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { menus, shopImages, shops, slots, slotWindowMenus, slotWindows } from '@/db/schema';
@@ -28,7 +13,7 @@ import { newCustomerOnlyVisible } from '@/server/customers';
 import type { ServiceType, ShopCategory } from '@/server/policy';
 import { customerVisibleShop } from '@/server/shops/visibility';
 
-import { shopInArea, type WindowArea } from './conditions';
+import { shopInArea, staleWindowHold, type WindowArea } from './conditions';
 import type { ShopMenu, WindowDraft, WindowMenuDraft } from './rules';
 import type { Range } from './starts';
 import type { LastWindowSettings, SlotWindowShop } from './types';
@@ -109,7 +94,7 @@ export async function readShopBusyRanges(
 
 /**
  * 고객에게 시작 시각을 줄 때 이미 차 있는 시간: 그 샵들의 [from, to)와 겹치는 예약대기·게시중·예약됨 매물(샵별).
- * 단, 시간대 안에서 손님이 만든 매물이 게시중인데 홀딩이 끝났으면(결제 없이 끝남) 비어 있는 것으로 본다(#308 ④)
+ * 단, 결제 없이 홀딩이 끝난 시간대 칸은 비어 있는 것으로 본다(staleWindowHold, 결제 대기 주문이 있으면 막는다, #308 ③)
  */
 export async function readOccupiedRangesByShop(
   db: DbReader,
@@ -118,12 +103,6 @@ export async function readOccupiedRangesByShop(
   const result = new Map<string, Range[]>();
   const shopIds = [...new Set(input.shopIds)];
   if (shopIds.length === 0) return result;
-  const releasedHold: SQL = and(
-    isNotNull(slots.windowId),
-    eq(slots.status, 'published'),
-    // lte()로 비교해야 시각이 컬럼 형식으로 바뀐다(sql``에 Date를 바로 넣으면 드라이버가 받지 못한다)
-    or(isNull(slots.holdExpiresAt), lte(slots.holdExpiresAt, input.now)),
-  )!;
   const rows = await db
     .select({ shopId: slots.shopId, start: slots.startAt, end: slots.endAt })
     .from(slots)
@@ -133,7 +112,7 @@ export async function readOccupiedRangesByShop(
         inArray(slots.status, BLOCKING_SLOT_STATUSES),
         lt(slots.startAt, input.to),
         gt(slots.endAt, input.from),
-        not(releasedHold),
+        not(staleWindowHold(input.now)),
       ),
     );
   for (const { shopId, ...range } of rows) {

@@ -5,7 +5,7 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
-import { slots } from '@/db/schema';
+import { slots, slotWindows } from '@/db/schema';
 
 import {
   createTestCustomer,
@@ -171,11 +171,45 @@ describeDb('10분 홀딩 저장 (실제 DB)', () => {
       const slotId = await insertSlot(tx, shop, '10:00', '11:00');
       await acquireHold(tx, { slotId, customerId: me.customerId, now: NOW });
 
-      expect(await releaseMyHold(tx, { slotId, customerId: other.customerId })).toBe(false);
+      expect(await releaseMyHold(tx, { slotId, customerId: other.customerId, now: NOW })).toBe(
+        false,
+      );
       expect((await holdOf(tx, slotId)).customerId).toBe(me.customerId);
-      expect(await releaseMyHold(tx, { slotId, customerId: me.customerId })).toBe(true);
+      expect(await releaseMyHold(tx, { slotId, customerId: me.customerId, now: NOW })).toBe(true);
       expect(await holdOf(tx, slotId)).toEqual({ customerId: null, expiresAt: null });
-      expect(await releaseMyHold(tx, { slotId, customerId: me.customerId })).toBe(false);
+      expect(await releaseMyHold(tx, { slotId, customerId: me.customerId, now: NOW })).toBe(false);
+    });
+  });
+  it('시간대 안에서 만든 칸은 풀면 홀딩만 비우지 않고 마감(hold_released)으로 닫는다(#308 ③)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const me = await createTestCustomer(tx);
+      const [window] = await tx
+        .insert(slotWindows)
+        .values({
+          shopId: shop.shopId,
+          startAt: new Date('2026-11-01T13:00:00+09:00'),
+          endAt: new Date('2026-11-01T18:00:00+09:00'),
+          publishAt: new Date('2026-10-30T10:00:00+09:00'),
+          status: 'published',
+          createdBy: shop.createdBy,
+        })
+        .returning({ id: slotWindows.id });
+      const slotId = await insertSlot(tx, shop, '13:00', '14:00', {
+        windowId: window.id,
+        holdCustomerId: me.customerId,
+        holdExpiresAt: at(10),
+      });
+
+      expect(await releaseMyHold(tx, { slotId, customerId: me.customerId, now: at(2) })).toBe(true);
+      const [row] = await tx
+        .select({ status: slots.status, closeReason: slots.closeReason, closedAt: slots.closedAt })
+        .from(slots)
+        .where(eq(slots.id, slotId));
+      expect(row).toEqual({ status: 'closed', closeReason: 'hold_released', closedAt: at(2) });
+      expect(await releaseMyHold(tx, { slotId, customerId: me.customerId, now: at(3) })).toBe(
+        false,
+      );
     });
   });
   it('지금 내 홀딩: 살아 있는 내 홀딩만 샵 이름·서비스·시작 시각과 함께 읽고, 끝났거나 남의 홀딩·예약된 매물은 없다', async () => {

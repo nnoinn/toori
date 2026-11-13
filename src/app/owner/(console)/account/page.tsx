@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: '내 계정' };
 const PAGE_PATH = '/owner/account';
 
 // 원장님 내 계정 (#307, O12 원장님 알림 받기 S-404). 고객 화면의 '내 정보'처럼 계정과 설정을 한곳에서 다룬다.
-// 로그인 계정, 이 기기에서 알림 받기, 고객센터(카카오톡 채널), 로그아웃.
+// 로그인 계정, 이 기기 푸시 알림(기기에 소리·배너로 뜨는 알림, #371 11/13 이름), 고객센터(카카오톡 채널), 로그아웃.
 // 계정 바꾸기 버튼은 두지 않는다(11/10 nnoinn): 같은 메일이어도 고객·원장님 계정은 별개라서,
 // 다른 계정으로 가려면 로그아웃한 뒤 로그인 화면에서 고른다. PC 기준
 export default function OwnerAccountPage() {
@@ -26,7 +26,7 @@ export default function OwnerAccountPage() {
     <OwnerPage
       title="내 계정"
       width="narrow"
-      description="로그인한 계정과 이 기기의 알림을 관리해요."
+      description="로그인한 계정과 이 기기의 푸시 알림을 관리해요."
     >
       <Suspense fallback={<LoadingCards count={3} />}>
         <AccountContent />
@@ -57,7 +57,7 @@ async function AccountContent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>알림</CardTitle>
+          <CardTitle>푸시 알림</CardTitle>
         </CardHeader>
         <CardContent>
           <PushSwitch description={OWNER_PUSH_DESCRIPTION} installSteps={OWNER_IOS_INSTALL_STEPS} />

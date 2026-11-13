@@ -22,7 +22,7 @@ import {
   type VisitResult,
 } from '@/db/schema';
 import { slotStatusIs } from '@/features/slot-status/slot-status-sql';
-import { notHoldReleasedSlot } from '@/server/slots/visibility';
+import { ownerListedSlot } from '@/server/slots/visibility';
 
 import { ADMIN_LIST_LIMIT, containsPattern, type ListResult, toListResult } from '../lookup';
 import type { ReservationFilter, SlotFilter } from './format';
@@ -120,7 +120,8 @@ export type SlotRow = {
 
 /**
  * 매물 목록(시작 시각이 늦은 순). 샵 이름·메뉴 이름 일부로 찾는다. 상태는 지금 시각으로 계산한 상태로 거른다.
- * 손님이 시간대 안에서 만들었다가 결제 없이 비운 칸(hold_released)은 어느 상태로 걸러도 보이지 않는다(#308 ④)
+ * 손님이 시간대 안에서 만들었다가 결제 없이 비운 칸(hold_released)과 아직 결제 중인 시간대 칸은 어느 상태로 걸러도
+ * 보이지 않는다(#308 ③④, ownerListedSlot). 결제가 끝난 시간대 칸은 예약으로 보인다
  */
 export async function selectSlots(
   db: DbReader,
@@ -149,7 +150,7 @@ export async function selectSlots(
     })
     .from(slots)
     .innerJoin(shops, eq(shops.id, slots.shopId))
-    .where(and(notHoldReleasedSlot(), status, search))
+    .where(and(ownerListedSlot(), status, search))
     .orderBy(desc(slots.startAt), asc(slots.id))
     .limit(ADMIN_LIST_LIMIT + 1);
   // DB의 check 제약이 6가지 상태만 허용한다
