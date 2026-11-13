@@ -82,7 +82,7 @@ export function SlotDetailView({
         returnPath={`/slots/${slot.slotId}`}
       />
 
-      <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 mx-auto w-full max-w-[480px] border-t bg-background p-3 md:hidden">
+      <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom)+var(--hold-bar-h,0px))] z-20 mx-auto w-full max-w-[480px] border-t bg-background p-3 md:hidden">
         <ReserveButton slotId={slot.slotId} availability={slot.availability} />
       </div>
     </article>
