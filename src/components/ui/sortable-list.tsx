@@ -14,8 +14,10 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import {
+  rectSortingStrategy,
   SortableContext,
   sortableKeyboardCoordinates,
+  type SortingStrategy,
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
@@ -26,6 +28,7 @@ import { GripVertical } from 'lucide-react';
 import {
   handleLabel,
   reorderIds,
+  SORTABLE_GRID_INSTRUCTIONS,
   SORTABLE_INSTRUCTIONS,
   SORTABLE_ROLE_DESCRIPTION,
   sortableTexts,
@@ -47,9 +50,38 @@ import {
 //       <div className="flex items-center gap-2">{handle}<span>{menu.name}</span></div>
 //     )}
 //   />
+//
+// 사진처럼 여러 칸으로 놓을 때는 layout="grid"와 칸 수를 준다(어느 쪽으로든 끌고, 키보드는 ↑↓←→):
+//   <SortableList layout="grid" className="grid-cols-3 gap-4" ... />
 
 /** 위아래로만 움직인다(옆으로 흔들리지 않게) */
 const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
+
+type SortableLayout = 'list' | 'grid';
+
+/** 세로 목록은 위아래로만, 여러 칸은 어느 쪽으로든 움직인다 */
+const LAYOUTS: Record<
+  SortableLayout,
+  {
+    strategy: SortingStrategy;
+    modifiers: Modifier[];
+    instructions: string;
+    className: string;
+  }
+> = {
+  list: {
+    strategy: verticalListSortingStrategy,
+    modifiers: [verticalOnly],
+    instructions: SORTABLE_INSTRUCTIONS,
+    className: 'flex flex-col gap-2',
+  },
+  grid: {
+    strategy: rectSortingStrategy,
+    modifiers: [],
+    instructions: SORTABLE_GRID_INSTRUCTIONS,
+    className: 'grid gap-2',
+  },
+};
 
 type SortableListProps<T> = {
   items: readonly T[];
@@ -62,6 +94,8 @@ type SortableListProps<T> = {
   renderItem: (item: T, handle: React.ReactNode) => React.ReactNode;
   /** 저장하는 동안처럼 잠시 끌지 못하게 할 때 */
   disabled?: boolean;
+  /** 'list'(기본): 세로 한 줄씩. 'grid': 여러 칸(칸 수는 className의 grid-cols-*로) */
+  layout?: SortableLayout;
   className?: string;
 };
 
@@ -72,8 +106,10 @@ export function SortableList<T>({
   onReorder,
   renderItem,
   disabled = false,
+  layout = 'list',
   className,
 }: SortableListProps<T>) {
+  const look = LAYOUTS[layout];
   // 서버와 브라우저가 같은 id를 쓰게 한다(안내 문구를 잇는 aria-describedby가 hydration 경고를 내지 않게)
   const dndId = React.useId();
   const sensors = useSensors(
@@ -115,15 +151,15 @@ export function SortableList<T>({
       id={dndId}
       sensors={sensors}
       collisionDetection={closestCenter}
-      modifiers={[verticalOnly]}
+      modifiers={look.modifiers}
       onDragEnd={handleDragEnd}
       accessibility={{
         announcements,
-        screenReaderInstructions: { draggable: SORTABLE_INSTRUCTIONS },
+        screenReaderInstructions: { draggable: look.instructions },
       }}
     >
-      <SortableContext items={ids} strategy={verticalListSortingStrategy} disabled={disabled}>
-        <ul data-slot="sortable-list" className={cn('flex flex-col gap-2', className)}>
+      <SortableContext items={ids} strategy={look.strategy} disabled={disabled}>
+        <ul data-slot="sortable-list" className={cn(look.className, className)}>
           {items.map((item) => (
             <SortableRow
               key={getId(item)}

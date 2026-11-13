@@ -3,7 +3,6 @@
 // 메뉴·가격표 서버 함수 (O3, S-106). 화면(menu-manager.tsx)에서 부른다.
 // 승인 전에도 메뉴를 만들 수 있다(#23 D11). 지우기 대신 숨김만 있다(D12).
 
-import { TransactionRollbackError } from 'drizzle-orm';
 import { refresh } from 'next/cache';
 import { isUuid } from '@/lib/uuid';
 
@@ -14,9 +13,10 @@ import { requireShopOwner } from '@/server/auth';
 
 import { type MenuFieldErrors, validateMenu } from './menu';
 import { isServiceTypeOf } from '@/server/policy';
+import { isIdList } from '../reorder';
 import {
   insertMenu,
-  moveMenu as moveMenuInDb,
+  saveMenuOrder,
   selectMenu,
   selectShopCategory,
   setMenuHidden as setMenuHiddenInDb,
@@ -24,6 +24,8 @@ import {
 } from './menu-store';
 
 const MENU_NOT_FOUND = '메뉴를 찾을 수 없어요';
+const MENU_ORDER_CHANGED =
+  '그사이 메뉴 목록이 바뀌어서 순서를 저장하지 못했어요. 지금 목록에서 다시 옮겨 주세요';
 
 export type SaveMenuResponse =
   { ok: true } | { ok: false; error: ResultError & { fieldErrors?: MenuFieldErrors } };
@@ -91,28 +93,17 @@ export async function setMenuHidden(
   return ok(null);
 }
 
-/** 보이는 메뉴를 한 칸 위·아래로 옮긴다 */
-export async function moveMenu(
-  shopId: string,
-  menuId: string,
-  direction: 'up' | 'down',
-): Promise<Result<null>> {
+/**
+ * 보이는 메뉴를 끌어 놓은 전체 순서(menuIds)로 저장한다(#358 2번).
+ * 그사이 목록이 바뀌었으면 저장하지 않고 화면을 지금 목록으로 새로 그린다
+ */
+export async function reorderMenus(shopId: string, menuIds: unknown): Promise<Result<null>> {
   const auth = await requireShopOwner(shopId);
   if (!auth.ok) return auth;
-  if (!isUuid(menuId) || (direction !== 'up' && direction !== 'down')) {
-    return fail('MENU_NOT_FOUND', MENU_NOT_FOUND);
-  }
+  if (!isIdList(menuIds)) return fail('MENU_ORDER_CHANGED', MENU_ORDER_CHANGED);
 
-  let moved = false;
-  try {
-    await getDb().transaction(async (tx) => {
-      moved = await moveMenuInDb(tx, shopId, menuId, direction);
-      if (!moved) tx.rollback();
-    });
-  } catch (error) {
-    if (!(error instanceof TransactionRollbackError)) throw error;
-  }
-  if (!moved) return fail('MENU_NOT_FOUND', MENU_NOT_FOUND);
+  // 순서를 0부터 다시 매기는 여러 줄을 한 트랜잭션으로 고친다(중간에 실패해도 순서가 반만 바뀌지 않는다)
+  const saved = await getDb().transaction((tx) => saveMenuOrder(tx, shopId, menuIds));
   refresh();
-  return ok(null);
+  return saved ? ok(null) : fail('MENU_ORDER_CHANGED', MENU_ORDER_CHANGED);
 }
