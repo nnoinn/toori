@@ -5,6 +5,7 @@ import { ChevronDown, ExternalLink, ImageOff, MapPin, Navigation, Phone } from '
 
 import { BackButton } from '@/components/ui/back-button';
 import { buttonVariants } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { ShopLocationMap } from '@/features/map/shop-location-map';
 import { CUSTOMER_HOME } from '@/server/auth/paths';
 import { NO_SHOW_PENALTY_RATE, OWNER_FAULT_COUPON_AMOUNT, REFUND_BANDS } from '@/server/policy';
@@ -64,7 +65,7 @@ export function DetailTop({
 export function RefundPolicyDetails() {
   const refundNotes = refundPolicyNotes(OWNER_FAULT_COUPON_AMOUNT);
   return (
-    <details className="group rounded-xl border px-3 py-2 text-sm">
+    <details className="group rounded-xl bg-muted/60 px-3 py-2 text-sm">
       <summary className="flex cursor-pointer list-none items-center justify-between font-medium">
         환불 규정
         <ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden />
@@ -108,9 +109,11 @@ export function ShopInfoSection({
   const tel = telHref(shop.phone);
 
   return (
-    <section
-      className="flex flex-col gap-3 border-t px-4 py-4 md:col-start-1 md:row-start-2 md:mt-6 md:px-0"
+    // 회색 배경 위 흰 카드(#359 2번). 폰은 양옆 16px, PC는 왼쪽 칸 사진 아래
+    <Card
+      role="region"
       aria-label="샵 정보"
+      className="mx-4 gap-3 px-4 text-base md:col-start-1 md:row-start-2 md:mx-0 md:p-5"
     >
       {/* 폰에서는 찜 동의 안내가 샵 이름 옆이 아니라 아래 줄을 다 쓰게 줄을 넘긴다(favorite-button.tsx) */}
       <div className="flex items-start justify-between gap-3 max-md:flex-wrap">
@@ -185,6 +188,6 @@ export function ShopInfoSection({
           ))}
         </div>
       ) : null}
-    </section>
+    </Card>
   );
 }

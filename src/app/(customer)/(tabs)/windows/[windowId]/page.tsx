@@ -2,6 +2,7 @@ import { cache, Suspense } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { getDb } from '@/db';
@@ -68,13 +69,13 @@ async function DetailContent({ params }: { params: Params }) {
 
 function DetailSkeleton() {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <Skeleton className="aspect-[4/3] w-full rounded-none" />
-      <div className="flex flex-col gap-3 px-4">
+      <Card className="mx-4 gap-3 px-4">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-7 w-48" />
         <Skeleton className="h-16 w-full" />
-      </div>
+      </Card>
     </div>
   );
 }
