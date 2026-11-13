@@ -152,6 +152,7 @@ PR 검사가 자동으로 막는 것:
 | DISPUTE-05 | 돈이 오가는 결론(환불 예외·무효·원장님 귀책 취소로 바꿈)은 처리 기능이 생길 때까지 고를 수 없다(화면은 "준비 중"). 그동안 이의제기는 확인 중으로 남아 정산 보류도 그대로다 | #350 | ✅ | `src/server/disputes/rules.test.ts` 은 처리 기능이 생길 때까지 OUTCOME_NOT_READY<br>`src/server/disputes/admin.test.ts` 돈이 오가는 결론은 OUTCOME_NOT_READY |
 | DISPUTE-06 | 카카오톡 채널 건은 등록한 운영자가 꼭 있고 앱 접수는 비어 있다. 결론이면 결론 종류가 꼭 있고 확인 중이면 비어 있다(DB가 막는다) | #350 | ✅ | `src/db/disputes.db.test.ts` 카카오톡 채널 건은 등록한 운영자가 꼭 있고, 앱 접수는 비어 있어야 한다<br>`src/db/disputes.db.test.ts` 결론 종류 6개는 모두 저장된다 |
 | DISPUTE-07 | 이의제기 내용은 빈칸(공백만 있는 것 포함)만 막고, 화면에 보이지 않는 상한 5,000자까지 받는다(글자 수는 보여주지 않는다). 화면과 서버가 같은 정책 값을 쓴다 | 11/12 점검 7-4, 11/13 nnoinn | ✅ | `src/server/disputes/rules.test.ts` 앞뒤 공백을 뺀 내용이 빈칸이면 DISPUTE_CONTENT_REQUIRED<br>`src/server/disputes/rules.test.ts` 안전 상한 5,000자까지 받고 넘으면 DISPUTE_CONTENT_TOO_LONG<br>`src/server/disputes/dispute.test.ts` 내용은 한 글자부터 5,000자까지 받고<br>`tests/docs/rule-docs.test.ts` 이의제기 내용의 화면에 보이지 않는 안전 상한 |
+| DISPUTE-08 | 이의제기는 그 예약의 손님만 신청한다. 손님 접수 함수는 고객 계정으로만 부를 수 있고, 내 예약이 아니면 받지 않는다. 원장님 쪽 요청은 원장님 귀책 취소(S-409)·합의 후 취소(S-410)·운영자 무효 처리(A-108)로 받는다 | C-507·A-104·#392, 11/13 nnoinn | ✅ | `src/server/auth/require.test.ts` 원장님 모드면 WRONG_MODE<br>`src/server/disputes/dispute.test.ts` 로그인하지 않았거나 고객 계정이 아니면 그 실패를 그대로<br>`src/server/disputes/dispute.test.ts` 내 예약이 아니면 RESERVATION_NOT_FOUND |
 
 ## 12. 정산
 
