@@ -40,27 +40,35 @@ export type StepDone = Record<StepNumber, boolean>;
 
 const STEPS = ['서비스', '시간', '할인율'] as const;
 
-/** 그 단계로 갈 수 있는지. 앞 단계를 다 골라야 다음 단계를 열 수 있다 */
-export function canOpenStep(target: StepNumber, done: StepDone): boolean {
-  return target === 1 || (target === 2 && done[1]) || (target === 3 && done[2]);
+/**
+ * 그 단계로 갈 수 있는지. 앞 단계를 다 골라야 다음 단계를 열 수 있다.
+ * 시간대 매물(window/window-form.tsx, 단계 4개)도 같이 쓴다
+ */
+export function canOpenStep<N extends number>(target: N, done: Record<N, boolean>): boolean {
+  return target === 1 || done[(target - 1) as N] === true;
 }
 
-/** 단계 버튼: 앞 단계를 다 고르면 눌러서 오갈 수 있다. 고른 단계는 브랜드 색으로 채우고 ✓를 붙인다 */
-export function StepNav({
+/**
+ * 단계 버튼: 앞 단계를 다 고르면 눌러서 오갈 수 있다. 고른 단계는 브랜드 색으로 채우고 ✓를 붙인다.
+ * labels를 주면 그 단계들로 그린다(시간대 매물: 시간·서비스·할인율·확인). 없으면 한 시술 매물 3단계
+ */
+export function StepNav<N extends number = StepNumber>({
+  labels = STEPS,
   step,
   done,
   pending,
   onGoTo,
 }: {
-  step: StepNumber;
-  done: StepDone;
+  labels?: readonly string[];
+  step: N;
+  done: Record<N, boolean>;
   pending: boolean;
-  onGoTo: (target: StepNumber) => void;
+  onGoTo: (target: N) => void;
 }) {
   return (
     <ol className="flex gap-2" aria-label="등록 단계">
-      {STEPS.map((label, index) => {
-        const number = (index + 1) as StepNumber;
+      {labels.map((label, index) => {
+        const number = (index + 1) as N;
         const isDone = done[number];
         const current = step === number;
         return (
@@ -276,20 +284,7 @@ export function DiscountStep({
           ))}
         </div>
 
-        <label className="flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={newCustomerOnly}
-            onChange={(event) => onChangeNewCustomerOnly(event.target.checked)}
-            className="mt-0.5 size-4 accent-primary"
-          />
-          <span className="flex flex-col">
-            <span className="font-medium">신규 고객 전용</span>
-            <span className="text-muted-foreground">
-              우리 샵에서 결제하거나 이용한 적 없는 고객에게만 보여요
-            </span>
-          </span>
-        </label>
+        <NewCustomerOnlyField checked={newCustomerOnly} onChange={onChangeNewCustomerOnly} />
 
         {preview && discountRate !== null ? (
           <PricePreview listPrice={menu.listPrice} discountRate={discountRate} preview={preview} />
@@ -300,6 +295,32 @@ export function DiscountStep({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** 신규 고객 전용 체크(S-207). 한 시술 매물과 시간대 매물(시간대 전체에 적용)이 같이 쓴다 */
+export function NewCustomerOnlyField({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label className="flex items-start gap-2 text-sm">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="mt-0.5 size-4 accent-primary"
+      />
+      <span className="flex flex-col">
+        <span className="font-medium">신규 고객 전용</span>
+        <span className="text-muted-foreground">
+          우리 샵에서 결제하거나 이용한 적 없는 고객에게만 보여요
+        </span>
+      </span>
+    </label>
   );
 }
 
