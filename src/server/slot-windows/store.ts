@@ -6,7 +6,7 @@ import 'server-only';
 import { and, asc, desc, eq, gt, inArray, isNull, lt, lte, not, type SQL, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
-import { menus, shopImages, shops, slots, slotWindowMenus, slotWindows } from '@/db/schema';
+import { menus, owners, shopImages, shops, slots, slotWindowMenus, slotWindows } from '@/db/schema';
 import type { BusinessHours } from '@/db/schema/shops';
 import type { SlotCloseReason } from '@/db/schema/slots';
 import { newCustomerOnlyVisible } from '@/server/customers';
@@ -304,6 +304,27 @@ export async function readWindowShopProfile(
   };
 }
 
+/**
+ * 결제 없이 끝난 시간대 칸을 마감(hold_released)으로 닫고 닫은 칸을 돌려준다. windowId를 주면 그 시간대 안만 본다.
+ * 다른 손님이 그 시간대를 고를 때(acquireWindowHold)와 10분마다 결제 정리 작업이 부른다
+ */
+export async function closeStaleWindowHolds(
+  db: Pick<ReturnType<typeof getDb>, 'update'>,
+  input: { now: Date; windowId?: string },
+): Promise<{ slotId: string; windowId: string }[]> {
+  const rows = await db
+    .update(slots)
+    .set({ status: 'closed', closeReason: 'hold_released', closedAt: input.now })
+    .where(
+      and(
+        staleWindowHold(input.now),
+        input.windowId ? eq(slots.windowId, input.windowId) : undefined,
+      ),
+    )
+    .returning({ slotId: slots.id, windowId: slots.windowId });
+  return rows.map((row) => ({ slotId: row.slotId, windowId: row.windowId! }));
+}
+
 /** 저장한 시간대 하나 */
 export type SavedWindow = {
   id: string;
@@ -384,17 +405,30 @@ export async function readLastWindowSettings(
   return { menus: rows, newCustomerOnly: last.newCustomerOnly };
 }
 
+/** 마감할 때 손님이 결제 중이라 남긴 칸 */
+export type KeptSlotRow = {
+  slotId: string;
+  startAt: Date;
+  endAt: Date;
+  menuName: string;
+  holdExpiresAt: Date;
+};
+
 /**
- * 내 샵의 예약대기·게시중이고 아직 끝나지 않은 시간대를 마감한다(사유·시각 기록). 안에서 결제가 끝난 예약과 결제 중인 칸은 그대로다.
+ * 내 샵의 예약대기·게시중이고 아직 끝나지 않은 시간대를 마감한다(사유·시각 기록). 트랜잭션 안에서 부른다.
+ * 안에서 결제가 끝난 예약은 그대로이고, 결제 없이 끝난 칸은 같이 닫고(hold_released), 손님이 결제 중인 칸(홀딩이 살아 있거나
+ * 결제 확인을 기다리는 칸)은 남겨서 돌려준다(#308 ③-2, 11/13 nnoinn). 남긴 칸은 결제하면 예약으로 남고, 결제 없이 끝나면
+ * closeStaleWindowHolds가 닫는다. [예약하기]는 시간대 줄을 읽기 잠금하므로, 마감은 진행 중인 [예약하기]가 끝난 뒤에 그 칸까지 보고 남긴다.
  * 없거나 남의 시간대면 WINDOW_NOT_FOUND, 이미 마감했거나 시간이 지났으면 WINDOW_CLOSED
  */
 export async function closeWindow(
-  db: Pick<ReturnType<typeof getDb>, 'select' | 'update'>,
+  tx: Pick<ReturnType<typeof getDb>, 'select' | 'update'>,
   input: { shopId: string; windowId: string; reason: SlotCloseReason; now: Date },
 ): Promise<
-  { ok: true; closedAt: Date } | { ok: false; code: 'WINDOW_NOT_FOUND' | 'WINDOW_CLOSED' }
+  | { ok: true; closedAt: Date; keptSlots: KeptSlotRow[] }
+  | { ok: false; code: 'WINDOW_NOT_FOUND' | 'WINDOW_CLOSED' }
 > {
-  const [closed] = await db
+  const [closed] = await tx
     .update(slotWindows)
     .set({ status: 'closed', closeReason: input.reason, closedAt: input.now })
     .where(
@@ -406,10 +440,68 @@ export async function closeWindow(
       ),
     )
     .returning({ closedAt: slotWindows.closedAt });
-  if (closed?.closedAt) return { ok: true, closedAt: closed.closedAt };
-  const [found] = await db
+  if (closed?.closedAt) {
+    await closeStaleWindowHolds(tx, { now: input.now, windowId: input.windowId });
+    const rows = await tx
+      .select({
+        slotId: slots.id,
+        startAt: slots.startAt,
+        endAt: slots.endAt,
+        menuName: slots.menuName,
+        holdExpiresAt: slots.holdExpiresAt,
+      })
+      .from(slots)
+      .where(and(eq(slots.windowId, input.windowId), eq(slots.status, 'published')))
+      .orderBy(asc(slots.startAt));
+    const keptSlots = rows.flatMap((row) =>
+      // 시간대 안 칸은 홀딩으로만 생긴다(풀면 닫힌다). 홀딩 시각이 없는 칸은 남길 이유가 없다
+      row.holdExpiresAt ? [{ ...row, holdExpiresAt: row.holdExpiresAt }] : [],
+    );
+    return { ok: true, closedAt: closed.closedAt, keptSlots };
+  }
+  const [found] = await tx
     .select({ id: slotWindows.id })
     .from(slotWindows)
     .where(and(eq(slotWindows.id, input.windowId), eq(slotWindows.shopId, input.shopId)));
   return { ok: false, code: found ? 'WINDOW_CLOSED' : 'WINDOW_NOT_FOUND' };
+}
+
+/** 원장님에게 알릴, 마감할 때 남겼다가 결제 없이 닫힌 칸 하나 */
+export type ReleasedKeptSlot = {
+  slotId: string;
+  ownerUserId: string;
+  menuName: string;
+  startAt: Date;
+  endAt: Date;
+};
+
+/**
+ * 이 칸들 중 원장님이 시간대를 마감할 때 결제 중이라 남겼다가 결제 없이 닫힌 칸(#308 ③-2). 마감한 시각보다 늦게 hold_released로
+ * 닫힌 시간대 칸만 고른다(마감할 때 같이 닫힌 칸과 마감 전에 닫힌 칸은 원장님이 알 필요가 없다). 알림(notifyKeptWindowSlotsReleased)이 쓴다
+ */
+export async function readReleasedKeptSlots(
+  db: DbReader,
+  slotIds: readonly string[],
+): Promise<ReleasedKeptSlot[]> {
+  if (slotIds.length === 0) return [];
+  return db
+    .select({
+      slotId: slots.id,
+      ownerUserId: owners.userId,
+      menuName: slots.menuName,
+      startAt: slots.startAt,
+      endAt: slots.endAt,
+    })
+    .from(slots)
+    .innerJoin(slotWindows, eq(slotWindows.id, slots.windowId))
+    .innerJoin(shops, eq(shops.id, slots.shopId))
+    .innerJoin(owners, eq(owners.id, shops.ownerId))
+    .where(
+      and(
+        inArray(slots.id, [...new Set(slotIds)]),
+        eq(slots.closeReason, 'hold_released'),
+        eq(slotWindows.status, 'closed'),
+        lt(slotWindows.closedAt, slots.closedAt),
+      ),
+    );
 }

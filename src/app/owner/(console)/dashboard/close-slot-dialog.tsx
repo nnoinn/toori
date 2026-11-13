@@ -21,8 +21,8 @@ import { closeSlot } from '../slots/actions';
 import { SLOT_CLOSE_REASON_LABELS, SLOT_CLOSE_REASON_OPTIONS } from '../slots/slot-edit';
 import type { DashboardSlot } from './dashboard';
 
-/** 마감 사유 칩(다른 곳 예약 / 잘못 올림 / 기타) */
-const REASON_CHIPS = SLOT_CLOSE_REASON_OPTIONS.map((key) => ({
+/** 마감 사유 칩(다른 곳 예약 / 잘못 올림 / 기타). 시간대 마감 창(close-window-dialog.tsx)도 같이 쓴다 */
+export const REASON_CHIPS = SLOT_CLOSE_REASON_OPTIONS.map((key) => ({
   key,
   label: SLOT_CLOSE_REASON_LABELS[key],
 }));

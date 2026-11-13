@@ -8,6 +8,7 @@
 // 예약이 있는 매물(예약됨·완료·취소)과 "처리 필요" 줄은 [상세]로 예약 상세(O11)에 간다.
 // 방문 완료·노쇼(O14)는 "처리 필요" 줄에서 바로 누르거나(#23 B1) 예약 상세에서 처리한다. 둘 다 같은 확인 창을 거친다.
 // 시작 전 '취소' 매물은 [재등록](O13, S-408)으로 같은 조건의 새 매물을 올리고, 재등록한 매물에는 "재등록함"을 보여준다.
+// 시간대 매물(#308)도 같은 목록에 시작 순서로 섞어 보여주고 [마감]할 수 있다. 시간대 안에서 들어온 예약은 매물 줄로 나온다.
 // 이 파일은 탭·필터와 마감·방문 확인 창을 맡고, 매물 줄과 "처리 필요" 카드는 dashboard-rows.tsx가 그린다.
 // 확인 창을 줄 안이 아니라 여기 두는 까닭: 처리하거나 그 사이 다른 곳에서 처리되면 그 줄이 사라지는데, 창은 결과 문구를 보여줄 때까지 남아야 한다.
 
@@ -25,20 +26,24 @@ import { ADVANCE_LISTING_DAYS, PUBLISH_WINDOW_HOURS } from '@/server/policy';
 import { visitSummary } from '../reservations/reservation-detail';
 import { VisitConfirmDialog, type VisitTarget } from '../reservations/visit-confirm-dialog';
 import { CloseSlotDialog } from './close-slot-dialog';
+import { CloseWindowDialog } from './close-window-dialog';
 import {
   type AllTabSection,
   allTabSections,
   countByStatus,
   DASHBOARD_STATUSES,
   type DashboardDay,
+  type DashboardEntry,
   type DashboardSlot,
   type DashboardTab,
+  type DashboardWindow,
   filterByStatus,
+  mergeEntries,
   SLOT_STATUS_LABELS,
   splitByDay,
   type StatusFilter,
 } from './dashboard';
-import { NeedsVisitCard, SlotRow } from './dashboard-rows';
+import { NeedsVisitCard, SlotRow, WindowRow } from './dashboard-rows';
 
 const TAB_LABELS: Record<DashboardTab, string> = { all: '전체', today: '오늘', upcoming: '예정' };
 
@@ -53,33 +58,46 @@ export function OwnerDashboard({
   shopId,
   nowIso,
   slots,
+  windows,
   needsVisit,
 }: {
   shopId: string;
   nowIso: string;
   /** 오늘 0시 이후에 시작하는 매물 */
   slots: DashboardSlot[];
+  /** 오늘 0시 이후에 시작하는 시간대 매물(#308) */
+  windows: DashboardWindow[];
   /** 시작이 지났는데 방문·노쇼를 처리하지 않은 예약 */
   needsVisit: DashboardSlot[];
 }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
-  const byDay = useMemo(() => splitByDay(slots, now), [slots, now]);
+  const byDay = useMemo(() => splitByDay(mergeEntries(slots, windows), now), [slots, windows, now]);
   const [tab, setTab] = useState<DashboardTab>('all');
   const [status, setStatus] = useState<StatusFilter>('all');
   // [마감]을 누른 매물(확인 창)
   const [closing, setClosing] = useState<DashboardSlot | null>(null);
+  // [마감]을 누른 시간대(확인 창)
+  const [closingWindow, setClosingWindow] = useState<DashboardWindow | null>(null);
   // "처리 필요" 줄에서 [방문 완료]·[노쇼]를 누른 예약(확인 창)
   const [visiting, setVisiting] = useState<VisitTarget | null>(null);
   // [더보기]로 탭을 바꾸면 그 탭 버튼으로 초점을 옮긴다(목록 아래에서 누르면 화면도 탭 줄로 올라간다)
   const tabButtons = useRef<Partial<Record<DashboardTab, HTMLButtonElement | null>>>({});
 
-  const tabSlots = useMemo<Record<DashboardTab, DashboardSlot[]>>(
+  const tabSlots = useMemo<Record<DashboardTab, DashboardEntry[]>>(
     () => ({ all: [...byDay.today, ...byDay.upcoming], ...byDay }),
     [byDay],
   );
   const inTab = tabSlots[tab];
   const counts = useMemo(() => countByStatus(inTab, now), [inTab, now]);
   const shown = filterByStatus(inTab, status, now);
+
+  /** 매물 줄 또는 시간대 줄 */
+  const row = (entry: DashboardEntry) =>
+    entry.kind === 'window' ? (
+      <WindowRow key={entry.id} window={entry} onClose={setClosingWindow} />
+    ) : (
+      <SlotRow key={entry.id} slot={entry} now={now} onClose={setClosing} />
+    );
 
   /** [더보기]: 그 탭으로 가고 상태 필터는 그대로 둔다 */
   const showMore = (day: DashboardDay) => {
@@ -178,21 +196,20 @@ export function OwnerDashboard({
               divided={index > 0}
               onMore={() => showMore(section.day)}
             >
-              {section.shown.map((slot) => (
-                <SlotRow key={slot.id} slot={slot} now={now} onClose={setClosing} />
-              ))}
+              {section.shown.map(row)}
             </AllTabSectionView>
           ))}
         </div>
       ) : (
-        <SlotList>
-          {shown.map((slot) => (
-            <SlotRow key={slot.id} slot={slot} now={now} onClose={setClosing} />
-          ))}
-        </SlotList>
+        <SlotList>{shown.map(row)}</SlotList>
       )}
 
       <CloseSlotDialog shopId={shopId} slot={closing} onDone={() => setClosing(null)} />
+      <CloseWindowDialog
+        shopId={shopId}
+        window={closingWindow}
+        onDone={() => setClosingWindow(null)}
+      />
       {/* 처리하면 화면이 새로 고쳐져 그 예약이 "처리 필요"에서 빠진다. 빠졌으면 더는 처리할 수 없다 */}
       <VisitConfirmDialog
         target={visiting}

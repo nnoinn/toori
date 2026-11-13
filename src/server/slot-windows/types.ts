@@ -27,6 +27,23 @@ export type CreatedSlotWindow = {
   status: 'scheduled' | 'published';
 };
 
+/** 마감할 때 손님이 결제 중이라 남긴 칸(#308 ③-2). 결제하면 예약으로 남고, 결제 없이 끝나면 자동으로 닫힌다 */
+export type KeptWindowSlot = {
+  slotId: string;
+  startAt: string;
+  endAt: string;
+  menuName: string;
+  /** 홀딩이 끝나는 시각(서버 시각 기준). 이미 지났으면 결제 확인을 기다리는 칸이다 */
+  holdExpiresAt: string;
+};
+
+/** closeSlotWindow 결과 */
+export type ClosedSlotWindow = {
+  closedAt: string;
+  /** 손님이 결제 중이라 남긴 칸(홀딩이 살아 있거나 결제 확인을 기다리는 칸). 없으면 [] */
+  keptSlots: KeptWindowSlot[];
+};
+
 /** getLastWindowSettings 결과. 그 샵이 마지막으로 올린 시간대의 서비스·할인율(지금 숨긴 메뉴는 뺀다) */
 export type LastWindowSettings = {
   menus: WindowMenuInput[];
