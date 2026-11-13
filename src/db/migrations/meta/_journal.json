@@ -99,6 +99,13 @@
       "when": 1794494950035,
       "tag": "0013_dispute_channel_outcome",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794495140130,
+      "tag": "0014_settlement_items_order_unique",
+      "breakpoints": true
     }
   ]
 }

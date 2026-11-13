@@ -33,6 +33,7 @@ import {
   agreedCancelRefundText,
 } from './agreed-cancel-texts';
 import { cancelDoneText } from './cancel-texts';
+import { DetailCard } from './detail-card';
 
 const RESPOND_FAILED_MESSAGE = '처리하지 못했어요. 잠시 후 다시 시도해 주세요';
 
@@ -91,19 +92,17 @@ export function AgreedCancelCard({ request }: { request: PendingAgreedCancel }) 
 
   if (declined) {
     return (
-      <section className="mx-4 rounded-xl border bg-card p-4 text-sm" aria-label="합의 후 취소">
+      <DetailCard className="text-sm" aria-label="합의 후 취소">
         <p role="status">{AGREED_CANCEL_DECLINED}</p>
-      </section>
+      </DetailCard>
     );
   }
 
   const locked = blocked || expired || pending;
 
   return (
-    <section
-      className="mx-4 flex flex-col gap-3 rounded-xl border border-primary/40 bg-card p-4"
-      aria-label="합의 후 취소"
-    >
+    // 답해야 하는 요청이라 다른 카드보다 테두리를 투리 색으로 강조한다
+    <DetailCard className="gap-3 ring-primary/40" aria-label="합의 후 취소">
       <div className="flex flex-col gap-1">
         <h2 className="font-semibold">{AGREED_CANCEL_TITLE}</h2>
         <p className="text-sm">{agreedCancelReasonText(request.reason, request.reasonText)}</p>
@@ -203,6 +202,6 @@ export function AgreedCancelCard({ request }: { request: PendingAgreedCancel }) 
           )}
         </DialogContent>
       </Dialog>
-    </section>
+    </DetailCard>
   );
 }

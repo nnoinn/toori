@@ -15,8 +15,8 @@ export type SubscribePushResult =
   | { status: 'dismissed' }
   | { status: 'failed'; message: string };
 
-const SUBSCRIBE_FAILED = '알림을 켜지 못했어요. 잠시 후 다시 시도해 주세요';
-const UNSUBSCRIBE_FAILED = '알림을 끄지 못했어요. 잠시 후 다시 시도해 주세요';
+const SUBSCRIBE_FAILED = '푸시 알림을 켜지 못했어요. 잠시 후 다시 시도해 주세요';
+const UNSUBSCRIBE_FAILED = '푸시 알림을 끄지 못했어요. 잠시 후 다시 시도해 주세요';
 
 /** 이 기기의 브라우저 구독 주소. 서비스 워커를 등록한 적이 없거나 구독이 없으면 null(등록하지 않고 보기만 한다) */
 async function deviceEndpoint(): Promise<string | null> {

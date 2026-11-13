@@ -9,7 +9,7 @@ import { fail, ok } from '@/lib/result';
 import type { CheckoutSlot } from './checkout-store';
 import { autoCancelFail, unconfirmedFail } from './errors';
 import type { ConfirmOutcome, MyOrder, OrderOutcome } from './confirm-store';
-import type { HoldOutcome } from './hold-store';
+import type { HoldOutcome, MyActiveHoldRow } from './hold-store';
 import type { PortOneCancel, PortOneLookup } from './portone';
 
 const SLOT = '2b3c4d5e-6f70-4812-9a3b-4c5d6e7f8091';
@@ -32,6 +32,8 @@ const state = vi.hoisted(() => ({
   isNew: true,
   /** 정해 두면 acquireHold가 이 결과를 돌려준다(실패 코드 확인용) */
   acquireOverride: null as HoldOutcome | null,
+  activeHold: null as MyActiveHoldRow | null,
+  activeHoldReads: [] as unknown[],
   acquireCalls: [] as { tx: unknown; input: AcquireInput }[],
   orders: [] as Record<string, unknown>[],
   /** 결제 번호 → 주문(메모리 흉내) */
@@ -211,6 +213,11 @@ vi.mock('./portone', () => ({
   },
 }));
 vi.mock('./hold-store', () => ({
+  // 지금 내 홀딩 찾기(조건)는 hold-store.db.test.ts가 실제 DB로 본다
+  readMyActiveHold: async (_db: unknown, input: unknown) => {
+    state.activeHoldReads.push(input);
+    return state.activeHold;
+  },
   acquireHold: async (tx: unknown, input: AcquireInput) => {
     state.acquireCalls.push({ tx, input });
     return state.acquireOverride ?? memoryAcquire(input);
@@ -224,8 +231,15 @@ vi.mock('./hold-store', () => ({
   },
 }));
 
-const { confirmPayment, getMyHold, holdSlot, previewCheckoutAmount, releaseHold, startPayment } =
-  await import('./checkout');
+const {
+  confirmPayment,
+  getMyActiveHold,
+  getMyHold,
+  holdSlot,
+  previewCheckoutAmount,
+  releaseHold,
+  startPayment,
+} = await import('./checkout');
 
 const COUPON = '7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d';
 const OTHER_COUPON = '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d';
@@ -262,6 +276,8 @@ beforeEach(() => {
   state.phone = '010-1234-5678';
   state.isNew = true;
   state.acquireOverride = null;
+  state.activeHold = null;
+  state.activeHoldReads = [];
   state.acquireCalls = [];
   state.releaseCalls = [];
   state.orders = [];
@@ -360,6 +376,46 @@ describe('releaseHold', () => {
   it('매물 id 모양이 아니면 아무것도 하지 않고 성공', async () => {
     expect(await releaseHold('x')).toEqual(ok(null));
     expect(state.releaseCalls).toEqual([]);
+  });
+});
+
+describe('getMyActiveHold', () => {
+  it('지금 내 홀딩이 있으면 매물·만료 시각·서버 시각과 막대에 보여줄 샵·서비스·시작 시각을 준다', async () => {
+    state.activeHold = {
+      slotId: SLOT,
+      holdExpiresAt: at(7),
+      shopName: '샘플 헤어',
+      menuName: '커트',
+      startAt: at(180),
+    };
+    state.now = at(3);
+    expect(await getMyActiveHold()).toEqual(
+      ok({
+        slotId: SLOT,
+        holdExpiresAt: at(7).toISOString(),
+        serverNow: at(3).toISOString(),
+        shopName: '샘플 헤어',
+        menuName: '커트',
+        startAt: at(180).toISOString(),
+      }),
+    );
+    expect(state.activeHoldReads).toEqual([{ customerId: ME, now: at(3) }]);
+  });
+
+  it('홀딩이 없으면 null', async () => {
+    expect(await getMyActiveHold()).toEqual(ok(null));
+  });
+
+  it('로그인 안 함·원장님 모드·고객 계정 없음도 오류가 아니라 null이고 DB를 읽지 않는다', async () => {
+    for (const [code, message] of [
+      ['UNAUTHENTICATED', '로그인해 주세요'],
+      ['WRONG_MODE', '고객 계정으로 바꿔서 이용해 주세요'],
+      ['NO_CUSTOMER_ACCOUNT', '고객 계정을 먼저 만들어 주세요'],
+    ]) {
+      state.auth = fail(code, message);
+      expect(await getMyActiveHold(), code).toEqual(ok(null));
+    }
+    expect(state.activeHoldReads).toEqual([]);
   });
 });
 

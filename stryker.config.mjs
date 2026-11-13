@@ -27,8 +27,10 @@ const config = {
     'src/server/visits/rules.ts',
     'src/server/slot-windows/rules.ts',
     'src/server/slot-windows/starts.ts',
+    'src/server/slot-windows/view.ts',
     'src/features/slot-status/slot-status.ts',
     'src/app/owner/(console)/slots/slot-time.ts',
+    'src/app/owner/(console)/slots/window/window-draft.ts',
   ],
   // 개발자용 오류 문구는 돌연변이에서 뺀다(stryker/ignore-error-messages.mjs)
   appendPlugins: ['./stryker/ignore-error-messages.mjs'],

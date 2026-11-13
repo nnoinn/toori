@@ -10,10 +10,11 @@ import { ErrorState, LoadingCards } from '@/components/ui/state';
 
 import { formatDistance } from './distance';
 import { applySortToSearch, SLOT_SORTS, type SlotSort } from './sort';
-import type { SlotListItem } from './types';
+import { type ListItem, listItemKey } from './types';
+import { WindowCard } from './window-card';
 
 type SlotListProps = {
-  items: SlotListItem[];
+  items: ListItem[];
   /** 서버가 준 "지금"(ISO). 남은 시간 계산 기준 */
   serverNow: string;
   /** 고른 정렬. 없으면 정렬 탭을 숨긴다(찜한 샵 매물은 임박순만) */
@@ -66,7 +67,7 @@ export function SortTabs({ sort }: { sort: SlotSort }) {
   );
 }
 
-/** 매물 카드 목록 (J4, C-204). 끝에 닿으면 다음 20개를 부른다(D8) */
+/** 매물 카드 목록 (J4, C-204). 시간대 매물(#308)은 시간대 카드로 섞여 있다. 끝에 닿으면 다음 20개를 부른다(D8) */
 export function SlotList({
   items,
   serverNow,
@@ -121,20 +122,36 @@ export function SlotList({
         // 폰에서는 카드가 화면 끝에 붙어 둥근 모서리가 잘려 보여서, 양옆 16px 여백과 카드 사이 간격을 둔다
         <ul className="flex flex-col divide-y max-md:gap-2 max-md:divide-y-0 max-md:px-4">
           {items.map((item) => (
-            <li key={item.slotId}>
-              <SlotCard
-                href={`/slots/${item.slotId}`}
-                imageUrl={item.imageUrl}
-                shopName={item.shopName}
-                menuName={item.menuName}
-                startAt={item.startAt}
-                serverNow={serverNow}
-                listPrice={item.listPrice}
-                salePrice={item.salePrice}
-                discountRate={item.discountRate}
-                badges={item.badges}
-                distanceText={formatDistance(item.distanceMeters)}
-              />
+            <li key={listItemKey(item)}>
+              {item.kind === 'slot' ? (
+                <SlotCard
+                  href={`/slots/${item.slotId}`}
+                  imageUrl={item.imageUrl}
+                  shopName={item.shopName}
+                  menuName={item.menuName}
+                  startAt={item.startAt}
+                  serverNow={serverNow}
+                  listPrice={item.listPrice}
+                  salePrice={item.salePrice}
+                  discountRate={item.discountRate}
+                  badges={item.badges}
+                  distanceText={formatDistance(item.distanceMeters)}
+                />
+              ) : (
+                <WindowCard
+                  href={`/windows/${item.windowId}`}
+                  imageUrl={item.imageUrl}
+                  shopName={item.shopName}
+                  firstMenuName={item.firstMenuName}
+                  menuCount={item.menuCount}
+                  startAt={item.startAt}
+                  endAt={item.endAt}
+                  maxDiscountRate={item.maxDiscountRate}
+                  minSalePrice={item.minSalePrice}
+                  badges={item.badges}
+                  distanceText={formatDistance(item.distanceMeters)}
+                />
+              )}
             </li>
           ))}
         </ul>
