@@ -1,6 +1,6 @@
 // 이의제기 접수 함수가 돌려주는 값 (연결 #20, #299). 시각은 ISO 문자열이다. 화면과 서버 어디서나 가져올 수 있다.
 
-import type { DisputeStatus, DisputeType } from '@/db/schema/admin';
+import type { DisputeOutcome, DisputeStatus, DisputeType } from '@/db/schema/admin';
 
 /**
  * 내 예약 상세의 이의제기 칸. 화면은 시각을 비교하지 않고 이 값으로 고른다(#299).
@@ -42,4 +42,34 @@ export type DisputeView = {
 export type SubmittedDispute = {
   disputeId: string;
   createdAt: string;
+};
+
+// ── 운영자(A-104, W19 ②) ──
+
+/** registerKakaoDispute 입력. receivedAt은 카카오톡 채널에서 받은 시각(ISO, 운영자가 입력) */
+export type RegisterKakaoDisputeInput = {
+  reservationId: string;
+  type: string;
+  content: string;
+  receivedAt: string;
+};
+
+/** registerKakaoDispute 결과 */
+export type RegisteredDispute = {
+  disputeId: string;
+  createdAt: string;
+};
+
+/** resolveDispute 입력. memo는 결론 메모(사유, 필수) */
+export type ResolveDisputeInput = {
+  disputeId: string;
+  outcome: string;
+  memo: string;
+};
+
+/** resolveDispute 결과 */
+export type ResolvedDispute = {
+  disputeId: string;
+  outcome: DisputeOutcome;
+  handledAt: string;
 };
