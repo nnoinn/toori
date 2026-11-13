@@ -15,6 +15,7 @@ import { isUuid } from '@/lib/uuid';
 import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
 import { disputeDeadline, disputeOpensAt, disputeTypes } from '@/server/disputes/rules';
+import { DISPUTE_DEADLINE_BUSINESS_HOURS } from '@/server/policy/dispute';
 
 import {
   labelCancelActor,
@@ -177,7 +178,7 @@ async function Detail({ params }: { params: Params }) {
                 접수 기간: {formatKstDateTime(disputeOpensAt(disputeTarget))}부터{' '}
                 {disputeDue
                   ? `${formatKstDateTime(disputeDue)}까지`
-                  : '방문·노쇼 처리 뒤 영업일 기준 48시간까지'}
+                  : `방문·노쇼 처리 뒤 영업일 기준 ${DISPUTE_DEADLINE_BUSINESS_HOURS}시간까지`}
                 . 카카오톡 채널로 받은 이의제기를 받은 시각과 함께 남겨요.
               </p>
               <div>

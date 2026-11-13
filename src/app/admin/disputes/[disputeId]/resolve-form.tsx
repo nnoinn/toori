@@ -21,8 +21,8 @@ import type { OutcomeOption } from '../format';
 
 /** 결론마다 확인 창에서 한 번 더 알릴 것. 결론은 되돌릴 수 없다 */
 const CONFIRM_TEXT: Partial<Record<DisputeOutcome, string>> = {
-  no_show_reversed: '예약이 노쇼에서 방문으로 바뀌고, 원장님 정산은 판매가로 들어가요.',
-  no_show_confirmed: '노쇼 그대로 두고, 원장님 정산은 판매가로 들어가요.',
+  no_show_reversed: '예약이 노쇼에서 방문으로 바뀌고, 원장님은 판매가 기준으로 정산돼요.',
+  no_show_confirmed: '노쇼 그대로 두고, 원장님은 판매가 기준으로 정산돼요.',
   no_change: '예약과 금액은 그대로예요.',
 };
 
