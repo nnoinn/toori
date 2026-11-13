@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { maskPhone } from '@/lib/phone';
 import { firstParam, type SearchValue } from '@/lib/search-params';
-import { formatKst } from '@/lib/time';
+import { formatKstDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
@@ -119,7 +119,7 @@ async function CustomerList({ query }: { query: string }) {
               </Link>
             </td>
             <td className={cn(CELL, 'whitespace-nowrap')}>{maskPhone(row.phone)}</td>
-            <td className={cn(CELL, 'whitespace-nowrap')}>{formatKst(row.createdAt)}</td>
+            <td className={cn(CELL, 'whitespace-nowrap')}>{formatKstDateTime(row.createdAt)}</td>
             <td className={CELL}>{row.reservationCount}</td>
             <td className={CELL}>{row.cancelCount}</td>
             <td className={cn(CELL, row.noShowCount > 0 && 'font-medium text-destructive')}>
@@ -169,7 +169,7 @@ async function OwnerList({ query }: { query: string }) {
             </td>
             <td className={cn(CELL, 'whitespace-nowrap')}>{maskPhone(row.phone)}</td>
             <td className={CELL}>{row.slotCount}</td>
-            <td className={cn(CELL, 'whitespace-nowrap')}>{formatKst(row.createdAt)}</td>
+            <td className={cn(CELL, 'whitespace-nowrap')}>{formatKstDateTime(row.createdAt)}</td>
             <td className={CELL}>
               <AccountBadge withdrawnAt={row.withdrawnAt} />
             </td>
