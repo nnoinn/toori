@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isHeldByMe, isHeldByOther, slotBadges, type SlotBadgeInput } from './badges';
+import { isHeldByMe, isHeldByOther, slotBadges, type SlotBadgeInput, windowBadges } from './badges';
 
 const NOW = new Date('2026-11-01T06:00:00+09:00');
 const ME = '11111111-1111-4111-8111-111111111111';
@@ -48,5 +48,34 @@ describe('매물 배지', () => {
     expect(isHeldByOther(slot(heldBy(ME)), ME, NOW)).toBe(false);
     expect(isHeldByOther(slot(heldBy(ME)), SOMEONE, NOW)).toBe(true);
     expect(isHeldByMe(slot(), ME, NOW)).toBe(false);
+  });
+});
+
+// 시간대 카드(#308): 임박은 가장 빠른 시작 기준(C-203, 6시간). 환불 불가는 고르는 시각마다 달라 카드에 붙이지 않는다
+describe('시간대 카드 배지', () => {
+  const at = (iso: string) => new Date(iso);
+
+  it('가장 빠른 시작이 6시간 미만이면 임박만, 딱 6시간이면 없음', () => {
+    expect(
+      windowBadges(
+        { earliestStartAt: at('2026-11-01T11:59:00+09:00'), newCustomerOnly: false },
+        NOW,
+      ),
+    ).toEqual(['imminent']);
+    expect(
+      windowBadges(
+        { earliestStartAt: at('2026-11-01T12:00:00+09:00'), newCustomerOnly: false },
+        NOW,
+      ),
+    ).toEqual([]);
+  });
+
+  it('신규 고객 전용 시간대는 신규 고객 전용 배지', () => {
+    expect(
+      windowBadges(
+        { earliestStartAt: at('2026-11-01T18:00:00+09:00'), newCustomerOnly: true },
+        NOW,
+      ),
+    ).toEqual(['newCustomerOnly']);
   });
 });

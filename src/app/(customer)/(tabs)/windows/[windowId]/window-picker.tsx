@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Countdown } from '@/components/ui/countdown';
 import { Price } from '@/components/ui/price';
 import { type SlotBadgeKind, SlotBadges } from '@/components/ui/slot-badge';
+import { startEndText, windowRangeText } from '@/features/map/slot-list/window-range';
 import { formatKst, formatKstTime } from '@/lib/time';
 import { customerJoinPath, loginPath } from '@/server/auth/paths';
 import { getSlotTimeFlags } from '@/server/policy';
@@ -19,13 +20,7 @@ import { holdWindowSlot } from '@/server/slot-windows/actions';
 import { formatDuration } from '../../slots/[slotId]/detail-format';
 import { RefundPolicyDetails } from '../../slots/[slotId]/detail-parts';
 import { checkoutPath } from '../../slots/[slotId]/reserve-button';
-import {
-  firstOpenMenuId,
-  reserveHint,
-  resolvePick,
-  startEndText,
-  windowRangeText,
-} from './window-texts';
+import { firstOpenMenuId, reserveHint, resolvePick } from './window-texts';
 
 const HOLD_FAILED_MESSAGE = '예약을 시작하지 못했어요. 잠시 후 다시 시도해 주세요';
 
