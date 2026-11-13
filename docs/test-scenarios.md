@@ -152,6 +152,7 @@ PR 검사가 자동으로 막는 것:
 | DISPUTE-05 | 돈이 오가는 결론(환불 예외·무효·원장님 귀책 취소로 바꿈)은 처리 기능이 생길 때까지 고를 수 없다(화면은 "준비 중"). 그동안 이의제기는 확인 중으로 남아 정산 보류도 그대로다 | #350 | ✅ | `src/server/disputes/rules.test.ts` 은 처리 기능이 생길 때까지 OUTCOME_NOT_READY<br>`src/server/disputes/admin.test.ts` 돈이 오가는 결론은 OUTCOME_NOT_READY |
 | DISPUTE-06 | 카카오톡 채널 건은 등록한 운영자가 꼭 있고 앱 접수는 비어 있다. 결론이면 결론 종류가 꼭 있고 확인 중이면 비어 있다(DB가 막는다) | #350 | ✅ | `src/db/disputes.db.test.ts` 카카오톡 채널 건은 등록한 운영자가 꼭 있고, 앱 접수는 비어 있어야 한다<br>`src/db/disputes.db.test.ts` 결론 종류 6개는 모두 저장된다 |
 | DISPUTE-07 | 이의제기 내용은 빈칸(공백만 있는 것 포함)만 막고, 화면에 보이지 않는 상한 5,000자까지 받는다(글자 수는 보여주지 않는다). 화면과 서버가 같은 정책 값을 쓴다 | 11/12 점검 7-4, 11/13 nnoinn | ✅ | `src/server/disputes/rules.test.ts` 앞뒤 공백을 뺀 내용이 빈칸이면 DISPUTE_CONTENT_REQUIRED<br>`src/server/disputes/rules.test.ts` 안전 상한 5,000자까지 받고 넘으면 DISPUTE_CONTENT_TOO_LONG<br>`src/server/disputes/dispute.test.ts` 내용은 한 글자부터 5,000자까지 받고<br>`tests/docs/rule-docs.test.ts` 이의제기 내용의 화면에 보이지 않는 안전 상한 |
+| DISPUTE-08 | 이의제기는 그 예약의 손님만 신청한다. 손님 접수 함수는 고객 계정으로만 부를 수 있고, 내 예약이 아니면 받지 않는다. 원장님 쪽 요청은 원장님 귀책 취소(S-409)·합의 후 취소(S-410)·운영자 무효 처리(A-108)로 받는다 | C-507·A-104·#392, 11/13 nnoinn | ✅ | `src/server/auth/require.test.ts` 원장님 모드면 WRONG_MODE<br>`src/server/disputes/dispute.test.ts` 로그인하지 않았거나 고객 계정이 아니면 그 실패를 그대로<br>`src/server/disputes/dispute.test.ts` 내 예약이 아니면 RESERVATION_NOT_FOUND |
 
 ## 12. 정산
 
@@ -165,6 +166,8 @@ PR 검사가 자동으로 막는 것:
 | SETTLE-06 | 정산 계좌번호는 암호화해서 저장하고, 화면에는 은행·뒷자리·예금주만 보인다 | S-107 | ✅ | `src/server/payouts/account-crypto.test.ts` 풀면 원래 번호가 나오고, 암호문에는 번호가 보이지 않는다<br>`src/app/owner/(console)/settings/payout/payout-store.db.test.ts` 화면용 조회는 은행·뒷자리·예금주만 돌려준다 |
 | SETTLE-07 | 지급일은 매주 목요일이고 공휴일이면 다음 영업일이다. 이의제기 접수 기한이 지급일 0시까지 지난 거래가 그날 지급에 들어가서 원장님은 보통 서비스 뒤 4~8일 안에 받는다(일요일 15시 → 4일 뒤 목요일, 금요일 15시 → 6일 뒤 목요일, 수요일 18시 → 8일 뒤 목요일). 방문·노쇼 처리가 늦으면 처리한 때부터 세고, 이의제기 중이면 보류한다 | X-206·기술 가이드 7장 "정산 주기"·#353 | ✅ | `src/server/settlements/settle-rules.test.ts` 기술 가이드 예시<br>`src/server/settlements/settle-rules.test.ts` 방문 처리가 늦으면 처리한 때부터 센다<br>`src/server/settlements/settle-rules.test.ts` 확인 중 이의제기가 있으면 보류하고 지급일이 없다<br>`src/server/settlements/payout-date.test.ts` 목요일이 공휴일이면 다음 영업일(금요일)에 지급하고 |
 | SETTLE-08 | 거래 하나에 정산 줄 하나다. 묶기 작업이 두 번 돌아도 같은 거래로 정산 줄을 두 번 만들 수 없다(DB가 막는다) | #353 | ✅ | `src/db/settlement-items.db.test.ts` 같은 거래로 정산 줄을 두 번 만들 수 없다 |
+| SETTLE-09 | 결제 수수료율이 정해지기 전(PG 계약 전)에는 어느 환경에서도 정산을 묶지 않는다. 개발 환경에도 임시 비율을 넣지 않는다 | #394, 11/13 nnoinn | ✅ | `src/server/settlements/batch.db.test.ts` 결제 수수료율이 정해지기 전(PG 계약 전)에도 묶지 않는다 |
+| SETTLE-10 | 정산서의 지급 계좌는 그때 지급을 요청한 계좌(은행·끝 4자리)다. 원장님이 나중에 계좌를 바꿔도 지난 정산서는 바뀌지 않는다 | #129, 11/13 nnoinn | ⏳ | |
 
 ## 13. 알림
 
