@@ -6,7 +6,7 @@
 
 import 'server-only';
 
-import { and, eq, inArray, not } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, not } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { customers, shops, slots } from '@/db/schema';
@@ -87,21 +87,29 @@ export async function acquireHold(
   return { ok: false, code: 'SLOT_NOT_AVAILABLE' };
 }
 
-/** 내 홀딩을 푼다(판매 전 매물만). 풀었으면 true, 내 홀딩이 아니었으면 false */
+/**
+ * 내 홀딩을 푼다(판매 전 매물만). 풀었으면 true, 내 홀딩이 아니었으면 false.
+ * 시간대 안에서 만든 칸(#308 ③)은 그 홀딩 때문에 만든 칸이라 홀딩만 비우지 않고 마감(hold_released)으로 닫는다
+ */
 export async function releaseMyHold(
   db: Pick<ReturnType<typeof getDb>, 'update'>,
-  input: { slotId: string; customerId: string },
+  input: { slotId: string; customerId: string; now: Date },
 ): Promise<boolean> {
+  const mine = and(
+    eq(slots.id, input.slotId),
+    eq(slots.holdCustomerId, input.customerId),
+    inArray(slots.status, ['scheduled', 'published']),
+  );
   const released = await db
     .update(slots)
     .set({ holdCustomerId: null, holdExpiresAt: null })
-    .where(
-      and(
-        eq(slots.id, input.slotId),
-        eq(slots.holdCustomerId, input.customerId),
-        inArray(slots.status, ['scheduled', 'published']),
-      ),
-    )
+    .where(and(mine, isNull(slots.windowId)))
     .returning({ id: slots.id });
-  return released.length > 0;
+  if (released.length > 0) return true;
+  const closed = await db
+    .update(slots)
+    .set({ status: 'closed', closeReason: 'hold_released', closedAt: input.now })
+    .where(and(mine, isNotNull(slots.windowId)))
+    .returning({ id: slots.id });
+  return closed.length > 0;
 }
