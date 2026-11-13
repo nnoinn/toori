@@ -4,6 +4,7 @@
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { isCronRequest } from '@/server/cron/auth';
+import { notifyKeptWindowSlotsReleased } from '@/server/notifications/alerts';
 import { sweepStaleOrders } from '@/server/payments';
 import { sweepStaleCancels } from '@/server/refunds';
 import { closeStaleWindowHolds } from '@/server/slot-windows';
@@ -21,6 +22,11 @@ export async function POST(request: Request) {
   const cancels = await sweepStaleCancels(db, now);
   const orders = await sweepStaleOrders(db, now);
   // 결제 대기 주문의 결과가 정해진 뒤에 닫아야 해서 주문 정리 다음에 한다
-  const windowHolds = (await closeStaleWindowHolds(db, { now })).length;
-  return Response.json({ orders, cancels, windowHolds });
+  const closed = await closeStaleWindowHolds(db, { now });
+  // 원장님이 마감할 때 결제 중이라 남긴 칸이 닫혔으면 알린다(그런 칸만 고른다, #308 ③-2)
+  notifyKeptWindowSlotsReleased(
+    db,
+    closed.map((slot) => slot.slotId),
+  );
+  return Response.json({ orders, cancels, windowHolds: closed.length });
 }
