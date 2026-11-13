@@ -36,5 +36,5 @@ export const OWNER_PUSH_DESCRIPTION =
 export const OWNER_IOS_INSTALL_STEPS = [
   IOS_INSTALL_STEPS[0],
   IOS_INSTALL_STEPS[1],
-  `홈 화면의 ${SITE_NAME}를 열고 원장님으로 로그인한 뒤 내 계정에서 알림을 켜요`,
+  `홈 화면의 ${SITE_NAME}를 열고 원장님으로 로그인한 뒤 내 계정에서 푸시 알림을 켜요`,
 ] as const;

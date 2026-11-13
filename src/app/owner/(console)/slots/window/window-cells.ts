@@ -1,20 +1,27 @@
 // 시간대 매물 ① 날짜·시간대의 시간표 계산 (#308, S-201 두 번째 방식). 화면('use client')과 테스트가 같이 쓴다.
 // 고른 날의 영업 구간(slot-time.ts openSpans, 입력하지 않은 요일은 하루 전체)을 30분 칸(SLOT_START_STEP_MINUTES)으로 나누고,
 // 드래그로 켠 칸의 이어진 묶음을 시간대 하나로 본다(예: 10:00~12:00, 13:00~18:00 → 시간대 두 개).
-// 새벽까지 여는 샵(11/11 nnoinn)은 그 날 아래에 다음 날 새벽 칸이 이어지고(18:00 ~ 다음 날 02:00을 시간대 하나로 올릴 수 있다),
+// 새벽까지 여는 샵(11/11 nnoinn)은 그 날 아래에 다음 날 새벽 칸이 이어지고(18:00 ~ 02:00(익일)을 시간대 하나로 올릴 수 있다),
 // 맨 위에는 전날 영업이 이어진 새벽 칸이 온다(그 날짜의 매물이다).
 // 지난 시각, 14일 밖, 이미 올린 매물·시간대와 겹치는 칸은 잠그고 켜지 않는다. 서버(createSlotWindows)가 저장할 때 다시 확인한다.
+// 다음 날 시각은 "02:00(익일)"처럼 쓴다. "24:00"·"다음 날 02:00"은 쓰지 않는다(11/13 nnoinn, 공통 함수 formatEndTime·withNextDayMark).
 
 import type { BusinessHours } from '@/db/schema/shops';
 import { formatDuration } from '@/lib/format';
-import { addMinutes, formatKstTime, kstDateKey, kstToUtc } from '@/lib/time';
+import {
+  addMinutes,
+  formatEndTime,
+  formatKstTime,
+  kstDateKey,
+  kstToUtc,
+  withNextDayMark,
+} from '@/lib/time';
 import { ADVANCE_LISTING_DAYS, SLOT_START_STEP_MINUTES } from '@/server/policy';
 
 import { partsOfKey } from '../calendar-days';
 import { latestStart, type OpenSpan, openSpans, rangesOverlap, type TimeRange } from '../slot-time';
 
 const DAY_MINUTES = 24 * 60;
-const NEXT_DAY = '다음 날';
 
 /** 칸을 고를 수 없는 이유 */
 export type CellLock = 'past' | 'tooFar' | 'busy';
@@ -42,14 +49,14 @@ export function daySpans(dateKey: string, hours: BusinessHours): OpenSpan[] {
     .filter((span) => span.start < span.end);
 }
 
-/** 자정부터 지난 분을 "HH:MM"으로. 예: 570 → "09:30", 1440 → "24:00", 1560 → "다음 날 02:00" */
+/** 자정부터 지난 분을 "HH:MM"으로. 자정이나 그 뒤(다음 날)면 "(익일)". 예: 570 → "09:30", 1440 → "00:00(익일)", 1560 → "02:00(익일)" */
 export function minutesLabel(minutes: number): string {
   const pad = (value: number) => String(value).padStart(2, '0');
-  if (minutes > DAY_MINUTES) return `${NEXT_DAY} ${minutesLabel(minutes - DAY_MINUTES)}`;
+  if (minutes >= DAY_MINUTES) return withNextDayMark(minutesLabel(minutes - DAY_MINUTES));
   return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
 }
 
-/** 영업 구간 이름. 예: "18:00~다음 날 02:00" */
+/** 영업 구간 이름. 예: "18:00~02:00(익일)" */
 export function spanLabel(span: OpenSpan): string {
   return `${minutesLabel(span.start)}~${minutesLabel(span.end)}`;
 }
@@ -124,19 +131,15 @@ export function selectedRanges(
   return ranges;
 }
 
-/** 끝 시각. 시작한 날 자정에 끝나면 "24:00", 다음 날로 넘어가면 "다음 날 02:00" */
-function endLabel(range: TimeRange): string {
-  if (kstDateKey(range.end) === kstDateKey(range.start)) return formatKstTime(range.end);
-  return formatKstTime(range.end) === '00:00' ? '24:00' : `${NEXT_DAY} ${formatKstTime(range.end)}`;
-}
-
 /**
- * 묶음 하나. 예: "13:00~18:00", "22:00~다음 날 02:00".
- * dateKey(고른 날)를 주면 그 다음 날에 시작하는 묶음 앞에 "다음 날"을 붙인다(예: "다음 날 00:30~02:00")
+ * 묶음 하나. 예: "13:00~18:00", "22:00~02:00(익일)", 자정에 끝나면 "23:30~00:00(익일)".
+ * dateKey(고른 날)를 주면 그 다음 날 새벽에 시작하는 묶음은 시작·끝 모두 "(익일)"이다(예: "00:30(익일)~02:00(익일)")
  */
 export function rangeLabel(range: TimeRange, dateKey?: string): string {
-  const prefix = dateKey && kstDateKey(range.start) !== dateKey ? `${NEXT_DAY} ` : '';
-  return `${prefix}${formatKstTime(range.start)}~${endLabel(range)}`;
+  if (dateKey && kstDateKey(range.start) !== dateKey) {
+    return `${withNextDayMark(formatKstTime(range.start))}~${withNextDayMark(formatKstTime(range.end))}`;
+  }
+  return `${formatKstTime(range.start)}~${formatEndTime(range.start, range.end)}`;
 }
 
 /** 고른 시간 요약. 예: "10:00~12:00, 13:00~18:00 (총 7시간)". 아무것도 안 켰으면 null */

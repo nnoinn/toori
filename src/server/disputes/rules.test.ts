@@ -1,4 +1,4 @@
-// 이의제기 접수 규칙 (#299, 11/10 결정 Q1~Q3). 받기 시작·기한·고를 수 있는 종류·화면 칸을 본다.
+// 이의제기 접수 규칙 (#299, 11/10 결정 Q1~Q3, 11/13 내용 기준). 받기 시작·기한·고를 수 있는 종류·화면 칸·내용을 본다.
 
 import { describe, expect, it } from 'vitest';
 
@@ -6,6 +6,7 @@ import { kstToUtc } from '@/lib/time';
 
 import {
   disputeBlockReason,
+  disputeContentProblem,
   disputeDeadline,
   disputeOpensAt,
   disputeState,
@@ -126,5 +127,19 @@ describe('disputeState·disputeBlockReason', () => {
 
   it('접수할 수 있으면 막는 이유가 없다', () => {
     expect(disputeBlockReason(noShow, false, kst('2026-11-12 12:00'))).toBeNull();
+  });
+});
+
+describe('disputeContentProblem (11/13 nnoinn, #360 2번)', () => {
+  it('앞뒤 공백을 뺀 내용이 빈칸이면 DISPUTE_CONTENT_REQUIRED, 한 글자부터 받는다', () => {
+    expect(disputeContentProblem('')).toBe('DISPUTE_CONTENT_REQUIRED');
+    expect(disputeContentProblem(' \n\t ')).toBe('DISPUTE_CONTENT_REQUIRED');
+    expect(disputeContentProblem(' 네 ')).toBeNull();
+  });
+
+  it('안전 상한 5,000자까지 받고 넘으면 DISPUTE_CONTENT_TOO_LONG(앞뒤 공백은 세지 않는다)', () => {
+    expect(disputeContentProblem('가'.repeat(5000))).toBeNull();
+    expect(disputeContentProblem(`   ${'가'.repeat(5000)}   `)).toBeNull();
+    expect(disputeContentProblem('가'.repeat(5001))).toBe('DISPUTE_CONTENT_TOO_LONG');
   });
 });

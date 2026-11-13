@@ -37,7 +37,7 @@ export function WindowTimetable({
   selected,
   onChange,
 }: {
-  /** 고른 날짜. 다음 날 새벽 칸에 "다음 날"을 붙일 때 쓴다 */
+  /** 고른 날짜. 다음 날 새벽 칸에 "(익일)"을 붙일 때 쓴다 */
   dateKey: string;
   cells: WindowCell[];
   /** 켜진 칸(cells의 번호) */
@@ -180,7 +180,7 @@ export function WindowTimetable({
             const segmentStart = breaksBefore(index);
             const segmentEnd = index === cells.length - 1 || breaksBefore(index + 1);
             const columnTop = index % rowsPerColumn === 0;
-            // 다음 날 새벽이 시작하는 칸 위에는 날짜를 적는다(칸 이름에도 "다음 날"이 붙는다)
+            // 다음 날 새벽이 시작하는 칸 위에는 날짜를 적는다(칸 이름에도 "(익일)"이 붙는다)
             const dayChange = cell.nextDay && (index === 0 || !cells[index - 1].nextDay);
             return (
               <Fragment key={cell.start.toISOString()}>
@@ -192,7 +192,7 @@ export function WindowTimetable({
                       !columnTop && 'pt-3',
                     )}
                   >
-                    다음 날 · {dateKeyLabel(addDaysToKey(dateKey, 1))}
+                    익일 · {dateKeyLabel(addDaysToKey(dateKey, 1))}
                   </p>
                 ) : segmentStart && !columnTop ? (
                   <div aria-hidden className="h-3" />
