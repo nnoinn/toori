@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { appendPage, resultView } from './result-view';
+import { type ListItem, listItemKey } from './types';
 
 const A = 'area-a';
 const B = 'area-b';
@@ -59,7 +60,38 @@ describe('홈 핀·목록을 다시 불러오는 동안 보여줄 것 (#199)', (
 });
 
 describe('이어 불러온 쪽 붙이기', () => {
-  const item = (slotId: string) => ({ slotId });
+  // 'w'로 시작하면 시간대 카드(#308), 아니면 매물 카드
+  const item = (id: string): ListItem =>
+    id.startsWith('w')
+      ? {
+          kind: 'window',
+          windowId: id,
+          shopId: 'shop',
+          shopName: '샵',
+          firstMenuName: '커트',
+          menuCount: 2,
+          startAt: 't',
+          endAt: 't',
+          maxDiscountRate: 30,
+          minSalePrice: 7000,
+          imageUrl: null,
+          distanceMeters: null,
+          badges: [],
+        }
+      : {
+          kind: 'slot',
+          slotId: id,
+          shopId: 'shop',
+          shopName: '샵',
+          menuName: '커트',
+          startAt: 't',
+          listPrice: 10000,
+          salePrice: 7000,
+          discountRate: 30,
+          imageUrl: null,
+          distanceMeters: null,
+          badges: [],
+        };
   const list = (key: string, ids: string[]) => ({
     key,
     data: { items: ids.map(item), nextCursor: 'c1' as string | null, serverNow: 't1' },
@@ -93,7 +125,17 @@ describe('이어 불러온 쪽 붙이기', () => {
 
   it('이미 목록에 있는 매물은 다시 붙이지 않는다(앞 쪽을 받은 뒤 할인율·시간이 바뀐 매물)', () => {
     const next = appendPage(list(A, ['s1', 's2']), A, page(['s2', 's3', 's1']));
-    expect(next?.data.items.map((it) => it.slotId)).toEqual(['s1', 's2', 's3']);
+    expect(next?.data.items.map(listItemKey)).toEqual(['slot:s1', 'slot:s2', 'slot:s3']);
     expect(next?.data.nextCursor).toBe('c2');
+  });
+
+  it('이미 목록에 있는 시간대도 다시 붙이지 않는다(시간이 지나 가장 빠른 시작이 바뀐 시간대)', () => {
+    const next = appendPage(list(A, ['s1', 'w1']), A, page(['w1', 'w2', 's2']));
+    expect(next?.data.items.map(listItemKey)).toEqual([
+      'slot:s1',
+      'window:w1',
+      'window:w2',
+      'slot:s2',
+    ]);
   });
 });

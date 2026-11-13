@@ -35,3 +35,18 @@ export function slotBadges(
   if (isHeldByOther(slot, customerId, now)) badges.push('onHold');
   return badges;
 }
+
+/**
+ * 시간대 카드 배지(#308). 가장 빠른 시작이 임박이면 임박, 신규 고객 전용이면 신규 고객 전용.
+ * 환불 불가는 고르는 시각에 따라 달라서 카드에는 붙이지 않는다(상세에서 시각을 고르면 붙는다).
+ * 홀딩은 시간대가 아니라 손님이 고른 시각 하나에 걸리므로 결제 중 배지도 없다
+ */
+export function windowBadges(
+  window: { earliestStartAt: Date; newCustomerOnly: boolean },
+  now: Date,
+): SlotBadgeKind[] {
+  const badges: SlotBadgeKind[] = [];
+  if (getSlotTimeFlags(window.earliestStartAt, now).imminent) badges.push('imminent');
+  if (window.newCustomerOnly) badges.push('newCustomerOnly');
+  return badges;
+}

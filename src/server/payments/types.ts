@@ -18,6 +18,14 @@ export type CheckoutAmount = {
 };
 
 /** getMyHold 결과(예약 확인 화면). 금액은 서버가 계산한다. 쿠폰 없는 금액이고, 쿠폰을 고르면 previewCheckoutAmount 값을 보여준다(#300) */
+/** getMyActiveHold 결과: 지금 내 홀딩(한 사람은 하나). 고객 화면 아래 결제 중 막대에 쓴다(#363) */
+export type ActiveHold = HoldInfo & {
+  shopName: string;
+  menuName: string;
+  /** 서비스 시작 시각(ISO) */
+  startAt: string;
+};
+
 export type MyHold = HoldInfo & {
   salePrice: number;
   couponAmount: number;

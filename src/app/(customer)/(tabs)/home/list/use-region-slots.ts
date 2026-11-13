@@ -12,17 +12,17 @@ import {
   resultView,
   type Shown,
 } from '@/features/map/slot-list/result-view';
-import type { SlotListItem } from '@/features/map/slot-list/types';
+import type { ListItem } from '@/features/map/slot-list/types';
 
 type ListData = {
-  items: SlotListItem[];
+  items: ListItem[];
   nextCursor: string | null;
   serverNow: string;
   total: number | null;
 };
 
 const LOAD_FAILED = '매물을 불러오지 못했어요. 잠시 후 다시 시도해 주세요';
-const NO_ITEMS: SlotListItem[] = [];
+const NO_ITEMS: ListItem[] = [];
 
 export function useRegionSlots({ areaCode, search }: { areaCode: string; search: string }) {
   const [attempt, setAttempt] = useState(0);

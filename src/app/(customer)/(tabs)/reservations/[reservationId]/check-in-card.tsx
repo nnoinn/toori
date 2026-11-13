@@ -1,6 +1,7 @@
 import { ReservationCode } from '@/components/ui/reservation-code';
 
 import { CHECK_IN_GUIDE, CHECK_IN_TITLE } from '../check-in-texts';
+import { DetailCard } from './detail-card';
 
 /**
  * 예약 상세의 '방문 확인' 칸(C-504). 샵에서 원장님께 화면을 보여 주는 용도라 예약번호를 크게 쓴다.
@@ -9,10 +10,7 @@ import { CHECK_IN_GUIDE, CHECK_IN_TITLE } from '../check-in-texts';
  */
 export function CheckInCard({ code }: { code: string }) {
   return (
-    <section
-      aria-labelledby="check-in-title"
-      className="mx-4 flex flex-col items-center gap-1 rounded-xl border bg-card p-4 text-center"
-    >
+    <DetailCard aria-labelledby="check-in-title" className="items-center gap-1 text-center">
       <h3 id="check-in-title" className="text-sm font-semibold text-muted-foreground">
         {CHECK_IN_TITLE}
       </h3>
@@ -21,6 +19,6 @@ export function CheckInCard({ code }: { code: string }) {
         <ReservationCode code={code} emphasizeTail className="font-bold" />
       </p>
       <p className="text-sm text-muted-foreground">{CHECK_IN_GUIDE}.</p>
-    </section>
+    </DetailCard>
   );
 }

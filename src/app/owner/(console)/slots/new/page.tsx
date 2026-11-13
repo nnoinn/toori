@@ -10,6 +10,7 @@ import { getRequestNow } from '@/lib/request-time';
 import { ensureOwnerPage } from '@/server/auth';
 import { SHOP_STATUS_LABELS } from '@/server/shops/status';
 import { getShopReviewStatus } from '@/server/shops/review';
+import { getLastWindowSettings } from '@/server/slot-windows/actions';
 
 import { OwnerPage } from '../../owner-page';
 import { SlotForm } from '../slot-form';
@@ -22,7 +23,7 @@ export const metadata: Metadata = { title: '매물 등록' };
 const PAGE_PATH = '/owner/slots/new';
 
 // 매물 등록 (S-201·S-204·S-209). 맨 위 탭에서 방식을 고른다(#308): 한 시술 매물(3탭 ① 서비스 ② 시간 ③ 할인율, O4·O5)
-// 또는 시간대 매물(① 날짜·시간대 ② 서비스 ③ 할인율, window/window-form.tsx). PC 기준
+// 또는 시간대 매물(① 날짜·시간대 ② 서비스 ③ 할인율 ④ 확인, window/window-form.tsx). PC 기준
 export default function SlotCreatePage() {
   return (
     <OwnerPage title="매물 등록" width="narrow">
@@ -62,7 +63,11 @@ async function SlotCreateContent() {
   }
 
   const now = await getRequestNow();
-  const data = await selectSlotFormData(getDb(), auth.shopId, now);
+  const [data, last] = await Promise.all([
+    selectSlotFormData(getDb(), auth.shopId, now),
+    // 시간대 매물을 처음 열 때 채울 지난 설정(#308). 못 읽으면 비워 두고 원장님이 고른다
+    getLastWindowSettings(auth.shopId),
+  ]);
   if (!data) return <ErrorState description="샵을 찾을 수 없어요" />;
   if (data.menus.length === 0) {
     return (
@@ -85,9 +90,12 @@ async function SlotCreateContent() {
       single={<SlotForm shopId={auth.shopId} nowIso={now.toISOString()} {...data} />}
       windowForm={
         <WindowForm
+          shopId={auth.shopId}
           nowIso={now.toISOString()}
           businessHours={data.businessHours}
+          menus={data.menus}
           busy={data.busy}
+          lastSettings={last.ok ? last.data : null}
         />
       }
     />
