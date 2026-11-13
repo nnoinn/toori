@@ -33,6 +33,7 @@ import {
   isDisputeContentValid,
   KAKAO_CHANNEL_LABEL,
 } from './dispute-texts';
+import { DetailCard } from './detail-card';
 
 const SUBMIT_FAILED_MESSAGE = '접수하지 못했어요. 잠시 후 다시 시도해 주세요';
 
@@ -55,7 +56,7 @@ const FINAL_FAILURES: readonly string[] = [
 export function DisputeSection({ view }: { view: DisputeView }) {
   if (view.state === 'not_open') return null;
   return (
-    <section className="flex flex-col gap-2 border-t px-4 pt-4" aria-label="이의제기">
+    <DetailCard aria-label="이의제기">
       <h3 className="font-semibold">이의제기</h3>
       {view.state === 'open' ? (
         <DisputeForm view={view} />
@@ -79,7 +80,7 @@ export function DisputeSection({ view }: { view: DisputeView }) {
           <ChannelLink />
         </>
       )}
-    </section>
+    </DetailCard>
   );
 }
 
