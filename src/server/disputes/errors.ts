@@ -2,11 +2,15 @@
 // 화면과 서버 어디서나 가져올 수 있다.
 
 import type { ResultError } from '@/lib/result';
-import { DISPUTE_CONTENT_MAX_LENGTH, DISPUTE_CONTENT_MIN_LENGTH } from '@/server/policy/dispute';
+import { DISPUTE_CONTENT_LIMIT } from '@/server/policy/dispute';
 
 export const DISPUTE_ERRORS = {
-  /** 종류가 없거나 이 예약에서 고를 수 없는 종류, 내용 글자 수가 맞지 않음 */
-  INVALID_INPUT: `종류를 고르고 내용을 ${DISPUTE_CONTENT_MIN_LENGTH}자 이상 ${DISPUTE_CONTENT_MAX_LENGTH}자 이하로 적어 주세요`,
+  /** 종류가 없거나 이 예약에서 고를 수 없는 종류 */
+  INVALID_INPUT: '이의제기 종류를 골라 주세요',
+  /** 내용이 빈칸(공백만 있는 것 포함, 11/13 nnoinn) */
+  DISPUTE_CONTENT_REQUIRED: '내용을 적어 주세요',
+  /** 내용이 안전 상한을 넘음(화면은 그 전에 입력을 멈춘다) */
+  DISPUTE_CONTENT_TOO_LONG: `${DISPUTE_CONTENT_LIMIT.toLocaleString('ko-KR')}자까지 쓸 수 있어요`,
   /** 없는 예약이거나 내 예약이 아님 */
   RESERVATION_NOT_FOUND: '예약을 찾을 수 없어요',
   /** 예정 예약의 서비스 시작 전 */
