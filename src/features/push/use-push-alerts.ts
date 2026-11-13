@@ -51,7 +51,7 @@ function readDeviceState(): DeviceState {
 }
 
 /**
- * 이 기기 알림 켜기·끄기 (J14, C-601·C-602, #131). 예약 완료 화면의 "예약 알림 받기"와 내 정보 > 알림이 같이 쓴다.
+ * 이 기기 푸시 알림 켜기·끄기 (J14, C-601·C-602, #131). 예약 완료 화면의 "예약 알림 받기"와 내 정보 > 알림이 같이 쓴다.
  * 켜짐 표시는 서버 기록(getPushSubscriptionStatus)으로 한다. 화면을 다시 보여줄 때(Activity) 다시 확인한다
  */
 export function usePushAlerts() {
