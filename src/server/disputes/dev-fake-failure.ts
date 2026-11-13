@@ -7,7 +7,14 @@ import 'server-only';
 import { type DisputeError, disputeFail } from './errors';
 
 const SWITCHABLE = {
-  submitDispute: ['RESERVATION_NOT_FOUND', 'NOT_OPEN_YET', 'DEADLINE_PASSED', 'ALREADY_SUBMITTED'],
+  submitDispute: [
+    'RESERVATION_NOT_FOUND',
+    'NOT_OPEN_YET',
+    'DEADLINE_PASSED',
+    'ALREADY_SUBMITTED',
+    'DISPUTE_CONTENT_REQUIRED',
+    'DISPUTE_CONTENT_TOO_LONG',
+  ],
 } as const satisfies Record<string, readonly string[]>;
 
 /** DEV_FAKE_DISPUTE_FAILURE가 이 함수를 가리키면 그 실패, 아니면 null. DEADLINE_PASSED의 기한은 지금 시각으로 준다 */

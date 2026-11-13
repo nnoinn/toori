@@ -6,10 +6,11 @@
 //   시작이 지났는데 원장님이 아직 방문·노쇼 처리를 안 했으면 처리 시각부터 세므로 아직 정해지지 않는다(null)
 // - 종류: no_show는 노쇼 예약만, after_start는 시작 뒤·취소 아닌 예약만(노쇼면 서비스를 받지 않아서 뺀다), refund_exception은 모두(Q2)
 // - 한 예약에 한 번(Q3)
+// - 내용: 빈칸(공백만 있는 것 포함)만 막고, 안전 상한 5,000자(11/13 nnoinn, #360 2번)
 
 import { DISPUTE_TYPES, type DisputeType } from '@/db/schema/admin';
 import type { ReservationStatus, VisitResult } from '@/db/schema/payments';
-import { DISPUTE_DEADLINE_BUSINESS_HOURS } from '@/server/policy/dispute';
+import { DISPUTE_CONTENT_LIMIT, DISPUTE_DEADLINE_BUSINESS_HOURS } from '@/server/policy/dispute';
 import { addBusinessHours } from '@/server/policy/holidays';
 
 import type { DisputeState } from './types';
@@ -69,4 +70,18 @@ export function disputeState(target: DisputeTarget, hasDispute: boolean, now: Da
   if (reason === 'NOT_OPEN_YET') return 'not_open';
   if (reason === 'DEADLINE_PASSED') return 'closed';
   return 'open';
+}
+
+/**
+ * 내용 확인(11/13 nnoinn). 앞뒤 공백을 뺀 길이로 센다. 빈칸이면 DISPUTE_CONTENT_REQUIRED,
+ * 안전 상한(DISPUTE_CONTENT_LIMIT)을 넘으면 DISPUTE_CONTENT_TOO_LONG, 괜찮으면 null.
+ * 고객 접수와 운영자 등록이 같이 쓰고, 화면도 같은 기준을 쓰도록 가져다 쓸 수 있다
+ */
+export function disputeContentProblem(
+  content: string,
+): 'DISPUTE_CONTENT_REQUIRED' | 'DISPUTE_CONTENT_TOO_LONG' | null {
+  const length = content.trim().length;
+  if (length === 0) return 'DISPUTE_CONTENT_REQUIRED';
+  if (length > DISPUTE_CONTENT_LIMIT) return 'DISPUTE_CONTENT_TOO_LONG';
+  return null;
 }

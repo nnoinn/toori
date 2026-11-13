@@ -153,19 +153,42 @@ describe('submitDispute', () => {
     ]);
   });
 
-  it('내용이 10자 미만·500자 초과이거나 종류가 없으면 INVALID_INPUT이고 저장하지 않는다', async () => {
-    for (const input of [
-      { type: 'after_start', content: '짧아요' },
-      { type: 'after_start', content: '가'.repeat(501) },
-      { type: 'unknown', content: CONTENT },
-      { type: '', content: CONTENT },
-    ]) {
-      expect(await submitDispute({ reservationId: RESERVATION, ...input })).toMatchObject({
-        ok: false,
-        error: { code: 'INVALID_INPUT' },
-      });
+  it('종류가 없거나 모르는 종류면 INVALID_INPUT이고 저장하지 않는다', async () => {
+    for (const type of ['unknown', '']) {
+      expect(await submitDispute({ reservationId: RESERVATION, type, content: CONTENT })).toEqual(
+        fail('INVALID_INPUT', '이의제기 종류를 골라 주세요'),
+      );
     }
     expect(state.inserts).toEqual([]);
+  });
+
+  it('내용이 빈칸(공백만 있는 것 포함)이면 DISPUTE_CONTENT_REQUIRED "내용을 적어 주세요"이고 저장하지 않는다(11/13)', async () => {
+    for (const content of ['', '   ', '\n\t ']) {
+      expect(
+        await submitDispute({ reservationId: RESERVATION, type: 'after_start', content }),
+      ).toEqual(fail('DISPUTE_CONTENT_REQUIRED', '내용을 적어 주세요'));
+    }
+    expect(state.inserts).toEqual([]);
+  });
+
+  it('내용은 한 글자부터 5,000자까지 받고, 넘으면 DISPUTE_CONTENT_TOO_LONG "5,000자까지 쓸 수 있어요"(11/13)', async () => {
+    expect(
+      await submitDispute({
+        reservationId: RESERVATION,
+        type: 'after_start',
+        content: '가'.repeat(5001),
+      }),
+    ).toEqual(fail('DISPUTE_CONTENT_TOO_LONG', '5,000자까지 쓸 수 있어요'));
+    expect(state.inserts).toEqual([]);
+
+    for (const content of [' 네 ', `  ${'가'.repeat(5000)}  `]) {
+      expect(
+        (await submitDispute({ reservationId: RESERVATION, type: 'after_start', content })).ok,
+      ).toBe(true);
+    }
+    expect(state.inserts.map((input) => (input as { content: string }).content.length)).toEqual([
+      1, 5000,
+    ]);
   });
 
   it('이 예약에서 고를 수 없는 종류면 INVALID_INPUT(노쇼가 아닌 예약에 노쇼 이의)', async () => {

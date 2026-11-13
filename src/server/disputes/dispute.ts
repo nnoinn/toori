@@ -15,13 +15,13 @@ import { DISPUTE_TYPES } from '@/db/schema/admin';
 import { getRequestNow } from '@/lib/request-time';
 import { ok } from '@/lib/result';
 import { requireCustomer } from '@/server/auth';
-import { DISPUTE_CONTENT_MAX_LENGTH, DISPUTE_CONTENT_MIN_LENGTH } from '@/server/policy/dispute';
 
 import { devFakeDisputeFailure } from './dev-fake-failure';
 import { readDisputeTarget, insertDispute, type DisputeRecord } from './dispute-store';
 import { disputeFail, type DisputeResult } from './errors';
 import {
   disputeBlockReason,
+  disputeContentProblem,
   disputeDeadline,
   disputeOpensAt,
   disputeState,
@@ -70,14 +70,11 @@ export async function getDisputeStatus(reservationId: string): Promise<DisputeRe
   return ok(toView(id.data, target, await getRequestNow()));
 }
 
-const submitSchema = z.object({
-  reservationId: z.uuid(),
-  type: z.enum(DISPUTE_TYPES),
-  content: z.string().trim().min(DISPUTE_CONTENT_MIN_LENGTH).max(DISPUTE_CONTENT_MAX_LENGTH),
-});
+const typeSchema = z.enum(DISPUTE_TYPES);
 
 /**
- * [이의제기] 접수. 종류는 getDisputeStatus의 types 중 하나, 내용은 앞뒤 공백을 빼고 10~500자.
+ * [이의제기] 접수. 종류는 getDisputeStatus의 types 중 하나(아니면 INVALID_INPUT). 내용은 앞뒤 공백을 빼고 저장하고,
+ * 빈칸이면 DISPUTE_CONTENT_REQUIRED, 안전 상한(5,000자)을 넘으면 DISPUTE_CONTENT_TOO_LONG(11/13 nnoinn).
  * 한 예약에 한 번만 받는다. 동시에 두 번 눌러도 예약 줄을 잠가서 하나만 저장된다
  */
 export async function submitDispute(input: {
@@ -94,9 +91,14 @@ export async function submitDispute(input: {
   if (!reservationIdSchema.safeParse(input?.reservationId).success) {
     return disputeFail('RESERVATION_NOT_FOUND');
   }
-  const parsed = submitSchema.safeParse(input);
-  if (!parsed.success) return disputeFail('INVALID_INPUT');
-  const { reservationId, type, content } = parsed.data;
+  const reservationId: string = input.reservationId;
+  const parsedType = typeSchema.safeParse(input?.type);
+  if (!parsedType.success) return disputeFail('INVALID_INPUT');
+  const type = parsedType.data;
+  const rawContent = typeof input?.content === 'string' ? input.content : '';
+  const contentProblem = disputeContentProblem(rawContent);
+  if (contentProblem) return disputeFail(contentProblem);
+  const content = rawContent.trim();
 
   return getDb().transaction(async (tx): Promise<DisputeResult<SubmittedDispute>> => {
     const target = await readDisputeTarget(tx, {
