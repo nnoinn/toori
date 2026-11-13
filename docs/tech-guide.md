@@ -197,6 +197,7 @@
   - 쓰는 법: 테스트를 `tests/db/test-db.ts`의 `describeDb`로 묶고, 테스트마다 `withRollback(async (tx) => { ... })` 안에서 데이터를 만든다(끝나면 모두 되돌린다). DB 제약을 어기는지는 `violatedConstraint(tx, (t) => ...)`가 제약 이름으로 알려준다. 예시: `tests/db/schema.test.ts`(매물 시간 겹침, 할인율, PostGIS 거리). 테스트 사용자·고객·샵(메뉴 포함)·매물 값은 `tests/db/fixtures.ts`의 `createTestUser`, `createTestCustomer`, `createTestShop`, `testSlot`으로, 예약은 `createTestReservation`(매물→주문→예약 한 벌)으로 만든다. `testSlot`의 소요 시간은 끝 − 시작이고, 시작 시각이나 소요 시간이 정책 단위(30분, #108)가 아니면 테스트가 멈춘다
   - 준비 과정: 검사가 시작될 때 `tests/db/global-setup.ts`가 Supabase가 미리 만들어 두는 것(`extensions` 스키마, `auth.users`, search_path)만 흉내 내고 `src/db/migrations`를 고치지 않고 그대로 적용한다. 그래서 새 마이그레이션이 SQL 오류로 실패하면 PR 검사에서 먼저 드러난다
   - 테스트 안의 서버 코드(`getDb()`)도 테스트 DB에만 접속한다(`vitest.config.mts`가 테스트 중 `DATABASE_URL`을 테스트 DB 주소로 바꾸고, 테스트 DB가 없으면 비운다). `getDb()`로 저장한 데이터는 `withRollback`으로 되돌려지지 않으므로 매번 새 id로 만든다
+  - 서버 흐름 테스트(회귀 테스트 ②, 11/13): 화면이 부르는 실제 서버 함수(예: `holdSlot` → `startPayment` → `confirmPayment` → `cancelReservation`)를 한 테스트 안에서 차례로 부르고 결과와 DB를 본다. `tests/flows/`에 두고, `vi.mock`으로 바깥 서비스(Supabase 로그인, 포트원, 웹 푸시)와 시각, 요청이 있어야 도는 Next.js 도구(쿠키·헤더·`connection`·`after`)만 `tests/flows/fakes.ts`의 가짜로 바꾼다. 여기서는 `getDb()`도 `withRollback`의 트랜잭션을 돌려줘서 끝나면 모두 되돌려진다. 예시: `tests/flows/customer-booking.db.test.ts`(FLOW-01)
   - 내 컴퓨터에 Docker가 없으면 DB 테스트는 건너뛰고(skipped) CI에서만 돈다. Docker가 있으면 `postgis/postgis:17-3.5`를 띄우고 `TEST_DATABASE_URL`을 그 주소로 두고 `npm test`를 실행한다(Claude에게 부탁하면 된다). `TEST_DATABASE_URL`에는 localhost 주소만 넣을 수 있고, 다른 주소면 테스트가 멈춘다
 
 ---
