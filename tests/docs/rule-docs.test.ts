@@ -22,6 +22,7 @@ import {
   PUBLISH_WINDOW_HOURS,
   REMINDER_MINUTES_BEFORE,
 } from '@/server/policy';
+import { DISPUTE_CONTENT_LIMIT } from '@/server/policy/dispute';
 import { calcAgreedCancel } from '@/server/refunds/agreed-cancel-rules';
 import { calcRefund, getPenaltyBand } from '@/server/refunds/calc-refund';
 import {
@@ -34,6 +35,7 @@ const read = (path: string) =>
   readFileSync(fileURLToPath(new URL(`../../${path}`, import.meta.url)), 'utf8');
 const RULES = read('CLAUDE.md');
 const EXAMPLES = read('docs/settlement-examples.md');
+const TECH_GUIDE = read('docs/tech-guide.md');
 
 const HOUR = 60 * 60 * 1000;
 const NOW = new Date('2026-11-02T10:00:00+09:00');
@@ -380,4 +382,15 @@ describe('settlement-examples.md 3장 합의 후 취소 표', () => {
       expect(turi.turiProfit, '투리 손익').toBe(amount(column.get('투리 손익')));
     });
   }
+});
+
+describe('docs/tech-guide.md 7장 결정의 숫자', () => {
+  it('이의제기 내용의 화면에 보이지 않는 안전 상한(11/13 nnoinn)', () => {
+    const [limit] = find(
+      TECH_GUIDE,
+      'docs/tech-guide.md',
+      /화면에 보이지 않는 상한 ([\d,]+)자를 정책값으로/,
+    );
+    expect(DISPUTE_CONTENT_LIMIT).toBe(won(limit));
+  });
 });
