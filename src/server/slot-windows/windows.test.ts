@@ -1,5 +1,6 @@
-// 시간대 매물 가짜 결과 버전 (#308). 원장님 함수(등록·지난 설정·마감)와 고객 함수(목록·상세·[예약하기])의 결과 모양,
-// 권한, 실패 코드, 스위치를 본다. 로그인·DB 읽기·시각은 가짜로 바꿔서 DB 없이 돈다(실제 DB 읽기는 store.db.test.ts).
+// 시간대 매물 함수 (#308). 원장님 함수(등록·지난 설정·마감, 진짜 버전 ①)는 권한·확인·저장에 넘기는 값·실패 코드를,
+// 고객 함수(목록·상세·[예약하기], 아직 가짜 결과 버전)는 결과 모양과 스위치를 본다. 로그인·DB·시각은 가짜로 바꿔서 DB 없이 돈다
+// (실제 DB 읽기·저장은 store.db.test.ts, owner-store.db.test.ts).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -48,6 +49,10 @@ const state = vi.hoisted(() => ({
   occupied: [] as Range[],
   areaShops: [] as AreaShop[],
   profile: null as unknown,
+  inserted: [] as unknown[],
+  insertError: null as unknown,
+  closed: [] as unknown[],
+  closeOutcome: null as unknown,
 }));
 
 vi.mock('@/lib/request-time', () => ({ getRequestNow: async () => state.now }));
@@ -56,13 +61,33 @@ vi.mock('@/server/auth', () => ({
   requireCustomer: async () => state.customer,
 }));
 vi.mock('@/server/shops', () => ({ assertShopApproved: async () => state.approved }));
-vi.mock('@/db', () => ({ getDb: () => 'db' }));
+vi.mock('@/db', () => ({
+  getDb: () => ({ transaction: (run: (tx: string) => unknown) => run('tx') }),
+}));
 vi.mock('./store', () => ({
   readWindowShop: async () => ({ businessHours: [], menus: state.menus }),
   readShopBusyRanges: async () => state.busy,
   readOccupiedRanges: async () => state.occupied,
   readAreaShops: async () => state.areaShops,
   readWindowShopProfile: async () => state.profile,
+  insertSlotWindows: async (
+    tx: unknown,
+    input: { windows: { start: Date; end: Date; publishAt: Date; status: string }[] },
+  ) => {
+    if (state.insertError) throw state.insertError;
+    state.inserted.push({ tx, ...input });
+    return input.windows.map((window, index) => ({
+      id: `window-${index + 1}`,
+      startAt: window.start,
+      endAt: window.end,
+      publishAt: window.publishAt,
+      status: window.status,
+    }));
+  },
+  closeWindow: async (_db: unknown, input: unknown) => {
+    state.closed.push(input);
+    return state.closeOutcome;
+  },
 }));
 
 const { closeSlotWindow, createSlotWindows, getLastWindowSettings, holdWindowSlot } =
@@ -78,6 +103,10 @@ beforeEach(() => {
   state.owner = ok({ userId: 'owner-user', ownerId: 'owner-1', shopId: SHOP });
   state.customer = ok({ userId: 'customer-user', customerId: 'customer-1' });
   state.approved = ok(null);
+  state.inserted = [];
+  state.insertError = null;
+  state.closed = [];
+  state.closeOutcome = { ok: true, closedAt: NOW };
   state.now = NOW;
   state.menus = [CUT, PERM];
   state.busy = [];
@@ -118,34 +147,60 @@ describe('createSlotWindows (원장님)', () => {
     newCustomerOnly: false,
   };
 
-  it('스위치를 켜면 확인을 통과했을 때 묶음마다 시간대 결과(가짜 버전은 저장하지 않는다)', async () => {
-    fakeOn();
-    const result = await createSlotWindows(SHOP, input);
-    expect(result).toMatchObject({
+  it('확인을 통과하면 합친 묶음·서비스 값·만든 원장님을 한 트랜잭션으로 저장하고 저장한 시간대를 돌려준다', async () => {
+    const result = await createSlotWindows(SHOP, { ...input, newCustomerOnly: true });
+    expect(result).toEqual({
       ok: true,
       data: {
         windows: [
           {
-            windowId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+            windowId: 'window-1',
             startAt: at('10:00', 13).toISOString(),
             endAt: at('12:00', 13).toISOString(),
             publishAt: NOW.toISOString(),
             status: 'published',
           },
-          { startAt: at('13:00', 13).toISOString(), endAt: at('18:00', 13).toISOString() },
+          {
+            windowId: 'window-2',
+            startAt: at('13:00', 13).toISOString(),
+            endAt: at('18:00', 13).toISOString(),
+            publishAt: NOW.toISOString(),
+            status: 'published',
+          },
         ],
       },
     });
+    expect(state.inserted).toEqual([
+      {
+        tx: 'tx',
+        shopId: SHOP,
+        createdBy: 'owner-user',
+        newCustomerOnly: true,
+        windows: [
+          expect.objectContaining({ start: at('10:00', 13), end: at('12:00', 13) }),
+          expect.objectContaining({ start: at('13:00', 13), end: at('18:00', 13) }),
+        ],
+        menus: [
+          expect.objectContaining({ menuId: CUT.id, discountRate: 30, salePrice: 14_000 }),
+          expect.objectContaining({ menuId: PERM.id, discountRate: 20, salePrice: 64_000 }),
+        ],
+      },
+    ]);
   });
 
-  it('스위치가 꺼진 곳(배포 주소)에서는 확인을 통과해도 저장한 것처럼 성공하지 않는다', async () => {
+  it('확인 뒤 다른 요청이 같은 시간을 먼저 저장해서 DB가 막으면 WINDOW_OVERLAP, 다른 DB 오류는 그대로 던진다', async () => {
+    state.insertError = Object.assign(new Error('exclusion'), {
+      constraint_name: 'slot_windows_no_overlap',
+    });
     expect(await createSlotWindows(SHOP, input)).toEqual({
       ok: false,
-      error: { code: 'NOT_OPEN', message: '시간대 매물은 곧 열려요' },
+      error: { code: 'WINDOW_OVERLAP', message: '같은 시간에 이미 올린 매물이나 시간대가 있어요' },
     });
+    state.insertError = new Error('connection lost');
+    await expect(createSlotWindows(SHOP, input)).rejects.toThrow('connection lost');
   });
 
-  it('확인 실패는 스위치와 상관없이 코드와 문구로: 겹침, 긴 메뉴, 모양이 틀린 입력', async () => {
+  it('확인에 실패하면 저장하지 않고 코드와 문구로: 겹침, 긴 메뉴, 모양이 틀린 입력', async () => {
     state.busy = [{ start: at('17:00', 13), end: at('19:00', 13) }];
     expect(await createSlotWindows(SHOP, input)).toEqual({
       ok: false,
@@ -162,6 +217,7 @@ describe('createSlotWindows (원장님)', () => {
     expect(
       await createSlotWindows(SHOP, { ...input, ranges: [{ startAt: 'x', endAt: 'y' }] }),
     ).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+    expect(state.inserted).toEqual([]);
   });
 
   it('내 샵이 아니거나 입점 승인 전이면 그 실패', async () => {
@@ -185,34 +241,43 @@ describe('createSlotWindows (원장님)', () => {
 });
 
 describe('getLastWindowSettings·closeSlotWindow (원장님)', () => {
-  it('스위치를 끄면 지난 설정 없음, 켜면 숨기지 않은 메뉴 두 개를 30%로', async () => {
-    expect(await getLastWindowSettings(SHOP)).toEqual(ok(null));
-    fakeOn();
-    expect(await getLastWindowSettings(SHOP)).toEqual(
-      ok({
-        menus: [
-          { menuId: CUT.id, discountRate: 30 },
-          { menuId: PERM.id, discountRate: 30 },
-        ],
-        newCustomerOnly: false,
-      }),
-    );
+  const windowId = '99999999-9999-4999-8999-999999999999';
+
+  it('지난 설정: 내 샵이 아니면 그 실패', async () => {
+    state.owner = fail('FORBIDDEN', '권한이 없어요');
+    expect(await getLastWindowSettings(SHOP)).toEqual(fail('FORBIDDEN', '권한이 없어요'));
   });
 
-  it('마감: 스위치를 켜면 마감 시각, 꺼져 있으면 NOT_OPEN. 원장님이 고르지 않는 사유(hold_released)는 받지 않는다', async () => {
-    const windowId = '99999999-9999-4999-8999-999999999999';
-    expect(await closeSlotWindow(SHOP, { windowId, reason: 'mistake' })).toEqual({
-      ok: false,
-      error: { code: 'NOT_OPEN', message: '시간대 매물은 곧 열려요' },
-    });
-    fakeOn();
+  it('마감: 내 샵·시간대·고른 사유·서버 시각으로 마감하고 마감 시각을 돌려준다', async () => {
     expect(await closeSlotWindow(SHOP, { windowId, reason: 'mistake' })).toEqual(
       ok({ closedAt: NOW.toISOString() }),
     );
+    expect(state.closed).toEqual([{ shopId: SHOP, windowId, reason: 'mistake', now: NOW }]);
+  });
+
+  it('마감: 없는·남의 시간대, 이미 마감·끝난 시간대는 그 코드와 문구로', async () => {
+    state.closeOutcome = { ok: false, code: 'WINDOW_NOT_FOUND' };
+    expect(await closeSlotWindow(SHOP, { windowId, reason: 'mistake' })).toEqual({
+      ok: false,
+      error: { code: 'WINDOW_NOT_FOUND', message: '시간대를 찾을 수 없어요' },
+    });
+    state.closeOutcome = { ok: false, code: 'WINDOW_CLOSED' };
+    expect(await closeSlotWindow(SHOP, { windowId, reason: 'mistake' })).toEqual({
+      ok: false,
+      error: { code: 'WINDOW_CLOSED', message: '이미 마감한 시간대예요' },
+    });
+  });
+
+  it('마감: 원장님이 고르지 않는 사유(hold_released)나 모양이 틀린 id는 받지 않는다', async () => {
     expect(await closeSlotWindow(SHOP, { windowId, reason: 'hold_released' })).toMatchObject({
       ok: false,
       error: { code: 'INVALID_INPUT' },
     });
+    expect(await closeSlotWindow(SHOP, { windowId: 'x', reason: 'mistake' })).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_INPUT' },
+    });
+    expect(state.closed).toEqual([]);
   });
 });
 

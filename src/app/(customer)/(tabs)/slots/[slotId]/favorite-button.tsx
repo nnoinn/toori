@@ -17,18 +17,19 @@ const SAVE_FAILED_MESSAGE = '찜을 저장하지 못했어요. 잠시 후 다시
 
 /**
  * 샵 찜 버튼 (#215 2장, C-209). 누르면 바로 하트를 바꿔 보여주고 서버에 저장한다. 실패하면 원래대로 돌아오고 안내를 띄운다.
- * 로그인 안 함·원장님 모드면 로그인 화면으로, 고객 계정이 없으면 약관 동의로 보내고 이 매물로 돌아온다(예약하기와 같게).
+ * 로그인 안 함·원장님 모드면 로그인 화면으로, 고객 계정이 없으면 약관 동의로 보내고 이 화면(매물·시간대 상세)으로 돌아온다(예약하기와 같게).
  * 찜을 눌렀는데 관심 동네·찜한 샵 알림 동의가 없으면 그 순간에만 동의를 권하고, 동의하면 이 기기 알림 켜기를 보여준다(#270 3번).
  * 찜 저장은 동의와 상관없이 된다
  */
 export function FavoriteButton({
   shopId,
-  slotId,
+  returnPath,
   favorite,
   interestAlertAgreed,
 }: {
   shopId: string;
-  slotId: string;
+  /** 로그인·약관 동의 뒤 돌아올 주소(지금 보고 있는 상세) */
+  returnPath: string;
   /** 서버가 본 지금 찜 여부. 고객으로 로그인하지 않았으면 false */
   favorite: boolean;
   /** 관심 동네·찜한 샵 새 매물 알림에 동의했는지 */
@@ -62,7 +63,7 @@ export function FavoriteButton({
           if (next && !consent.agreed) setAskConsent(true);
           return;
         }
-        const here = `/slots/${slotId}`;
+        const here = returnPath;
         switch (result.error.code) {
           case 'UNAUTHENTICATED':
           case 'WRONG_MODE':
