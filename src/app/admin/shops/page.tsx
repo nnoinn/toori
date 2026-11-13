@@ -100,7 +100,9 @@ async function ShopList({ searchParams }: { searchParams: SearchParams }) {
                   <td className="px-4 py-3">{categoryLabel(row.category)}</td>
                   <td className="px-4 py-3">{row.businessName}</td>
                   <td className="px-4 py-3">{row.sigungu}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{formatKstDateTime(row.appliedAt)}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {formatKstDateTime(row.appliedAt)}
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {row.reviewedAt ? formatKstDateTime(row.reviewedAt) : '-'}
                   </td>
