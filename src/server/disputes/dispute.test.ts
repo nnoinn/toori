@@ -90,6 +90,7 @@ describe('getDisputeStatus', () => {
     state.target = {
       ...VISITED,
       dispute: {
+        id: 'dispute-0',
         type: 'after_start',
         status: 'open',
         createdAt: new Date('2026-11-12T01:00:00.000Z'),
@@ -223,7 +224,12 @@ describe('submitDispute', () => {
     state.now = kst('2026-11-12 12:00');
     state.target = {
       ...VISITED,
-      dispute: { type: 'refund_exception', status: 'resolved', createdAt: new Date() },
+      dispute: {
+        id: 'dispute-0',
+        type: 'refund_exception',
+        status: 'resolved',
+        createdAt: new Date(),
+      },
     };
     expect(
       await submitDispute({ reservationId: RESERVATION, type: 'after_start', content: CONTENT }),

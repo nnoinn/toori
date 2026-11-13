@@ -8,7 +8,6 @@ import { alias } from 'drizzle-orm/pg-core';
 
 import type { getDb } from '@/db';
 import {
-  disputes,
   ownerPenalties,
   refunds,
   reservations,
@@ -18,6 +17,7 @@ import {
 } from '@/db/schema';
 import type { CancelActor, ReservationStatus, VisitResult } from '@/db/schema/payments';
 import type { SettlementItemKind, SettlementStatus } from '@/db/schema/settlements';
+import { hasOpenDispute } from '@/server/disputes/conditions';
 
 import type { SettlementRow } from './settlement-view';
 
@@ -50,7 +50,8 @@ export async function readShopSettlementRows(
       discountRate: slots.discountRate,
       cancelPenaltyRate: cancelRefund.penaltyRate,
       hasAdminRefund: sql<boolean>`exists (select 1 from ${refunds} where ${refunds.reservationId} = ${reservations.id} and ${refunds.reason} = 'admin_exception')`,
-      hasOpenDispute: sql<boolean>`exists (select 1 from ${disputes} where ${disputes.reservationId} = ${reservations.id} and ${disputes.status} = 'open')`,
+      // 확인 중 이의제기가 있으면 정산 보류(#350 3장, 이의제기 쪽 조건 하나를 같이 쓴다)
+      hasOpenDispute: sql<boolean>`${hasOpenDispute(reservations.id)}`,
       itemId: settlementItems.id,
       itemKind: settlementItems.kind,
       baseAmount: settlementItems.baseAmount,

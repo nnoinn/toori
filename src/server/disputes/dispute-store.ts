@@ -13,15 +13,21 @@ import type { DisputeTarget } from './rules';
 
 type Tx = Pick<ReturnType<typeof getDb>, 'select' | 'insert'>;
 
-export type DisputeRecord = { type: DisputeType; status: DisputeStatus; createdAt: Date };
+export type DisputeRecord = {
+  id: string;
+  type: DisputeType;
+  status: DisputeStatus;
+  createdAt: Date;
+};
 
 /**
  * 내 예약의 규칙 값과 이미 접수한 이의제기(가장 먼저 접수한 것). 내 예약이 아니면 null.
+ * customerId가 null이면 고객을 가리지 않는다(운영자가 카카오톡 채널 건을 등록할 때, 권한은 부른 쪽이 확인한다).
  * lock이면 예약 줄을 잠근다(트랜잭션 안에서, 두 번 눌러도 한 번만 접수되게). 매물 줄은 잠그지 않는다
  */
 export async function readDisputeTarget(
   tx: Tx,
-  input: { reservationId: string; customerId: string; lock?: boolean },
+  input: { reservationId: string; customerId: string | null; lock?: boolean },
 ): Promise<(DisputeTarget & { dispute: DisputeRecord | null }) | null> {
   const query = tx
     .select({
@@ -34,13 +40,21 @@ export async function readDisputeTarget(
     .from(reservations)
     .innerJoin(slots, eq(slots.id, reservations.slotId))
     .where(
-      and(eq(reservations.id, input.reservationId), eq(reservations.customerId, input.customerId)),
+      and(
+        eq(reservations.id, input.reservationId),
+        input.customerId === null ? undefined : eq(reservations.customerId, input.customerId),
+      ),
     );
   const [row] = input.lock ? await query.for('update', { of: reservations }) : await query;
   if (!row) return null;
 
   const [dispute] = await tx
-    .select({ type: disputes.type, status: disputes.status, createdAt: disputes.createdAt })
+    .select({
+      id: disputes.id,
+      type: disputes.type,
+      status: disputes.status,
+      createdAt: disputes.createdAt,
+    })
     .from(disputes)
     .where(eq(disputes.reservationId, input.reservationId))
     .orderBy(asc(disputes.createdAt))
@@ -54,6 +68,7 @@ export async function readDisputeTarget(
     cancelledAt: row.cancelledAt,
     dispute: dispute
       ? {
+          id: dispute.id,
           type: dispute.type as DisputeType,
           status: dispute.status as DisputeStatus,
           createdAt: dispute.createdAt,

@@ -104,7 +104,12 @@ describeDb('이의제기 접수 저장 (실제 DB)', () => {
       expect(target).toMatchObject({
         status: 'cancelled',
         cancelledAt: new Date('2026-10-31T09:00:00+09:00'),
-        dispute: { type: 'refund_exception', status: 'open', createdAt: saved.createdAt },
+        dispute: {
+          id: saved.id,
+          type: 'refund_exception',
+          status: 'open',
+          createdAt: saved.createdAt,
+        },
       });
     });
   });
