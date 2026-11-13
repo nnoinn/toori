@@ -9,7 +9,11 @@ import { readShopReviewStatus } from '@/server/shops/review-store';
 
 import { JoinedNotice } from '../join/joined-notice';
 import { startOfKstDay } from '@/lib/time';
-import { selectDashboardSlots, selectNeedsVisitRecord } from './dashboard/dashboard-store';
+import {
+  selectDashboardSlots,
+  selectDashboardWindows,
+  selectNeedsVisitRecord,
+} from './dashboard/dashboard-store';
 import { OwnerDashboard } from './dashboard/owner-dashboard';
 import { OwnerPage } from './owner-page';
 import { ReviewStatusCard } from './review-status-card';
@@ -31,7 +35,7 @@ export default function OwnerHomePage() {
   );
 }
 
-/** 입점 승인 전이면 입점 상태 안내, 승인됐으면 오늘 0시 이후 매물과 처리 필요 예약으로 대시보드를 그린다 */
+/** 입점 승인 전이면 입점 상태 안내, 승인됐으면 오늘 0시 이후 매물·시간대와 처리 필요 예약으로 대시보드를 그린다 */
 async function OwnerHomeContent() {
   // 로그인하지 않았으면 로그인 화면, 원장님 가입 전이면 /owner/join 으로 보낸다
   const auth = await ensureOwnerPage(PAGE_PATH);
@@ -40,8 +44,9 @@ async function OwnerHomeContent() {
   if (review && review.status !== 'approved') return <ReviewStatusCard review={review} />;
 
   const now = await getRequestNow();
-  const [slots, needsVisit] = await Promise.all([
+  const [slots, windows, needsVisit] = await Promise.all([
     selectDashboardSlots(db, auth.shopId, startOfKstDay(now)),
+    selectDashboardWindows(db, auth.shopId, startOfKstDay(now), now),
     selectNeedsVisitRecord(db, auth.shopId, now),
   ]);
   return (
@@ -49,6 +54,7 @@ async function OwnerHomeContent() {
       shopId={auth.shopId}
       nowIso={now.toISOString()}
       slots={slots}
+      windows={windows}
       needsVisit={needsVisit}
     />
   );
