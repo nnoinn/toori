@@ -3,7 +3,7 @@
 
 import { afterAll, expect, it } from 'vitest';
 
-import { refunds } from '@/db/schema';
+import { agreedCancelRequests, refunds } from '@/db/schema';
 
 import {
   createTestCustomer,
@@ -15,6 +15,9 @@ import { closeTestDb, describeDb, withRollback } from '../../../../../tests/db/t
 import { selectMyReservationDetail, selectMyReservations } from './queries';
 
 afterAll(closeTestDb);
+
+/** 테스트 예약(11/1)은 모두 시작 전 */
+const NOW = new Date('2026-10-31T09:00:00+09:00');
 
 describeDb('내 예약 조회', () => {
   it('본인 예약만, 탭별로, 예정은 가까운 순', async () => {
@@ -30,17 +33,107 @@ describeDb('내 예약 조회', () => {
       });
       await createTestReservation(tx, shop, other.customerId, '13:00', '14:00', 'confirmed');
 
-      const upcoming = await selectMyReservations(tx, me.customerId, 'upcoming');
+      const upcoming = await selectMyReservations(tx, me.customerId, 'upcoming', NOW);
       expect(upcoming.map((item) => new Date(item.startAt).getUTCHours())).toEqual([2, 6]); // 11시, 15시(한국)
       // 카드의 "~ 끝 시각"(#359 2번): 12시, 16시(한국)
       expect(upcoming.map((item) => new Date(item.endAt).getUTCHours())).toEqual([3, 7]);
       expect(upcoming.every((item) => !item.noShow)).toBe(true);
 
-      const completed = await selectMyReservations(tx, me.customerId, 'completed');
+      const completed = await selectMyReservations(tx, me.customerId, 'completed', NOW);
       expect(completed).toHaveLength(1);
       expect(completed[0].noShow).toBe(true);
 
-      expect(await selectMyReservations(tx, me.customerId, 'cancelled')).toEqual([]);
+      expect(await selectMyReservations(tx, me.customerId, 'cancelled', NOW)).toEqual([]);
+    });
+  });
+
+  it('합의 후 취소 요청 뱃지: 가장 최근 요청이 답 기한 전이면 붙고, 거절·만료면 없다(#359 3번)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const me = await createTestCustomer(tx);
+      const request = (
+        reservationId: string,
+        status: 'requested' | 'declined',
+        requestedAt: string,
+        expiresAt: string,
+      ) =>
+        tx.insert(agreedCancelRequests).values({
+          reservationId,
+          requestedBy: shop.createdBy,
+          reason: 'style_mismatch',
+          status,
+          requestedAt: new Date(requestedAt),
+          expiresAt: new Date(expiresAt),
+          respondedAt: status === 'declined' ? new Date(requestedAt) : null,
+        });
+
+      const pending = await createTestReservation(
+        tx,
+        shop,
+        me.customerId,
+        '10:00',
+        '11:00',
+        'confirmed',
+      );
+      const expired = await createTestReservation(
+        tx,
+        shop,
+        me.customerId,
+        '12:00',
+        '13:00',
+        'confirmed',
+      );
+      const declinedThenAgain = await createTestReservation(
+        tx,
+        shop,
+        me.customerId,
+        '14:00',
+        '15:00',
+        'confirmed',
+      );
+      const declined = await createTestReservation(
+        tx,
+        shop,
+        me.customerId,
+        '16:00',
+        '17:00',
+        'confirmed',
+      );
+      // 지금(10/31 09:00) 기준: 답 기한 전 / 답 기한 지남(상태는 아직 requested)
+      await request(
+        pending.reservation.id,
+        'requested',
+        '2026-10-31T08:00:00+09:00',
+        '2026-11-01T08:00:00+09:00',
+      );
+      await request(
+        expired.reservation.id,
+        'requested',
+        '2026-10-30T08:00:00+09:00',
+        '2026-10-31T08:00:00+09:00',
+      );
+      // 거절한 뒤 원장님이 다시 요청 → 가장 최근 요청으로 본다
+      await request(
+        declinedThenAgain.reservation.id,
+        'declined',
+        '2026-10-30T08:00:00+09:00',
+        '2026-10-31T08:00:00+09:00',
+      );
+      await request(
+        declinedThenAgain.reservation.id,
+        'requested',
+        '2026-10-31T08:30:00+09:00',
+        '2026-11-01T08:30:00+09:00',
+      );
+      await request(
+        declined.reservation.id,
+        'declined',
+        '2026-10-31T08:00:00+09:00',
+        '2026-11-01T08:00:00+09:00',
+      );
+
+      const upcoming = await selectMyReservations(tx, me.customerId, 'upcoming', NOW);
+      expect(upcoming.map((item) => item.agreedCancelPending)).toEqual([true, false, true, false]);
     });
   });
 
