@@ -1,9 +1,9 @@
 // 시간대 매물 DB 읽기를 실제 DB(TEST_DATABASE_URL이 있을 때만)로 확인한다 (#308). 고객 목록·상세 읽기는 진짜 버전 ②.
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
-import { menus, slots, slotWindows } from '@/db/schema';
+import { menus, orders, slots, slotWindows } from '@/db/schema';
 
 import {
   createTestCustomer,
@@ -104,7 +104,7 @@ describeDb('시간대 매물 DB 읽기 (실제 DB)', () => {
     });
   });
 
-  it('고객 시작 시각의 차 있는 시간: 결제 없이 홀딩이 끝난 시간대 안 매물은 비어 있는 것으로 본다', async () => {
+  it('고객 시작 시각의 차 있는 시간: 결제 없이 홀딩이 끝난 시간대 안 매물은 비어 있는 것으로 보고, 결제 대기 주문이 있으면 막는다', async () => {
     await withRollback(async (tx) => {
       const db = tx as unknown as Db;
       const shop = await createTestShop(tx, { status: 'approved' });
@@ -138,6 +138,26 @@ describeDb('시간대 매물 DB 읽기 (실제 DB)', () => {
       const occupied = await readOccupiedRanges(db, { shopId: shop.shopId, ...DAY, now });
       expect(occupied.map((range) => range.start.toISOString()).sort()).toEqual(
         [at('13:00'), at('15:00')].map((date) => date.toISOString()).sort(),
+      );
+
+      // 홀딩이 끝났어도 결제 대기 주문이 있으면(결제는 했는데 확인이 늦을 수 있다) 그 시간을 막는다(#308 ③)
+      const [expired] = await tx
+        .select({ id: slots.id })
+        .from(slots)
+        .where(and(eq(slots.windowId, window.id), eq(slots.startAt, at('14:00'))));
+      await tx.insert(orders).values({
+        paymentId: `test_${crypto.randomUUID()}`,
+        slotId: expired.id,
+        customerId,
+        salePrice: 14_000,
+        amount: 14_000,
+        refundPolicyVersion: 'test',
+        refundPolicyAgreedAt: now,
+        status: 'pending',
+      });
+      const withPending = await readOccupiedRanges(db, { shopId: shop.shopId, ...DAY, now });
+      expect(withPending.map((range) => range.start.toISOString()).sort()).toEqual(
+        [at('13:00'), at('14:00'), at('15:00')].map((date) => date.toISOString()).sort(),
       );
     });
   });
