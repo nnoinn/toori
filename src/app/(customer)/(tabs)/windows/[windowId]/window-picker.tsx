@@ -7,6 +7,7 @@ import { Clock } from 'lucide-react';
 import { cn } from 'cn';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Countdown } from '@/components/ui/countdown';
 import { Price } from '@/components/ui/price';
 import { type SlotBadgeKind, SlotBadges } from '@/components/ui/slot-badge';
@@ -114,9 +115,10 @@ export function WindowPicker({ window }: { window: SlotWindowDetail }) {
 
   return (
     <>
-      <section
-        className="flex flex-col gap-4 px-4 py-4 md:sticky md:top-22 md:col-start-2 md:row-span-2 md:row-start-1 md:max-h-[calc(100dvh-6.5rem)] md:overflow-y-auto md:rounded-2xl md:border md:bg-card md:p-5"
+      <Card
+        role="region"
         aria-label="서비스와 시작 시각 고르기"
+        className="mx-4 gap-4 px-4 text-base md:sticky md:top-22 md:col-start-2 md:row-span-2 md:row-start-1 md:mx-0 md:max-h-[calc(100dvh-6.5rem)] md:overflow-y-auto md:p-5"
       >
         <div className="flex flex-col gap-1.5">
           <p className="text-sm text-muted-foreground">{window.shop.name}</p>
@@ -242,7 +244,7 @@ export function WindowPicker({ window }: { window: SlotWindowDetail }) {
         <div className="hidden md:sticky md:-bottom-5 md:-mx-5 md:block md:border-t md:bg-card md:px-5 md:py-3">
           {reserveBlock}
         </div>
-      </section>
+      </Card>
 
       <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 mx-auto w-full max-w-[480px] border-t bg-background p-3 md:hidden">
         {reserveBlock}

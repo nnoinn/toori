@@ -1,5 +1,6 @@
 import { Clock } from 'lucide-react';
 
+import { Card } from '@/components/ui/card';
 import { Countdown } from '@/components/ui/countdown';
 import { Price } from '@/components/ui/price';
 import { SlotBadges } from '@/components/ui/slot-badge';
@@ -22,8 +23,8 @@ type SlotDetailViewProps = {
 
 /**
  * 매물 상세 (J7, C-301~C-305, C-308).
- * 폰: 사진 → 정보 → 샵 정보 한 줄, 아래 고정 예약 바. 예약하기는 10분 홀딩을 걸고 예약 확인 화면으로 간다(reserve-button.tsx).
- * PC(md 이상): 가운데 최대 1024px 두 칸. 왼쪽 사진·샵 정보, 오른쪽 정보·가격·예약하기 상자(스크롤해도 따라온다).
+ * 폰: 사진 → 정보 카드 → 샵 정보 카드(회색 배경 위 흰 카드, #359 2번), 아래 고정 예약 바. 예약하기는 10분 홀딩을 걸고 예약 확인 화면으로 간다(reserve-button.tsx).
+ * PC(md 이상): 가운데 최대 1024px 두 칸. 왼쪽 사진·샵 정보 카드, 오른쪽 정보·가격·예약하기 카드(스크롤해도 따라온다).
  * 사진·샵 정보·환불 규정은 시간대 상세(#308)와 같이 쓴다(detail-parts.tsx)
  */
 export function SlotDetailView({
@@ -37,10 +38,10 @@ export function SlotDetailView({
 
   return (
     // PC: 오른쪽 카드가 두 줄에 걸쳐 있다. 둘째 줄(샵 정보)을 1fr로 두어 카드 높이가 첫 줄(사진·안내)을 늘리지 않게 한다
-    <article className="flex flex-1 flex-col pb-24 md:mx-auto md:grid md:w-full md:max-w-5xl md:grid-cols-[minmax(0,1fr)_380px] md:grid-rows-[auto_1fr] md:items-start md:gap-x-8 md:px-6 md:py-6">
+    <article className="flex flex-1 flex-col gap-3 pb-24 md:mx-auto md:grid md:w-full md:max-w-5xl md:grid-cols-[minmax(0,1fr)_380px] md:grid-rows-[auto_1fr] md:items-start md:gap-x-8 md:gap-y-6 md:px-6 md:py-6">
       <DetailTop imageUrls={slot.imageUrls} shopName={shop.name} photosKey={slot.slotId} />
 
-      <section className="flex flex-col gap-3 px-4 py-4 md:sticky md:top-22 md:col-start-2 md:row-span-2 md:row-start-1 md:rounded-2xl md:border md:bg-card md:p-5">
+      <Card className="mx-4 gap-3 px-4 text-base md:sticky md:top-22 md:col-start-2 md:row-span-2 md:row-start-1 md:mx-0 md:p-5">
         <p className="text-sm text-muted-foreground">{shop.name}</p>
         <h1 className="text-xl font-bold">{menu.name}</h1>
         <SlotBadges kinds={slot.badges} />
@@ -72,7 +73,7 @@ export function SlotDetailView({
         <div className="hidden md:block">
           <ReserveButton slotId={slot.slotId} availability={slot.availability} />
         </div>
-      </section>
+      </Card>
 
       <ShopInfoSection
         shop={shop}
