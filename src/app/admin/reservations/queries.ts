@@ -9,6 +9,9 @@ import { and, asc, desc, eq, ilike, or, type SQL, sql } from 'drizzle-orm';
 import type { getDb } from '@/db';
 import {
   customers,
+  type DisputeOutcome,
+  disputes,
+  type DisputeStatus,
   orders,
   refunds,
   type ReservationStatus,
@@ -191,6 +194,8 @@ export type ReservationDetail = {
   couponAmount: number;
   amount: number;
   refunds: RefundRow[];
+  /** 이 예약의 이의제기(한 예약에 하나). 없으면 null. 있으면 [이의제기 등록] 대신 그 상세로 보낸다 */
+  dispute: { disputeId: string; status: DisputeStatus; outcome: DisputeOutcome | null } | null;
 };
 
 /** 예약 상세. 없으면 null */
@@ -249,11 +254,23 @@ export async function selectReservationDetail(
     .where(eq(refunds.reservationId, reservationId))
     .orderBy(asc(refunds.createdAt));
 
+  const [dispute] = await db
+    .select({ disputeId: disputes.id, status: disputes.status, outcome: disputes.outcome })
+    .from(disputes)
+    .where(eq(disputes.reservationId, reservationId));
+
   return {
     ...row,
     // DB의 check 제약이 정해 둔 값만 허용한다
     status: row.status as ReservationStatus,
     visitResult: row.visitResult as VisitResult | null,
     refunds: refundRows,
+    dispute: dispute
+      ? {
+          disputeId: dispute.disputeId,
+          status: dispute.status as DisputeStatus,
+          outcome: dispute.outcome as DisputeOutcome | null,
+        }
+      : null,
   };
 }
