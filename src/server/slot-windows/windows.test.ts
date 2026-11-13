@@ -87,8 +87,8 @@ vi.mock('./store', () => ({
       status: window.status,
     }));
   },
-  closeWindow: async (_db: unknown, input: unknown) => {
-    state.closed.push(input);
+  closeWindow: async (db: unknown, input: object) => {
+    state.closed.push({ db, ...input });
     return state.closeOutcome;
   },
 }));
@@ -112,7 +112,7 @@ beforeEach(() => {
   state.inserted = [];
   state.insertError = null;
   state.closed = [];
-  state.closeOutcome = { ok: true, closedAt: NOW };
+  state.closeOutcome = { ok: true, closedAt: NOW, keptSlots: [] };
   state.now = NOW;
   state.menus = [CUT, PERM];
   state.busy = [];
@@ -242,11 +242,43 @@ describe('getLastWindowSettings·closeSlotWindow (원장님)', () => {
     expect(await getLastWindowSettings(SHOP)).toEqual(fail('FORBIDDEN', '권한이 없어요'));
   });
 
-  it('마감: 내 샵·시간대·고른 사유·서버 시각으로 마감하고 마감 시각을 돌려준다', async () => {
+  it('마감: 내 샵·시간대·고른 사유·서버 시각으로 한 트랜잭션에서 마감하고 마감 시각을 돌려준다', async () => {
     expect(await closeSlotWindow(SHOP, { windowId, reason: 'mistake' })).toEqual(
-      ok({ closedAt: NOW.toISOString() }),
+      ok({ closedAt: NOW.toISOString(), keptSlots: [] }),
     );
-    expect(state.closed).toEqual([{ shopId: SHOP, windowId, reason: 'mistake', now: NOW }]);
+    expect(state.closed).toEqual([
+      { db: 'tx', shopId: SHOP, windowId, reason: 'mistake', now: NOW },
+    ]);
+  });
+
+  it('마감: 손님이 결제 중이라 남긴 칸을 시각·서비스·홀딩 끝 시각과 함께 돌려준다(#308 ③-2)', async () => {
+    state.closeOutcome = {
+      ok: true,
+      closedAt: NOW,
+      keptSlots: [
+        {
+          slotId: 'slot-1',
+          startAt: at('14:00', 13),
+          endAt: at('15:00', 13),
+          menuName: '커트',
+          holdExpiresAt: at('12:07'),
+        },
+      ],
+    };
+    expect(await closeSlotWindow(SHOP, { windowId, reason: 'other_channel' })).toEqual(
+      ok({
+        closedAt: NOW.toISOString(),
+        keptSlots: [
+          {
+            slotId: 'slot-1',
+            startAt: at('14:00', 13).toISOString(),
+            endAt: at('15:00', 13).toISOString(),
+            menuName: '커트',
+            holdExpiresAt: at('12:07').toISOString(),
+          },
+        ],
+      }),
+    );
   });
 
   it('마감: 없는·남의 시간대, 이미 마감·끝난 시간대는 그 코드와 문구로', async () => {

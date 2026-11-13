@@ -30,6 +30,7 @@ import {
   readWindowShop,
 } from './store';
 import type {
+  ClosedSlotWindow,
   CreatedSlotWindow,
   CreateSlotWindowsInput,
   HoldWindowSlotInput,
@@ -132,27 +133,41 @@ const closeSchema = z.object({
 });
 
 /**
- * 원장님 시간대 [마감](사유 기록). 안에서 결제가 끝난 예약과 지금 결제 중인 칸은 그대로다(#308 질문 1, 추천안).
+ * 원장님 시간대 [마감](사유 기록). 결제가 끝난 예약은 그대로이고, 손님이 결제 중인 칸은 남겨서 keptSlots로 돌려준다
+ * (#308 질문 1, 11/13 nnoinn). 마감 화면은 남긴 칸을 바로 알린다. 남긴 칸은 결제하면 예약으로 남고(원장님 새 예약 알림에
+ * "마감 전에 결제를 시작한 손님"), 결제 없이 끝나면 닫히면서 원장님에게 알림이 간다.
  * 없거나 남의 시간대면 WINDOW_NOT_FOUND, 이미 마감했거나 시간이 지났으면 WINDOW_CLOSED
  */
 export async function closeSlotWindow(
   shopId: string,
   input: { windowId: string; reason: string },
-): Promise<SlotWindowResult<{ closedAt: string }>> {
+): Promise<SlotWindowResult<ClosedSlotWindow>> {
   const auth = await requireShopOwner(shopId);
   if (!auth.ok) return auth;
   const parsed = closeSchema.safeParse(input);
   if (!parsed.success) return slotWindowFail('INVALID_INPUT');
   const switched = fakeWindowFailure('closeSlotWindow');
   if (switched) return switched;
-  const closed = await closeWindow(getDb(), {
-    shopId,
-    windowId: parsed.data.windowId,
-    reason: parsed.data.reason,
-    now: await getRequestNow(),
-  });
+  const now = await getRequestNow();
+  const closed = await getDb().transaction((tx) =>
+    closeWindow(tx, {
+      shopId,
+      windowId: parsed.data.windowId,
+      reason: parsed.data.reason,
+      now,
+    }),
+  );
   if (!closed.ok) return slotWindowFail(closed.code);
-  return ok({ closedAt: closed.closedAt.toISOString() });
+  return ok({
+    closedAt: closed.closedAt.toISOString(),
+    keptSlots: closed.keptSlots.map((slot) => ({
+      slotId: slot.slotId,
+      startAt: slot.startAt.toISOString(),
+      endAt: slot.endAt.toISOString(),
+      menuName: slot.menuName,
+      holdExpiresAt: slot.holdExpiresAt.toISOString(),
+    })),
+  });
 }
 
 const holdSchema = z.object({
