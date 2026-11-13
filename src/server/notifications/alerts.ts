@@ -93,7 +93,7 @@ export function notifyReservationCancelled(
   sendAfterResponse(event, async () => {
     const alert = await readReservationAlert(db, reservationId);
     if (!alert) return;
-    const canRelist = alert.startAt.getTime() > now.getTime();
+    const canRelist = alert.startAt.getTime() < now.getTime();
     const ownerAlert = canRelist
       ? {
           title: '예약 건이 취소되었습니다',
