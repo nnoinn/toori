@@ -369,6 +369,24 @@ describe('notifyKeptWindowSlotsReleased', () => {
     ]);
   });
 
+  it('자정을 넘겨 끝나는 칸은 끝 시각에 "(익일)"을 붙인다(끝나는 시각 표기 11/13)', async () => {
+    state.keptRows = [
+      {
+        slotId: 'slot-late',
+        ownerUserId: 'owner-user',
+        menuName: '커트',
+        // 한국 시간 11/14(토) 23:00 ~ 11/15 01:00
+        startAt: new Date('2026-11-14T14:00:00.000Z'),
+        endAt: new Date('2026-11-14T16:00:00.000Z'),
+      },
+    ];
+    notifyKeptWindowSlotsReleased(db, ['slot-late']);
+    await runAfterTasks();
+    expect(state.notified).toMatchObject([
+      { body: '결제가 끝나지 않아 11/14(토) 23:00~01:00(익일)(커트)도 닫았어요' },
+    ]);
+  });
+
   it('고른 칸이 없으면 보내지 않고, 칸 id가 없으면 읽지도 않는다', async () => {
     notifyKeptWindowSlotsReleased(db, ['slot-9']);
     await runAfterTasks();

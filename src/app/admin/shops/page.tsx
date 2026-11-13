@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/state';
 import { getDb } from '@/db';
-import { formatKst } from '@/lib/time';
+import { formatKstDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
@@ -100,9 +100,11 @@ async function ShopList({ searchParams }: { searchParams: SearchParams }) {
                   <td className="px-4 py-3">{categoryLabel(row.category)}</td>
                   <td className="px-4 py-3">{row.businessName}</td>
                   <td className="px-4 py-3">{row.sigungu}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{formatKst(row.appliedAt)}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    {row.reviewedAt ? formatKst(row.reviewedAt) : '-'}
+                    {formatKstDateTime(row.appliedAt)}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {row.reviewedAt ? formatKstDateTime(row.reviewedAt) : '-'}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={row.status} />
