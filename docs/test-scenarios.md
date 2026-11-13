@@ -90,6 +90,7 @@ PR 검사가 자동으로 막는 것:
 | HOLD-06 | 같은 주문을 동시에 두 번 확인해도 예약은 하나다 | W11 | ✅ | `src/server/payments/confirm-concurrency.db.test.ts` 같은 주문을 동시에 두 번 확인해도 예약은 하나 |
 | HOLD-07 | 원장님 모드로는 예약·결제할 수 없다 | X-101 | ✅ | `src/server/auth/require.test.ts` 원장님 모드면 WRONG_MODE |
 | HOLD-08 | 예약이 확정되면 고객과 원장님에게 각자의 문구로 알린다 | #131 | ✅ | `src/server/notifications/alerts.test.ts` 고객과 원장님에게 각자의 문구와 주소로 보낸다 |
+| HOLD-09 | 지금 내 홀딩(결제 중 막대)은 만료 전인 내 홀딩 하나만 보여 준다. 남의 홀딩, 끝난 홀딩, 예약된 매물은 보이지 않고, 로그인 안 함·원장님 모드·고객 계정 없음은 오류 없이 "없음"이다 | C-404·#363 | ✅ | `src/server/payments/hold-store.db.test.ts` 지금 내 홀딩: 살아 있는 내 홀딩만<br>`src/server/payments/checkout.test.ts` 로그인 안 함·원장님 모드·고객 계정 없음도 오류가 아니라 null |
 
 ## 6. 고객 취소·환불
 
