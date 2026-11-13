@@ -21,7 +21,7 @@ import {
 } from '@/db/schema';
 import { normalizePhone } from '@/lib/phone';
 import { type OptionalConsents, readOptionalConsents } from '@/server/auth/account-store';
-import { notHoldReleasedSlot } from '@/server/slots/visibility';
+import { ownerListedSlot } from '@/server/slots/visibility';
 
 import { ADMIN_LIST_LIMIT, containsPattern, type ListResult, toListResult } from '../lookup';
 
@@ -95,7 +95,10 @@ export type OwnerRow = {
   shopId: string | null;
   shopName: string | null;
   shopStatus: ShopStatus | null;
-  /** 원장님이 올린 매물 수. 손님이 시간대 안에서 만들었다가 결제 없이 비운 칸(hold_released)은 세지 않는다(#308 ④) */
+  /**
+   * 원장님이 올린 매물 수. 손님이 시간대 안에서 만들었다가 결제 없이 비운 칸(hold_released)과 아직 결제 중인 시간대 칸은
+   * 세지 않는다(#308 ③④, ownerListedSlot)
+   */
   slotCount: number;
 };
 
@@ -126,7 +129,7 @@ export async function selectOwners(db: DbReader, query: string): Promise<ListRes
     .from(owners)
     .innerJoin(profiles, eq(profiles.id, owners.userId))
     .leftJoin(shops, eq(shops.ownerId, owners.id))
-    .leftJoin(slots, and(eq(slots.shopId, shops.id), notHoldReleasedSlot()))
+    .leftJoin(slots, and(eq(slots.shopId, shops.id), ownerListedSlot()))
     .where(where)
     .groupBy(owners.id, shops.id)
     .orderBy(desc(owners.createdAt))
