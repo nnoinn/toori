@@ -4,7 +4,6 @@
 // 사진은 화면이 강규민님 업로드 주소(createShopImageUploadUrl)로 Storage에 직접 올린 뒤 saveShopImage로 정보를 저장한다(#47, D6).
 // 승인 전에도 사진·링크를 입력할 수 있다(#23 D11).
 
-import { TransactionRollbackError } from 'drizzle-orm';
 import { refresh } from 'next/cache';
 import { isUuid } from '@/lib/uuid';
 
@@ -21,10 +20,11 @@ import {
   shopImageInputSchema,
   validateShopLinks,
 } from './shop-images';
+import { isIdList } from '../reorder';
 import {
   deleteShopImage as deleteShopImageInDb,
   insertShopImage,
-  moveStyleImage,
+  saveStyleImageOrder,
   setStyleImageMenu,
   updateShopLinks,
 } from './shop-images-store';
@@ -63,31 +63,20 @@ export async function deleteShopImage(shopId: string, imageId: string): Promise<
   return ok(null);
 }
 
-/** 스타일 사진을 한 칸 앞·뒤로 옮긴다 */
-export async function moveShopImage(
-  shopId: string,
-  imageId: string,
-  direction: 'up' | 'down',
-): Promise<Result<null>> {
+/**
+ * 스타일 사진을 끌어 놓은 전체 순서(imageIds)로 저장한다(#358 2번).
+ * 그사이 목록이 바뀌었으면 저장하지 않고 화면을 지금 목록으로 새로 그린다
+ */
+export async function reorderStyleImages(shopId: string, imageIds: unknown): Promise<Result<null>> {
   const auth = await requireShopOwner(shopId);
   if (!auth.ok) return auth;
-  if (!isUuid(imageId) || (direction !== 'up' && direction !== 'down')) {
-    return fail('IMAGE_NOT_FOUND', SHOP_IMAGE_ERRORS.NOT_FOUND);
-  }
-  // 순서를 0부터 다시 매기는 여러 줄을 한 트랜잭션으로 고친다(메뉴 순서 바꾸기와 같게).
-  // 빠르게 두 번 누르거나 중간에 실패해도 순서가 겹치거나 반만 바뀌지 않는다
-  let moved = false;
-  try {
-    await getDb().transaction(async (tx) => {
-      moved = await moveStyleImage(tx, shopId, imageId, direction);
-      if (!moved) tx.rollback();
-    });
-  } catch (error) {
-    if (!(error instanceof TransactionRollbackError)) throw error;
-  }
-  if (!moved) return fail('IMAGE_NOT_FOUND', SHOP_IMAGE_ERRORS.NOT_FOUND);
+  if (!isIdList(imageIds)) return fail('IMAGE_ORDER_CHANGED', SHOP_IMAGE_ERRORS.ORDER_CHANGED);
+
+  // 순서를 0부터 다시 매기는 여러 줄을 한 트랜잭션으로 고친다(메뉴 순서와 같게).
+  // 중간에 실패해도 순서가 겹치거나 반만 바뀌지 않는다
+  const saved = await getDb().transaction((tx) => saveStyleImageOrder(tx, shopId, imageIds));
   refresh();
-  return ok(null);
+  return saved ? ok(null) : fail('IMAGE_ORDER_CHANGED', SHOP_IMAGE_ERRORS.ORDER_CHANGED);
 }
 
 /** 스타일 사진에 메뉴를 연결하거나 끊는다(menuId null) */

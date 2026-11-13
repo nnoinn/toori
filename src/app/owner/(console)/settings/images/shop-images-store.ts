@@ -12,7 +12,7 @@ import { menus, shopImages, shops } from '@/db/schema';
 import type { ShopImageKind } from '@/db/schema/shops';
 import { fail, ok, type Result } from '@/lib/result';
 
-import { moveOneStep } from '../reorder';
+import { checkReorder } from '../reorder';
 import { SHOP_IMAGE_ERRORS, SHOP_IMAGE_LIMITS, type ShopLinks } from './shop-images';
 
 type Db = ReturnType<typeof getDb>;
@@ -141,27 +141,24 @@ export async function deleteShopImage(
 }
 
 /**
- * 스타일 사진 하나를 한 칸 앞·뒤로 옮긴다. 스타일 사진 순서를 0부터 다시 매긴다.
- * 그 샵의 스타일 사진이 아니면 false, 맨 앞·맨 뒤라 못 옮기면 바꾸지 않고 true
+ * 스타일 사진을 끌어 놓은 전체 순서(imageIds)대로 0부터 다시 매긴다(#358 2번).
+ * imageIds가 지금 그 샵의 스타일 사진과 같은 것들이 아니면 바꾸지 않고 false
+ * (다른 샵 사진·대표 사진이 섞임, 다른 창에서 사진을 올리거나 지워서 목록이 바뀜)
  */
-export async function moveStyleImage(
+export async function saveStyleImageOrder(
   db: Pick<Db, 'select' | 'update'>,
   shopId: string,
-  imageId: string,
-  direction: 'up' | 'down',
+  imageIds: readonly string[],
 ): Promise<boolean> {
   const styles = await db
     .select({ id: shopImages.id })
     .from(shopImages)
-    .where(and(eq(shopImages.shopId, shopId), eq(shopImages.kind, 'style')))
-    .orderBy(asc(shopImages.sortOrder), asc(shopImages.createdAt));
-  const ordered = moveOneStep(
+    .where(and(eq(shopImages.shopId, shopId), eq(shopImages.kind, 'style')));
+  const ordered = checkReorder(
     styles.map((image) => image.id),
-    imageId,
-    direction,
+    imageIds,
   );
-  if (ordered === 'not-found') return false;
-  if (ordered === 'edge') return true;
+  if (ordered === 'changed') return false;
   for (const [sortOrder, id] of ordered.entries()) {
     await db.update(shopImages).set({ sortOrder }).where(byShopAndId(shopId, id));
   }
