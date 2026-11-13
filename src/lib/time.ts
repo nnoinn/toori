@@ -49,6 +49,34 @@ export function formatKstTime(date: Date): string {
   return `${pad2(t.hour)}:${pad2(t.minute)}`;
 }
 
+/** 다음 날을 나타내는 표시. 영업시간의 닫는 시각과 끝나는 시각에 같이 쓴다(11/12·11/13 nnoinn) */
+export const NEXT_DAY_MARK = '(익일)';
+
+/** 시각 글자 뒤에 다음 날 표시를 붙인다. 예: "02:00" → "02:00(익일)" */
+export function withNextDayMark(time: string): string {
+  return `${time}${NEXT_DAY_MARK}`;
+}
+
+/**
+ * 끝나는 시각. 시작과 같은 날(한국 날짜)이면 "16:00", 다음 날이면 "00:00(익일)"·"01:00(익일)".
+ * "24:00"·"다음 날 01:00"은 쓰지 않는다(11/13 nnoinn). 매물·시간대·예약 화면이 같이 쓴다. ISO 문자열도 받는다
+ */
+export function formatEndTime(startAt: Date | string, endAt: Date | string): string {
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  const time = formatKstTime(end);
+  return kstDateKey(start) === kstDateKey(end) ? time : withNextDayMark(time);
+}
+
+/**
+ * 운영자 목록·계정 이력의 기록 시각. 예: "2026-11-02 18:22"(한국 시간, 연도 넣고 요일 뺌, 11/13 nnoinn).
+ * 기록이 해를 넘겨 쌓이므로 연도를 꼭 넣는다. ISO 문자열도 받는다
+ */
+export function formatKstDateTime(date: Date | string): string {
+  const value = new Date(date);
+  return `${kstDateKey(value)} ${formatKstTime(value)}`;
+}
+
 /** target까지 남은 시간(밀리초). 이미 지났으면 음수 */
 export function msUntil(target: Date, now: Date): number {
   return target.getTime() - now.getTime();

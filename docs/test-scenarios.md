@@ -90,6 +90,7 @@ PR 검사가 자동으로 막는 것:
 | HOLD-06 | 같은 주문을 동시에 두 번 확인해도 예약은 하나다 | W11 | ✅ | `src/server/payments/confirm-concurrency.db.test.ts` 같은 주문을 동시에 두 번 확인해도 예약은 하나 |
 | HOLD-07 | 원장님 모드로는 예약·결제할 수 없다 | X-101 | ✅ | `src/server/auth/require.test.ts` 원장님 모드면 WRONG_MODE |
 | HOLD-08 | 예약이 확정되면 고객과 원장님에게 각자의 문구로 알린다 | #131 | ✅ | `src/server/notifications/alerts.test.ts` 고객과 원장님에게 각자의 문구와 주소로 보낸다 |
+| HOLD-09 | 지금 내 홀딩(결제 중 막대)은 만료 전인 내 홀딩 하나만 보여 준다. 남의 홀딩, 끝난 홀딩, 예약된 매물은 보이지 않고, 로그인 안 함·원장님 모드·고객 계정 없음은 오류 없이 "없음"이다 | C-404·#363 | ✅ | `src/server/payments/hold-store.db.test.ts` 지금 내 홀딩: 살아 있는 내 홀딩만<br>`src/server/payments/checkout.test.ts` 로그인 안 함·원장님 모드·고객 계정 없음도 오류가 아니라 null |
 
 ## 6. 고객 취소·환불
 
@@ -111,7 +112,7 @@ PR 검사가 자동으로 막는 것:
 | AGREED-03 | 답을 기다리는 요청은 한 번에 하나이고, 거절되거나 24시간이 지나면 다시 요청할 수 있다(횟수 제한 없음) | #301 | ✅ | `src/server/refunds/agreed-cancel.test.ts` 답을 기다리는 요청이 이미 있으면(unique) ALREADY_REQUESTED<br>`src/server/refunds/agreed-cancel.test.ts` 거절된 요청 뒤에는 다시 요청할 수 있다 |
 | AGREED-04 | 예정 예약일 때만 요청한다(서비스 시작 뒤 포함, 방문·노쇼 처리 전) | X-208 | ✅ | `src/server/refunds/agreed-cancel-rules.test.ts` 예정 예약이고 방문·노쇼 처리 전일 때만 |
 | AGREED-05 | 동의했는데 환불이 안 되면 요청은 다시 답 기다림으로 돌아간다. 손님 직접 취소와 겹쳐도 환불은 한 번이다 | #346·#348 | ✅ | `src/server/refunds/agreed-cancel.test.ts` 결제사가 거절했고 돌아간 돈이 없으면<br>`src/server/refunds/agreed-cancel.test.ts` 손님 직접 취소 환불이 먼저 들어와 있으면 RESERVATION_CHANGED(환불은 한 번)<br>`src/server/refunds/agreed-cancel-store.db.test.ts` 진행 중 기록 지우기와 요청 되돌리기를 한 번에 |
-| AGREED-07 | 결제액이 홀수라 50%에 원 미만이 생기면 고객 취소처럼 손님 쪽으로 맞춘다(위약금 쪽에서 버림). 23,457원 → 위약금 11,728원, 손님 환불 11,729원 | 11/12 nnoinn·정산 예시 3장 | ⏳ | |
+| AGREED-07 | 결제액이 홀수라 50%에 원 미만이 생기면 고객 취소처럼 손님 쪽으로 맞춘다(위약금 쪽에서 버림). 23,457원 → 위약금 11,728원, 손님 환불 11,729원 | 11/12 nnoinn·정산 예시 3장 | ✅ | `tests/docs/rule-docs.test.ts` 합의 후 취소 원 미만은 고객 취소처럼 손님 쪽으로<br>`src/server/refunds/agreed-cancel-rules.test.ts` 원 미만은 고객 취소처럼 손님 쪽으로 맞춘다 |
 | AGREED-06 | 정산 줄을 만들 때 합의 후 취소의 기준 금액은 판매가 × 50%다(판매가 45,000원 → 22,500원, 원장님 정산 21,758원) | X-208·W20·정산 예시 3장 | ✅ | `src/server/settlements/calc-settlement.test.ts` 합의 후 취소는 판매가 × 50% |
 
 ## 8. 원장님 귀책 취소 (P1, 준비 중)
@@ -160,9 +161,10 @@ PR 검사가 자동으로 막는 것:
 | SETTLE-02 | 법인 전환 뒤 할인율별 수수료(10%→10% … 50%→6%)로 바꾸면 정산 예시 4장 표와 같다. 바꾸는 값은 `PLATFORM_FEE_MODE` 하나다 | X-205 | ✅ | `tests/docs/rule-docs.test.ts` 3장·4장 이용 완료 표<br>`src/server/policy/fees.test.ts` 지금은 오픈 기간 방식(launch)이다 |
 | SETTLE-03 | 고객 취소 정산의 기준 금액은 판매가 × 위약금 비율(원 미만 버림)이고, 정산 예시 3장·4장 취소 표와 같다(오픈 기간 13,055원) | X-205 | ✅ | `tests/docs/rule-docs.test.ts` 3장·4장 고객 취소 표<br>`src/server/settlements/calc-settlement.test.ts` 고객 취소는 판매가 × 위약금 비율 |
 | SETTLE-04 | 원장님 귀책 패널티는 오래된 것부터 떼고, 남은 금액은 다음 정산으로 넘긴다 | X-207 | ✅ | `src/server/settlements/calc-settlement.test.ts` 모자라면 오래된 것부터 떼고, 남은 금액은 다음 정산으로 넘긴다 |
-| SETTLE-05 | 정산은 매주 목요일(공휴일이면 다음 영업일)에 이의제기 기한이 지났고 이의제기 중이 아닌 거래를 묶어 지급한다 | X-206 | ⏳ | |
+| SETTLE-05 | 정산은 매주 목요일(공휴일이면 다음 영업일) 새벽에, 그날 0시(한국 시간)까지 이의제기 접수 기한이 지났고 이의제기 중이 아닌 거래를 샵 하나 × 지급일 하나로 묶는다. 비율은 그날의 정책값을 쓰고, 패널티를 떼고 0원이면 지급 요청 없이 지급 완료(0원)로 끝내며 원장님 정산 내역에 이유가 보인다 | X-206·#353 | ⏳ | |
 | SETTLE-06 | 정산 계좌번호는 암호화해서 저장하고, 화면에는 은행·뒷자리·예금주만 보인다 | S-107 | ✅ | `src/server/payouts/account-crypto.test.ts` 풀면 원래 번호가 나오고, 암호문에는 번호가 보이지 않는다<br>`src/app/owner/(console)/settings/payout/payout-store.db.test.ts` 화면용 조회는 은행·뒷자리·예금주만 돌려준다 |
 | SETTLE-07 | 지급일은 매주 목요일이고 공휴일이면 다음 영업일이다. 이의제기 접수 기한이 지급일 0시까지 지난 거래가 그날 지급에 들어가서 원장님은 보통 서비스 뒤 4~8일 안에 받는다(일요일 15시 → 4일 뒤 목요일, 금요일 15시 → 6일 뒤 목요일, 수요일 18시 → 8일 뒤 목요일). 방문·노쇼 처리가 늦으면 처리한 때부터 세고, 이의제기 중이면 보류한다 | X-206·기술 가이드 7장 "정산 주기"·#353 | ✅ | `src/server/settlements/settle-rules.test.ts` 기술 가이드 예시<br>`src/server/settlements/settle-rules.test.ts` 방문 처리가 늦으면 처리한 때부터 센다<br>`src/server/settlements/settle-rules.test.ts` 확인 중 이의제기가 있으면 보류하고 지급일이 없다<br>`src/server/settlements/payout-date.test.ts` 목요일이 공휴일이면 다음 영업일(금요일)에 지급하고 |
+| SETTLE-08 | 거래 하나에 정산 줄 하나다. 묶기 작업이 두 번 돌아도 같은 거래로 정산 줄을 두 번 만들 수 없다(DB가 막는다) | #353 | ✅ | `src/db/settlement-items.db.test.ts` 같은 거래로 정산 줄을 두 번 만들 수 없다 |
 
 ## 13. 알림
 
@@ -202,8 +204,9 @@ PR 검사가 자동으로 막는 것:
 | WINDOW-02 | 시간대는 30분 단위, 지금 뒤·14일 안이고, 같은 샵의 예약대기·게시중·예약됨 매물과 겹치지 않아야 한다 | #308 | ✅ | `src/server/slot-windows/rules.test.ts` 시작·끝은 30분 단위, 시작은 지금 뒤·14일 안<br>`src/db/slot-windows.db.test.ts` 시간대는 예약대기·게시중·예약됨 매물과 겹치면 막힌다 |
 | WINDOW-03 | 등록은 켠 묶음마다 시간대 한 줄과 올릴 때 서비스 값(이름·정가·소요 시간·할인가)을 한 번에 저장한다. 확인 뒤 같은 샵의 매물·시간대가 같은 시간을 먼저 차지하면 "같은 시간에 이미 올린 매물이나 시간대가 있어요"로 막는다. 마감은 사유·시각을 남기고, 이미 마감했거나 끝난 시간대는 막는다(#344의 "진짜 버전 전에는 저장한 것처럼 성공하지 않는다"를 진짜 버전으로 바꿈) | #308 ① | ✅ | `src/server/slot-windows/owner-store.db.test.ts` 묶음마다 시간대 한 줄과 올릴 때 서비스 값을 저장하고<br>`src/server/slot-windows/owner-store.db.test.ts` 같은 샵의 예약대기·게시중·예약됨 매물이나 시간대와 겹치면<br>`src/server/slot-windows/windows.test.ts` 확인 뒤 다른 요청이 같은 시간을 먼저 저장해서 DB가 막으면 WINDOW_OVERLAP<br>`src/server/slot-windows/owner-store.db.test.ts` 마감: 내 샵의 끝나지 않은 시간대만 |
 | WINDOW-04 | [예약하기]로 시간대 안에 매물 한 칸을 만들어 홀딩하고, 결제 없이 끝나면 그 칸은 마감(hold_released)이 된다 | #308 ④ | ⏳ | |
-| WINDOW-05 | 원장님 ② 서비스: 소요 시간이 켜진 가장 긴 묶음보다 긴 서비스는 고를 수 없고, 딱 같으면 고를 수 있다. 짧은 묶음에만 안 들어가는 서비스는 고를 수 있다(그 묶음에서는 고객에게 보이지 않는다) | #308 | ✅ | `src/app/owner/(console)/slots/window/window-draft.test.ts` 소요 시간이 가장 긴 묶음보다 길면 고를 수 없고<br>`src/app/owner/(console)/slots/window/window-draft.test.ts` 짧은 묶음에만 안 들어가는 서비스는 고를 수 있고 |
+| WINDOW-05 | 고객 목록·상세에는 게시 시각이 지났고 끝나지 않은 예약대기·게시중 시간대만 보인다(승인된 샵). 서비스마다 그 샵의 예약됨·결제 중인 시간을 뺀 시작 가능 시각을 주고, 남은 시간에 들어가는 서비스가 없으면 목록·상세에서 내린다. 필터를 걸면 카드 요약(서비스 수·첫 서비스·할인율·최저가·가장 빠른 시작)은 필터에 맞는 서비스로만 계산한다. 신규 고객 전용 시간대는 그 샵에 이력이 있는 고객에게 보이지 않는다 | #308 ②·C-306 | ✅ | `src/server/slot-windows/store.db.test.ts` 고객에게 보이는 시간대: 게시 시각이 지났고 끝나지 않은 예약대기·게시중 시간대만<br>`src/server/slot-windows/store.db.test.ts` 신규 고객 전용 시간대는 그 샵에 확정·이용 완료 예약이 있는 고객에게 보이지 않는다<br>`src/server/slot-windows/queries.db.test.ts` 예약됨·결제 중 매물을 뺀 시작 가능 시각으로 카드와 상세를 만들고<br>`src/server/slot-windows/view.test.ts` 남은 시간에 들어가는 서비스가 없으면<br>`src/server/slot-windows/view.test.ts` 필터를 걸면 요약은 필터에 맞는 서비스로만 계산한다 |
 | WINDOW-06 | 원장님이 시간대를 마감할 때 그 안에서 손님이 결제 중이면 그 칸만 남기고 나머지를 바로 닫는다. 남긴 칸은 마감 화면에서 바로 알리고, 결제하면 예약으로 남으며(원장님 새 예약 알림에 "마감 전에 결제를 시작한 손님"), 결제 없이 끝나면 그 칸도 닫고 원장님에게 알린다 | #308, 11/13 nnoinn | ⏳ | |
+| WINDOW-07 | 원장님 ② 서비스: 소요 시간이 켜진 가장 긴 묶음보다 긴 서비스는 고를 수 없고, 딱 같으면 고를 수 있다. 짧은 묶음에만 안 들어가는 서비스는 고를 수 있다(그 묶음에서는 고객에게 보이지 않는다) | #308 | ✅ | `src/app/owner/(console)/slots/window/window-draft.test.ts` 소요 시간이 가장 긴 묶음보다 길면 고를 수 없고<br>`src/app/owner/(console)/slots/window/window-draft.test.ts` 짧은 묶음에만 안 들어가는 서비스는 고를 수 있고 |
 
 ## 16. 한 바퀴 흐름 (서버 흐름 ②·브라우저 ③에서 자동으로)
 

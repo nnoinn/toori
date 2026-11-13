@@ -18,7 +18,7 @@ type WindowDetailViewProps = {
  */
 export function WindowDetailView({ window, favorite, interestAlertAgreed }: WindowDetailViewProps) {
   return (
-    <article className="flex flex-1 flex-col pb-24 md:mx-auto md:grid md:w-full md:max-w-5xl md:grid-cols-[minmax(0,1fr)_380px] md:grid-rows-[auto_1fr] md:items-start md:gap-x-8 md:px-6 md:py-6">
+    <article className="flex flex-1 flex-col gap-3 pb-24 md:mx-auto md:grid md:w-full md:max-w-5xl md:grid-cols-[minmax(0,1fr)_380px] md:grid-rows-[auto_1fr] md:items-start md:gap-x-8 md:gap-y-6 md:px-6 md:py-6">
       <DetailTop
         imageUrls={window.imageUrls}
         shopName={window.shop.name}

@@ -337,6 +337,35 @@ describe('settlement-examples.md 3장·4장 고객 취소 표', () => {
 
 });
 
+describe('settlement-examples.md 3장 합의 후 취소 원 미만', () => {
+  it('합의 후 취소 원 미만은 고객 취소처럼 손님 쪽으로: 위약금 쪽에서 버리고 환불 = 결제액 − 위약금', () => {
+    const examples = [
+      ...EXAMPLES.matchAll(
+        /결제액 ([\d,]+)원, 합의 후 취소 → 위약금 ([\d,]+)원.*?손님 환불 ([\d,]+)원/g,
+      ),
+    ].map(([, paid, penalty, refund]) => ({
+      paid: won(paid),
+      penalty: won(penalty),
+      refund: won(refund),
+    }));
+    expect(examples.length, '3장의 합의 후 취소 원 미만 예시').toBeGreaterThan(0);
+    for (const example of examples) {
+      // 원 미만이 0.5라서 버림(손님 쪽)과 반올림·올림(원장님 쪽)이 갈린다
+      expect((example.paid * (100 - AGREED_CANCEL_REFUND_RATE)) % 100, '원 미만이 생기는 예시').toBe(
+        50,
+      );
+      const { refundAmount } = calcAgreedCancel({
+        paidAmount: example.paid,
+        salePrice: example.paid,
+      });
+      expect([example.paid - refundAmount, refundAmount], `결제액 ${example.paid}원`).toEqual([
+        example.penalty,
+        example.refund,
+      ]);
+    }
+  });
+});
+
 describe('settlement-examples.md 3장 합의 후 취소 표', () => {
   const agreedHeading = '오픈 기간, 손님과 합의 후 취소한 경우 (손님 50% 환불, 10% 할인 매물)';
   const [refundRate, agreedDiscount] = find(

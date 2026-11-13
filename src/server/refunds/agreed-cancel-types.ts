@@ -66,7 +66,7 @@ export type PendingAgreedCancel = {
   requestId: string;
   reason: AgreedCancelReason;
   reasonText: string | null;
-  /** 동의하면 돌려받는 금액 = 실제 결제액 × 50% */
+  /** 동의하면 돌려받는 금액 = 실제 결제액 × 50%(원 미만은 손님 쪽으로 맞춘다) */
   refundAmount: number;
   /** 실제 결제액(쿠폰을 뺀 금액) */
   paidAmount: number;

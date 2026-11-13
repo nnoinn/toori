@@ -12,8 +12,8 @@ import {
 import { usePushAlerts } from '@/features/push/use-push-alerts';
 
 /**
- * 빈 동네 알림 상자의 "이 기기 알림 켜기" (C-208, #241 리뷰). 관심 동네 등록과 광고성 동의가 끝난 뒤에 보여준다.
- * 내 정보 > 알림의 "이 기기에서 알림 받기"와 같은 구독이다(usePushAlerts). 권한은 버튼을 눌렀을 때만 묻는다
+ * 빈 동네 알림 상자의 "이 기기 푸시 알림 켜기" (C-208, #241 리뷰). 관심 동네 등록과 광고성 동의가 끝난 뒤에 보여준다.
+ * 내 정보 > 알림의 "이 기기에서 푸시 알림 받기"와 같은 구독이다(usePushAlerts). 권한은 버튼을 눌렀을 때만 묻는다
  */
 export function AreaDevicePush() {
   const push = usePushAlerts();
@@ -24,7 +24,7 @@ export function AreaDevicePush() {
   if (push.state === 'on') {
     return (
       <p role="status" className="flex items-center gap-1 text-primary">
-        <Check className="size-4" aria-hidden />이 기기 알림이 켜져 있어요
+        <Check className="size-4" aria-hidden />이 기기 푸시 알림이 켜져 있어요
       </p>
     );
   }
@@ -46,9 +46,9 @@ export function AreaDevicePush() {
 
   return (
     <>
-      <p>이 기기에서 알림을 켜야 새 매물 알림을 받을 수 있어요.</p>
+      <p>이 기기에서 푸시 알림을 켜면 새 매물 알림을 바로 받을 수 있어요.</p>
       <Button type="button" size="sm" disabled={push.pending} onClick={push.turnOn}>
-        {push.pending ? '알림을 켜는 중…' : '이 기기 알림 켜기'}
+        {push.pending ? '푸시 알림을 켜는 중…' : '이 기기 푸시 알림 켜기'}
       </Button>
       {push.message ? (
         <p
