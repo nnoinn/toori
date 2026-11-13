@@ -10,7 +10,7 @@ export {
   type SlotWindowDetailQuery,
   type SlotWindowListQuery,
 } from './queries';
-export { closeStaleWindowHolds } from './hold-store';
 export { checkWindowDraft, mergeRanges } from './rules';
+export { closeStaleWindowHolds } from './store';
 export { menusMatchingFilters, type Range, windowStarts, windowStatus } from './starts';
 export type * from './types';

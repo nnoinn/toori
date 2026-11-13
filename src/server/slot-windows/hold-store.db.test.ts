@@ -14,8 +14,8 @@ import {
   testSlot,
 } from '../../../tests/db/fixtures';
 import { closeTestDb, describeDb, type TestTx, withRollback } from '../../../tests/db/test-db';
-import { acquireWindowHold, closeStaleWindowHolds } from './hold-store';
-import { insertSlotWindows } from './store';
+import { acquireWindowHold } from './hold-store';
+import { closeStaleWindowHolds, insertSlotWindows } from './store';
 
 /** 'HH:MM'(2026-11-01, 한국 시간, fixtures testSlot과 같은 날) */
 const at = (hm: string) => new Date(`2026-11-01T${hm}:00+09:00`);

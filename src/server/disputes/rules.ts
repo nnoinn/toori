@@ -8,7 +8,7 @@
 // - 한 예약에 한 번(Q3)
 // - 내용: 빈칸(공백만 있는 것 포함)만 막고, 안전 상한 5,000자(11/13 nnoinn, #360 2번)
 
-import { DISPUTE_TYPES, type DisputeType } from '@/db/schema/admin';
+import { type DisputeOutcome, DISPUTE_TYPES, type DisputeType } from '@/db/schema/admin';
 import type { ReservationStatus, VisitResult } from '@/db/schema/payments';
 import { DISPUTE_CONTENT_LIMIT, DISPUTE_DEADLINE_BUSINESS_HOURS } from '@/server/policy/dispute';
 import { addBusinessHours } from '@/server/policy/holidays';
@@ -83,5 +83,33 @@ export function disputeContentProblem(
   const length = content.trim().length;
   if (length === 0) return 'DISPUTE_CONTENT_REQUIRED';
   if (length > DISPUTE_CONTENT_LIMIT) return 'DISPUTE_CONTENT_TOO_LONG';
+  return null;
+}
+
+/**
+ * 지금 고를 수 있는 결론(#350 nnoinn 리뷰 1번). 돈이 오가는 결론(환불 예외 refund_exception, 무효 voided,
+ * 원장님 귀책 취소로 바꿈 owner_fault_cancel)은 처리 기능이 생길 때까지 고를 수 없다(화면은 "준비 중").
+ * 그동안 이의제기는 확인 중(open)으로 남아 정산 보류도 그대로다. 기능이 생기면 여기에 하나씩 더한다(DB 목록에는 이미 있다)
+ */
+export const READY_DISPUTE_OUTCOMES = [
+  'no_show_confirmed',
+  'no_show_reversed',
+  'no_change',
+] as const satisfies readonly DisputeOutcome[];
+
+/**
+ * 이 결론을 지금 기록할 수 없는 이유. 기록할 수 있으면 null.
+ * - OUTCOME_NOT_READY: 처리 기능이 준비 중인 결론
+ * - OUTCOME_NOT_ALLOWED: 노쇼 확정·노쇼 취소는 노쇼로 처리된 예약에서만
+ */
+export function outcomeBlockReason(
+  outcome: DisputeOutcome,
+  reservation: { visitResult: VisitResult | null },
+): 'OUTCOME_NOT_READY' | 'OUTCOME_NOT_ALLOWED' | null {
+  if (!(READY_DISPUTE_OUTCOMES as readonly DisputeOutcome[]).includes(outcome)) {
+    return 'OUTCOME_NOT_READY';
+  }
+  const aboutNoShow = outcome === 'no_show_confirmed' || outcome === 'no_show_reversed';
+  if (aboutNoShow && reservation.visitResult !== 'no_show') return 'OUTCOME_NOT_ALLOWED';
   return null;
 }

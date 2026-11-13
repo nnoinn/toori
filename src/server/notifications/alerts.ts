@@ -3,12 +3,13 @@
 
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { after } from 'next/server';
 
 import type { getDb } from '@/db';
-import { customers, orders, owners, reservations, shops, slots } from '@/db/schema';
-import { formatKst } from '@/lib/time';
+import { customers, orders, owners, reservations, shops, slots, slotWindows } from '@/db/schema';
+import { formatKst, formatKstTime } from '@/lib/time';
+import { readReleasedKeptSlots } from '@/server/slot-windows/store';
 
 import { notify } from './notify';
 
@@ -34,15 +35,21 @@ async function readReservationAlert(db: Db, reservationId: string) {
       menuName: slots.menuName,
       startAt: slots.startAt,
       slotId: slots.id,
+      // 시간대 안 칸인데 그 시간대를 원장님이 마감했다: 마감 전에 결제를 시작한 손님이다(#308 ③-2)
+      windowClosed: sql<boolean>`coalesce(${slotWindows.status} = 'closed', false)`,
     })
     .from(reservations)
     .innerJoin(customers, eq(customers.id, reservations.customerId))
     .innerJoin(slots, eq(slots.id, reservations.slotId))
     .innerJoin(shops, eq(shops.id, slots.shopId))
     .innerJoin(owners, eq(owners.id, shops.ownerId))
+    .leftJoin(slotWindows, eq(slotWindows.id, slots.windowId))
     .where(eq(reservations.id, reservationId));
   return row ?? null;
 }
+
+/** 시간대를 마감할 때 결제 중이라 남긴 칸이 결제를 마쳤을 때 원장님 새 예약 알림에 더하는 말(#308 ③-2, 11/13 nnoinn) */
+export const KEPT_SLOT_RESERVED_NOTE = '마감 전에 결제를 시작한 손님이에요';
 
 /** 결제가 확정됐을 때 고객과 원장님에게(C-602, S-404). 결제 확인·웹훅·정리 작업이 같은 예약으로 불러도 한 번만 간다 */
 export function notifyReservationConfirmed(db: Db, reservationId: string) {
@@ -67,10 +74,37 @@ export function notifyReservationConfirmed(db: Db, reservationId: string) {
         event,
         dedupeKey: `${event}:owner:${reservationId}`,
         title: '새 예약이 들어왔어요',
-        body: `${alert.menuName} · ${when}`,
+        body: alert.windowClosed
+          ? `${alert.menuName} · ${when} · ${KEPT_SLOT_RESERVED_NOTE}`
+          : `${alert.menuName} · ${when}`,
         url: `/owner/reservations/${reservationId}`,
       }),
     ]);
+  });
+}
+
+/**
+ * 원장님이 시간대를 마감할 때 손님이 결제 중이라 남긴 칸이 결제 없이 끝나서 닫혔을 때 원장님에게(#308 ③-2, 11/13 nnoinn).
+ * 닫힌 칸 id를 받아 그런 칸만 골라 보낸다(readReleasedKeptSlots). 손님이 [취소]했을 때와 결제 정리 작업이 부른다. 같은 칸은 한 번만 간다
+ */
+export function notifyKeptWindowSlotsReleased(db: Db, slotIds: readonly string[]) {
+  if (slotIds.length === 0) return;
+  const event = 'window.kept_slot_released';
+  sendAfterResponse(event, async () => {
+    const released = await readReleasedKeptSlots(db, slotIds);
+    await Promise.all(
+      released.map((slot) =>
+        notify(db, {
+          userId: slot.ownerUserId,
+          accountType: 'owner',
+          event,
+          dedupeKey: `${event}:owner:${slot.slotId}`,
+          title: '마감한 시간대의 남은 칸도 닫았어요',
+          body: `결제가 끝나지 않아 ${formatKst(slot.startAt)}~${formatKstTime(slot.endAt)}(${slot.menuName})도 닫았어요`,
+          url: '/owner',
+        }),
+      ),
+    );
   });
 }
 

@@ -7,6 +7,8 @@ import { kstToUtc } from '@/lib/time';
 import {
   disputeBlockReason,
   disputeContentProblem,
+  outcomeBlockReason,
+  READY_DISPUTE_OUTCOMES,
   disputeDeadline,
   disputeOpensAt,
   disputeState,
@@ -141,5 +143,32 @@ describe('disputeContentProblem (11/13 nnoinn, #360 2번)', () => {
     expect(disputeContentProblem('가'.repeat(5000))).toBeNull();
     expect(disputeContentProblem(`   ${'가'.repeat(5000)}   `)).toBeNull();
     expect(disputeContentProblem('가'.repeat(5001))).toBe('DISPUTE_CONTENT_TOO_LONG');
+  });
+});
+
+describe('outcomeBlockReason (#350 nnoinn 리뷰)', () => {
+  const noShow = { visitResult: 'no_show' as const };
+  const visited = { visitResult: 'visited' as const };
+
+  it('돈이 오가는 결론(환불 예외·무효·원장님 귀책 취소로 바꿈)은 처리 기능이 생길 때까지 OUTCOME_NOT_READY', () => {
+    expect([...READY_DISPUTE_OUTCOMES].sort()).toEqual(
+      ['no_change', 'no_show_confirmed', 'no_show_reversed'].sort(),
+    );
+    for (const outcome of ['refund_exception', 'voided', 'owner_fault_cancel'] as const) {
+      expect(outcomeBlockReason(outcome, noShow), outcome).toBe('OUTCOME_NOT_READY');
+      expect(outcomeBlockReason(outcome, visited), outcome).toBe('OUTCOME_NOT_READY');
+    }
+  });
+
+  it('노쇼 확정·노쇼 취소는 노쇼로 처리된 예약에서만, 바꿀 것 없음은 어느 예약이든', () => {
+    for (const outcome of ['no_show_confirmed', 'no_show_reversed'] as const) {
+      expect(outcomeBlockReason(outcome, noShow), outcome).toBeNull();
+      expect(outcomeBlockReason(outcome, visited), outcome).toBe('OUTCOME_NOT_ALLOWED');
+      expect(outcomeBlockReason(outcome, { visitResult: null }), outcome).toBe(
+        'OUTCOME_NOT_ALLOWED',
+      );
+    }
+    expect(outcomeBlockReason('no_change', visited)).toBeNull();
+    expect(outcomeBlockReason('no_change', { visitResult: null })).toBeNull();
   });
 });

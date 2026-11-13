@@ -4,6 +4,8 @@ import {
   allTabSections,
   countByStatus,
   type DashboardSlot,
+  type DashboardWindow,
+  mergeEntries,
   onHold,
   splitByDay,
   viewStatus,
@@ -15,6 +17,7 @@ const now = new Date('2026-10-31T12:00:00+09:00');
 const kst = (iso: string) => new Date(`${iso}+09:00`).toISOString();
 
 const slot = (start: string, extra: Partial<DashboardSlot> = {}): DashboardSlot => ({
+  kind: 'slot',
   id: start,
   status: 'published',
   startAt: kst(start),
@@ -28,6 +31,7 @@ const slot = (start: string, extra: Partial<DashboardSlot> = {}): DashboardSlot 
   holdCustomerId: null,
   holdExpiresAt: null,
   closeReason: null,
+  windowId: null,
   reservationId: null,
   reservationCode: null,
   relistedSlotId: null,
@@ -143,12 +147,101 @@ describe('대시보드 [전체] 탭 구역 (#358)', () => {
       ['today', 8, 7, 1],
       ['upcoming', 2, 2, 0],
     ]);
-    expect(publishedOnly[0].shown.every((s) => s.status === 'published')).toBe(true);
+    expect(publishedOnly[0].shown.every((s) => viewStatus(s, now) === 'published')).toBe(true);
 
     const reservedOnly = allTabSections(byDay, 'reserved', now);
     expect(reservedOnly.map((s) => [s.day, s.total, s.shown.map((x) => x.id), s.more])).toEqual([
       ['today', 1, ['2026-10-31T12:30:00'], 0],
       ['upcoming', 0, [], 0],
+    ]);
+  });
+});
+
+/** 시간대 매물 한 줄(#308). 상태는 서버가 계산해 넘긴 값 */
+const windowEntry = (
+  start: string,
+  end: string,
+  extra: Partial<DashboardWindow> = {},
+): DashboardWindow => ({
+  kind: 'window',
+  id: `window-${start}`,
+  startAt: kst(start),
+  endAt: kst(end),
+  publishAt: kst('2026-10-30T00:00:00'),
+  state: 'published',
+  closeReason: null,
+  newCustomerOnly: false,
+  menus: [{ name: '커트', discountRate: 30 }],
+  ...extra,
+});
+
+describe('대시보드 시간대 매물 (#308)', () => {
+  it('시간대 상태는 매물 상태 이름으로 센다: 남은 시간에 들어가는 서비스가 없어도(full) 게시중', () => {
+    expect(
+      viewStatus(
+        windowEntry('2026-11-02T10:00:00', '2026-11-02T12:00:00', { state: 'scheduled' }),
+        now,
+      ),
+    ).toBe('scheduled');
+    expect(viewStatus(windowEntry('2026-10-31T13:00:00', '2026-10-31T18:00:00'), now)).toBe(
+      'published',
+    );
+    expect(
+      viewStatus(windowEntry('2026-10-31T13:00:00', '2026-10-31T14:00:00', { state: 'full' }), now),
+    ).toBe('published');
+    expect(
+      viewStatus(
+        windowEntry('2026-10-31T09:00:00', '2026-10-31T11:00:00', { state: 'closed' }),
+        now,
+      ),
+    ).toBe('closed');
+  });
+
+  it('매물과 시간대를 시작 순서로 섞고, 같은 시각이면 시간대가 먼저 온다', () => {
+    const merged = mergeEntries(
+      [
+        slot('2026-10-31T15:00:00'),
+        slot('2026-10-31T13:00:00', { windowId: 'window-2026-10-31T13:00:00' }),
+      ],
+      [
+        windowEntry('2026-10-31T13:00:00', '2026-10-31T18:00:00'),
+        windowEntry('2026-10-31T09:00:00', '2026-10-31T11:00:00', { state: 'closed' }),
+      ],
+    );
+    expect(merged.map((entry) => `${entry.kind} ${entry.id}`)).toEqual([
+      'window window-2026-10-31T09:00:00',
+      'window window-2026-10-31T13:00:00',
+      'slot 2026-10-31T13:00:00',
+      'slot 2026-10-31T15:00:00',
+    ]);
+  });
+
+  it('탭 나누기·상태별 개수·[전체] 구역에 시간대도 한 줄로 들어간다', () => {
+    const entries = mergeEntries(
+      [slot('2026-10-31T15:00:00', { status: 'reserved' })],
+      [
+        windowEntry('2026-10-31T13:00:00', '2026-10-31T18:00:00', { state: 'full' }),
+        windowEntry('2026-11-02T10:00:00', '2026-11-02T12:00:00', { state: 'scheduled' }),
+      ],
+    );
+    const byDay = splitByDay(entries, now);
+    expect([byDay.today.length, byDay.upcoming.length]).toEqual([2, 1]);
+    expect(countByStatus(entries, now)).toEqual({
+      scheduled: 1,
+      published: 1,
+      reserved: 1,
+      closed: 0,
+      cancelled: 0,
+      completed: 0,
+    });
+    expect(
+      allTabSections(byDay, 'published', now).map((section) => [
+        section.day,
+        section.shown.map((entry) => entry.kind),
+      ]),
+    ).toEqual([
+      ['today', ['window']],
+      ['upcoming', []],
     ]);
   });
 });

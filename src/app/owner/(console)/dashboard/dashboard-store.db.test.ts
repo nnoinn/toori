@@ -3,21 +3,68 @@
 
 import { afterAll, expect, it } from 'vitest';
 
-import { slots } from '@/db/schema';
+import { slots, slotWindowMenus, slotWindows } from '@/db/schema';
 
 import {
   createTestCustomer,
   createTestReservation,
   createTestShop,
+  type TestShop,
   testSlot,
 } from '../../../../../tests/db/fixtures';
-import { closeTestDb, describeDb, withRollback } from '../../../../../tests/db/test-db';
-import { selectDashboardSlots, selectNeedsVisitRecord } from './dashboard-store';
+import {
+  closeTestDb,
+  describeDb,
+  type TestTx,
+  withRollback,
+} from '../../../../../tests/db/test-db';
+import {
+  selectDashboardSlots,
+  selectDashboardWindows,
+  selectNeedsVisitRecord,
+} from './dashboard-store';
 
 afterAll(closeTestDb);
 
 // 매물 날짜는 2026-11-01(testSlot). 그날 0시부터 본다
 const from = new Date('2026-11-01T00:00:00+09:00');
+
+/** 'YYYY-MM-DD HH:MM'(한국 시간) */
+const kst = (value: string) => new Date(`${value.replace(' ', 'T')}:00+09:00`);
+
+/** 시간대 한 줄과 그 샵 메뉴(커트 20,000원 60분) 서비스 하나를 바로 넣는다(#308) */
+async function addWindow(
+  tx: TestTx,
+  shop: TestShop,
+  start: string,
+  end: string,
+  extra: Partial<typeof slotWindows.$inferInsert> = {},
+  discountRate = 30,
+) {
+  const [row] = await tx
+    .insert(slotWindows)
+    .values({
+      shopId: shop.shopId,
+      startAt: kst(start),
+      endAt: kst(end),
+      publishAt: kst('2026-10-31 08:00'),
+      status: 'published',
+      createdBy: shop.createdBy,
+      ...extra,
+    })
+    .returning({ id: slotWindows.id });
+  await tx.insert(slotWindowMenus).values({
+    windowId: row.id,
+    menuId: shop.menuId,
+    serviceType: 'cut',
+    menuName: '커트',
+    listPrice: 20000,
+    durationMinutes: 60,
+    discountRate,
+    salePrice: 20000 * (1 - discountRate / 100),
+  });
+  return row.id;
+}
 
 describeDb('원장님 대시보드 조회 (실제 DB)', () => {
   it('그 샵의 from 이후 매물을 시작 순서로, 예약된 매물은 예약 id·예약번호와 같이', async () => {
@@ -103,6 +150,65 @@ describeDb('원장님 대시보드 조회 (실제 DB)', () => {
         ]),
       );
       expect(rows).toHaveLength(3);
+    });
+  });
+
+  it('시간대 매물: 그 샵의 from 이후 시간대를 시작 순서로 서비스·할인율과 함께, 마감한 시간대는 사유와 같이(#308)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx);
+      const other = await createTestShop(tx);
+      await addWindow(tx, shop, '2026-11-01 13:00', '2026-11-01 15:00');
+      await addWindow(
+        tx,
+        shop,
+        '2026-11-01 10:00',
+        '2026-11-01 12:00',
+        {
+          status: 'closed',
+          closedAt: kst('2026-10-31 20:00'),
+          closeReason: 'mistake',
+        },
+        20,
+      );
+      // 전날 시간대, 다른 샵 시간대는 빠진다
+      await addWindow(tx, shop, '2026-10-31 13:00', '2026-10-31 15:00');
+      await addWindow(tx, other, '2026-11-01 13:00', '2026-11-01 15:00');
+
+      const rows = await selectDashboardWindows(tx, shop.shopId, from, kst('2026-11-01 09:00'));
+      expect(
+        rows.map((row) => [row.kind, row.startAt, row.state, row.closeReason, row.menus]),
+      ).toEqual([
+        [
+          'window',
+          kst('2026-11-01 10:00').toISOString(),
+          'closed',
+          'mistake',
+          [{ name: '커트', discountRate: 20 }],
+        ],
+        [
+          'window',
+          kst('2026-11-01 13:00').toISOString(),
+          'published',
+          null,
+          [{ name: '커트', discountRate: 30 }],
+        ],
+      ]);
+    });
+  });
+
+  it('시간대 상태: 게시 전이면 예약대기, 남은 시간에 들어가는 서비스가 없으면 full(#308)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx);
+      // 10:30 지금, 10:00~11:00에 60분 서비스: 10:00은 지났고 10:30에 시작하면 11:30에 끝나서 넘친다
+      await addWindow(tx, shop, '2026-11-01 10:00', '2026-11-01 11:00');
+      await addWindow(tx, shop, '2026-11-03 10:00', '2026-11-03 12:00', {
+        status: 'scheduled',
+        // 게시 시각(12:00)이 지금(10:30)보다 늦다
+        publishAt: kst('2026-11-01 12:00'),
+      });
+
+      const rows = await selectDashboardWindows(tx, shop.shopId, from, kst('2026-11-01 10:30'));
+      expect(rows.map((row) => row.state)).toEqual(['full', 'scheduled']);
     });
   });
 
