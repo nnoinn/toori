@@ -2,19 +2,15 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { cn } from 'cn';
-import { ChevronRight } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
-import { formatReservationCode } from '@/components/ui/reservation-code';
 import { EmptyState, ErrorState, LoadingCards } from '@/components/ui/state';
-import { formatWon } from '@/lib/format';
 import { getRequestNow } from '@/lib/request-time';
-import { formatKst } from '@/lib/time';
 import { ensureCustomerPage } from '@/server/auth';
 import { CUSTOMER_HOME } from '@/server/auth/paths';
 
 import { getMyReservations } from './queries';
+import { ReservationCard } from './reservation-card';
 import {
   isVisitPending,
   parseTab,
@@ -34,7 +30,8 @@ const EMPTY_TEXT: Record<ReservationTab, string> = {
   cancelled: '취소한 예약이 없어요',
 };
 
-// 내 예약 목록 (J12, C-501). 로그인 확인은 <Suspense> 안에서 한다(기술 가이드 2장). PC는 가운데 최대 768px
+// 내 예약 목록 (J12, C-501). 로그인 확인은 <Suspense> 안에서 한다(기술 가이드 2장). PC는 가운데 최대 768px.
+// 예약 하나가 회색 배경 위 흰 카드 하나다(#359 2번, reservation-card.tsx)
 export default function ReservationsPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <main className="flex flex-1 flex-col md:mx-auto md:w-full md:max-w-3xl md:px-6 md:py-6">
@@ -87,29 +84,13 @@ async function ReservationsContent({ searchParams }: { searchParams: SearchParam
           }
         />
       ) : (
-        <ul className="flex flex-col divide-y">
+        <ul className="flex flex-col gap-2 px-4 pt-3 pb-4 md:gap-3 md:px-0 md:pt-4">
           {result.data.map((item) => (
             <li key={item.reservationId}>
-              <Link
-                href={`/reservations/${item.reservationId}`}
-                className="flex items-center gap-3 px-4 py-3"
-              >
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="truncate">{item.shopName}</span>
-                    {item.noShow ? <Badge variant="destructive">노쇼</Badge> : null}
-                    {isVisitPending(statusOfTab(tab), item.startAt, now) ? (
-                      <Badge variant="secondary">방문 확인 중</Badge>
-                    ) : null}
-                  </p>
-                  <p className="truncate font-semibold">{item.menuName}</p>
-                  <p className="text-sm">{formatKst(new Date(item.startAt))}</p>
-                  <p className="text-xs text-muted-foreground">
-                    예약번호 {formatReservationCode(item.code)} · {formatWon(item.amount)}
-                  </p>
-                </div>
-                <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />
-              </Link>
+              <ReservationCard
+                item={item}
+                visitPending={isVisitPending(statusOfTab(tab), item.startAt, now)}
+              />
             </li>
           ))}
         </ul>

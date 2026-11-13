@@ -60,7 +60,7 @@ describeDb('이의제기 접수 저장 (실제 DB)', () => {
     });
   });
 
-  it('확인 중(open)으로 저장하고, 다시 읽으면 접수한 이의제기가 붙어 있다', async () => {
+  it('확인 중(open)·앱 접수로 저장하고, 다시 읽으면 접수한 이의제기가 붙어 있다', async () => {
     await withRollback(async (tx) => {
       const db = tx as unknown as Db;
       const shop = await createTestShop(tx, { status: 'approved' });
@@ -79,6 +79,7 @@ describeDb('이의제기 접수 저장 (실제 DB)', () => {
         reservationId: reservation.id,
         type: 'refund_exception',
         content: '취소했는데 환불 금액이 안내와 달라요',
+        receivedAt: new Date('2026-11-01T10:00:00+09:00'),
       });
       const [row] = await tx.select().from(disputes).where(eq(disputes.id, saved.id));
       expect(row).toMatchObject({
@@ -86,6 +87,10 @@ describeDb('이의제기 접수 저장 (실제 DB)', () => {
         type: 'refund_exception',
         content: '취소했는데 환불 금액이 안내와 달라요',
         status: 'open',
+        channel: 'app',
+        receivedAt: new Date('2026-11-01T10:00:00+09:00'),
+        registeredBy: null,
+        outcome: null,
         result: null,
         handledBy: null,
         handledAt: null,

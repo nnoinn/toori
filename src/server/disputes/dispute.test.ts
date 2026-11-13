@@ -132,7 +132,7 @@ describe('getDisputeStatus', () => {
 });
 
 describe('submitDispute', () => {
-  it('예약 줄을 잠그고 읽은 뒤, 앞뒤 공백을 뺀 내용으로 저장한다', async () => {
+  it('예약 줄을 잠그고 읽은 뒤, 앞뒤 공백을 뺀 내용과 기한을 확인한 시각(접수 시각)으로 저장한다', async () => {
     expect(
       await submitDispute({
         reservationId: RESERVATION,
@@ -144,7 +144,12 @@ describe('submitDispute', () => {
       ['tx', { reservationId: RESERVATION, customerId: 'customer-1', lock: true }],
     ]);
     expect(state.inserts).toEqual([
-      { reservationId: RESERVATION, type: 'after_start', content: CONTENT },
+      {
+        reservationId: RESERVATION,
+        type: 'after_start',
+        content: CONTENT,
+        receivedAt: kst('2026-11-12 12:00'),
+      },
     ]);
   });
 
