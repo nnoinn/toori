@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useLayoutEffect, useState, useTransition } from 'react';
+import { useId, useLayoutEffect, useRef, useState, useTransition } from 'react';
 import { unstable_rethrow, useRouter } from 'next/navigation';
 import { ExternalLink, Info, MessageCircle } from 'lucide-react';
 
@@ -17,21 +17,23 @@ import { Textarea } from '@/components/ui/textarea';
 import { KAKAO_CHANNEL_URL } from '@/lib/site';
 import type { DisputeErrorCode, DisputeView } from '@/server/disputes';
 import { submitDispute } from '@/server/disputes/dispute';
-import { DISPUTE_CONTENT_MAX_LENGTH } from '@/server/policy/dispute';
+import { DISPUTE_CONTENT_LIMIT } from '@/server/policy/dispute';
 
 import {
-  DISPUTE_CONTENT_HINT,
+  DISPUTE_CONTENT_LIMIT_NOTE,
+  DISPUTE_CONTENT_PLACEHOLDER,
   DISPUTE_FOLLOW_UP,
   DISPUTE_IN_REVIEW,
   DISPUTE_PRIVACY_NOTE,
   DISPUTE_RESOLVED,
   DISPUTE_TYPE_LABELS,
   disputeClosedText,
+  disputeContentError,
   disputeDeadlineText,
   disputeSubmittedText,
   type DisputeType,
-  isDisputeContentValid,
   KAKAO_CHANNEL_LABEL,
+  reachedContentLimit,
 } from './dispute-texts';
 import { DetailCard } from './detail-card';
 
@@ -102,18 +104,21 @@ function ChannelLink() {
 function DisputeForm({ view }: { view: DisputeView }) {
   const router = useRouter();
   const contentId = useId();
+  const contentRef = useRef<HTMLTextAreaElement>(null);
   const [open, setOpen] = useState(false);
   // 고를 수 있는 종류가 하나뿐이면 골라 둔다
   const [type, setType] = useState<DisputeType | null>(
     view.types.length === 1 ? view.types[0] : null,
   );
   const [content, setContent] = useState('');
+  // [접수하기]를 눌렀을 때 내용이 빈칸이면 칸 아래에 보여줄 안내(11/13 nnoinn: 빈칸만 막고 글자 수는 보여주지 않는다)
+  const [contentError, setContentError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [blocked, setBlocked] = useState(false);
   const [done, setDone] = useState(false);
   const [pending, startTransition] = useTransition();
-  const canSubmit =
-    type !== null && view.types.includes(type) && isDisputeContentValid(content) && !blocked;
+  // 내용은 누를 때 확인한다(빈칸이면 안내). 그래서 종류만 골랐으면 누를 수 있다
+  const canSubmit = type !== null && view.types.includes(type) && !blocked;
 
   // 떠났다 돌아오면 Next.js가 이 화면을 상태 그대로 다시 보여준다(Activity). 열려 있던 창은 닫아 둔다
   useLayoutEffect(() => () => setOpen(false), []);
@@ -121,6 +126,7 @@ function DisputeForm({ view }: { view: DisputeView }) {
   function handleOpenChange(next: boolean) {
     if (next) {
       if (!blocked) setMessage(null);
+      setContentError(null);
       setOpen(true);
       return;
     }
@@ -133,6 +139,12 @@ function DisputeForm({ view }: { view: DisputeView }) {
   function handleSubmit() {
     if (!type || !canSubmit) return;
     setMessage(null);
+    const problem = disputeContentError(content);
+    if (problem) {
+      setContentError(problem);
+      contentRef.current?.focus();
+      return;
+    }
     startTransition(async () => {
       try {
         const result = await submitDispute({ reservationId: view.reservationId, type, content });
@@ -201,26 +213,34 @@ function DisputeForm({ view }: { view: DisputeView }) {
               </fieldset>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor={contentId}>내용</Label>
+                {/* 상한(5,000자)은 화면에 숫자로 보여주지 않고, 닿으면 입력이 멈추며 그때만 안내한다 */}
                 <Textarea
+                  ref={contentRef}
                   id={contentId}
                   value={content}
-                  maxLength={DISPUTE_CONTENT_MAX_LENGTH}
+                  maxLength={DISPUTE_CONTENT_LIMIT}
                   rows={5}
+                  placeholder={DISPUTE_CONTENT_PLACEHOLDER}
                   disabled={pending}
+                  aria-invalid={contentError ? true : undefined}
                   aria-describedby={`${contentId}-help`}
-                  onChange={(e) => setContent(e.target.value)}
+                  onChange={(e) => {
+                    setContent(e.target.value);
+                    setContentError(null);
+                  }}
                 />
-                <p
-                  id={`${contentId}-help`}
-                  className="flex justify-between gap-3 text-xs text-muted-foreground"
-                >
-                  <span>
-                    {DISPUTE_CONTENT_HINT} {DISPUTE_PRIVACY_NOTE}
-                  </span>
-                  <span className="shrink-0 tabular-nums">
-                    {content.trim().length}/{DISPUTE_CONTENT_MAX_LENGTH}
-                  </span>
-                </p>
+                <div id={`${contentId}-help`} className="flex flex-col gap-0.5 text-xs">
+                  {contentError ? (
+                    <p role="alert" className="text-destructive">
+                      {contentError}
+                    </p>
+                  ) : reachedContentLimit(content) ? (
+                    <p role="status" className="text-foreground">
+                      {DISPUTE_CONTENT_LIMIT_NOTE}
+                    </p>
+                  ) : null}
+                  <p className="text-muted-foreground">{DISPUTE_PRIVACY_NOTE}</p>
+                </div>
               </div>
               {message ? (
                 <p role="alert" className="text-sm text-destructive">
