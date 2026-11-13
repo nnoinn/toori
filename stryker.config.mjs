@@ -27,6 +27,7 @@ const config = {
     'src/server/visits/rules.ts',
     'src/server/slot-windows/rules.ts',
     'src/server/slot-windows/starts.ts',
+    'src/server/slot-windows/view.ts',
     'src/features/slot-status/slot-status.ts',
     'src/app/owner/(console)/slots/slot-time.ts',
   ],

@@ -1,6 +1,5 @@
 // 시간대 매물 DB 읽기·저장 (#308). 서버에서만 부른다.
-// 원장님 등록·지난 설정·마감은 시간대 표를 읽고 쓴다(진짜 버전 ①). 고객 목록·상세·[예약하기]는 아직 가짜 결과 버전이라
-// 샵·메뉴·매물만 읽는다(fake.ts, 진짜 버전 ②③에서 시간대 표를 읽는다).
+// 원장님 등록·지난 설정·마감은 시간대 표를 읽고 쓴다(진짜 버전 ①). 고객 목록·상세는 시간대 표와 그 안의 매물을 읽는다(②).
 
 import 'server-only';
 
@@ -25,6 +24,7 @@ import type { getDb } from '@/db';
 import { menus, shopImages, shops, slots, slotWindowMenus, slotWindows } from '@/db/schema';
 import type { BusinessHours } from '@/db/schema/shops';
 import type { SlotCloseReason } from '@/db/schema/slots';
+import { newCustomerOnlyVisible } from '@/server/customers';
 import type { ServiceType, ShopCategory } from '@/server/policy';
 import { customerVisibleShop } from '@/server/shops/visibility';
 
@@ -32,6 +32,7 @@ import { shopInArea, type WindowArea } from './conditions';
 import type { ShopMenu, WindowDraft, WindowMenuDraft } from './rules';
 import type { Range } from './starts';
 import type { LastWindowSettings, SlotWindowShop } from './types';
+import type { WindowMenuRow } from './view';
 
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 type DbWriter = Pick<ReturnType<typeof getDb>, 'insert'>;
@@ -107,31 +108,47 @@ export async function readShopBusyRanges(
 }
 
 /**
- * 고객에게 시작 시각을 줄 때 이미 차 있는 시간: 그 샵의 예약대기·게시중·예약됨 매물.
+ * 고객에게 시작 시각을 줄 때 이미 차 있는 시간: 그 샵들의 [from, to)와 겹치는 예약대기·게시중·예약됨 매물(샵별).
  * 단, 시간대 안에서 손님이 만든 매물이 게시중인데 홀딩이 끝났으면(결제 없이 끝남) 비어 있는 것으로 본다(#308 ④)
  */
-export async function readOccupiedRanges(
+export async function readOccupiedRangesByShop(
   db: DbReader,
-  input: { shopId: string; from: Date; to: Date; now: Date },
-): Promise<Range[]> {
+  input: { shopIds: readonly string[]; from: Date; to: Date; now: Date },
+): Promise<Map<string, Range[]>> {
+  const result = new Map<string, Range[]>();
+  const shopIds = [...new Set(input.shopIds)];
+  if (shopIds.length === 0) return result;
   const releasedHold: SQL = and(
     isNotNull(slots.windowId),
     eq(slots.status, 'published'),
     // lte()로 비교해야 시각이 컬럼 형식으로 바뀐다(sql``에 Date를 바로 넣으면 드라이버가 받지 못한다)
     or(isNull(slots.holdExpiresAt), lte(slots.holdExpiresAt, input.now)),
   )!;
-  return db
-    .select({ start: slots.startAt, end: slots.endAt })
+  const rows = await db
+    .select({ shopId: slots.shopId, start: slots.startAt, end: slots.endAt })
     .from(slots)
     .where(
       and(
-        eq(slots.shopId, input.shopId),
+        inArray(slots.shopId, shopIds),
         inArray(slots.status, BLOCKING_SLOT_STATUSES),
         lt(slots.startAt, input.to),
         gt(slots.endAt, input.from),
         not(releasedHold),
       ),
     );
+  for (const { shopId, ...range } of rows) {
+    result.set(shopId, [...(result.get(shopId) ?? []), range]);
+  }
+  return result;
+}
+
+/** 한 샵의 이미 차 있는 시간(readOccupiedRangesByShop과 같은 기준) */
+export async function readOccupiedRanges(
+  db: DbReader,
+  input: { shopId: string; from: Date; to: Date; now: Date },
+): Promise<Range[]> {
+  const { shopId, ...rest } = input;
+  return (await readOccupiedRangesByShop(db, { shopIds: [shopId], ...rest })).get(shopId) ?? [];
 }
 
 /** 목록 카드에 쓰는 샵 값 */
@@ -145,13 +162,56 @@ export type AreaShop = {
   imagePath: string | null;
 };
 
-/** 범위 안 승인된 샵(업종을 골랐으면 그 업종만), 이름 순으로 limit개까지 */
-export async function readAreaShops(
+/**
+ * 고객에게 보이는 시간대: 예약대기·게시중으로 저장했고 게시 시각이 지났고 아직 끝나지 않음, 승인된 샵,
+ * 신규 고객 전용이면 그 샵에 이력이 없는 고객만(C-306·X-104, 로그인하지 않았으면 거르지 않는다).
+ * 예약대기로 저장했어도 게시 시각이 지났으면 게시중으로 본다(windowStatus와 같다). shops와 조인한 쿼리에 넣는다
+ */
+function openWindowFor(customerId: string | null, now: Date): SQL {
+  return and(
+    inArray(slotWindows.status, ['scheduled', 'published']),
+    lte(slotWindows.publishAt, now),
+    gt(slotWindows.endAt, now),
+    customerVisibleShop(),
+    newCustomerOnlyVisible(customerId, {
+      shopId: slotWindows.shopId,
+      newCustomerOnly: slotWindows.newCustomerOnly,
+    }),
+  )!;
+}
+
+/** 고객에게 보이는 시간대 하나 */
+export type OpenWindow = {
+  windowId: string;
+  shopId: string;
+  startAt: Date;
+  endAt: Date;
+  newCustomerOnly: boolean;
+};
+
+/** 목록 카드에 쓰는 시간대와 샵 값 */
+export type AreaWindow = OpenWindow & AreaShop;
+
+/**
+ * 범위 안의 고객에게 보이는 시간대(업종을 골랐으면 그 업종만). 시간대 시작 순으로 limit개까지.
+ * 남은 시간에 들어가는 서비스가 있는지·필터는 부른 쪽이 계산한다(view.ts)
+ */
+export async function readAreaWindows(
   db: DbReader,
-  input: { area: WindowArea; category: ShopCategory | null; limit: number },
-): Promise<AreaShop[]> {
+  input: {
+    area: WindowArea;
+    category: ShopCategory | null;
+    customerId: string | null;
+    now: Date;
+    limit: number;
+  },
+): Promise<AreaWindow[]> {
   const rows = await db
     .select({
+      windowId: slotWindows.id,
+      startAt: slotWindows.startAt,
+      endAt: slotWindows.endAt,
+      newCustomerOnly: slotWindows.newCustomerOnly,
       shopId: shops.id,
       name: shops.name,
       category: shops.category,
@@ -161,18 +221,69 @@ export async function readAreaShops(
         string | null
       >`(select ${shopImages.storagePath} from ${shopImages} where ${shopImages.shopId} = ${shops.id} and ${shopImages.kind} = 'main' order by ${shopImages.sortOrder} limit 1)`,
     })
-    .from(shops)
+    .from(slotWindows)
+    .innerJoin(shops, eq(shops.id, slotWindows.shopId))
     .where(
       and(
-        customerVisibleShop(),
+        openWindowFor(input.customerId, input.now),
         shopInArea(input.area),
         input.category ? eq(shops.category, input.category) : undefined,
       ),
     )
-    .orderBy(asc(shops.name))
+    .orderBy(asc(slotWindows.startAt), asc(slotWindows.id))
     .limit(input.limit);
   // DB의 check 제약이 정해진 업종만 허용한다
   return rows.map((row) => ({ ...row, category: row.category as ShopCategory }));
+}
+
+/** 고객에게 보이는 시간대 하나(openWindowFor와 같은 기준). 없거나 볼 수 없으면 null */
+export async function readOpenWindow(
+  db: DbReader,
+  input: { windowId: string; customerId: string | null; now: Date },
+): Promise<OpenWindow | null> {
+  const [row] = await db
+    .select({
+      windowId: slotWindows.id,
+      shopId: slotWindows.shopId,
+      startAt: slotWindows.startAt,
+      endAt: slotWindows.endAt,
+      newCustomerOnly: slotWindows.newCustomerOnly,
+    })
+    .from(slotWindows)
+    .innerJoin(shops, eq(shops.id, slotWindows.shopId))
+    .where(and(eq(slotWindows.id, input.windowId), openWindowFor(input.customerId, input.now)));
+  return row ?? null;
+}
+
+/** 시간대마다 올린 서비스(올릴 때 값). 샵의 메뉴 순서대로 */
+export async function readWindowMenus(
+  db: DbReader,
+  windowIds: readonly string[],
+): Promise<Map<string, WindowMenuRow[]>> {
+  const result = new Map<string, WindowMenuRow[]>();
+  if (windowIds.length === 0) return result;
+  const rows = await db
+    .select({
+      windowId: slotWindowMenus.windowId,
+      menuId: slotWindowMenus.menuId,
+      serviceType: slotWindowMenus.serviceType,
+      name: slotWindowMenus.menuName,
+      description: slotWindowMenus.menuDescription,
+      durationMinutes: slotWindowMenus.durationMinutes,
+      listPrice: slotWindowMenus.listPrice,
+      discountRate: slotWindowMenus.discountRate,
+      salePrice: slotWindowMenus.salePrice,
+    })
+    .from(slotWindowMenus)
+    .innerJoin(menus, eq(menus.id, slotWindowMenus.menuId))
+    .where(inArray(slotWindowMenus.windowId, [...new Set(windowIds)]))
+    .orderBy(asc(menus.sortOrder), asc(slotWindowMenus.menuName));
+  for (const { windowId, ...menu } of rows) {
+    // DB의 check 제약이 정해진 서비스 종류만 허용한다
+    const row = { ...menu, serviceType: menu.serviceType as ServiceType };
+    result.set(windowId, [...(result.get(windowId) ?? []), row]);
+  }
+  return result;
 }
 
 /** 시간대 상세의 샵과 사진(지금 매물 상세와 같은 모양·순서). 승인된 샵이 아니면 null */
