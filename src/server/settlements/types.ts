@@ -8,36 +8,63 @@ import type { SettlementItemKind, SettlementStatus } from '@/db/schema/settlemen
  * - scheduled: 지급 예정(payoutDate에 지급). 이의제기 접수 기한이 지나면 그 뒤 첫 목요일에 묶인다
  * - held: 이의제기 중이라 보류. 결론이 나면 돌아오는 지급일에 들어간다(payoutDate는 null)
  * - pending: 묶였고 지급 요청 전 / requested: PG에 지급 요청함 / paid: 지급 완료 / failed: 지급 실패(재요청 예정)
+ * - no_payout: 원장님 사정 취소·무효처럼 정산할 금액이 없는 줄(합계에 넣지 않는다)
  */
-export type SettlementItemStatus = 'scheduled' | 'held' | SettlementStatus;
+export type SettlementItemStatus = 'scheduled' | 'held' | 'no_payout' | SettlementStatus;
+
+/**
+ * 정산 내역 한 줄의 종류
+ * - sale 이용 완료 / no_show 노쇼 / penalty 고객 취소 위약금 / agreed_cancel 합의 후 취소: 정산 줄이 있는 거래
+ * - owner_cancel 원장님 사정 취소(X-207): 기준 금액 0원과 패널티를 보여준다
+ * - void 무효(A-108): 기준 금액 0원. 예약 무효 처리를 만들면 나온다
+ */
+export type SettlementItemViewKind = SettlementItemKind | 'owner_cancel' | 'void';
 
 export type SettlementItemView = {
   reservationId: string;
   reservationCode: string;
-  /** sale 이용 완료 / no_show 노쇼 / penalty 고객 취소 위약금 / agreed_cancel 합의 후 취소 */
-  kind: SettlementItemKind;
+  kind: SettlementItemViewKind;
   /** 서비스 시작 시각 */
   startAt: string;
+  /** 메뉴(서비스) 이름 */
+  menuName: string;
   /** 방문·노쇼 처리 또는 취소 시각. 기간 검색은 이 시각(한국 날짜) 기준이다 */
   occurredAt: string;
+  /** 정가 */
+  listPrice: number;
+  /** 할인율(%) */
+  discountRate: number;
   /** 판매가(쿠폰 적용 전). 원장님 정산은 쿠폰과 상관없다 */
   salePrice: number;
-  /** 고객 취소·합의 후 취소에 적용한 위약금 비율(%). 이용 완료·노쇼는 null */
+  /** 고객 취소·합의 후 취소에 적용한 위약금 비율(%). 그 밖에는 null */
   penaltyRate: number | null;
-  /** 기준 금액: 이용 완료·노쇼 = 판매가, 고객 취소·합의 후 취소 = 판매가 × 위약금 비율 */
+  /** 고객 취소·원장님 사정 취소면 서비스 시작 몇 시간 전에 취소했는지(시간 단위, 버림). 그 밖에는 null */
+  hoursBeforeStart: number | null;
+  /** 기준 금액: 이용 완료·노쇼 = 판매가, 고객 취소·합의 후 취소 = 판매가 × 위약금 비율, 원장님 사정 취소·무효 = 0 */
   baseAmount: number;
   /** 플랫폼 수수료율(%). 오픈 기간은 0 */
   platformFeeRate: number;
   platformFee: number;
   platformFeeVat: number;
-  /** 결제 수수료율(판매가의 N%). PG 계약 전이라 정해지기 전에는 null("PG 계약 후 확정") */
+  /**
+   * 결제 수수료율(판매가의 N%). PG 계약 전이라 정해지기 전에는 null("PG 계약 후 확정").
+   * 정산할 금액이 없는 줄(no_payout)은 비율이 null이고 금액은 0이다
+   */
   paymentFeeRate: number | null;
   paymentFee: number | null;
   paymentFeeVat: number | null;
-  /** 이 거래로 받을 금액(패널티를 떼기 전). 결제 수수료율이 정해지기 전에는 null */
+  /** 이 거래로 받을 금액(패널티를 떼기 전). 결제 수수료율이 정해지기 전에는 null, 정산할 금액이 없는 줄은 0 */
   payoutAmount: number | null;
+  /** 쿠폰을 쓴 예약인지. 쿠폰 금액은 투리가 부담해서 원장님 정산과 상관없어 주지 않는다 */
+  couponUsed: boolean;
+  /** 원장님 사정 취소의 패널티(X-207)와 아직 정산에서 떼지 못한 금액. 그 밖에는 null */
+  ownerPenalty: { amount: number; remaining: number } | null;
+  /** 이 시각까지 이의제기가 없으면 정산이 확정된다(이의제기 접수 기한) */
+  disputeDeadlineAt: string;
+  /** 보류 중(held)이면 그 이유. 예: 이의제기 중(11/15 접수) */
+  hold: { reason: 'dispute'; receivedAt: string } | null;
   status: SettlementItemStatus;
-  /** 지급일(예정일 포함). 보류면 null */
+  /** 지급일(예정일 포함). 보류·정산할 금액이 없는 줄은 null */
   payoutDate: string | null;
 };
 
@@ -45,7 +72,10 @@ export type SettlementItemView = {
 export type SettlementList = {
   /** 기간 안의 거래. 처리·취소 시각이 늦은 것부터 */
   items: SettlementItemView[];
-  /** 기간 안 거래의 합계. 결제 수수료율을 모르는 거래가 하나라도 있으면 금액 합계는 null */
+  /**
+   * 기간 안 거래의 합계. 정산할 금액이 없는 줄(no_payout)은 넣지 않는다.
+   * 결제 수수료율을 모르는 거래가 하나라도 있으면 금액 합계는 null
+   */
   summary: {
     count: number;
     baseAmount: number;
