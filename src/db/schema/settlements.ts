@@ -35,7 +35,8 @@ export const settlements = pgTable(
     shopId: uuid()
       .notNull()
       .references(() => shops.id),
-    // 정산 기간(주기는 2단계 전에 정한다, #13 Q20)
+    // 정산 기간. 샵 하나 × 지급일 하나로 묶고, 기간은 그 샵의 직전 지급일 다음 날 ~ 지급일(#353, 11/12).
+    // 첫 정산은 처음 묶이는 거래가 끝난 날부터. 이의제기로 늦게 들어온 거래는 서비스 날짜가 기간보다 앞설 수 있다
     periodStart: date({ mode: 'string' }).notNull(),
     periodEnd: date({ mode: 'string' }).notNull(),
     itemCount: integer().notNull(),
@@ -44,7 +45,7 @@ export const settlements = pgTable(
     totalFeeAmount: integer().notNull(),
     // 이번에 뗀 패널티
     penaltyDeducted: integer().notNull(),
-    // 최종 지급액
+    // 최종 지급액. 패널티를 떼고 0원이면 지급 요청 없이 paid로 끝낸다(payout_ref 없음, #353)
     payoutAmount: integer().notNull(),
     status: text().notNull(),
     paidAt: timestamptz(),
@@ -85,8 +86,9 @@ export const settlementItems = pgTable(
     paymentFeeVat: integer().notNull(),
     // 이 거래로 원장님이 받을 금액
     payoutAmount: integer().notNull(),
-    // 실제 PG 수수료(실제 결제액 기준). 투리 손익 계산용, 원장님 정산에는 쓰지 않는다
-    pgFeeActual: integer().notNull(),
+    // 실제 PG 수수료(실제 결제액 기준). 투리 손익 계산용, 원장님 정산에는 쓰지 않는다.
+    // PG 정산 자료가 와야 아는 값이라 묶을 때는 비워 두고, 자료가 오면 채운다(#353)
+    pgFeeActual: integer(),
     // 투리가 부담한 쿠폰 금액. 투리 손익 계산용
     couponAmount: integer().notNull().default(0),
     // 어느 정산에 들어갔는지. 비어 있으면 정산 전
@@ -96,5 +98,7 @@ export const settlementItems = pgTable(
   (t) => [
     check('settlement_items_kind_check', inValues(t.kind, SETTLEMENT_ITEM_KINDS)),
     index('settlement_items_shop_id_settlement_id_idx').on(t.shopId, t.settlementId),
+    // 거래 하나에 한 줄. 묶기 작업이 두 번 돌거나 겹쳐 돌아도 같은 거래를 두 번 정산하지 않는다(#353)
+    unique('settlement_items_order_id_unique').on(t.orderId),
   ],
 ).enableRLS();
