@@ -31,7 +31,7 @@ import { publishPlan, type TimeRange } from '../slot-time';
 import { rangeLabel } from './window-cells';
 import { commonRate, menuFit, type MenuRates } from './window-draft';
 
-/** 짧은 묶음 이름들. 예: "10:00~12:00, 다음 날 00:30~02:00" */
+/** 짧은 묶음 이름들. 예: "10:00~12:00, 00:30(익일)~02:00(익일)" */
 function rangesLabel(ranges: readonly TimeRange[], dateKey: string): string {
   return ranges.map((range) => rangeLabel(range, dateKey)).join(', ');
 }
