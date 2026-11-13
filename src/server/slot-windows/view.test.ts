@@ -125,10 +125,26 @@ describe('windowCardSummary', () => {
     expect(windowCardSummary(views([], at('17:00')), EMPTY_FILTERS)).toBeNull();
   });
 
-  it('필터는 보일지만 정한다: 남은 서비스 중 하나라도 맞으면 보이고, 맞는 것이 없으면 null', () => {
-    expect(windowCardSummary(views([]), { ...EMPTY_FILTERS, services: ['perm'] })).toMatchObject({
+  it('필터를 걸면 요약은 필터에 맞는 서비스로만 계산한다(고른 조건과 다른 서비스·가격이 보이지 않게, #370 리뷰)', () => {
+    // 14:00~14:30이 차면 커트는 13:00부터, 펌(3시간)은 14:30부터 들어간다
+    const busy = views([{ start: at('14:00'), end: at('14:30') }]);
+    expect(windowCardSummary(busy, EMPTY_FILTERS)).toEqual({
       menuCount: 2,
+      firstMenuName: '커트',
+      maxDiscountRate: 30,
+      minSalePrice: 14_000,
+      earliestStart: at('13:00'),
     });
+    expect(windowCardSummary(busy, { ...EMPTY_FILTERS, services: ['perm'] })).toEqual({
+      menuCount: 1,
+      firstMenuName: '펌',
+      maxDiscountRate: 20,
+      minSalePrice: 64_000,
+      earliestStart: at('14:30'),
+    });
+  });
+
+  it('필터에 맞는 남은 서비스가 하나도 없으면 null', () => {
     expect(windowCardSummary(views([]), { ...EMPTY_FILTERS, services: ['color'] })).toBeNull();
     // 펌이 들어가지 않으면 펌 필터에는 맞는 서비스가 없다
     expect(

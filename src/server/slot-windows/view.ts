@@ -50,25 +50,25 @@ export type WindowCardSummary = {
 };
 
 /**
- * 목록 카드의 서비스 요약. 남은 시간에 들어가는 서비스만 센다.
- * 남은 시간에 들어가는 서비스가 없거나(꽉 참), 그중 필터에 맞는 서비스가 하나도 없으면 null(목록에서 뺀다)
+ * 목록 카드의 서비스 요약. 남은 시간에 들어가고 필터에 맞는 서비스만으로 센다(필터가 없으면 남은 서비스 전체).
+ * 고른 조건과 다른 서비스·가격이 카드에 보이지 않게 한다(#370 리뷰). 맞는 서비스가 하나도 없으면 null(목록에서 뺀다)
  */
 export function windowCardSummary(
   views: readonly WindowMenuView[],
   filters: Omit<HomeFilters, 'category'>,
 ): WindowCardSummary | null {
   const open = views.filter((view) => view.startRanges.length > 0);
-  if (open.length === 0) return null;
+  // 필터(시작 시각 구간)는 계산용 시작 시각(Range)으로 본다
   const matched = menusMatchingFilters(
     open.map((view) => ({ ...view.menu, starts: view.startRanges })),
     filters,
   );
   if (matched.length === 0) return null;
   return {
-    menuCount: open.length,
-    firstMenuName: open[0].menu.name,
-    maxDiscountRate: Math.max(...open.map((view) => view.menu.discountRate)),
-    minSalePrice: Math.min(...open.map((view) => view.menu.salePrice)),
-    earliestStart: new Date(Math.min(...open.map((view) => view.startRanges[0].start.getTime()))),
+    menuCount: matched.length,
+    firstMenuName: matched[0].name,
+    maxDiscountRate: Math.max(...matched.map((menu) => menu.discountRate)),
+    minSalePrice: Math.min(...matched.map((menu) => menu.salePrice)),
+    earliestStart: new Date(Math.min(...matched.map((menu) => menu.starts[0].start.getTime()))),
   };
 }
