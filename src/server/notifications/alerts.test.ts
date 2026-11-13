@@ -9,11 +9,20 @@ const state = vi.hoisted(() => ({
   notified: [] as unknown[],
   row: null as unknown,
   notifyError: null as Error | null,
+  keptRows: [] as unknown[],
+  keptReads: [] as unknown[],
 }));
 
 vi.mock('next/server', () => ({
   after: (task: () => Promise<void>) => {
     state.afterTasks.push(task);
+  },
+}));
+vi.mock('@/server/slot-windows/store', () => ({
+  // 마감 때 남겼다가 닫힌 칸 고르기는 slot-windows/owner-store.db.test.ts가 실제 DB로 본다
+  readReleasedKeptSlots: async (_db: unknown, slotIds: unknown) => {
+    state.keptReads.push(slotIds);
+    return state.keptRows;
   },
 }));
 vi.mock('./notify', () => ({
@@ -24,8 +33,10 @@ vi.mock('./notify', () => ({
 }));
 
 const {
+  KEPT_SLOT_RESERVED_NOTE,
   notifyAgreedCancelRequested,
   notifyAgreedCancelResult,
+  notifyKeptWindowSlotsReleased,
   notifyNoShow,
   notifyPaymentAutoCancelled,
   notifyPayoutAccountChanged,
@@ -40,6 +51,7 @@ const db = (() => {
   const chain = {
     from: () => chain,
     innerJoin: () => chain,
+    leftJoin: () => chain,
     where: async () => (state.row ? [state.row] : []),
   };
   return { select: () => chain } as unknown as ReturnType<typeof getDb>;
@@ -58,7 +70,10 @@ beforeEach(() => {
     menuName: '커트',
     startAt: new Date('2026-11-05T06:00:00.000Z'),
     slotId: 'slot-1',
+    windowClosed: false,
   };
+  state.keptRows = [];
+  state.keptReads = [];
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -90,6 +105,21 @@ describe('notifyReservationConfirmed', () => {
         title: '새 예약이 들어왔어요',
         body: '커트 · 11/5(목) 15:00',
         url: '/owner/reservations/r-1',
+      },
+    ]);
+  });
+
+  it('원장님이 시간대를 마감할 때 결제 중이라 남긴 칸이면 원장님 알림에 "마감 전에 결제를 시작한 손님"을 더한다(#308 ③-2)', async () => {
+    state.row = { ...(state.row as object), windowClosed: true };
+    notifyReservationConfirmed(db, 'r-1');
+    await runAfterTasks();
+    expect(KEPT_SLOT_RESERVED_NOTE).toBe('마감 전에 결제를 시작한 손님이에요');
+    expect(state.notified).toMatchObject([
+      { accountType: 'customer', body: '샘플 헤어 · 11/5(목) 15:00' },
+      {
+        accountType: 'owner',
+        title: '새 예약이 들어왔어요',
+        body: '커트 · 11/5(목) 15:00 · 마감 전에 결제를 시작한 손님이에요',
       },
     ]);
   });
@@ -308,5 +338,42 @@ describe('W16 ② 알림(#131 표 문구·주소)', () => {
     notifyNoShow(db, 'r-1');
     await expect(runAfterTasks()).resolves.toBeDefined();
     expect(console.error).toHaveBeenCalled();
+  });
+});
+
+describe('notifyKeptWindowSlotsReleased', () => {
+  it('마감 때 남겼다가 결제 없이 닫힌 칸마다 원장님에게 칸 시각·서비스를 알린다(#308 ③-2)', async () => {
+    state.keptRows = [
+      {
+        slotId: 'slot-7',
+        ownerUserId: 'owner-user',
+        menuName: '커트',
+        startAt: new Date('2026-11-14T05:00:00.000Z'),
+        endAt: new Date('2026-11-14T06:00:00.000Z'),
+      },
+    ];
+    notifyKeptWindowSlotsReleased(db, ['slot-7', 'slot-8']);
+    expect(state.notified).toEqual([]);
+    await runAfterTasks();
+    expect(state.keptReads).toEqual([['slot-7', 'slot-8']]);
+    expect(state.notified).toEqual([
+      {
+        userId: 'owner-user',
+        accountType: 'owner',
+        event: 'window.kept_slot_released',
+        dedupeKey: 'window.kept_slot_released:owner:slot-7',
+        title: '마감한 시간대의 남은 칸도 닫았어요',
+        body: '결제가 끝나지 않아 11/14(토) 14:00~15:00(커트)도 닫았어요',
+        url: '/owner',
+      },
+    ]);
+  });
+
+  it('고른 칸이 없으면 보내지 않고, 칸 id가 없으면 읽지도 않는다', async () => {
+    notifyKeptWindowSlotsReleased(db, ['slot-9']);
+    await runAfterTasks();
+    expect(state.notified).toEqual([]);
+    notifyKeptWindowSlotsReleased(db, []);
+    expect(state.afterTasks).toHaveLength(1);
   });
 });

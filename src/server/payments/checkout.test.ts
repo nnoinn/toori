@@ -32,6 +32,7 @@ const state = vi.hoisted(() => ({
   isNew: true,
   /** 정해 두면 acquireHold가 이 결과를 돌려준다(실패 코드 확인용) */
   acquireOverride: null as HoldOutcome | null,
+  keptAlerts: [] as string[][],
   acquireCalls: [] as { tx: unknown; input: AcquireInput }[],
   orders: [] as Record<string, unknown>[],
   /** 결제 번호 → 주문(메모리 흉내) */
@@ -71,6 +72,9 @@ function memoryAcquire({ slotId, customerId, now }: AcquireInput): HoldOutcome {
 vi.mock('@/server/notifications/alerts', () => ({
   notifyReservationConfirmed: () => {},
   notifyPaymentAutoCancelled: () => {},
+  notifyKeptWindowSlotsReleased: (_db: unknown, slotIds: string[]) => {
+    state.keptAlerts.push(slotIds);
+  },
 }));
 vi.mock('next/headers', () => ({
   cookies: async () => ({
@@ -262,6 +266,7 @@ beforeEach(() => {
   state.phone = '010-1234-5678';
   state.isNew = true;
   state.acquireOverride = null;
+  state.keptAlerts = [];
   state.acquireCalls = [];
   state.releaseCalls = [];
   state.orders = [];
@@ -346,14 +351,18 @@ describe('releaseHold', () => {
     await holdSlot(SLOT);
     expect(await releaseHold(SLOT)).toEqual(ok(null));
     expect(state.releaseCalls).toEqual([{ slotId: SLOT, customerId: ME, now: NOW }]);
+    // 푼 칸이 마감 때 남긴 시간대 칸이면 원장님에게 알린다(고르는 것은 알림 쪽, #308 ③-2). 두 번째 [취소]는 푼 것이 없어서 보내지 않는다
+    expect(state.keptAlerts).toEqual([[SLOT]]);
     expect(await getMyHold(SLOT)).toEqual(ok(null));
     expect(await releaseHold(SLOT)).toEqual(ok(null));
+    expect(state.keptAlerts).toEqual([[SLOT]]);
     expect((await holdSlot(OTHER_SLOT)).ok).toBe(true);
   });
 
   it('다른 고객의 홀딩은 풀지 않는다', async () => {
     state.slots.set(SLOT, slot(SLOT, { holdCustomerId: 'customer-2', holdExpiresAt: at(5) }));
     expect(await releaseHold(SLOT)).toEqual(ok(null));
+    expect(state.keptAlerts).toEqual([]);
     expect(state.slots.get(SLOT)?.holdCustomerId).toBe('customer-2');
   });
 
