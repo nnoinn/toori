@@ -10,12 +10,24 @@ import { disputes } from '@/db/schema';
 // DB 연결 없이 조건 안의 하위 쿼리만 만든다. 실행할 때 바깥 쿼리와 같은 이름 규칙(snake_case)으로 바뀐다
 const queryBuilder = new QueryBuilder({ casing: 'snake_case' });
 
+/** 확인 중(open) 이의제기 중 그 예약(바깥 쿼리의 예약 id 컬럼) 것 */
+const openDisputeOf = (reservationId: AnyColumn) =>
+  and(eq(disputes.reservationId, reservationId), eq(disputes.status, 'open'));
+
 /** 그 예약(바깥 쿼리의 예약 id 컬럼)에 확인 중(open) 이의제기가 있다 = 정산 보류 */
 export function hasOpenDispute(reservationId: AnyColumn): SQL {
   return exists(
     queryBuilder
       .select({ one: sql`1` })
       .from(disputes)
-      .where(and(eq(disputes.reservationId, reservationId), eq(disputes.status, 'open'))),
+      .where(openDisputeOf(reservationId)),
   );
+}
+
+/** 그 예약의 확인 중 이의제기를 받은 시각(여럿이면 가장 이른 것). 없으면 null. 정산 내역의 보류 이유에 쓴다(#129) */
+export function openDisputeReceivedAt(reservationId: AnyColumn): SQL<Date | null> {
+  return sql<Date | null>`(${queryBuilder
+    .select({ receivedAt: sql`min(${disputes.receivedAt})` })
+    .from(disputes)
+    .where(openDisputeOf(reservationId))})`.mapWith(disputes.receivedAt);
 }

@@ -8,6 +8,7 @@ import { alias } from 'drizzle-orm/pg-core';
 
 import type { getDb } from '@/db';
 import {
+  orders,
   ownerPenalties,
   refunds,
   reservations,
@@ -17,7 +18,7 @@ import {
 } from '@/db/schema';
 import type { CancelActor, ReservationStatus, VisitResult } from '@/db/schema/payments';
 import type { SettlementItemKind, SettlementStatus } from '@/db/schema/settlements';
-import { hasOpenDispute } from '@/server/disputes/conditions';
+import { hasOpenDispute, openDisputeReceivedAt } from '@/server/disputes/conditions';
 
 import type { SettlementRow } from './settlement-view';
 
@@ -46,12 +47,19 @@ export async function readShopSettlementRows(
       cancelledAt: reservations.cancelledAt,
       cancelActor: reservations.cancelActor,
       startAt: slots.startAt,
+      menuName: slots.menuName,
+      listPrice: slots.listPrice,
       salePrice: slots.salePrice,
       discountRate: slots.discountRate,
+      couponUsed: sql<boolean>`${orders.couponId} is not null`,
       cancelPenaltyRate: cancelRefund.penaltyRate,
       hasAdminRefund: sql<boolean>`exists (select 1 from ${refunds} where ${refunds.reservationId} = ${reservations.id} and ${refunds.reason} = 'admin_exception')`,
       // 확인 중 이의제기가 있으면 정산 보류(#350 3장, 이의제기 쪽 조건 하나를 같이 쓴다)
       hasOpenDispute: sql<boolean>`${hasOpenDispute(reservations.id)}`,
+      openDisputeReceivedAt: openDisputeReceivedAt(reservations.id),
+      // 원장님 귀책 취소 패널티(예약 하나에 하나, owner_penalties_reservation_id_unique)
+      penaltyAmount: ownerPenalties.amount,
+      penaltyCollected: ownerPenalties.collectedAmount,
       itemId: settlementItems.id,
       itemKind: settlementItems.kind,
       baseAmount: settlementItems.baseAmount,
@@ -67,6 +75,8 @@ export async function readShopSettlementRows(
     })
     .from(reservations)
     .innerJoin(slots, eq(slots.id, reservations.slotId))
+    .innerJoin(orders, eq(orders.id, reservations.orderId))
+    .leftJoin(ownerPenalties, eq(ownerPenalties.reservationId, reservations.id))
     .leftJoin(
       cancelRefund,
       and(
@@ -112,11 +122,19 @@ export async function readShopSettlementRows(
     cancelledAt: row.cancelledAt,
     cancelActor: row.cancelActor as CancelActor | null,
     startAt: row.startAt,
+    menuName: row.menuName,
+    listPrice: row.listPrice,
     salePrice: row.salePrice,
     discountRate: row.discountRate,
+    couponUsed: row.couponUsed,
     cancelPenaltyRate: row.cancelPenaltyRate,
     hasAdminRefund: row.hasAdminRefund,
     hasOpenDispute: row.hasOpenDispute,
+    openDisputeReceivedAt: row.openDisputeReceivedAt,
+    ownerPenalty:
+      row.penaltyAmount === null || row.penaltyCollected === null
+        ? null
+        : { amount: row.penaltyAmount, collectedAmount: row.penaltyCollected },
     item:
       row.itemId === null
         ? null

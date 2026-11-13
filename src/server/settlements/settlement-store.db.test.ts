@@ -1,10 +1,13 @@
 // 원장님 정산 내역 DB 읽기(readShopSettlementRows, readOutstandingPenalty)를 실제 DB(TEST_DATABASE_URL이 있을 때만)로 확인한다.
 // 정산 규칙과 금액 계산은 settle-rules.test.ts·settlement-view.test.ts가 본다.
 
+import { eq } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
 import {
+  coupons,
   disputes,
+  orders,
   ownerPenalties,
   refunds,
   settlementItems,
@@ -21,7 +24,7 @@ import {
 import { closeTestDb, describeDb, type TestTx, withRollback } from '../../../tests/db/test-db';
 import { readOutstandingPenalty, readShopSettlementRows } from './settlement-store';
 
-// 매물은 한국 시간 11/1(fixtures의 testSlot 날짜), 판매가 14,000원·30% 할인
+// 매물은 한국 시간 11/1(fixtures의 testSlot 날짜), 커트, 정가 20,000원·30% 할인·판매가 14,000원
 const at = (value: string) => new Date(`${value}+09:00`);
 
 /** 11/1 hh:00 서비스를 그 한 시간 뒤 방문 완료(또는 노쇼)로 처리한 예약 */
@@ -151,11 +154,16 @@ describeDb('원장님 정산 내역 읽기 (실제 DB)', () => {
         cancelledAt: null,
         cancelActor: null,
         startAt: at('2026-11-01T09:00:00'),
+        menuName: '커트',
+        listPrice: 20_000,
         salePrice: 14_000,
         discountRate: 30,
+        couponUsed: false,
         cancelPenaltyRate: null,
         hasAdminRefund: false,
         hasOpenDispute: false,
+        openDisputeReceivedAt: null,
+        ownerPenalty: null,
         item: null,
       });
 
@@ -186,7 +194,7 @@ describeDb('원장님 정산 내역 읽기 (실제 DB)', () => {
     });
   });
 
-  it('운영자 취소 환불이 있으면 hasAdminRefund, 확인 중 이의제기만 hasOpenDispute', async () => {
+  it('운영자 취소 환불이 있으면 hasAdminRefund, 확인 중 이의제기만 hasOpenDispute와 받은 시각', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
       const { customerId } = await createTestCustomer(tx);
@@ -201,7 +209,7 @@ describeDb('원장님 정산 내역 읽기 (실제 DB)', () => {
           content: '테스트 이의제기 내용이에요',
           status: 'open',
           channel: 'app',
-          receivedAt: new Date(),
+          receivedAt: at('2026-11-02T10:00:00'),
         },
         {
           reservationId: resolvedDispute.reservation.id,
@@ -217,11 +225,19 @@ describeDb('원장님 정산 내역 읽기 (실제 DB)', () => {
       const rows = await readShopSettlementRows(tx, { shopId: shop.shopId });
       const flagsOf = (made: Made) => {
         const row = rows.find((r) => r.reservationId === made.reservation.id);
-        return { admin: row?.hasAdminRefund, open: row?.hasOpenDispute };
+        return {
+          admin: row?.hasAdminRefund,
+          open: row?.hasOpenDispute,
+          receivedAt: row?.openDisputeReceivedAt,
+        };
       };
-      expect(flagsOf(adminRefunded)).toEqual({ admin: true, open: false });
-      expect(flagsOf(openDispute)).toEqual({ admin: false, open: true });
-      expect(flagsOf(resolvedDispute)).toEqual({ admin: false, open: false });
+      expect(flagsOf(adminRefunded)).toEqual({ admin: true, open: false, receivedAt: null });
+      expect(flagsOf(openDispute)).toEqual({
+        admin: false,
+        open: true,
+        receivedAt: at('2026-11-02T10:00:00'),
+      });
+      expect(flagsOf(resolvedDispute)).toEqual({ admin: false, open: false, receivedAt: null });
     });
   });
 
@@ -256,6 +272,44 @@ describeDb('원장님 정산 내역 읽기 (실제 DB)', () => {
       expect(unpaid.map((row) => row.reservationId).sort()).toEqual(
         [requested.reservation.id, notSettled.reservation.id].sort(),
       );
+    });
+  });
+
+  it('쿠폰을 쓴 주문이면 couponUsed, 원장님 귀책 취소면 그 예약의 패널티와 걷은 금액을 읽는다', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const { customerId } = await createTestCustomer(tx);
+      const withCoupon = await completed(tx, shop, customerId, 9);
+      const ownerFault = await cancelled(tx, shop, customerId, 10, 'owner_fault');
+      const [coupon] = await tx
+        .insert(coupons)
+        .values({
+          customerId,
+          amount: 3_000,
+          reason: 'owner_fault_compensation',
+          issuedAt: at('2026-10-20T10:00:00'),
+          expiresAt: at('2027-01-18T10:00:00'),
+        })
+        .returning();
+      await tx
+        .update(orders)
+        .set({ couponId: coupon.id, couponAmount: 3_000, amount: 11_000 })
+        .where(eq(orders.id, withCoupon.order.id));
+      await tx.insert(ownerPenalties).values({
+        shopId: shop.shopId,
+        reservationId: ownerFault.reservation.id,
+        amount: 5_000,
+        collectedAmount: 2_000,
+      });
+
+      const rows = await readShopSettlementRows(tx, { shopId: shop.shopId });
+      const rowOf = (made: Made) => rows.find((row) => row.reservationId === made.reservation.id);
+      expect(rowOf(withCoupon)).toMatchObject({ couponUsed: true, ownerPenalty: null });
+      expect(rowOf(ownerFault)).toMatchObject({
+        couponUsed: false,
+        cancelActor: 'owner_fault',
+        ownerPenalty: { amount: 5_000, collectedAmount: 2_000 },
+      });
     });
   });
 
