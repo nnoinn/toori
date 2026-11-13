@@ -233,7 +233,11 @@ export function LoginForm({
 
   return (
     <section className="flex flex-1 flex-col gap-8 px-4 pt-2 pb-12">
-      {isFirst ? <div className="h-4" aria-hidden /> : <BackButton className="-ml-2 self-start" />}
+      {isFirst ? (
+        <div className="h-4" aria-hidden />
+      ) : (
+        <BackButton className="-ml-2 self-start max-md:size-10" />
+      )}
       <div className="flex flex-col items-center gap-2 text-center">
         {isFirst ? <Logo className="mb-2 h-9" /> : null}
         <h1 className="text-2xl font-bold">{SITE_NAME} 시작하기</h1>
@@ -267,7 +271,7 @@ export function LoginForm({
         // 로그인 없이 고객 화면(홈·목록·지도·매물 상세)만 둘러본다(#215). 예약·찜·내 정보는 그때 로그인한다
         <Link
           href={CUSTOMER_HOME}
-          className={buttonVariants({ variant: 'ghost', className: 'self-center' })}
+          className={buttonVariants({ variant: 'ghost', className: 'self-center max-md:h-10' })}
         >
           로그인 없이 둘러보기
         </Link>

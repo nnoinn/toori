@@ -32,8 +32,8 @@ describe('시간대 매물 ① 시간표 (#308)', () => {
     expect(daySpans('2026-11-13', hours)).toEqual([{ start: 0, end: 1440 }]);
     expect(daySpans('2026-11-15', hours)).toEqual([]);
     expect(minutesLabel(570)).toBe('09:30');
-    expect(minutesLabel(1440)).toBe('24:00');
-    expect(minutesLabel(1560)).toBe('다음 날 02:00');
+    expect(minutesLabel(1440)).toBe('00:00(익일)');
+    expect(minutesLabel(1560)).toBe('02:00(익일)');
     // 30분 단위가 아닌 예전 값은 안쪽 칸으로
     expect(daySpans(THURSDAY, [{ weekday: 4, open: '10:15', close: '13:45' }])).toEqual([
       { start: 630, end: 810 },
@@ -47,7 +47,7 @@ describe('시간대 매물 ① 시간표 (#308)', () => {
       { weekday: 4, open: '20:00', close: '01:00' },
     ];
     const spans = daySpans(THURSDAY, night);
-    expect(spans.map(spanLabel)).toEqual(['00:00~02:00', '20:00~다음 날 01:00']);
+    expect(spans.map(spanLabel)).toEqual(['00:00~02:00', '20:00~01:00(익일)']);
     const cells = dayCells(THURSDAY, night, now, []);
     expect(starts(cells)).toEqual([
       '00:00',
@@ -70,10 +70,10 @@ describe('시간대 매물 ① 시간표 (#308)', () => {
     expect(cells.slice(0, 4).every((cell) => cell.lock === 'past')).toBe(true);
     // 자정을 넘겨도 이어진 칸은 시간대 하나
     const ranges = selectedRanges(cells, new Set([10, 11, 12, 13]));
-    expect(ranges.map((range) => rangeLabel(range, THURSDAY))).toEqual(['23:00~다음 날 01:00']);
-    // 다음 날에 시작하는 묶음에는 "다음 날"
+    expect(ranges.map((range) => rangeLabel(range, THURSDAY))).toEqual(['23:00~01:00(익일)']);
+    // 다음 날에 시작하는 묶음은 시작·끝 모두 "(익일)"
     expect(rangesSummary(selectedRanges(cells, new Set([13])), THURSDAY)).toBe(
-      '다음 날 00:30~01:00 (총 30분)',
+      '00:30(익일)~01:00(익일) (총 30분)',
     );
     // 쉬는 날이어도 전날에서 이어진 새벽은 남는다
     expect(daySpans(THURSDAY, [night[0], { weekday: 4, closed: true }]).map(spanLabel)).toEqual([
@@ -116,10 +116,10 @@ describe('시간대 매물 ① 시간표 (#308)', () => {
     expect(cells[1].lock).toBe('tooFar');
   });
 
-  it('하루 전체 시간표의 마지막 칸은 자정에 끝나고 "24:00"으로 보인다', () => {
+  it('하루 전체 시간표의 마지막 칸은 자정에 끝나고 "00:00(익일)"로 보인다', () => {
     const cells = dayCells('2026-11-13', hours, now, []);
     expect(cells).toHaveLength(48);
-    expect(rangeLabel(cells[47])).toBe('23:30~24:00');
+    expect(rangeLabel(cells[47])).toBe('23:30~00:00(익일)');
   });
 
   it('드래그: 시작한 칸부터 지금 칸까지 잠기지 않은 칸을 켜고, 되돌아가면 시작할 때 값으로', () => {

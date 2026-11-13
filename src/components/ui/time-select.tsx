@@ -2,6 +2,8 @@
 
 import { cn } from 'cn';
 
+import { withNextDayMark } from '@/lib/time';
+
 // 시각 고르기: 24시간 표기 칸 하나(#311, 11/11 nnoinn). 누르면 00:00, 00:30, … 23:30 목록에서 한 번에 시각 전체를 고른다.
 // 값은 "HH:MM"(빈 값은 ''). 비어 있으면 "선택"으로 둔다.
 // 닫는 시각 칸(closing)은 다음 날에 닫는 시각에 "(익일)"을 붙인다(11/12 nnoinn, 점검 1-6. 예전 "00:00(자정)"을 바꿨다).
@@ -28,7 +30,7 @@ export function timeOptions(stepMinutes: number, extra?: string): string[] {
 export function timeOptionLabel(value: string, closing = false, openValue?: string): string {
   if (!closing) return value;
   const nextDay = openValue && TIME.test(openValue) ? value <= openValue : value === '00:00';
-  return nextDay ? `${value}(익일)` : value;
+  return nextDay ? withNextDayMark(value) : value;
 }
 
 const SELECT_CLASS =

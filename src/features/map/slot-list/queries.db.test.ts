@@ -3,7 +3,7 @@
 
 import { afterAll, expect, it } from 'vitest';
 
-import { favorites, slots } from '@/db/schema';
+import { favorites, slots, slotWindows } from '@/db/schema';
 
 import {
   createTestCustomer,
@@ -18,13 +18,14 @@ import { EMPTY_FILTERS, type HomeFilters } from '../filters';
 import type { MapBounds } from '../types';
 import { decodeCursor, SLOT_PAGE_SIZE } from './cursor';
 import {
-  countSlots,
+  countListItems,
   type HomeSlotQuery,
   selectFavoriteSlots,
   selectMapShops,
   selectSlotPage,
 } from './queries';
 import type { SlotSort } from './sort';
+import type { ListItem } from './types';
 
 afterAll(closeTestDb);
 
@@ -70,7 +71,9 @@ async function insertSlot(
   return row;
 }
 
-const ids = (items: { slotId: string }[]) => items.map((item) => item.slotId);
+// 테스트에서는 가짜 시간대가 꺼져 있어(listSlotWindows가 빈 목록) 매물만 나온다
+const ids = (items: ListItem[]) =>
+  items.map((item) => (item.kind === 'slot' ? item.slotId : item.windowId));
 
 describeDb('홈 목록·지도 조회', () => {
   it('매물 목록: 고른 시·군·구 안의 매물만, 매물 수도 같은 조건(#215)', async () => {
@@ -95,7 +98,40 @@ describeDb('홈 목록·지도 조회', () => {
         shopId: null,
       });
       expect(ids(result.items)).toEqual([shown.id]);
-      expect(await countSlots(tx, query)).toBe(1);
+      expect(await countListItems(tx, query)).toBe(1);
+    });
+  });
+
+  it('시간대 안에서 손님이 만든 매물은 목록·매물 수·지도·찜한 샵 매물에서 빠진다(#308, 시간대 카드로만 보인다)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const me = await createTestCustomer(tx);
+      await tx.insert(favorites).values({ customerId: me.customerId, shopId: shop.shopId });
+      const [window] = await tx
+        .insert(slotWindows)
+        .values({
+          shopId: shop.shopId,
+          startAt: new Date('2026-11-01T13:00:00+09:00'),
+          endAt: new Date('2026-11-01T18:00:00+09:00'),
+          publishAt: new Date('2026-10-30T13:00:00+09:00'),
+          status: 'published',
+          createdBy: shop.createdBy,
+        })
+        .returning();
+      const shown = await insertSlot(tx, shop, '10:00', '11:00');
+      await insertSlot(tx, shop, '14:00', '15:00', { windowId: window.id });
+
+      expect(ids((await page(tx)).items)).toEqual([shown.id]);
+      expect(await countListItems(tx, baseQuery())).toBe(1);
+      expect(await selectMapShops(tx, baseQuery())).toEqual([
+        expect.objectContaining({ shopId: shop.shopId, slotCount: 1 }),
+      ]);
+      const liked = await selectFavoriteSlots(tx, {
+        customerId: me.customerId,
+        now: NOW,
+        origin: null,
+      });
+      expect(ids(liked)).toEqual([shown.id]);
     });
   });
 

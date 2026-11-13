@@ -17,7 +17,7 @@ import { getCustomerLocation, latLngSchema } from '../location';
 import { REGION_PARAM, withLinkedRegion } from '../region-link';
 import type { MapBounds, MapShop } from '../types';
 import { decodeCursor } from './cursor';
-import { countSlots, selectMapShops, selectSlotPage, type HomeSlotQuery } from './queries';
+import { countListItems, selectMapShops, selectSlotPage, type HomeSlotQuery } from './queries';
 import { parseSort } from './sort';
 import type { SlotListPage } from './types';
 
@@ -152,7 +152,7 @@ export async function loadRegionSlots(
         cursor: decodeCursor(cursor, sort),
         shopId: null,
       }),
-      cursor ? null : countSlots(db, query),
+      cursor ? null : countListItems(db, query),
     ]);
     return ok({ ...page, serverNow: now.toISOString(), total });
   } catch (error) {

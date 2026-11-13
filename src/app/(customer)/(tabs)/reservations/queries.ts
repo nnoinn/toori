@@ -8,11 +8,15 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
-import { orders, refunds, reservations, shops, slots } from '@/db/schema';
+import { agreedCancelRequests, orders, refunds, reservations, shops, slots } from '@/db/schema';
+import type { ReservationStatus, VisitResult } from '@/db/schema/payments';
+import type { AgreedCancelRequestStatus } from '@/db/schema/refunds';
 import type { Result } from '@/lib/result';
 import { fail, ok } from '@/lib/result';
+import { getRequestNow } from '@/lib/request-time';
 import { requireCustomer } from '@/server/auth';
 
+import { hasPendingAgreedCancel } from './agreed-cancel-badge';
 import { statusOfTab, type ReservationTab } from './reservation-tabs';
 
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
@@ -35,7 +39,16 @@ export type MyReservationItem = {
 export type MyReservationListItem = MyReservationItem & {
   /** 서비스 끝 시각(ISO) */
   endAt: string;
+  /** 원장님의 합의 후 취소 요청에 아직 답하지 않음(카드 뱃지, #359 3번. 예약 상세 요청 카드와 같은 기준) */
+  agreedCancelPending: boolean;
 };
+
+/** 그 예약의 가장 최근 합의 후 취소 요청의 한 칸(예약 상세 readLatestAgreedCancelRequest와 같은 "가장 최근") */
+function latestRequestColumn(
+  column: typeof agreedCancelRequests.status | typeof agreedCancelRequests.expiresAt,
+) {
+  return sql`(select ${column} from ${agreedCancelRequests} where ${agreedCancelRequests.reservationId} = ${reservations.id} order by ${agreedCancelRequests.requestedAt} desc limit 1)`;
+}
 
 export type MyReservationDetail = MyReservationItem & {
   status: 'confirmed' | 'completed' | 'cancelled';
@@ -68,11 +81,12 @@ export type MyReservationDetail = MyReservationItem & {
 
 const iso = (date: Date | null) => (date ? date.toISOString() : null);
 
-/** 그 고객의 한 탭 예약. 예정은 가까운 순, 이용 완료는 최근 이용 순, 취소는 최근 취소 순 */
+/** 그 고객의 한 탭 예약. 예정은 가까운 순, 이용 완료는 최근 이용 순, 취소는 최근 취소 순. now는 합의 후 취소 요청 답 기한 기준 */
 export async function selectMyReservations(
   db: DbReader,
   customerId: string,
   tab: ReservationTab,
+  now: Date,
 ): Promise<MyReservationListItem[]> {
   const order =
     tab === 'upcoming'
@@ -85,8 +99,15 @@ export async function selectMyReservations(
     .select({
       reservationId: reservations.id,
       code: reservations.code,
+      status: reservations.status,
       visitResult: reservations.visitResult,
       cancelledAt: reservations.cancelledAt,
+      requestStatus: latestRequestColumn(agreedCancelRequests.status).mapWith(
+        agreedCancelRequests.status,
+      ),
+      requestExpiresAt: latestRequestColumn(agreedCancelRequests.expiresAt).mapWith(
+        agreedCancelRequests.expiresAt,
+      ),
       shopName: shops.name,
       menuName: slots.menuName,
       startAt: slots.startAt,
@@ -110,6 +131,20 @@ export async function selectMyReservations(
     amount: row.amount,
     noShow: row.visitResult === 'no_show',
     cancelledAt: iso(row.cancelledAt),
+    agreedCancelPending: hasPendingAgreedCancel(
+      row.requestStatus && row.requestExpiresAt
+        ? {
+            status: row.requestStatus as AgreedCancelRequestStatus,
+            expiresAt: row.requestExpiresAt,
+          }
+        : null,
+      // DB 검사 조건이 정해진 값만 허용한다
+      {
+        status: row.status as ReservationStatus,
+        visitResult: row.visitResult as VisitResult | null,
+      },
+      now,
+    ),
   }));
 }
 
@@ -205,7 +240,7 @@ export async function getMyReservations(
 ): Promise<Result<MyReservationListItem[]>> {
   const auth = await requireCustomer();
   if (!auth.ok) return auth;
-  return ok(await selectMyReservations(getDb(), auth.data.customerId, tab));
+  return ok(await selectMyReservations(getDb(), auth.data.customerId, tab, await getRequestNow()));
 }
 
 const reservationIdSchema = z.uuid();

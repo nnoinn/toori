@@ -1,5 +1,6 @@
 // 합의 후 취소 계산과 규칙 (X-208, #301, 11/8·11/10 결정). 계산만 한다. 화면은 이 계산 대신 함수 결과를 쓴다.
-// - 손님 환불 = 실제 결제액 × 50%(원 미만 버림, 쓴 쿠폰은 돌려주지 않는다)
+// - 손님 환불 = 실제 결제액 − 위약금(실제 결제액 × 50%, 원 미만 버림). 원 미만은 고객 취소처럼 손님 쪽으로 맞춘다(11/12).
+//   쓴 쿠폰은 돌려주지 않는다
 // - 원장님 기준 금액 = 판매가 × (100 − 50)%(원 미만 버림). 수수료는 고객 취소 위약금과 같은 방식(정산 W20)
 // - 요청은 예정 예약(방문·노쇼 처리 전, 서비스 시작 뒤 포함)에만, 답을 기다리는 요청은 한 번에 하나
 
@@ -21,8 +22,10 @@ export function calcAgreedCancel({
   if (!Number.isInteger(salePrice) || salePrice < 0) {
     throw new RangeError(`판매가가 올바르지 않아요: ${salePrice}`);
   }
+  // 위약금 쪽에서 원 미만을 버려서 손님 환불이 표시한 비율보다 적어지지 않게 한다(calcRefund와 같은 방식)
+  const penaltyAmount = Math.floor((paidAmount * (100 - AGREED_CANCEL_REFUND_RATE)) / 100);
   return {
-    refundAmount: Math.floor((paidAmount * AGREED_CANCEL_REFUND_RATE) / 100),
+    refundAmount: paidAmount - penaltyAmount,
     baseAmount: Math.floor((salePrice * (100 - AGREED_CANCEL_REFUND_RATE)) / 100),
   };
 }

@@ -6,7 +6,7 @@
 
 import 'server-only';
 
-import { and, eq, inArray, not } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, not } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { customers, shops, slots } from '@/db/schema';
@@ -34,6 +34,46 @@ function myActiveHold(db: Db, customerId: string, now: Date) {
       and(eq(slots.holdCustomerId, customerId), slotIsOnHold(now), slotStatusIs('published', now)),
     )
     .limit(1);
+}
+
+/** 지금 내 홀딩과 결제 중 막대에 보여줄 값(샵 이름·서비스·시작 시각) */
+export type MyActiveHoldRow = {
+  slotId: string;
+  holdExpiresAt: Date;
+  shopName: string;
+  menuName: string;
+  startAt: Date;
+};
+
+/**
+ * 지금 살아 있는 내 홀딩(한 사람은 동시에 하나, acquireHold와 같은 기준). 없거나 끝났으면 null.
+ * 시간대 안에서 만든 매물(#308)도 매물 한 칸이라 같은 모양으로 나온다
+ */
+export async function readMyActiveHold(
+  db: Pick<ReturnType<typeof getDb>, 'select'>,
+  input: { customerId: string; now: Date },
+): Promise<MyActiveHoldRow | null> {
+  const [row] = await db
+    .select({
+      slotId: slots.id,
+      holdExpiresAt: slots.holdExpiresAt,
+      shopName: shops.name,
+      menuName: slots.menuName,
+      startAt: slots.startAt,
+    })
+    .from(slots)
+    .innerJoin(shops, eq(shops.id, slots.shopId))
+    .where(
+      and(
+        eq(slots.holdCustomerId, input.customerId),
+        slotIsOnHold(input.now),
+        slotStatusIs('published', input.now),
+      ),
+    )
+    .orderBy(desc(slots.holdExpiresAt))
+    .limit(1);
+  if (!row?.holdExpiresAt) return null;
+  return { ...row, holdExpiresAt: row.holdExpiresAt };
 }
 
 /**
@@ -87,21 +127,29 @@ export async function acquireHold(
   return { ok: false, code: 'SLOT_NOT_AVAILABLE' };
 }
 
-/** 내 홀딩을 푼다(판매 전 매물만). 풀었으면 true, 내 홀딩이 아니었으면 false */
+/**
+ * 내 홀딩을 푼다(판매 전 매물만). 풀었으면 true, 내 홀딩이 아니었으면 false.
+ * 시간대 안에서 만든 칸(#308 ③)은 그 홀딩 때문에 만든 칸이라 홀딩만 비우지 않고 마감(hold_released)으로 닫는다
+ */
 export async function releaseMyHold(
   db: Pick<ReturnType<typeof getDb>, 'update'>,
-  input: { slotId: string; customerId: string },
+  input: { slotId: string; customerId: string; now: Date },
 ): Promise<boolean> {
+  const mine = and(
+    eq(slots.id, input.slotId),
+    eq(slots.holdCustomerId, input.customerId),
+    inArray(slots.status, ['scheduled', 'published']),
+  );
   const released = await db
     .update(slots)
     .set({ holdCustomerId: null, holdExpiresAt: null })
-    .where(
-      and(
-        eq(slots.id, input.slotId),
-        eq(slots.holdCustomerId, input.customerId),
-        inArray(slots.status, ['scheduled', 'published']),
-      ),
-    )
+    .where(and(mine, isNull(slots.windowId)))
     .returning({ id: slots.id });
-  return released.length > 0;
+  if (released.length > 0) return true;
+  const closed = await db
+    .update(slots)
+    .set({ status: 'closed', closeReason: 'hold_released', closedAt: input.now })
+    .where(and(mine, isNotNull(slots.windowId)))
+    .returning({ id: slots.id });
+  return closed.length > 0;
 }

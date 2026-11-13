@@ -9,14 +9,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MapBounds, MapShop } from '../types';
 import { loadHomeMap, loadHomeSlots } from './actions';
 import { appendPage, type Failed, resultView, type Shown } from './result-view';
-import type { SlotListItem } from './types';
+import type { ListItem } from './types';
 
-type ListData = { items: SlotListItem[]; nextCursor: string | null; serverNow: string };
+type ListData = { items: ListItem[]; nextCursor: string | null; serverNow: string };
 
 const LOAD_FAILED = '매물을 불러오지 못했어요. 잠시 후 다시 시도해 주세요';
 
 const NO_SHOPS: MapShop[] = [];
-const NO_ITEMS: SlotListItem[] = [];
+const NO_ITEMS: ListItem[] = [];
 
 export function useHomeSlots({
   bounds,

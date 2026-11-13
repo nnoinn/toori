@@ -32,11 +32,12 @@ import {
   toUnconfirmedCode,
   unconfirmedFail,
 } from './errors';
-import { acquireHold, releaseMyHold } from './hold-store';
+import { acquireHold, readMyActiveHold, releaseMyHold } from './hold-store';
 import { createPendingOrder, newPaymentId } from './order-store';
 import { getPortOnePayment } from './portone';
 import { autoCancelOrder, recordFailedPayment, settlePaidOrder } from './settle-order';
 import type {
+  ActiveHold,
   CheckoutAmount,
   ConfirmedReservation,
   HoldInfo,
@@ -109,15 +110,41 @@ export async function holdSlot(slotId: string): Promise<PaymentResult<HoldInfo>>
   return ok(holdInfo(id.data, outcome.holdExpiresAt, now));
 }
 
-/** 예약 확인 화면의 '취소'. 내 홀딩을 바로 푼다. 이미 풀렸거나 내 홀딩이 아니어도 성공(두 번 눌러도 된다) */
+/**
+ * 예약 확인 화면의 '취소'. 내 홀딩을 바로 푼다. 이미 풀렸거나 내 홀딩이 아니어도 성공(두 번 눌러도 된다).
+ * 시간대 안에서 만든 칸은 바로 닫혀서 그 시간이 다시 열린다(#308 ③)
+ */
 export async function releaseHold(slotId: string): Promise<PaymentResult<null>> {
   const auth = await requireCustomer();
   if (!auth.ok) return auth;
   const id = slotIdSchema.safeParse(slotId);
   if (!id.success) return ok(null);
 
-  await releaseMyHold(getDb(), { slotId: id.data, customerId: auth.data.customerId });
+  await releaseMyHold(getDb(), {
+    slotId: id.data,
+    customerId: auth.data.customerId,
+    now: await getRequestNow(),
+  });
   return ok(null);
+}
+
+/**
+ * 지금 내 홀딩(한 사람은 동시에 하나, C-404). 고객 화면 아래 결제 중 막대(#363, 정찬형)가 화면을 옮길 때마다 부른다.
+ * 둘러보는 화면마다 부르므로 로그인 안 함·원장님 모드·고객 계정 없음도 오류가 아니라 null이다. 홀딩이 없거나 끝났어도 null.
+ * [취소]는 releaseHold(slotId)를 쓴다
+ */
+export async function getMyActiveHold(): Promise<PaymentResult<ActiveHold | null>> {
+  const auth = await requireCustomer();
+  if (!auth.ok) return ok(null);
+  const now = await getRequestNow();
+  const hold = await readMyActiveHold(getDb(), { customerId: auth.data.customerId, now });
+  if (!hold) return ok(null);
+  return ok({
+    ...holdInfo(hold.slotId, hold.holdExpiresAt, now),
+    shopName: hold.shopName,
+    menuName: hold.menuName,
+    startAt: hold.startAt.toISOString(),
+  });
 }
 
 /**

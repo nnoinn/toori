@@ -4,13 +4,17 @@ import {
   addHours,
   addMinutes,
   formatHourLabel,
+  formatEndTime,
   formatKst,
+  formatKstDateTime,
   formatKstTime,
   hoursUntil,
   kstToUtc,
   minutesUntil,
   utcToKst,
   kstDateKey,
+  NEXT_DAY_MARK,
+  withNextDayMark,
 } from './time';
 
 describe('kstToUtc', () => {
@@ -81,5 +85,39 @@ describe('formatHourLabel', () => {
     expect(formatHourLabel(8)).toBe('아침 8시');
     expect(formatHourLabel(12)).toBe('오후 12시');
     expect(formatHourLabel(0)).toBe('밤 12시');
+  });
+});
+
+describe('끝나는 시각과 운영자 기록 시각 (11/13 nnoinn)', () => {
+  it('같은 날 끝나면 시각만, 다음 날 끝나면 "(익일)"을 붙인다("24:00"·"다음 날"은 쓰지 않는다)', () => {
+    // 한국 시간 11/14 15:00 ~ 16:00
+    expect(formatEndTime(new Date('2026-11-14T06:00:00Z'), new Date('2026-11-14T07:00:00Z'))).toBe(
+      '16:00',
+    );
+    // 한국 시간 11/14 23:00 ~ 11/15 00:00(자정에 끝남)
+    expect(formatEndTime(new Date('2026-11-14T14:00:00Z'), new Date('2026-11-14T15:00:00Z'))).toBe(
+      '00:00(익일)',
+    );
+    // 한국 시간 11/14 23:30 ~ 11/15 01:00
+    expect(formatEndTime('2026-11-14T14:30:00Z', '2026-11-14T16:00:00Z')).toBe('01:00(익일)');
+  });
+
+  it('날짜는 UTC가 아니라 한국 날짜로 본다', () => {
+    // UTC로는 11/14 14:00 ~ 14:59(같은 날)이지만, 한국 시간으로도 11/14 23:00 ~ 23:59라 같은 날
+    expect(formatEndTime('2026-11-14T14:00:00Z', '2026-11-14T14:59:00Z')).toBe('23:59');
+    // UTC로는 11/14 13:00 ~ 11/14 15:30(같은 날)이지만, 한국 시간으로는 22:00 ~ 다음 날 00:30
+    expect(formatEndTime('2026-11-14T13:00:00Z', '2026-11-14T15:30:00Z')).toBe('00:30(익일)');
+  });
+
+  it('(익일) 표시는 한 곳에서 붙인다', () => {
+    expect(NEXT_DAY_MARK).toBe('(익일)');
+    expect(withNextDayMark('02:00')).toBe('02:00(익일)');
+  });
+
+  it('운영자 기록 시각은 연도를 넣고 요일을 뺀 "YYYY-MM-DD HH:mm"(한국 시간)', () => {
+    expect(formatKstDateTime(new Date('2026-11-02T09:22:00Z'))).toBe('2026-11-02 18:22');
+    expect(formatKstDateTime('2026-11-02T09:22:00Z')).toBe('2026-11-02 18:22');
+    // 해가 바뀌는 때: UTC 12/31 15:30은 한국 시간 다음 해 1/1 00:30
+    expect(formatKstDateTime('2026-12-31T15:30:00Z')).toBe('2027-01-01 00:30');
   });
 });

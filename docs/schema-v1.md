@@ -498,11 +498,13 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 
 ### settlement_items — 거래별 정산 내역 (거래 하나에 한 줄)
 
+정산 줄은 매주 목요일(공휴일이면 다음 영업일) 새벽 묶기 작업이 만든다. 지급일 0시(한국 시간)까지 이의제기 접수 기한이 지났고 확인 중(`open`) 이의제기가 없는 끝난 거래(이용 완료·노쇼·고객 취소·합의 후 취소)를 고르고, 비율은 그날의 정책값을 쓴다. 기준 금액이 0인 거래(원장님 귀책 취소, 운영자 취소 `admin_exception`)는 줄을 만들지 않는다(#353, 11/12). 그 전까지 원장님 정산 내역(S-501)은 같은 계산으로 지급 예정일과 보류를 그때그때 보여준다.
+
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | id | uuid PK | |
 | shop_id | uuid → shops | |
-| order_id | uuid → orders | |
+| order_id | uuid → orders | unique: 거래 하나에 한 줄. 묶기 작업이 두 번 돌거나 겹쳐 돌아도 같은 거래를 두 번 정산하지 않는다 |
 | kind | text | `sale`(이용 완료) / `penalty`(고객 취소 위약금) / `no_show`(노쇼) / `agreed_cancel`(합의 후 취소, 판매가 × 50%를 기준 금액으로 고객 취소 위약금과 같은 방식) |
 | base_amount | integer | 판매가 기준 남은 금액: 이용 완료·노쇼 = 판매가, 고객 취소 = 판매가 × 위약금 비율(쿠폰과 무관) |
 | fee_rate | integer | 적용한 플랫폼 수수료율(당시 값, %). 오픈 기간은 0 |
@@ -512,7 +514,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | payment_fee | integer | 원장님에게 받는 결제 수수료 = base_amount × payment_fee_rate(원 미만 버림) |
 | payment_fee_vat | integer | 결제 수수료 VAT |
 | payout_amount | integer | 이 거래로 원장님이 받을 금액 = base_amount − fee_amount − fee_vat − payment_fee − payment_fee_vat |
-| pg_fee_actual | integer | 실제 PG 수수료(실제 결제액 기준). 투리 손익 계산용, 원장님 정산에는 쓰지 않는다 |
+| pg_fee_actual | integer, null | 실제 PG 수수료(실제 결제액 기준). 투리 손익 계산용, 원장님 정산에는 쓰지 않는다. PG 정산 자료가 와야 아는 값이라 묶을 때는 비워 두고 자료가 오면 채운다 |
 | coupon_amount | integer, 기본 0 | 투리가 부담한 쿠폰 금액. 투리 손익 계산용 |
 | settlement_id | uuid, null → settlements | 어느 정산에 들어갔는지. 비어 있으면 정산 전 |
 | created_at | timestamptz | |
@@ -523,12 +525,12 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | --- | --- | --- |
 | id | uuid PK | |
 | shop_id | uuid → shops | |
-| period_start, period_end | date | 정산 기간(주기는 2단계 전에 정한다). unique(`shop_id`, `period_start`, `period_end`): 같은 기간을 두 번 묶어 두 번 지급 요청하는 실수를 막는다(#64) |
+| period_start, period_end | date | 샵 하나 × 지급일 하나로 묶는다. `period_end` = 지급일, `period_start` = 그 샵의 직전 지급일 다음 날(첫 정산은 처음 묶이는 거래가 끝난 날). 이의제기로 늦게 들어온 거래는 서비스 날짜가 기간보다 앞설 수 있다(기간은 "이번에 확정된 묶음"이라는 뜻, #353). unique(`shop_id`, `period_start`, `period_end`): 같은 기간을 두 번 묶어 두 번 지급 요청하는 실수를 막는다(#64) |
 | item_count | integer | |
 | total_base_amount | integer | |
 | total_fee_amount | integer | 플랫폼 수수료 + VAT + 결제 수수료 + VAT 합 |
 | penalty_deducted | integer | 이번에 뗀 패널티 |
-| payout_amount | integer | 최종 지급액 |
+| payout_amount | integer | 최종 지급액. 패널티를 떼고 0원이면 지급 요청 없이 `paid`(지급 완료, `payout_ref` 없음)로 끝내고, 못 뗀 패널티는 다음 정산으로 넘어간다. 원장님 정산 내역(S-501)에는 "패널티로 상계해서 0원"처럼 이유가 보이게 한다(`penalty_deducted`로 안다, #353) |
 | status | text | `pending`(지급 전) / `requested`(PG에 지급 요청) / `paid`(지급 완료) / `failed`(지급 실패, 재요청 필요) |
 | paid_at | timestamptz, null | |
 | payout_ref | text, null | PG 지급대행 요청 번호(결과 확인·재요청용). 투리는 직접 송금하지 않는다(10/12) |
@@ -668,7 +670,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | agreed_cancel_requests | unique(reservation_id) where status = `requested`, (reservation_id, requested_at), (expires_at) where status = `requested` | 답을 기다리는 요청 하나, 가장 최근 요청, 만료 처리 작업 |
 | disputes | unique(reservation_id), check: `kakao` ⇔ registered_by 있음, `resolved` ⇔ outcome 있음 | 한 예약에 이의제기 하나, 등록한 운영자·결론 종류 빠뜨리지 않기 |
 | coupons | (customer_id, expires_at) | 보유 쿠폰 |
-| settlement_items | (shop_id, settlement_id) | 정산 묶기 |
+| settlement_items | (shop_id, settlement_id), unique(order_id) | 정산 묶기, 거래 하나에 한 줄 |
 | notifications | unique(dedupe_key) | 중복 발송 방지 |
 | 상태 값 컬럼 전부 | check(값 목록) | 잘못된 값 저장 방지 |
 
@@ -712,3 +714,4 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | 2026-11-11 | 시간대 매물 `slot_windows`·`slot_window_menus`와 `slots.window_id`를 더한다(#308, 11/10·11/11 nnoinn). 고객이 예약할 때 지금 매물 한 칸으로 바꾼다. 같은 샵의 시간대끼리는 EXCLUDE로, 시간대와 한 시술 매물 사이는 트리거로 겹침을 막는다. 마이그레이션 0011 |
 | 2026-11-11 | 합의 후 취소 요청 `agreed_cancel_requests`를 더하고, `reservations.cancel_actor`에 `agreed`, `refunds.reason`에 `agreed_cancel`, `settlement_items.kind`에 `agreed_cancel`을 더한다. 취소 환불 unique를 고객 취소와 합의 후 취소에 같이 건다(`refunds_cancel_unique`, #320 승인). `slots.close_reason`에 `hold_released`(결제 없이 홀딩 끝남, #308 ④)를 더한다. 마이그레이션 0012 |
 | 2026-11-12 | `disputes`에 `channel`(접수 경로)·`received_at`(접수 시각)·`registered_by`(카카오톡 채널 건을 등록한 운영자)·`outcome`(결론 종류 6개)을 더하고 unique(`reservation_id`)를 건다. 지금 있는 기록은 `app`, `created_at`으로 채운다. check는 양쪽으로: `kakao` ⇔ 등록한 운영자 있음, `resolved` ⇔ 결론 종류 있음. 돈이 오가는 결론 셋은 처리 기능이 생길 때까지 서버가 막는다. 정산 보류는 칸 없이 "`open` 이의제기가 있으면"으로 본다(#350, 11/12 nnoinn). 마이그레이션 0013 |
+| 2026-11-12 | 정산 묶는 방식: 정산 줄은 목요일 새벽 묶기 작업이 지급일 0시(한국 시간) 기준으로 만들고 그날의 결제 수수료율을 쓴다(플랫폼 수수료 방식도 같다. 법인 전환 때는 공급자 약관 시행일 뒤 첫 정산일 묶음부터). 묶음은 샵 하나 × 지급일 하나, 기간은 직전 지급일 다음 날 ~ 지급일. 패널티를 떼고 0원이면 지급 요청 없이 지급 완료(0원)로 끝내고 S-501에 이유를 보인다. `settlement_items`에 unique(`order_id`), `pg_fee_actual` null 허용(#353, 11/12 nnoinn). 마이그레이션 0014 |
