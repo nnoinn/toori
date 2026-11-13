@@ -5,10 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { formatReservationCode } from '@/components/ui/reservation-code';
 import { formatWon } from '@/lib/format';
-import { formatKst } from '@/lib/time';
+import { formatEndTime, formatKst } from '@/lib/time';
 
 import type { MyReservationListItem } from './queries';
-import { reservationEndText } from './reservation-time';
 
 /**
  * [내 예약] 목록의 예약 하나 = 흰 카드 하나(#359 2번). 카드 어디를 눌러도 예약 상세로 간다.
@@ -24,7 +23,7 @@ export function ReservationCard({
   visitPending: boolean;
 }) {
   const start = formatKst(new Date(item.startAt));
-  const end = reservationEndText(item.startAt, item.endAt);
+  const end = formatEndTime(item.startAt, item.endAt);
   const code = formatReservationCode(item.code);
 
   return (
