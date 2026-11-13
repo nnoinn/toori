@@ -1,9 +1,8 @@
-// 시간대 매물 [예약하기] 홀딩 저장과 결제 없이 끝난 칸 닫기 (C-404·X-304, #308 ③). 서버에서만 부른다.
+// 시간대 매물 [예약하기] 홀딩 저장 (C-404·X-304, #308 ③). 서버에서만 부른다.
 // - acquireWindowHold: 고른 서비스·시작 시각으로 매물 한 칸(window_id)을 만들어 10분 홀딩한다. 지금 매물 홀딩(acquireHold)과 같은 규칙:
 //   한 고객은 동시에 1개만(고객 줄을 잠근다), 신규 고객 전용, 승인된 샵. 두 손님이 같은 시간을 동시에 고르면
 //   매물 겹침 제약(slots_no_overlap)이 뒤 사람을 막는다(부른 쪽이 TIME_TAKEN으로 바꾼다)
-// - closeStaleWindowHolds: 홀딩이 끝났는데 결제 없이 남은 시간대 칸을 마감(hold_released)으로 닫는다. 결제 대기 주문이 있으면
-//   (결제는 했는데 확인이 늦는 경우) 결과가 나올 때까지 닫지 않는다. 닫으면 늦게 확인된 정상 결제가 자동 취소되기 때문이다
+// 결제 없이 끝난 칸 닫기(closeStaleWindowHolds)는 마감(closeWindow)도 같이 써서 store.ts에 있다
 
 import 'server-only';
 
@@ -17,34 +16,12 @@ import { isNewCustomer } from '@/server/customers';
 import { HOLD_MINUTES } from '@/server/policy';
 import { customerVisibleShop } from '@/server/shops/visibility';
 
-import { staleWindowHold } from './conditions';
 import { windowStarts } from './starts';
-import { readOccupiedRanges } from './store';
+import { closeStaleWindowHolds, readOccupiedRanges } from './store';
 
 type Tx = Pick<ReturnType<typeof getDb>, 'select' | 'selectDistinct' | 'insert' | 'update'>;
 
 const MINUTE_MS = 60 * 1000;
-
-/**
- * 결제 없이 끝난 시간대 칸을 마감(hold_released)으로 닫고 닫은 칸을 돌려준다. windowId를 주면 그 시간대 안만 본다.
- * 다른 손님이 그 시간대를 고를 때(acquireWindowHold)와 10분마다 결제 정리 작업이 부른다
- */
-export async function closeStaleWindowHolds(
-  db: Pick<ReturnType<typeof getDb>, 'update'>,
-  input: { now: Date; windowId?: string },
-): Promise<{ slotId: string; windowId: string }[]> {
-  const rows = await db
-    .update(slots)
-    .set({ status: 'closed', closeReason: 'hold_released', closedAt: input.now })
-    .where(
-      and(
-        staleWindowHold(input.now),
-        input.windowId ? eq(slots.windowId, input.windowId) : undefined,
-      ),
-    )
-    .returning({ slotId: slots.id, windowId: slots.windowId });
-  return rows.map((row) => ({ slotId: row.slotId, windowId: row.windowId! }));
-}
 
 export type WindowHoldOutcome =
   | { ok: true; slotId: string; holdExpiresAt: Date }

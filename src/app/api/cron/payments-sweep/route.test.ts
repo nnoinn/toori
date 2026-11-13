@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   sweep: vi.fn(),
   sweepCancels: vi.fn(),
   closeWindowHolds: vi.fn(),
+  keptAlerts: [] as unknown[],
   order: [] as string[],
 }));
 
@@ -18,6 +19,11 @@ vi.mock('@/lib/request-time', () => ({ getRequestNow: async () => NOW }));
 vi.mock('@/server/payments', () => ({ sweepStaleOrders: state.sweep }));
 vi.mock('@/server/refunds', () => ({ sweepStaleCancels: state.sweepCancels }));
 vi.mock('@/server/slot-windows', () => ({ closeStaleWindowHolds: state.closeWindowHolds }));
+vi.mock('@/server/notifications/alerts', () => ({
+  notifyKeptWindowSlotsReleased: (_db: unknown, slotIds: string[]) => {
+    state.keptAlerts.push(slotIds);
+  },
+}));
 
 const { POST } = await import('./route');
 
@@ -34,6 +40,7 @@ beforeEach(() => {
   state.sweepCancels.mockReset();
   state.sweepCancels.mockResolvedValue(CANCEL_SUMMARY);
   state.order = [];
+  state.keptAlerts = [];
   state.sweep.mockImplementation(async () => {
     state.order.push('orders');
     return SUMMARY;
@@ -65,6 +72,8 @@ describe('POST /api/cron/payments-sweep', () => {
     expect(state.sweepCancels).toHaveBeenCalledWith('db', NOW);
     expect(state.closeWindowHolds).toHaveBeenCalledWith('db', { now: NOW });
     expect(state.order).toEqual(['orders', 'windowHolds']);
+    // 닫은 칸 중 마감 때 남긴 칸이 있으면 원장님에게 알린다(고르는 것은 알림 쪽)
+    expect(state.keptAlerts).toEqual([['slot-1']]);
   });
 
   it.each([

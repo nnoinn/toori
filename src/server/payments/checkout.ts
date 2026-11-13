@@ -17,6 +17,7 @@ import { requireCustomer } from '@/server/auth';
 import { readMyCoupon } from '@/server/coupons/coupon-store';
 import { couponBlockReason } from '@/server/coupons/rules';
 import { isNewCustomer } from '@/server/customers';
+import { notifyKeptWindowSlotsReleased } from '@/server/notifications/alerts';
 
 import { calcPaymentAmount } from './amount';
 import { isMyActiveHold } from './checkout-rules';
@@ -120,11 +121,14 @@ export async function releaseHold(slotId: string): Promise<PaymentResult<null>> 
   const id = slotIdSchema.safeParse(slotId);
   if (!id.success) return ok(null);
 
-  await releaseMyHold(getDb(), {
+  const db = getDb();
+  const released = await releaseMyHold(db, {
     slotId: id.data,
     customerId: auth.data.customerId,
     now: await getRequestNow(),
   });
+  // 원장님이 마감할 때 결제 중이라 남긴 시간대 칸이었으면 닫혔다고 알린다(그런 칸이 아니면 보내지 않는다, #308 ③-2)
+  if (released) notifyKeptWindowSlotsReleased(db, [id.data]);
   return ok(null);
 }
 
