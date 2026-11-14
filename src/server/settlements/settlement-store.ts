@@ -31,10 +31,16 @@ const cancelRefund = alias(refunds, 'cancel_refund');
  * 샵의 끝난 예약(이용 완료·취소)과 정산에 필요한 값.
  * - occurred: 방문·노쇼 처리 또는 취소 시각이 [from, to)인 예약만
  * - unpaidOnly: 아직 지급하지 않은 예약만(묶이지 않았거나, 묶음이 지급 전·지급 요청 상태)
+ * - settlementId: 그 정산 묶음에 묶인 예약만(정산서 펼치기)
  */
 export async function readShopSettlementRows(
   db: Db,
-  input: { shopId: string; occurred?: { from: Date; to: Date }; unpaidOnly?: boolean },
+  input: {
+    shopId: string;
+    occurred?: { from: Date; to: Date };
+    unpaidOnly?: boolean;
+    settlementId?: string;
+  },
 ): Promise<SettlementRow[]> {
   const { occurred } = input;
   const rows = await db
@@ -108,6 +114,7 @@ export async function readShopSettlementRows(
         input.unpaidOnly
           ? or(isNull(settlements.id), inArray(settlements.status, ['pending', 'requested']))
           : undefined,
+        input.settlementId ? eq(settlementItems.settlementId, input.settlementId) : undefined,
       ),
     )
     .orderBy(desc(sql`coalesce(${reservations.visitRecordedAt}, ${reservations.cancelledAt})`));

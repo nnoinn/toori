@@ -167,13 +167,24 @@ function wholeHoursBefore(startAt: Date, cancelledAt: Date): number {
 }
 
 /** 합계. 하나라도 null이면 null */
-function sumOrNull(values: readonly (number | null)[]): number | null {
+export function sumOrNull(values: readonly (number | null)[]): number | null {
   let total = 0;
   for (const value of values) {
     if (value === null) return null;
     total += value;
   }
   return total;
+}
+
+/** 예약들의 정산 내역 줄. 정산 내역에 없는 예약은 빼고, 처리·취소가 늦은 것부터 */
+export function toSettlementItemViews(
+  rows: readonly SettlementRow[],
+  options: Options,
+): SettlementItemView[] {
+  return rows
+    .map((row) => toSettlementItemView(row, options))
+    .filter((item) => item !== null)
+    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
 }
 
 /** 다음에 지급될 상태: 지급 예정, 지급 전, 지급 요청 */
@@ -190,10 +201,7 @@ export function buildSettlementList(input: {
   paymentFeeRate: number | null;
 }): SettlementList {
   const options = { now: input.now, paymentFeeRate: input.paymentFeeRate };
-  const items = input.rows
-    .map((row) => toSettlementItemView(row, options))
-    .filter((item) => item !== null)
-    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+  const items = toSettlementItemViews(input.rows, options);
 
   const upcoming = input.unpaidRows
     .map((row) => toSettlementItemView(row, options))
