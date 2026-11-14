@@ -34,6 +34,24 @@ export const RESERVATION_FILTER_LABELS: Record<ReservationFilter, string> = {
   review: '확인 필요',
 };
 
+/**
+ * 예약 목록 정렬. 주소 ?sort= 값(#360 1번). 첫 칸이 예약한 시각이라 기본은 최근에 예약한 것부터다.
+ * 서비스 일시로도 고를 수 있다
+ */
+export const RESERVATION_SORTS = ['latest', 'oldest', 'start_soon', 'start_late'] as const;
+export type ReservationSort = (typeof RESERVATION_SORTS)[number];
+
+export function toReservationSort(value: string | undefined): ReservationSort {
+  return RESERVATION_SORTS.find((sort) => sort === value) ?? 'latest';
+}
+
+export const RESERVATION_SORT_LABELS: Record<ReservationSort, string> = {
+  latest: '최신 예약 순',
+  oldest: '오래된 예약 순',
+  start_soon: '서비스 일시 빠른 순',
+  start_late: '서비스 일시 늦은 순',
+};
+
 /** 매물 목록 거르기. 주소 ?status= 값 */
 export type SlotFilter = 'all' | SlotStatus;
 export const SLOT_FILTERS: readonly SlotFilter[] = ['all', ...SLOT_STATUSES];
@@ -42,12 +60,20 @@ export function toSlotFilter(value: string | undefined): SlotFilter {
   return SLOT_FILTERS.find((filter) => filter === value) ?? 'all';
 }
 
-/** 목록 주소. 기본값은 주소에 넣지 않는다 */
-export function lookupHref(input: { tab: LookupTab; status?: string; query?: string }): string {
+/** 목록 주소. 기본값은 주소에 넣지 않는다. 정렬은 예약 목록에만 있다 */
+export function lookupHref(input: {
+  tab: LookupTab;
+  status?: string;
+  query?: string;
+  sort?: ReservationSort;
+}): string {
   const params = new URLSearchParams();
   if (input.tab !== 'reservations') params.set('tab', input.tab);
   if (input.status && input.status !== 'all') params.set('status', input.status);
   if (input.query) params.set('q', input.query);
+  if (input.tab === 'reservations' && input.sort && input.sort !== 'latest') {
+    params.set('sort', input.sort);
+  }
   const search = params.toString();
   return search ? `/admin/reservations?${search}` : '/admin/reservations';
 }

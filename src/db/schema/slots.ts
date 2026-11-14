@@ -23,7 +23,7 @@ import { customers, profiles } from './accounts';
 import { menus, shops } from './shops';
 import { createdAt, inValues, timestamptz, updatedAt } from './types';
 
-/** 매물의 저장 상태. 화면 상태 6개(예약대기·게시중·예약됨·마감·취소·완료)와 같은 이름을 쓴다 */
+/** 매물의 저장 상태. 화면 상태 6개(게시예정·게시중·예약됨·마감·취소·완료)와 같은 이름을 쓴다 */
 export const SLOT_STATUSES = [
   'scheduled',
   'published',
@@ -41,7 +41,7 @@ export type SlotStatus = (typeof SLOT_STATUSES)[number];
 export const SLOT_CLOSE_REASONS = ['other_channel', 'mistake', 'other', 'hold_released'] as const;
 export type SlotCloseReason = (typeof SLOT_CLOSE_REASONS)[number];
 
-/** 시간대 매물의 저장 상태: 예약대기·게시중·마감(#308). 시간이 지나서 마감되는 것은 매물처럼 조회할 때 계산한다 */
+/** 시간대 매물의 저장 상태: 게시예정·게시중·마감(#308). 시간이 지나서 마감되는 것은 매물처럼 조회할 때 계산한다 */
 export const SLOT_WINDOW_STATUSES = ['scheduled', 'published', 'closed'] as const;
 export type SlotWindowStatus = (typeof SLOT_WINDOW_STATUSES)[number];
 
@@ -59,7 +59,7 @@ export const slotWindows = pgTable(
       .references(() => shops.id),
     startAt: timestamptz().notNull(),
     endAt: timestamptz().notNull(),
-    // 게시 시각. 시간대 시작 48시간 전보다 이르면 그때까지 '예약대기'(매물과 같다)
+    // 게시 시각. 시간대 시작 48시간 전보다 이르면 그때까지 '게시예정'(매물과 같다)
     publishAt: timestamptz().notNull(),
     status: text().notNull(),
     // 시간대 전체에 켠다(안에서 만든 매물도 같은 값)
@@ -111,7 +111,7 @@ export const slots = pgTable(
     startAt: timestamptz().notNull(),
     // 시작 + 소요 시간
     endAt: timestamptz().notNull(),
-    // 게시 시각. 시작 48시간 전보다 이르면 그때까지 '예약대기'
+    // 게시 시각. 시작 48시간 전보다 이르면 그때까지 '게시예정'
     publishAt: timestamptz().notNull(),
     status: text().notNull(),
     // 10분 홀딩(C-404): 홀딩한 고객과 만료 시각. 만료된 홀딩은 시각 비교로 무시한다

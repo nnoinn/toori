@@ -450,7 +450,7 @@ async function ownerSlots(sql, me, now) {
   const c = await seedCustomer(sql, 'c');
   const base = floorHour(now).getTime();
   const plan = [
-    { label: '예약대기', status: 'scheduled', at: base + 72 * HOUR },
+    { label: '게시예정', status: 'scheduled', at: base + 72 * HOUR },
     { label: '게시중', status: 'published', at: base + 5 * HOUR },
     { label: '마감(팔리지 않고 시작 지남)', status: 'published', at: base - 3 * HOUR },
     { label: '마감(직접 마감)', status: 'closed', at: base + 10 * HOUR, closeReason: 'other_channel' },

@@ -99,6 +99,21 @@ async function clearSeedData(sql, userIds) {
 }
 
 /**
+ * 시드 계정의 profiles. 운영자 시드(admin: true)만 운영자 권한을 켜고, 다른 시드 계정은 끈 채로 둔다.
+ * @param {import('postgres').Sql | import('postgres').TransactionSql} sql
+ * @param {readonly { key: string, email: string, admin?: boolean }[]} accounts
+ * @param {Record<string, string>} userIds
+ */
+export async function upsertSeedProfiles(sql, accounts, userIds) {
+  const profiles = accounts.map((account) => ({
+    id: userIds[account.key],
+    email: account.email,
+    is_admin: account.admin === true,
+  }));
+  await sql`insert into profiles ${sql(profiles)} on conflict (id) do update set is_admin = excluded.is_admin`;
+}
+
+/**
  * 시드 데이터를 지우고 다시 넣는다. 트랜잭션 안에서 부른다(중간에 실패하면 모두 되돌린다).
  * @param {import('postgres').TransactionSql} sql
  * @param {{ now: Date, userIds: Record<string, string> }} options userIds: SEED_ACCOUNTS의 key → auth.users id
@@ -117,8 +132,7 @@ export async function seedDevData(sql, { now, userIds }) {
   const at = (hours) => new Date(base + hours * HOUR);
   const ago = (ms) => new Date(now.getTime() - ms);
 
-  const profiles = SEED_ACCOUNTS.map((account) => ({ id: userIds[account.key], email: account.email }));
-  await sql`insert into profiles ${sql(profiles)} on conflict (id) do nothing`;
+  await upsertSeedProfiles(sql, SEED_ACCOUNTS, userIds);
 
   const customers = SEED_CUSTOMERS.map((c, i) => ({
     id: crypto.randomUUID(),
@@ -268,7 +282,7 @@ export async function seedDevData(sql, { now, userIds }) {
   await insertBookings(sql, booked);
 
   return {
-    accounts: profiles.length,
+    accounts: SEED_ACCOUNTS.length,
     shops: shops.length,
     menus: menus.length,
     slots: slots.length,
@@ -276,13 +290,16 @@ export async function seedDevData(sql, { now, userIds }) {
   };
 }
 
-/** 시드 계정의 로그인 정보(auth.users)를 찾고, 없으면 Supabase 관리 기능으로 비밀번호 없이 만든다 */
-async function ensureSeedUsers(sql, supabaseUrl, secretKey) {
-  const emails = SEED_ACCOUNTS.map((account) => account.email);
+/**
+ * 시드 계정의 로그인 정보(auth.users)를 찾고, 없으면 Supabase 관리 기능으로 비밀번호 없이 만든다.
+ * accounts를 주면 그 계정만 본다(운영자 시드만 만들 때)
+ */
+async function ensureSeedUsers(sql, supabaseUrl, secretKey, accounts = SEED_ACCOUNTS) {
+  const emails = accounts.map((account) => account.email);
   const rows = await sql`select id, email from auth.users where email in ${sql(emails)}`;
   const idByEmail = new Map(rows.map((row) => [row.email, row.id]));
 
-  const missing = SEED_ACCOUNTS.filter((account) => !idByEmail.has(account.email));
+  const missing = accounts.filter((account) => !idByEmail.has(account.email));
   if (missing.length > 0) {
     const { createClient } = await import('@supabase/supabase-js');
     const admin = createClient(supabaseUrl, secretKey, {
@@ -298,10 +315,27 @@ async function ensureSeedUsers(sql, supabaseUrl, secretKey) {
       idByEmail.set(account.email, data.user.id);
     }
   }
-  return Object.fromEntries(SEED_ACCOUNTS.map((account) => [account.key, idByEmail.get(account.email)]));
+  return Object.fromEntries(accounts.map((account) => [account.key, idByEmail.get(account.email)]));
+}
+
+/** 운영자 시드만 만든다(다른 시드 데이터는 건드리지 않는다). npm run db:seed -- --admin-only */
+async function seedAdminsOnly() {
+  const admins = SEED_ACCOUNTS.filter((account) => account.admin);
+  const { sql, supabaseUrl, secretKey } = await openDevDb('운영자 시드');
+  try {
+    const userIds = await ensureSeedUsers(sql, supabaseUrl, secretKey, admins);
+    await upsertSeedProfiles(sql, admins, userIds);
+    console.log(`운영자 시드를 만들었어요: ${admins.map((account) => account.key).join(', ')}`);
+  } finally {
+    await sql.end();
+  }
 }
 
 async function main() {
+  if (process.argv.includes('--admin-only')) {
+    await seedAdminsOnly();
+    return;
+  }
   if (!process.argv.includes('--yes')) {
     console.log(
       `개발 DB의 시드 데이터(@${SEED_EMAIL_DOMAIN} 계정의 샵·메뉴·매물·예약)를 지우고 다시 넣어요. 팀원 모두가 보는 데이터예요.\n` +

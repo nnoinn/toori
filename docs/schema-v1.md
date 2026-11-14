@@ -253,7 +253,7 @@ erDiagram
 | new_customer_only | boolean, 기본 false | 신규 고객 전용 |
 | start_at | timestamptz | 서비스 시작. 30분 단위(#108, 저장할 때 서버에서 확인) |
 | end_at | timestamptz | 서비스 끝 = 시작 + 소요 시간 |
-| publish_at | timestamptz | 게시 시각. 시작 48시간 전보다 이르면 그때까지 '예약대기' |
+| publish_at | timestamptz | 게시 시각. 시작 48시간 전보다 이르면 그때까지 '게시예정' |
 | status | text | 저장된 상태(아래) |
 | hold_customer_id | uuid, null → customers | 10분 홀딩한 고객 |
 | hold_expires_at | timestamptz, null | 홀딩 만료 시각 |
@@ -268,7 +268,7 @@ erDiagram
 
 | 저장 값 | 바뀌는 때 | 화면 상태 |
 | --- | --- | --- |
-| `scheduled` | 등록(게시 시각 전) | 예약대기. `publish_at`이 지났으면 **게시중**으로 계산 |
+| `scheduled` | 등록(게시 시각 전) | 게시예정. `publish_at`이 지났으면 **게시중**으로 계산 |
 | `published` | 등록(바로 게시) | 게시중. `start_at`이 지났으면 **마감**으로 계산 |
 | `reserved` | 결제 확정 | 예약됨. 시작이 지나도 방문·노쇼 처리 전까지 예약됨 |
 | `closed` | 원장님 직접 마감 | 마감 |
@@ -298,8 +298,8 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | shop_id | uuid → shops | |
 | start_at | timestamptz | 시간대 시작. 30분 단위(저장할 때 서버에서 확인) |
 | end_at | timestamptz | 시간대 끝. 예약은 이 시각을 넘을 수 없다 |
-| publish_at | timestamptz | 게시 시각. 시간대 시작 48시간 전보다 이르면 그때까지 '예약대기'(미리 올리기는 14일 안) |
-| status | text | `scheduled`(예약대기) / `published`(게시중) / `closed`(마감). 시간이 지나서 마감되는 것은 조회할 때 계산한다 |
+| publish_at | timestamptz | 게시 시각. 시간대 시작 48시간 전보다 이르면 그때까지 '게시예정'(미리 올리기는 14일 안) |
+| status | text | `scheduled`(게시예정) / `published`(게시중) / `closed`(마감). 시간이 지나서 마감되는 것은 조회할 때 계산한다 |
 | new_customer_only | boolean, 기본 false | 시간대 전체에 켠다. 안에서 만든 매물도 같은 값 |
 | closed_at | timestamptz, null | 원장님이 직접 마감한 시각 |
 | close_reason | text, null | 매물과 같은 사유(`other_channel` / `mistake` / `other`) |

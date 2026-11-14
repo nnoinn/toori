@@ -49,6 +49,35 @@ describeDb('입점 심사 조회 (실제 DB)', () => {
     });
   });
 
+  it('정렬을 고르면 그 순서로 준다. 최신 심사 순은 아직 심사하지 않은 샵을 뒤에 둔다(#360 1번)', async () => {
+    await withRollback(async (tx) => {
+      const pendingOld = await createTestShop(tx, { appliedAt: at('2026-10-01T00:00:00Z') });
+      const pendingNew = await createTestShop(tx, { appliedAt: at('2026-10-05T00:00:00Z') });
+      const rejected = await createTestShop(tx, {
+        status: 'rejected',
+        rejectionReason: '등록증이 흐려요',
+        appliedAt: at('2026-09-01T00:00:00Z'),
+        reviewedAt: at('2026-10-10T00:00:00Z'),
+      });
+      const approved = await createTestShop(tx, {
+        status: 'approved',
+        appliedAt: at('2026-09-15T00:00:00Z'),
+        reviewedAt: at('2026-10-12T00:00:00Z'),
+      });
+      const shops = [pendingOld, pendingNew, rejected, approved].map((shop) => shop.shopId);
+      const mine = new Set(shops);
+      const [pOld, pNew, rej, app] = shops;
+      const order = async (sort: Parameters<typeof selectShopsForReview>[2]) =>
+        (await selectShopsForReview(tx, 'all', sort))
+          .map((row) => row.shopId)
+          .filter((id) => mine.has(id));
+
+      expect(await order('applied_old')).toEqual([rej, app, pOld, pNew]);
+      expect(await order('applied_new')).toEqual([pNew, pOld, app, rej]);
+      expect(await order('reviewed_new')).toEqual([app, rej, pNew, pOld]);
+    });
+  });
+
   it('상세: 사업자·원장님·샵 정보와 계좌 뒷자리만, 심사 기록은 최근 것부터', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, {

@@ -91,3 +91,63 @@ export type SettlementList = {
   outstandingPenalty: number;
   serverNow: string;
 };
+
+/** 정산 계좌. 은행 이름과 끝 4자리만 보여준다(SETTLE-06) */
+export type PayoutAccountView = { bankName: string; accountLast4: string };
+
+/** 정산서의 상태. scheduled는 아직 묶이지 않은 지급 예정이고, 나머지는 정산 묶음의 상태다 */
+export type SettlementStatementStatus = 'scheduled' | SettlementStatus;
+
+/** 정산서 한 장의 요약 (S-501, 지급일 하나에 한 장) */
+export type SettlementStatementSummary = {
+  /** 지급일(예정일 포함) */
+  payoutDate: string;
+  /** 기간: 직전 지급일 다음 날 ~ 지급일. 첫 정산은 처음 거래가 끝난 날부터 */
+  periodStart: string;
+  periodEnd: string;
+  status: SettlementStatementStatus;
+  /** 종류별 거래 수 */
+  counts: { sale: number; no_show: number; penalty: number; agreed_cancel: number };
+  /** 기준 금액 합계 */
+  baseAmount: number;
+  /** 플랫폼 수수료 + VAT 합계 */
+  platformFeeTotal: number;
+  /** 결제 수수료 + VAT 합계. 결제 수수료율이 정해지기 전에는 null */
+  paymentFeeTotal: number | null;
+  /** 이번에 뗀 원장님 귀책 패널티. 지급 예정이면 지금 남은 패널티로 계산한 예상값이고, 정산액을 모르면 null */
+  penaltyDeducted: number | null;
+  /** 실지급액(패널티를 뗀 뒤). 결제 수수료율이 정해지기 전에는 null */
+  payoutAmount: number | null;
+  /** 0원이면 이유. penalty_offset: 패널티로 상계해서 0원(지급 요청 없이 지급 완료로 끝낸다, #353) */
+  zeroReason: 'penalty_offset' | null;
+  /** 지급 완료 시각 */
+  paidAt: string | null;
+};
+
+/** getSettlementStatement 결과: 정산서 한 장 펼치기 */
+export type SettlementStatement = SettlementStatementSummary & {
+  /** 이 정산서의 거래(1장 모양). 처리·취소가 늦은 것부터 */
+  items: SettlementItemView[];
+  /** 이번에 뗀 패널티 건별(원장님 사정 취소 예약번호와 금액). 지급 예정 정산서는 지금 남은 패널티로 계산한 예상값이다 */
+  penalties: { reservationCode: string; amount: number }[];
+  /** 지금 등록된 정산 계좌 */
+  payoutAccount: PayoutAccountView | null;
+};
+
+/** getSettlementStatements 결과 */
+export type SettlementStatementList = {
+  /** 지급일이 기간 안인 정산서. 지급일이 늦은 것부터. 아직 묶이지 않은 지급 예정도 같은 모양이다 */
+  statements: SettlementStatementSummary[];
+  /** 이의제기로 보류 중인 거래(기간과 상관없이). 결론이 나면 그다음 지급일에 들어간다 */
+  held: {
+    count: number;
+    baseAmount: number;
+    payoutAmount: number | null;
+    items: SettlementItemView[];
+  };
+  /** 아직 다 걷지 못한 원장님 귀책 취소 패널티 */
+  outstandingPenalty: number;
+  /** 지금 등록된 정산 계좌 */
+  payoutAccount: PayoutAccountView | null;
+  serverNow: string;
+};
