@@ -60,7 +60,7 @@ export async function readWindowShop(
 }
 
 /**
- * 그 샵에서 [from, to)와 겹치는, 이미 올린 시간: 예약대기·게시중·예약됨 매물과 예약대기·게시중 시간대.
+ * 그 샵에서 [from, to)와 겹치는, 이미 올린 시간: 게시예정·게시중·예약됨 매물과 게시예정·게시중 시간대.
  * 원장님 등록의 겹침 확인(WINDOW_OVERLAP)에 쓴다
  */
 export async function readShopBusyRanges(
@@ -93,7 +93,7 @@ export async function readShopBusyRanges(
 }
 
 /**
- * 고객에게 시작 시각을 줄 때 이미 차 있는 시간: 그 샵들의 [from, to)와 겹치는 예약대기·게시중·예약됨 매물(샵별).
+ * 고객에게 시작 시각을 줄 때 이미 차 있는 시간: 그 샵들의 [from, to)와 겹치는 게시예정·게시중·예약됨 매물(샵별).
  * 단, 결제 없이 홀딩이 끝난 시간대 칸은 비어 있는 것으로 본다(staleWindowHold, 결제 대기 주문이 있으면 막는다, #308 ③)
  */
 export async function readOccupiedRangesByShop(
@@ -142,9 +142,9 @@ export type AreaShop = {
 };
 
 /**
- * 고객에게 보이는 시간대: 예약대기·게시중으로 저장했고 게시 시각이 지났고 아직 끝나지 않음, 승인된 샵,
+ * 고객에게 보이는 시간대: 게시예정·게시중으로 저장했고 게시 시각이 지났고 아직 끝나지 않음, 승인된 샵,
  * 신규 고객 전용이면 그 샵에 이력이 없는 고객만(C-306·X-104, 로그인하지 않았으면 거르지 않는다).
- * 예약대기로 저장했어도 게시 시각이 지났으면 게시중으로 본다(windowStatus와 같다). shops와 조인한 쿼리에 넣는다
+ * 게시예정으로 저장했어도 게시 시각이 지났으면 게시중으로 본다(windowStatus와 같다). shops와 조인한 쿼리에 넣는다
  */
 function openWindowFor(customerId: string | null, now: Date): SQL {
   return and(
@@ -415,7 +415,7 @@ export type KeptSlotRow = {
 };
 
 /**
- * 내 샵의 예약대기·게시중이고 아직 끝나지 않은 시간대를 마감한다(사유·시각 기록). 트랜잭션 안에서 부른다.
+ * 내 샵의 게시예정·게시중이고 아직 끝나지 않은 시간대를 마감한다(사유·시각 기록). 트랜잭션 안에서 부른다.
  * 안에서 결제가 끝난 예약은 그대로이고, 결제 없이 끝난 칸은 같이 닫고(hold_released), 손님이 결제 중인 칸(홀딩이 살아 있거나
  * 결제 확인을 기다리는 칸)은 남겨서 돌려준다(#308 ③-2, 11/13 nnoinn). 남긴 칸은 결제하면 예약으로 남고, 결제 없이 끝나면
  * closeStaleWindowHolds가 닫는다. [예약하기]는 시간대 줄을 읽기 잠금하므로, 마감은 진행 중인 [예약하기]가 끝난 뒤에 그 칸까지 보고 남긴다.

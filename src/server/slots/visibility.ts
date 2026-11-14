@@ -22,7 +22,7 @@ export function notHoldReleasedSlot(): SQL {
 
 /**
  * 원장님이 올린 매물과 결제가 끝난 시간대 칸만(#308 ③). 결제 없이 비운 칸(hold_released)과 손님이 아직 결제 중인 시간대 칸
- * (window_id가 있고 예약대기·게시중)을 뺀다. 원장님 대시보드·예약 현황, 운영자 매물 목록·원장님 매물 수에 쓴다.
+ * (window_id가 있고 게시예정·게시중)을 뺀다. 원장님 대시보드·예약 현황, 운영자 매물 목록·원장님 매물 수에 쓴다.
  * 넣는 자리는 notHoldReleasedSlot()과 같다(목록은 where, 수를 세는 left join은 join 조건)
  */
 export function ownerListedSlot(): SQL {

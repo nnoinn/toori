@@ -93,7 +93,7 @@ describe('checkWindowDraft', () => {
     });
   });
 
-  it('48시간보다 먼 시간대는 예약대기로 두고 48시간 전에 게시한다', () => {
+  it('48시간보다 먼 시간대는 게시예정으로 두고 48시간 전에 게시한다', () => {
     const result = draft({ ranges: [{ start: at('13:00', 20), end: at('18:00', 20) }] });
     expect(result).toMatchObject({
       ok: true,

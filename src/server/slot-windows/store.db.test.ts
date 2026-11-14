@@ -75,7 +75,7 @@ describeDb('시간대 매물 DB 읽기 (실제 DB)', () => {
     });
   });
 
-  it('이미 올린 시간: 예약대기·게시중·예약됨 매물과 예약대기·게시중 시간대(마감·취소는 뺀다)', async () => {
+  it('이미 올린 시간: 게시예정·게시중·예약됨 매물과 게시예정·게시중 시간대(마감·취소는 뺀다)', async () => {
     await withRollback(async (tx) => {
       const db = tx as unknown as Db;
       const shop = await createTestShop(tx, { status: 'approved' });
@@ -162,13 +162,13 @@ describeDb('시간대 매물 DB 읽기 (실제 DB)', () => {
     });
   });
 
-  it('고객에게 보이는 시간대: 게시 시각이 지났고 끝나지 않은 예약대기·게시중 시간대만, 승인된 샵·범위·업종', async () => {
+  it('고객에게 보이는 시간대: 게시 시각이 지났고 끝나지 않은 게시예정·게시중 시간대만, 승인된 샵·범위·업종', async () => {
     await withRollback(async (tx) => {
       const db = tx as unknown as Db;
       const approved = await createTestShop(tx, { status: 'approved', name: '가 테스트 미용실' });
       const pending = await createTestShop(tx, { status: 'pending' });
       const published = await addWindow(tx, approved, '13:00', '15:00');
-      // 예약대기로 저장했어도 게시 시각이 지났으면 보인다
+      // 게시예정으로 저장했어도 게시 시각이 지났으면 보인다
       const publishedLate = await addWindow(tx, approved, '15:00', '16:00', {
         status: 'scheduled',
       });
