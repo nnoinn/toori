@@ -360,10 +360,12 @@ describeDb('목요일 정산 묶기 (실제 DB)', () => {
         .where(eq(settlementItems.orderId, late.order.id));
       expect(lateItem).toEqual([]);
 
-      // 같은 날 다시 돌아도 두 번 묶지 않는다
+      // 같은 날 다시 돌아도 두 번 묶지 않는다(이미 묶인 거래는 정산 줄이 있어서 후보에 없다)
       expect(
         await runSettlementBatch(db, { now: friday, paymentFeeRate: PAYMENT_FEE_RATE }),
-      ).toMatchObject({ status: 'done', catchUp: true, shops: 0, skipped: 2 });
+      ).toMatchObject({ status: 'done', catchUp: true, shops: 0, items: 0, failed: 0 });
+      expect(await settlementsOf(tx, shopA.shopId)).toHaveLength(1);
+      expect(await settlementsOf(tx, shopB.shopId)).toHaveLength(1);
       // 이틀 뒤(11/07 토)는 따라잡지 않는다(SETTLEMENT_CATCH_UP_DAYS = 1)
       expect(
         await runSettlementBatch(db, {

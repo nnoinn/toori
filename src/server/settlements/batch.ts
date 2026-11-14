@@ -36,7 +36,7 @@ export type SettlementBatchResult =
   | {
       status: 'done';
       payoutDate: string;
-      /** 지난 지급일을 따라잡은 실행(지급일 다음 날 새벽). 그날 이미 묶은 샵은 skipped로 센다 */
+      /** 지난 지급일을 따라잡은 실행(지급일 다음 날 새벽). 그날 이미 묶인 거래는 정산 줄이 있어서 후보에 없다 */
       catchUp: boolean;
       /** 이번에 묶은 샵 수와 거래 수 */
       shops: number;
