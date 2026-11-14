@@ -141,6 +141,24 @@ describeDb('시드 데이터 (실제 DB)', () => {
     });
   });
 
+  it('운영자 시드(admin-a)만 운영자 권한이 켜지고, 고객·원장님 계정은 만들지 않는다(11/14)', async () => {
+    await withRollbackSql(async (sql) => {
+      const userIds = await createSeedUsers(sql);
+      await seedDevData(sql, { now: NOW, userIds });
+      const rows = await sql<{ id: string; is_admin: boolean }[]>`
+        select id, is_admin from profiles where id in ${sql(Object.values(userIds))}`;
+      const adminOf = new Map(rows.map((row) => [row.id, row.is_admin]));
+      expect(adminOf.get(userIds['admin-a'])).toBe(true);
+      expect(adminOf.get(userIds['owner-a'])).toBe(false);
+      expect(adminOf.get(userIds['customer-a'])).toBe(false);
+      const [accounts] = await sql<{ customers: number; owners: number }[]>`
+        select
+          (select count(*)::int from customers where user_id = ${userIds['admin-a']}) as customers,
+          (select count(*)::int from owners where user_id = ${userIds['admin-a']}) as owners`;
+      expect(accounts).toEqual({ customers: 0, owners: 0 });
+    });
+  });
+
   it('원장님 A의 샵에 매물 저장 상태 6가지가 모두 있고, 재등록·홀딩·할인가가 맞다', async () => {
     await withRollbackSql(async (sql) => {
       const userIds = await createSeedUsers(sql);

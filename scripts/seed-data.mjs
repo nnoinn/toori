@@ -314,11 +314,22 @@ export const SEED_CUSTOMERS = [
   { key: 'c', nickname: '샘플 고객 C' },
 ];
 
-/** 시드 계정 전체. key는 owner-a, customer-a처럼 쓴다 */
+/**
+ * 시드 운영자(11/14 nnoinn). 운영자 화면을 Claude가 직접 열어 보고 PR 사진을 찍으려고 둔다(`--as admin-a`).
+ * 개발 DB에만 있고 고객·원장님 계정은 없다. 운영자 권한(profiles.is_admin)만 켠다
+ */
+export const SEED_ADMINS = [{ key: 'a' }];
+
+/** 시드 계정 전체. key는 owner-a, customer-a, admin-a처럼 쓴다. admin이 true면 운영자다 */
 export const SEED_ACCOUNTS = [
   ...SEED_SHOPS.map((shop) => ({ key: `owner-${shop.key}`, email: `owner-${shop.key}@${SEED_EMAIL_DOMAIN}` })),
   ...SEED_CUSTOMERS.map((c) => ({
     key: `customer-${c.key}`,
     email: `customer-${c.key}@${SEED_EMAIL_DOMAIN}`,
+  })),
+  ...SEED_ADMINS.map((a) => ({
+    key: `admin-${a.key}`,
+    email: `admin-${a.key}@${SEED_EMAIL_DOMAIN}`,
+    admin: true,
   })),
 ];
