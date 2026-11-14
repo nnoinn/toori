@@ -5,6 +5,7 @@ import {
   countByStatus,
   type DashboardSlot,
   type DashboardWindow,
+  keptSlotsNotice,
   mergeEntries,
   onHold,
   splitByDay,
@@ -172,6 +173,7 @@ const windowEntry = (
   closeReason: null,
   newCustomerOnly: false,
   menus: [{ name: '커트', discountRate: 30 }],
+  keptSlots: [],
   ...extra,
 });
 
@@ -243,5 +245,35 @@ describe('대시보드 시간대 매물 (#308)', () => {
       ['today', ['window']],
       ['upcoming', []],
     ]);
+  });
+});
+
+describe('시간대 마감 때 손님이 결제 중이라 남긴 칸 안내 (WINDOW-06)', () => {
+  /** 남긴 칸 하나. 시각은 한국 시간 */
+  const kept = (start: string, end: string, menuName = '커트') => ({
+    startAt: kst(start),
+    endAt: kst(end),
+    menuName,
+  });
+
+  it('남긴 칸이 없으면 안내하지 않는다', () => {
+    expect(keptSlotsNotice([])).toBeNull();
+  });
+
+  it('11/13 nnoinn 문구: 시작~끝(서비스)과 결제하면 예약으로 남고 결제하지 않으면 자동으로 닫힌다는 안내', () => {
+    expect(keptSlotsNotice([kept('2026-11-14T14:00:00', '2026-11-14T15:00:00')])).toBe(
+      '손님이 결제 중인 14:00~15:00(커트)은 결제가 끝날 때까지 남아 있어요. 결제하면 예약으로 남고, 결제하지 않으면 자동으로 닫혀요.',
+    );
+  });
+
+  it('칸이 여러 개면 받은 순서(시작 순)대로 쉼표로 잇고, 다음 날 끝나는 칸은 끝 시각에 (익일)', () => {
+    expect(
+      keptSlotsNotice([
+        kept('2026-11-14T14:00:00', '2026-11-14T15:00:00'),
+        kept('2026-11-14T23:30:00', '2026-11-15T00:30:00', '펌'),
+      ]),
+    ).toBe(
+      '손님이 결제 중인 14:00~15:00(커트), 23:30~00:30(익일)(펌)은 결제가 끝날 때까지 남아 있어요. 결제하면 예약으로 남고, 결제하지 않으면 자동으로 닫혀요.',
+    );
   });
 });
