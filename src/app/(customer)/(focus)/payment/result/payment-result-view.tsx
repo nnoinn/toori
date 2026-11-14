@@ -122,7 +122,10 @@ export function PaymentResultView({
           >
             예약 상세 보기
           </Link>
-          <Link href={CUSTOMER_HOME} className={buttonVariants({ variant: 'ghost' })}>
+          <Link
+            href={CUSTOMER_HOME}
+            className={buttonVariants({ variant: 'ghost', className: 'max-md:h-10' })}
+          >
             홈으로
           </Link>
         </div>
@@ -144,7 +147,10 @@ export function PaymentResultView({
           <Button size="lg" className="h-12 text-base" onClick={recheck} disabled={rechecking}>
             {rechecking ? '확인하는 중…' : '다시 확인'}
           </Button>
-          <Link href="/reservations" className={buttonVariants({ variant: 'ghost' })}>
+          <Link
+            href="/reservations"
+            className={buttonVariants({ variant: 'ghost', className: 'max-md:h-10' })}
+          >
             내 예약 보기
           </Link>
         </div>
@@ -172,7 +178,10 @@ export function PaymentResultView({
           {action.label}
         </Link>
         {action.href !== CUSTOMER_HOME ? (
-          <Link href={CUSTOMER_HOME} className={buttonVariants({ variant: 'ghost' })}>
+          <Link
+            href={CUSTOMER_HOME}
+            className={buttonVariants({ variant: 'ghost', className: 'max-md:h-10' })}
+          >
             홈으로
           </Link>
         ) : null}

@@ -89,7 +89,7 @@ export function CompletedReservationDetails({ reservationId }: { reservationId: 
           href={kakaoMapLink(shop.name, shop.lat, shop.lng)}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1 self-start text-sm text-muted-foreground"
+          className="flex items-center gap-1 self-start text-sm text-muted-foreground max-md:min-h-10"
         >
           카카오맵에서 크게 보기
           <ExternalLink className="size-3.5" aria-hidden />

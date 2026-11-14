@@ -215,7 +215,7 @@ export function CheckoutView({
   return (
     <section className="flex flex-1 flex-col gap-6 px-4 pt-2 pb-8">
       <div className="flex items-center justify-between">
-        <BackButton fallbackHref={CUSTOMER_HOME} className="-ml-2" />
+        <BackButton fallbackHref={CUSTOMER_HOME} className="-ml-2 max-md:size-10" />
         <div
           className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-sm font-semibold tabular-nums"
           aria-label="결제 가능 남은 시간"
@@ -297,13 +297,16 @@ export function CheckoutView({
       {expired ? (
         <div role="alert" className="flex flex-col gap-3 rounded-xl border border-destructive p-4">
           <p className="text-sm text-destructive">{PAYMENT_ERRORS.HOLD_EXPIRED}</p>
-          <Link href={detailPath} className={buttonVariants({ variant: 'outline' })}>
+          <Link
+            href={detailPath}
+            className={buttonVariants({ variant: 'outline', className: 'max-md:h-10' })}
+          >
             매물 다시 보기
           </Link>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          <label className="flex items-start gap-3 text-sm">
+          <label className="flex items-start gap-3 text-sm max-md:min-h-10">
             <input
               type="checkbox"
               className="mt-0.5 size-5 shrink-0 accent-primary"
@@ -337,7 +340,13 @@ export function CheckoutView({
               휴대폰 번호가 저장되면 결제할 수 있어요.
             </p>
           ) : null}
-          <Button type="button" variant="ghost" disabled={cancelling || paying} onClick={cancel}>
+          <Button
+            type="button"
+            variant="ghost"
+            className="max-md:h-10"
+            disabled={cancelling || paying}
+            onClick={cancel}
+          >
             {cancelling ? '취소하는 중…' : '취소'}
           </Button>
         </div>
@@ -412,7 +421,7 @@ function BookerInfoConsent({
         </label>
         <button
           type="button"
-          className="flex shrink-0 items-center text-xs text-muted-foreground"
+          className="flex shrink-0 items-center text-xs text-muted-foreground max-md:-mr-2 max-md:min-h-10 max-md:px-2"
           aria-expanded={open}
           onClick={() => setOpen((prev) => !prev)}
         >
@@ -443,12 +452,15 @@ export function HoldEnded({ slotId }: { slotId: string }) {
     <section className="flex flex-1 flex-col gap-4 px-4 pt-2 pb-8">
       {/* 결제 화면과 같은 화면 제목(화면 읽기 프로그램용) */}
       <h1 className="sr-only">예약 확인</h1>
-      <BackButton fallbackHref={CUSTOMER_HOME} className="-ml-2 self-start" />
+      <BackButton fallbackHref={CUSTOMER_HOME} className="-ml-2 self-start max-md:size-10" />
       <EmptyState
         title="결제할 수 있는 상태가 아니에요"
         description={HOLD_ENDED_HINT}
         action={
-          <Link href={`/slots/${slotId}`} className={buttonVariants({ variant: 'outline' })}>
+          <Link
+            href={`/slots/${slotId}`}
+            className={buttonVariants({ variant: 'outline', className: 'max-md:h-10' })}
+          >
             매물 다시 보기
           </Link>
         }

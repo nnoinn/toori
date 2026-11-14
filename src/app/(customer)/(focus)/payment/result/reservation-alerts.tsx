@@ -50,7 +50,12 @@ export function ReservationAlerts() {
   } else {
     body = (
       <div className="flex flex-col gap-2">
-        <Button type="button" className="self-start" disabled={push.pending} onClick={push.turnOn}>
+        <Button
+          type="button"
+          className="self-start max-md:h-10"
+          disabled={push.pending}
+          onClick={push.turnOn}
+        >
           {push.pending ? '푸시 알림을 켜는 중…' : '푸시 알림 받기'}
         </Button>
         {push.message ? (
