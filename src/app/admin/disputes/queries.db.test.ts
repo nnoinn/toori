@@ -53,7 +53,7 @@ async function addDispute(
 describeDb('운영자 이의제기 조회 (실제 DB)', () => {
   afterAll(closeTestDb);
 
-  it('확인 중은 받은 시각이 오래된 순, 결론은 기록한 시각이 최근인 순, 전체는 받은 시각이 최근인 순. 예약번호·샵 이름·손님 닉네임으로 찾는다', async () => {
+  it('확인 중은 받은 시각이 오래된 순, 결론은 기록한 시각이 최근인 순, 전체는 받은 시각이 최근인 순. 예약번호·샵 이름·손님 이름·닉네임으로 찾는다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
       const shopName = unique('이의샵');
@@ -92,10 +92,17 @@ describeDb('운영자 이의제기 조회 (실제 DB)', () => {
       ]);
       expect(await ids('all', newer.reservation.code)).toEqual([newer.disputeId]);
       expect(await ids('all', unique('없는샵'))).toEqual([]);
-      // 신청한 손님(그 예약의 손님) 닉네임으로도 찾는다
-      const nickname = unique('이의손님');
-      await tx.update(customers).set({ nickname }).where(eq(customers.id, doneLate.customerId));
+      // 신청한 손님(그 예약의 손님)의 예약자 이름(#375)으로 찾고, 닉네임으로도 찾는다
+      const name = unique('이의이름');
+      const nickname = unique('이의닉네임');
+      await tx
+        .update(customers)
+        .set({ name, nickname })
+        .where(eq(customers.id, doneLate.customerId));
+      expect(await ids('all', name)).toEqual([doneLate.disputeId]);
       expect(await ids('all', nickname)).toEqual([doneLate.disputeId]);
+      const [named] = (await selectDisputes(tx, { filter: 'all', query: name })).rows;
+      expect(named.customerName).toBe(name);
 
       const [row] = (await selectDisputes(tx, { filter: 'open', query: shopName })).rows;
       expect(row).toEqual({
@@ -110,7 +117,7 @@ describeDb('운영자 이의제기 조회 (실제 DB)', () => {
         reservationCode: older.reservation.code,
         shopName,
         customerId: older.customerId,
-        customerNickname: '테스트 고객',
+        customerName: '테스트 고객',
       });
     });
   });
@@ -149,7 +156,7 @@ describeDb('운영자 이의제기 조회 (실제 DB)', () => {
         shopId: shop.shopId,
         shopName: '상세 이의샵',
         customerId,
-        customerNickname: '테스트 고객',
+        customerName: '테스트 고객',
       });
       expect(await selectDisputeDetail(tx, crypto.randomUUID())).toBeNull();
     });
