@@ -19,6 +19,7 @@ import {
   selectSettlementItemExtras,
   selectSettlementOwner,
   selectSettlements,
+  selectShopName,
 } from './queries';
 
 const unique = (prefix: string) => `${prefix}${crypto.randomUUID().slice(0, 8)}`;
@@ -279,6 +280,11 @@ describeDb('운영자 정산 관리 조회 (실제 DB)', () => {
         payoutDate: '2026-11-12',
       });
       expect(await selectSettlementOwner(tx, crypto.randomUUID())).toBeNull();
+      expect(await selectShopName(tx, shop.shopId)).toEqual({
+        shopId: shop.shopId,
+        shopName: shop.name,
+      });
+      expect(await selectShopName(tx, crypto.randomUUID())).toBeNull();
 
       const extras = await selectSettlementItemExtras(tx, row.id);
       expect(extras.get(withCoupon.reservation.id)).toEqual({

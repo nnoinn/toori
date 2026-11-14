@@ -24,6 +24,7 @@ import {
   SETTLEMENT_SORT_LABELS,
   SETTLEMENT_SORTS,
   settlementsHref,
+  shopStatementsHref,
   toPayoutDate,
   toSettlementFilter,
   toSettlementSort,
@@ -249,7 +250,7 @@ function OutstandingPenalties({ rows }: { rows: OutstandingPenaltyRow[] }) {
             <ul className="flex flex-col gap-1">
               {rows.map((row) => (
                 <li key={row.shopId} className="flex justify-between gap-3">
-                  <Link href={`/admin/shops/${row.shopId}`} className="hover:underline">
+                  <Link href={shopStatementsHref(row.shopId)} className="hover:underline">
                     {row.shopName}
                   </Link>
                   <span className="whitespace-nowrap text-muted-foreground">
