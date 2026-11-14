@@ -440,7 +440,7 @@
 
 화면이 바뀐 PR은 PR을 만든 뒤 Claude가 찍어 댓글로 올린다. 개발 서버(`npm run dev`)를 켠 내 컴퓨터에서, 크롬으로 PC 크기(1280×800)로 찍는다.
 
-- 찍기: `npm run screenshot -- capture --as owner-a /owner /owner/slots/new`. `--as`는 시드 계정이라 가짜 데이터만 보인다(`owner-a`, `customer-a` 등)
+- 찍기: `npm run screenshot -- capture --as owner-a /owner /owner/slots/new`. `--as`는 시드 계정이라 가짜 데이터만 보인다(`owner-a`, `customer-a` 등). 운영자 화면은 시드 운영자 `--as admin-a`로 찍는다(11/14, 개발 DB에만 있는 운영자 권한 계정. 개발 DB에 없으면 `npm run db:seed -- --admin-only`로 그것만 만든다)
 - 내 시나리오 데이터가 필요하면: `npm run screenshot -- capture --email <내 로그인 이메일> --mode owner /owner`. 이메일이 화면에 보일 수 있으니 사진을 꼭 확인한다
 - 확인: 레포가 공개다. Claude가 사진을 직접 열어 진짜 이메일·전화번호·계좌번호가 없는지 본다. 있으면 올리지 않는다
 - 올리기: `npm run screenshot -- upload --pr <번호> <찍은 파일>...`. 사진은 GitHub 릴리스 `pr-screenshots`에 올라가고 PR 댓글에 나온다. 잘못 올렸으면 `gh release delete-asset pr-screenshots <파일 이름>`으로 지운다
