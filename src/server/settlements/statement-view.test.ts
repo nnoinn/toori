@@ -14,6 +14,7 @@ import {
   scheduledStatements,
   type StoredSettlement,
   storedStatementSummary,
+  type UnpaidPenalty,
 } from './statement-view';
 
 /** 한국 시간 'YYYY-MM-DD HH:MM' → UTC Date */
@@ -91,6 +92,19 @@ const pendingItem: SettledItem = {
   settlement: { status: 'pending', payoutDate: '2026-11-19' },
 };
 
+/** 원장님 귀책 패널티(5,000원). 예약번호와 생긴 날로 구분한다 */
+const penalty = (
+  reservationCode: string,
+  createdAt: string,
+  collectedAmount = 0,
+): UnpaidPenalty => ({
+  penaltyId: `penalty-${reservationCode}`,
+  reservationCode,
+  amount: 5_000,
+  collectedAmount,
+  createdAt: kst(createdAt),
+});
+
 const views = (rows: SettlementRow[], paymentFeeRate: number | null = DOC_PAYMENT_FEE_RATE) =>
   toSettlementItemViews(rows, { now: NOW, paymentFeeRate });
 
@@ -107,7 +121,7 @@ describe('scheduledStatements: 지급 예정 정산서', () => {
         }),
       ]),
       lastPayoutDate: '2026-11-12',
-      outstandingPenalty: 0,
+      penalties: [],
     });
     expect(statements.map(({ summary }) => summary)).toEqual([
       {
@@ -154,16 +168,21 @@ describe('scheduledStatements: 지급 예정 정산서', () => {
     const [first] = scheduledStatements({
       items: views([row(), cancelledRow('customer', 30, { reservationId: 'cancel' })]),
       lastPayoutDate: null,
-      outstandingPenalty: 0,
+      penalties: [],
     });
     expect(first.summary).toMatchObject({ periodStart: '2026-11-14', periodEnd: '2026-11-19' });
   });
 
-  it('남은 패널티를 지급일이 이른 장부터 떼고, 0원이 되면 이유를 남기고 나머지는 다음 장에서 뗀다', () => {
+  it('남은 패널티를 묶기와 같이 오래된 것부터, 지급일이 이른 장부터 떼고, 0원이 되면 이유를 남기고 나머지는 다음 장에서 뗀다', () => {
     const statements = scheduledStatements({
       items: views([cancelledRow('customer', 30, { reservationId: 'cancel' }), wednesday]),
       lastPayoutDate: '2026-11-12',
-      outstandingPenalty: 20_000,
+      // 5,000원 셋(15,000원). 넘긴 순서와 상관없이 생긴 날이 이른 것부터 뗀다
+      penalties: [
+        penalty('300000000003', '2026-11-01 10:00'),
+        penalty('300000000001', '2026-10-30 10:00'),
+        penalty('300000000002', '2026-10-31 10:00'),
+      ],
     });
     expect(statements.map(({ summary }) => summary)).toMatchObject([
       // 13,055원을 다 떼서 0원
@@ -173,8 +192,16 @@ describe('scheduledStatements: 지급 예정 정산서', () => {
         payoutAmount: 0,
         zeroReason: 'penalty_offset',
       },
-      // 남은 6,945원을 떼서 43,515 − 6,945
-      { payoutDate: '2026-11-26', penaltyDeducted: 6_945, payoutAmount: 36_570, zeroReason: null },
+      // 남은 1,945원을 떼서 43,515 − 1,945
+      { payoutDate: '2026-11-26', penaltyDeducted: 1_945, payoutAmount: 41_570, zeroReason: null },
+    ]);
+    expect(statements.map((statement) => statement.penalties)).toEqual([
+      [
+        { reservationCode: '300000000001', amount: 5_000 },
+        { reservationCode: '300000000002', amount: 5_000 },
+        { reservationCode: '300000000003', amount: 3_055 },
+      ],
+      [{ reservationCode: '300000000003', amount: 1_945 }],
     ]);
   });
 
@@ -182,7 +209,7 @@ describe('scheduledStatements: 지급 예정 정산서', () => {
     const [first] = scheduledStatements({
       items: views([row()], null),
       lastPayoutDate: null,
-      outstandingPenalty: 5_000,
+      penalties: [penalty('300000000001', '2026-10-30 10:00')],
     });
     expect(first.summary).toMatchObject({
       baseAmount: 45_000,
@@ -202,7 +229,7 @@ describe('scheduledStatements: 지급 예정 정산서', () => {
         row({ reservationId: 'pending', item: pendingItem }),
       ]),
       lastPayoutDate: null,
-      outstandingPenalty: 0,
+      penalties: [],
     });
     expect(statements).toEqual([]);
   });
@@ -268,7 +295,8 @@ describe('buildStatementList: 정산서 목록', () => {
         row({ reservationId: 'pending', item: pendingItem }),
       ]),
       lastPayoutDate: '2026-11-12',
-      outstandingPenalty: 0,
+      // 5,000원 중 2,000원은 이미 뗐다
+      penalties: [penalty('300000000001', '2026-10-30 10:00', 2_000)],
       payoutAccount: { bankName: '국민은행', accountLast4: '1234' },
       // 11/26은 기간 밖
       period: { from: '2026-11-01', to: '2026-11-20' },
@@ -278,6 +306,9 @@ describe('buildStatementList: 정산서 목록', () => {
       ['2026-11-19', 'scheduled'],
       ['2026-11-12', 'paid'],
     ]);
+    // 남은 패널티 3,000원은 가장 이른 지급 예정 정산서에서 뗀다
+    expect(list.statements[0]).toMatchObject({ penaltyDeducted: 3_000, payoutAmount: 40_515 });
+    expect(list.outstandingPenalty).toBe(3_000);
     expect(list.held).toMatchObject({ count: 1, baseAmount: 45_000, payoutAmount: 43_515 });
     expect(list.held.items.map((item) => item.reservationId)).toEqual(['held']);
     expect(list.payoutAccount).toEqual({ bankName: '국민은행', accountLast4: '1234' });
@@ -286,11 +317,11 @@ describe('buildStatementList: 정산서 목록', () => {
 });
 
 describe('scheduledStatement: 지급 예정 정산서 한 장', () => {
-  it('그 지급일의 거래를 펼치고, 뗄 패널티 건은 묶을 때 정해져서 비어 있으며, 없는 날이면 null', () => {
+  it('그 지급일의 거래와 뗄 패널티 건별(예상)을 펼치고, 없는 날이면 null', () => {
     const input = {
       unpaidItems: views([row(), wednesday]),
       lastPayoutDate: '2026-11-12',
-      outstandingPenalty: 5_000,
+      penalties: [penalty('300000000001', '2026-10-30 10:00')],
       payoutAccount: null,
     };
     const statement = scheduledStatement({ ...input, payoutDate: '2026-11-19' });
@@ -298,7 +329,7 @@ describe('scheduledStatement: 지급 예정 정산서 한 장', () => {
       payoutDate: '2026-11-19',
       penaltyDeducted: 5_000,
       payoutAmount: 38_515,
-      penalties: [],
+      penalties: [{ reservationCode: '300000000001', amount: 5_000 }],
       payoutAccount: null,
     });
     expect(statement?.items.map((item) => item.reservationId)).toEqual(['visit']);

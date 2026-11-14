@@ -13,13 +13,14 @@ import { requireShopOwner } from '@/server/auth';
 import { PAYMENT_FEE_RATE } from '@/server/policy';
 
 import { settlementFail } from './errors';
-import { readOutstandingPenalty, readShopSettlementRows } from './settlement-store';
+import { readShopSettlementRows } from './settlement-store';
 import { parseSettlementPeriod, toSettlementItemViews } from './settlement-view';
 import {
   readLastPayoutDate,
   readPayoutAccount,
   readPenaltyCollections,
   readShopSettlements,
+  readUnpaidPenalties,
 } from './statement-store';
 import { buildStatementList, scheduledStatement, storedStatement } from './statement-view';
 import type { SettlementStatement, SettlementStatementList } from './types';
@@ -40,21 +41,19 @@ export async function getSettlementStatements(input: {
   const now = await getRequestNow();
   const db = getDb();
   const shopId = auth.data.shopId;
-  const [stored, unpaidRows, outstandingPenalty, lastPayoutDate, payoutAccount] = await Promise.all(
-    [
-      readShopSettlements(db, { shopId, from: input.from, to: input.to }),
-      readShopSettlementRows(db, { shopId, unpaidOnly: true }),
-      readOutstandingPenalty(db, shopId),
-      readLastPayoutDate(db, shopId),
-      readPayoutAccount(db, shopId),
-    ],
-  );
+  const [stored, unpaidRows, penalties, lastPayoutDate, payoutAccount] = await Promise.all([
+    readShopSettlements(db, { shopId, from: input.from, to: input.to }),
+    readShopSettlementRows(db, { shopId, unpaidOnly: true }),
+    readUnpaidPenalties(db, shopId),
+    readLastPayoutDate(db, shopId),
+    readPayoutAccount(db, shopId),
+  ]);
   return ok(
     buildStatementList({
       stored,
       unpaidItems: toSettlementItemViews(unpaidRows, { now, paymentFeeRate: PAYMENT_FEE_RATE }),
       lastPayoutDate,
-      outstandingPenalty,
+      penalties,
       payoutAccount,
       period: { from: input.from, to: input.to },
       now,
@@ -98,16 +97,16 @@ export async function getSettlementStatement(input: {
     );
   }
 
-  const [unpaidRows, outstandingPenalty, lastPayoutDate] = await Promise.all([
+  const [unpaidRows, penalties, lastPayoutDate] = await Promise.all([
     readShopSettlementRows(db, { shopId, unpaidOnly: true }),
-    readOutstandingPenalty(db, shopId),
+    readUnpaidPenalties(db, shopId),
     readLastPayoutDate(db, shopId),
   ]);
   const scheduled = scheduledStatement({
     payoutDate: payoutDate.data,
     unpaidItems: toSettlementItemViews(unpaidRows, options),
     lastPayoutDate,
-    outstandingPenalty,
+    penalties,
     payoutAccount,
   });
   return scheduled ? ok(scheduled) : settlementFail('STATEMENT_NOT_FOUND');

@@ -25,6 +25,7 @@ import {
   readPayoutAccount,
   readPenaltyCollections,
   readShopSettlements,
+  readUnpaidPenalties,
 } from './statement-store';
 
 const at = (value: string) => new Date(`${value}+09:00`);
@@ -217,6 +218,71 @@ describeDb('원장님 정산서 읽기 (실제 DB)', () => {
         { settlementId: target.id, reservationCode: secondCancel.reservation.code, amount: 3_000 },
       ]);
       expect(await readPenaltyCollections(tx, [])).toEqual([]);
+    });
+  });
+
+  it('readUnpaidPenalties: 내 샵의 다 걷지 못한 패널티를 원인 예약번호와 함께 오래된 것부터 읽는다', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const other = await createTestShop(tx, { status: 'approved' });
+      const { customerId } = await createTestCustomer(tx);
+      const cancel = (target: TestShop, hour: number) =>
+        createTestReservation(
+          tx,
+          target,
+          customerId,
+          `${String(hour).padStart(2, '0')}:00`,
+          `${String(hour + 1).padStart(2, '0')}:00`,
+          'cancelled',
+          { cancelActor: 'owner_fault', cancelledAt: at('2026-10-31T09:00:00') },
+        );
+      const later = await cancel(shop, 9);
+      const earlier = await cancel(shop, 10);
+      const done = await cancel(shop, 11);
+      const elsewhere = await cancel(other, 9);
+      const [laterPenalty, earlierPenalty] = await tx
+        .insert(ownerPenalties)
+        .values([
+          {
+            shopId: shop.shopId,
+            reservationId: later.reservation.id,
+            amount: 5_000,
+            createdAt: at('2026-10-31T10:00:00'),
+          },
+          {
+            shopId: shop.shopId,
+            reservationId: earlier.reservation.id,
+            amount: 5_000,
+            collectedAmount: 2_000,
+            createdAt: at('2026-10-30T10:00:00'),
+          },
+          {
+            shopId: shop.shopId,
+            reservationId: done.reservation.id,
+            amount: 5_000,
+            collectedAmount: 5_000,
+            fullyCollectedAt: at('2026-11-05T10:00:00'),
+          },
+          { shopId: other.shopId, reservationId: elsewhere.reservation.id, amount: 5_000 },
+        ])
+        .returning();
+
+      expect(await readUnpaidPenalties(tx, shop.shopId)).toEqual([
+        {
+          penaltyId: earlierPenalty.id,
+          amount: 5_000,
+          collectedAmount: 2_000,
+          createdAt: at('2026-10-30T10:00:00'),
+          reservationCode: earlier.reservation.code,
+        },
+        {
+          penaltyId: laterPenalty.id,
+          amount: 5_000,
+          collectedAmount: 0,
+          createdAt: at('2026-10-31T10:00:00'),
+          reservationCode: later.reservation.code,
+        },
+      ]);
     });
   });
 

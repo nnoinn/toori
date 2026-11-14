@@ -128,7 +128,7 @@ export type SettlementStatementSummary = {
 export type SettlementStatement = SettlementStatementSummary & {
   /** 이 정산서의 거래(1장 모양). 처리·취소가 늦은 것부터 */
   items: SettlementItemView[];
-  /** 이번에 뗀 패널티 건별(원장님 사정 취소 예약번호와 금액). 지급 예정 정산서는 묶을 때 정해져서 비어 있다 */
+  /** 이번에 뗀 패널티 건별(원장님 사정 취소 예약번호와 금액). 지급 예정 정산서는 지금 남은 패널티로 계산한 예상값이다 */
   penalties: { reservationCode: string; amount: number }[];
   /** 지금 등록된 정산 계좌 */
   payoutAccount: PayoutAccountView | null;

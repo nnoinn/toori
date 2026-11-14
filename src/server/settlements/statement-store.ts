@@ -3,7 +3,7 @@
 
 import 'server-only';
 
-import { and, asc, desc, eq, gte, inArray, lte, max, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, lte, max, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import {
@@ -18,7 +18,7 @@ import type { SettlementStatus } from '@/db/schema/settlements';
 import { bankName } from '@/server/policy/banks';
 
 import type { PayoutAccountView } from './types';
-import type { StoredSettlement } from './statement-view';
+import type { StoredSettlement, UnpaidPenalty } from './statement-view';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select'>;
 
@@ -102,6 +102,25 @@ export async function readPenaltyCollections(
     .innerJoin(ownerPenalties, eq(ownerPenalties.id, penaltyCollections.penaltyId))
     .innerJoin(reservations, eq(reservations.id, ownerPenalties.reservationId))
     .where(inArray(penaltyCollections.settlementId, [...settlementIds]))
+    .orderBy(asc(ownerPenalties.createdAt), asc(ownerPenalties.id));
+}
+
+/**
+ * 샵의 아직 다 걷지 못한 원장님 귀책 패널티와 원인 예약번호. 오래된 것부터.
+ * 지급 예정 정산서의 뗄 패널티 예상에 쓴다(묶기의 readOutstandingPenalties와 같은 조건, 읽기만 해서 잠그지 않는다)
+ */
+export async function readUnpaidPenalties(db: Db, shopId: string): Promise<UnpaidPenalty[]> {
+  return db
+    .select({
+      penaltyId: ownerPenalties.id,
+      amount: ownerPenalties.amount,
+      collectedAmount: ownerPenalties.collectedAmount,
+      createdAt: ownerPenalties.createdAt,
+      reservationCode: reservations.code,
+    })
+    .from(ownerPenalties)
+    .innerJoin(reservations, eq(reservations.id, ownerPenalties.reservationId))
+    .where(and(eq(ownerPenalties.shopId, shopId), isNull(ownerPenalties.fullyCollectedAt)))
     .orderBy(asc(ownerPenalties.createdAt), asc(ownerPenalties.id));
 }
 

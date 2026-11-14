@@ -2,12 +2,14 @@
 //
 // - 묶인 정산서: 정산 묶음(settlements)에 저장한 합계·뗀 패널티·지급액을 그대로 쓴다
 // - 지급 예정 정산서: 아직 묶이지 않은 지급 예정 거래를 지급 예정일별로 모아, 목요일 묶기(W20 ③)와 같은 방식으로 계산한다.
-//   기간은 직전 지급일 다음 날부터(첫 정산은 처음 거래가 끝난 한국 날짜부터)이고, 남은 패널티는 지급일이 이른 장부터 뗀다(예상값)
+//   기간은 직전 지급일 다음 날부터(첫 정산은 처음 거래가 끝난 한국 날짜부터)이고, 남은 패널티는 지급일이 이른 장부터
+//   묶기와 같은 함수(allocatePenalties)로 오래된 것부터 뗀다. 그래서 예상값과 실제로 떼는 값이 같은 순서로 나온다(#129 리뷰)
 // - 결제 수수료율이 정해지기 전에는 결제 수수료·지급액·뗄 패널티를 비운다(가격 미리보기 S-203과 같다)
 
 import type { SettlementStatus } from '@/db/schema/settlements';
 import { kstDateKey, kstToUtc } from '@/lib/time';
 
+import { allocatePenalties, type OutstandingPenalty } from './calc-settlement';
 import { sumOrNull } from './settlement-view';
 import type {
   PayoutAccountView,
@@ -32,10 +34,14 @@ export type StoredSettlement = {
   paymentFeeTotal: number;
 };
 
-/** 지급 예정 정산서의 요약과 그 거래 */
+/** 아직 다 걷지 못한 원장님 귀책 패널티와 그 원인 예약번호(statement-store.ts readUnpaidPenalties) */
+export type UnpaidPenalty = OutstandingPenalty & { reservationCode: string };
+
+/** 지급 예정 정산서의 요약, 그 거래, 뗄 패널티 건별(예상) */
 export type ScheduledStatement = {
   summary: SettlementStatementSummary;
   items: SettlementItemView[];
+  penalties: { reservationCode: string; amount: number }[];
 };
 
 // 한국은 서머타임이 없어서 하루는 늘 24시간이다
@@ -83,7 +89,7 @@ export function storedStatementSummary(stored: StoredSettlement): SettlementStat
 export function scheduledStatements(input: {
   items: readonly SettlementItemView[];
   lastPayoutDate: string | null;
-  outstandingPenalty: number;
+  penalties: readonly UnpaidPenalty[];
 }): ScheduledStatement[] {
   const byDate = new Map<string, SettlementItemView[]>();
   for (const item of input.items) {
@@ -91,9 +97,12 @@ export function scheduledStatements(input: {
     byDate.set(item.payoutDate, [...(byDate.get(item.payoutDate) ?? []), item]);
   }
 
+  const codeOf = new Map(
+    input.penalties.map((penalty) => [penalty.penaltyId, penalty.reservationCode]),
+  );
   let previous = input.lastPayoutDate;
   // 남은 패널티. 앞 장의 지급액을 모르면 뒤 장에서 뗄 금액도 알 수 없어서 null로 둔다
-  let remaining: number | null = input.outstandingPenalty;
+  let remaining: OutstandingPenalty[] | null = [...input.penalties];
   return [...byDate.keys()].sort().map((payoutDate) => {
     const items = [...(byDate.get(payoutDate) ?? [])].sort((a, b) =>
       b.occurredAt.localeCompare(a.occurredAt),
@@ -105,10 +114,23 @@ export function scheduledStatements(input: {
     const payoutBefore = sumOrNull(items.map((item) => item.payoutAmount));
     let penaltyDeducted: number | null = null;
     let payoutAmount: number | null = null;
+    let penalties: ScheduledStatement['penalties'] = [];
     if (payoutBefore !== null && remaining !== null) {
-      penaltyDeducted = Math.min(remaining, payoutBefore);
-      payoutAmount = payoutBefore - penaltyDeducted;
-      remaining -= penaltyDeducted;
+      const allocated = allocatePenalties(payoutBefore, remaining);
+      penaltyDeducted = allocated.collections.reduce((total, taken) => total + taken.amount, 0);
+      payoutAmount = allocated.payoutAfter;
+      penalties = allocated.collections.map((taken) => ({
+        reservationCode: codeOf.get(taken.penaltyId) ?? '',
+        amount: taken.amount,
+      }));
+      // 이번 장에서 뗀 만큼 걷은 것으로 보고 다음 장으로 넘긴다
+      const taken = new Map(allocated.collections.map((c) => [c.penaltyId, c.amount]));
+      remaining = remaining
+        .map((penalty) => ({
+          ...penalty,
+          collectedAmount: penalty.collectedAmount + (taken.get(penalty.penaltyId) ?? 0),
+        }))
+        .filter((penalty) => penalty.collectedAmount < penalty.amount);
     } else {
       remaining = null;
     }
@@ -138,8 +160,13 @@ export function scheduledStatements(input: {
       zeroReason: zeroReasonOf(payoutAmount, penaltyDeducted),
       paidAt: null,
     };
-    return { summary, items };
+    return { summary, items, penalties };
   });
+}
+
+/** 아직 다 걷지 못한 패널티 합계 */
+function outstandingOf(penalties: readonly UnpaidPenalty[]): number {
+  return penalties.reduce((total, penalty) => total + penalty.amount - penalty.collectedAmount, 0);
 }
 
 /**
@@ -150,7 +177,7 @@ export function buildStatementList(input: {
   stored: readonly StoredSettlement[];
   unpaidItems: readonly SettlementItemView[];
   lastPayoutDate: string | null;
-  outstandingPenalty: number;
+  penalties: readonly UnpaidPenalty[];
   payoutAccount: PayoutAccountView | null;
   period: { from: string; to: string };
   now: Date;
@@ -159,7 +186,7 @@ export function buildStatementList(input: {
   const scheduled = scheduledStatements({
     items: input.unpaidItems,
     lastPayoutDate: input.lastPayoutDate,
-    outstandingPenalty: input.outstandingPenalty,
+    penalties: input.penalties,
   })
     .map((statement) => statement.summary)
     .filter((summary) => summary.payoutDate >= from && summary.payoutDate <= to);
@@ -176,7 +203,7 @@ export function buildStatementList(input: {
       payoutAmount: sumOrNull(held.map((item) => item.payoutAmount)),
       items: held,
     },
-    outstandingPenalty: input.outstandingPenalty,
+    outstandingPenalty: outstandingOf(input.penalties),
     payoutAccount: input.payoutAccount,
     serverNow: input.now.toISOString(),
   };
@@ -197,25 +224,24 @@ export function storedStatement(input: {
   };
 }
 
-/** 지급 예정 정산서 한 장 펼치기. 그 지급일에 지급 예정 거래가 없으면 null */
+/** 지급 예정 정산서 한 장 펼치기. 뗄 패널티 건별은 지금 남은 패널티로 계산한 예상값이다. 그 지급일에 지급 예정 거래가 없으면 null */
 export function scheduledStatement(input: {
   payoutDate: string;
   unpaidItems: readonly SettlementItemView[];
   lastPayoutDate: string | null;
-  outstandingPenalty: number;
+  penalties: readonly UnpaidPenalty[];
   payoutAccount: PayoutAccountView | null;
 }): SettlementStatement | null {
   const found = scheduledStatements({
     items: input.unpaidItems,
     lastPayoutDate: input.lastPayoutDate,
-    outstandingPenalty: input.outstandingPenalty,
+    penalties: input.penalties,
   }).find((statement) => statement.summary.payoutDate === input.payoutDate);
   if (!found) return null;
-  // 뗄 패널티 건은 목요일에 묶을 때 정해진다
   return {
     ...found.summary,
     items: found.items,
-    penalties: [],
+    penalties: found.penalties,
     payoutAccount: input.payoutAccount,
   };
 }
