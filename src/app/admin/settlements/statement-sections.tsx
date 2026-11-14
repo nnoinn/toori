@@ -64,7 +64,7 @@ export function StatementCard({
               ? '결제 수수료율이 정해지기 전이에요'
               : `${formatWon(statement.paymentFeeTotal)}(VAT 포함)`}
           </Field>
-          <Field label={`뗀 패널티${mark}`}>
+          <Field label={estimated ? `뗄 패널티${mark}` : '뗀 패널티'}>
             {statement.penaltyDeducted === null ? '-' : formatWon(statement.penaltyDeducted)}
           </Field>
           <Field label={`실지급액${mark}`}>
@@ -175,7 +175,7 @@ export function ItemTable({
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[64rem] text-sm">
+      <table className="w-full min-w-[56rem] text-sm">
         <thead className="text-left text-muted-foreground">
           <tr className="border-b">
             <th className={HEAD_CELL}>예약번호</th>
