@@ -25,8 +25,8 @@ describe('결제 실패 뒤 다음 행동 (C-406, D12)', () => {
         message: PAYMENT_ERRORS.PAYMENT_FAILED,
         slotId: SLOT,
         holdActive: false,
-      }).href,
-    ).toBe(`/slots/${SLOT}`);
+      }),
+    ).toEqual({ label: '매물 다시 보기', href: `/slots/${SLOT}` });
   });
 
   it('자동 취소(환불)했거나 결제 정보를 못 찾으면 고객 홈', () => {
@@ -35,11 +35,28 @@ describe('결제 실패 뒤 다음 행동 (C-406, D12)', () => {
         code: 'SLOT_SOLD',
         message: AUTO_CANCEL_ERRORS.SLOT_SOLD,
         autoCancelled: true,
-      }).href,
-    ).toBe('/home');
+      }),
+    ).toEqual({ label: '홈으로', href: '/home' });
     expect(
-      failureAction({ code: 'PAYMENT_NOT_FOUND', message: PAYMENT_ERRORS.PAYMENT_NOT_FOUND }).href,
-    ).toBe('/home');
+      failureAction({ code: 'PAYMENT_NOT_FOUND', message: PAYMENT_ERRORS.PAYMENT_NOT_FOUND }),
+    ).toEqual({ label: '홈으로', href: '/home' });
+  });
+
+  it('매물을 모르는 결제 취소·실패는 고객 홈(빈 매물 주소로 보내지 않는다)', () => {
+    expect(
+      failureAction({ code: 'PAYMENT_CANCELLED', message: PAYMENT_ERRORS.PAYMENT_CANCELLED }),
+    ).toEqual({ label: '홈으로', href: '/home' });
+  });
+
+  it('예약을 확정하지 못했고 결제 취소를 기다리는 중이면 매물이 있어도 고객 홈(곧 모두 환불)', () => {
+    expect(
+      failureAction({
+        code: 'HOLD_EXPIRED',
+        message: UNCONFIRMED_ERRORS.HOLD_EXPIRED,
+        autoCancelled: false,
+        slotId: SLOT,
+      }),
+    ).toEqual({ label: '홈으로', href: '/home' });
   });
 });
 

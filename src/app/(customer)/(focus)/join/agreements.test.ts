@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -97,5 +100,35 @@ describe('문구 안의 시각·기간', () => {
     expect(text).toContain('받는 정보: 할인 이벤트, 쿠폰 같은 혜택 소식');
     expect(text).toContain('밤 9시부터 아침 8시까지');
     expect(text).toContain('2년마다');
+  });
+});
+
+// 화면 항목이 동의 문구 초안(docs/legal/consent-texts.md 1장 화면 모양)과 어긋나지 않는지 본다
+describe('가입 동의 항목과 동의 문구 1장', () => {
+  const consentDoc = readFileSync(join(process.cwd(), 'docs/legal/consent-texts.md'), 'utf8');
+  const screen = consentDoc.split('## 1. 고객 가입 약관 동의')[1].split('```')[1];
+  const lines = screen.split('\n').filter((line) => line.startsWith('[ ] ('));
+
+  it('항목 이름·필수 여부·순서가 같다', () => {
+    expect(lines.map((line) => line.replace(/\s+보기 >$/, ''))).toEqual(
+      AGREEMENT_ITEMS.map((item) => `[ ] (${item.required ? '필수' : '선택'}) ${item.label}`),
+    );
+  });
+
+  it('본문이 있는 항목에만 "보기"가 있다', () => {
+    expect(lines.map((line) => line.endsWith('보기 >'))).toEqual(
+      AGREEMENT_ITEMS.map((item) => item.hasDocument),
+    );
+  });
+
+  it('선택 동의 설명이 문서 7장(관심 동네·찜한 샵 알림)·1-2(이벤트·혜택)와 줄마다 같다', () => {
+    // 문서는 "- " 목록이고 끝에 마침표가 없다. 화면은 줄마다 마침표로 끝난다
+    const block = (heading: string) =>
+      consentDoc.split(heading)[1].split('```')[1].split('\n').slice(1).filter(Boolean);
+    const plain = (line: string) => line.replace(/^- /, '').replace(/\.$/, '');
+    const description = (key: string) =>
+      AGREEMENT_ITEMS.find((item) => item.key === key)?.description?.map(plain);
+    expect(description('interest_alert')).toEqual(block('## 7. ').map(plain));
+    expect(description('marketing')).toEqual(block('### 1-2. ').map(plain));
   });
 });

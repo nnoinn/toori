@@ -35,6 +35,8 @@ describe('웹 푸시를 받을 수 있는 기기인지 (J14)', () => {
     expect(isIos(IPHONE, 5)).toBe(true);
     expect(isIos(IPAD_AS_MAC, 5)).toBe(true);
     expect(isIos(IPAD_AS_MAC, 0)).toBe(false);
+    // 아이패드는 손가락 여러 개를 받는다. 1개만 받는 맥은 아이패드가 아니다
+    expect(isIos(IPAD_AS_MAC, 1)).toBe(false);
     expect(
       pushSupport({ ...pc, userAgent: IPHONE, maxTouchPoints: 5, hasPushManager: false }),
     ).toBe('ios-install');

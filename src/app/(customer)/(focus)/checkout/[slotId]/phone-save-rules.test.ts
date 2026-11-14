@@ -27,6 +27,11 @@ describe('연락처 자동 저장: 다 쳤거나 칸을 벗어났을 때 (#183)'
 
   it('빈 칸은 그대로 둔다', () => {
     expect(phoneSubmit('', A, null)).toEqual({ kind: 'none' });
+    expect(phoneSubmit('   ', A, null)).toEqual({ kind: 'none' });
+  });
+
+  it('고객 연락처는 휴대폰 번호만 받는다(#19 D31)', () => {
+    expect(phoneSubmit('031-123-4567', A, null)).toEqual({ kind: 'invalid' });
   });
 
   it('저장 중이면 저장 중인 번호와 비교한다', () => {
@@ -55,5 +60,7 @@ describe('연락처가 결제할 수 있는 상태인지 (#183)', () => {
 
   it('저장된 번호가 없거나 저장에 실패했으면 잠근다', () => {
     expect(isPhoneReady(A, null, null)).toBe(false);
+    // 저장된 번호도 없고 칸도 비었으면 결제할 수 없다(연락처는 꼭 있어야 한다, C-401)
+    expect(isPhoneReady('', null, null)).toBe(false);
   });
 });

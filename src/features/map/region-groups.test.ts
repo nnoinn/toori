@@ -48,6 +48,19 @@ describe('구 단위 묶음 (#204)', () => {
     expect(group.center.lng).toBeCloseTo(127.1, 6);
   });
 
+  it('매물 많은 구부터, 같으면 시·군·구 코드 순', () => {
+    const groups = groupShopsByRegion([
+      shop('a', '41271', 1),
+      shop('b', '41273', 3),
+      shop('c', '41390', 1),
+    ]);
+    expect(groups.map((group) => [group.code, group.count])).toEqual([
+      ['41273', 3],
+      ['41271', 1],
+      ['41390', 1],
+    ]);
+  });
+
   it('구를 모르는 샵은 묶지 않는다', () => {
     expect(groupShopsByRegion([shop('a', undefined, 2)])).toEqual([]);
   });
