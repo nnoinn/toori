@@ -156,6 +156,10 @@ describeDb('시드 데이터 (실제 DB)', () => {
           (select count(*)::int from customers where user_id = ${userIds['admin-a']}) as customers,
           (select count(*)::int from owners where user_id = ${userIds['admin-a']}) as owners`;
       expect(accounts).toEqual({ customers: 0, owners: 0 });
+      // 운영자 시드는 운영자 프로필(#372)도 있다
+      const adminProfiles = await sql<{ user_id: string; name: string }[]>`
+        select user_id, name from admin_profiles where user_id in ${sql(Object.values(userIds))}`;
+      expect(adminProfiles).toEqual([{ user_id: userIds['admin-a'], name: '샘플 운영자 A' }]);
     });
   });
 

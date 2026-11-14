@@ -111,6 +111,17 @@ export async function upsertSeedProfiles(sql, accounts, userIds) {
     is_admin: account.admin === true,
   }));
   await sql`insert into profiles ${sql(profiles)} on conflict (id) do update set is_admin = excluded.is_admin`;
+  // 운영자 시드는 운영자 프로필(#372 4장)도 둔다. 프로필은 지울 수 없어서(트리거) 이름만 맞춘다
+  const adminProfiles = accounts
+    .filter((account) => account.admin === true)
+    .map((account) => ({
+      user_id: userIds[account.key],
+      // 예: admin-a → 샘플 운영자 A
+      name: `샘플 운영자 ${account.key.replace('admin-', '').toUpperCase()}`,
+    }));
+  if (adminProfiles.length > 0) {
+    await sql`insert into admin_profiles ${sql(adminProfiles)} on conflict (user_id) do update set name = excluded.name`;
+  }
 }
 
 /**
@@ -137,6 +148,8 @@ export async function seedDevData(sql, { now, userIds }) {
   const customers = SEED_CUSTOMERS.map((c, i) => ({
     id: crypto.randomUUID(),
     user_id: userIds[`customer-${c.key}`],
+    // 예약자 이름(#375). 시드 이름은 현동훈이 넣기 전까지 닉네임과 같게 둔다
+    name: c.nickname,
     nickname: c.nickname,
     // 가입 때 휴대폰 번호를 받는다(11/2, #183). 원장님 예약 상세에 연락처가 보이게
     phone: `010-0001-${pad(i + 1, 4)}`,

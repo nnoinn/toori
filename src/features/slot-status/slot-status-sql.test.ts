@@ -133,7 +133,7 @@ describeDb('slotIsOnHold (실제 DB)', () => {
       const userId = await createUser(tx);
       const [customer] = await tx
         .insert(customers)
-        .values({ userId, nickname: '테스트 고객' })
+        .values({ userId, name: '테스트 고객', nickname: '테스트 고객' })
         .returning();
       const holdInput = hold(customer.id);
       const id = await insertSlot(tx, {
