@@ -77,7 +77,7 @@ async function ensureCustomer(sql, userId) {
   const [c] = await sql`select id from customers where user_id = ${userId}`;
   if (c) return c.id;
   const [created] =
-    await sql`insert into customers ${sql({ user_id: userId, nickname: `${TAG} 고객` })} returning id`;
+    await sql`insert into customers ${sql({ user_id: userId, name: `${TAG} 고객`, nickname: `${TAG} 고객` })} returning id`;
   return created.id;
 }
 

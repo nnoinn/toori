@@ -84,10 +84,13 @@ export async function createCustomerAccount(input: {
   const user = await getSessionUser();
   if (!user) return fail('UNAUTHENTICATED', AUTH_ERRORS.UNAUTHENTICATED);
 
+  const nickname = user.name ?? DEFAULT_CUSTOMER_NICKNAME;
   const saved = await getDb().transaction((tx) =>
     saveCustomerAccount(tx, {
       userId: user.userId,
-      nickname: user.name ?? DEFAULT_CUSTOMER_NICKNAME,
+      // 가입 화면에 이름 칸이 생기기 전까지는 이름도 닉네임으로 둔다(0015 전 계정과 같다). 이름 받기는 #375 함수 PR
+      name: nickname,
+      nickname,
       phone,
       optionalTerms: OPTIONAL_CUSTOMER_TERMS.filter((type) => agreements[type] === true),
     }),
