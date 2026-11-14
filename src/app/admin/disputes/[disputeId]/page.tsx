@@ -17,7 +17,7 @@ import { disputeDeadline, outcomeBlockReason } from '@/server/disputes/rules';
 
 import { labelReservation } from '../../lookup';
 import {
-  DISPUTE_CHANNEL_LABELS,
+  DISPUTE_CHANNEL_DETAIL_LABELS,
   DISPUTE_OUTCOME_LABELS,
   DISPUTE_TYPE_LABELS,
   labelDisputeStatus,
@@ -106,9 +106,17 @@ async function Detail({ params }: { params: Params }) {
             </Field>
             <Field label="메뉴">{detail.menuName}</Field>
             <Field label="서비스 일시">{formatKst(detail.startAt)}</Field>
-            <Field label="고객">{detail.customerNickname}</Field>
+            {/* 이의제기는 그 예약의 손님만 신청한다(11/13 nnoinn). 연락처는 보여주지 않는다(#360 4번) */}
+            <Field label="신청한 사람">
+              <Link
+                href={`/admin/users/customers/${detail.customerId}`}
+                className="hover:underline"
+              >
+                {detail.customerNickname}
+              </Link>
+            </Field>
             <Field label="종류">{DISPUTE_TYPE_LABELS[detail.type]}</Field>
-            <Field label="경로">{DISPUTE_CHANNEL_LABELS[detail.channel]}</Field>
+            <Field label="경로">{DISPUTE_CHANNEL_DETAIL_LABELS[detail.channel]}</Field>
             <Field label="받은 시각">{formatKstDateTime(detail.receivedAt)}</Field>
             <Field label="접수 기한">
               {deadline

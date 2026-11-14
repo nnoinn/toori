@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { DISPUTE_OUTCOMES } from '@/db/schema';
 
 import {
+  DISPUTE_CHANNEL_DETAIL_LABELS,
   DISPUTE_OUTCOME_LABELS,
   disputesHref,
   fromKstInputValue,
@@ -37,6 +38,13 @@ describe('상태 이름', () => {
     for (const outcome of DISPUTE_OUTCOMES) {
       expect(DISPUTE_OUTCOME_LABELS[outcome], outcome).toBeTruthy();
     }
+  });
+
+  it('상세의 경로는 누가 어떻게 남겼는지 풀어서 쓴다(이의제기는 손님만 신청, 11/13 nnoinn)', () => {
+    expect(DISPUTE_CHANNEL_DETAIL_LABELS).toEqual({
+      app: '앱에서 손님이 직접 접수',
+      kakao: '카카오톡 채널로 받아 운영자가 등록',
+    });
   });
 });
 

@@ -46,6 +46,12 @@ export const DISPUTE_CHANNEL_LABELS: Record<DisputeChannel, string> = {
   kakao: '카카오톡 채널',
 };
 
+/** 상세의 경로: 누가 어떻게 남겼는지 풀어서 (이의제기는 손님만 신청한다, 11/13 nnoinn) */
+export const DISPUTE_CHANNEL_DETAIL_LABELS: Record<DisputeChannel, string> = {
+  app: '앱에서 손님이 직접 접수',
+  kakao: '카카오톡 채널로 받아 운영자가 등록',
+};
+
 export const DISPUTE_OUTCOME_LABELS: Record<DisputeOutcome, string> = {
   no_show_confirmed: '노쇼 확정',
   no_show_reversed: '노쇼 취소(방문으로 바꿈)',

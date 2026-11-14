@@ -87,7 +87,7 @@ async function List({ searchParams }: { searchParams: SearchParams }) {
             name="q"
             defaultValue={query}
             maxLength={50}
-            placeholder="예약번호, 샵 이름"
+            placeholder="예약번호, 샵 이름, 손님"
             aria-label="이의제기 검색"
           />
           <Button type="submit" variant="outline">
@@ -103,12 +103,13 @@ async function List({ searchParams }: { searchParams: SearchParams }) {
         />
       ) : (
         <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
-          <table className="w-full min-w-[56rem] text-sm">
+          <table className="w-full min-w-[64rem] text-sm">
             <thead className="text-left text-muted-foreground">
               <tr className="border-b">
                 <th className={HEAD_CELL}>받은 시각</th>
                 <th className={HEAD_CELL}>예약번호</th>
                 <th className={HEAD_CELL}>샵</th>
+                <th className={HEAD_CELL}>손님</th>
                 <th className={HEAD_CELL}>종류</th>
                 <th className={HEAD_CELL}>경로</th>
                 <th className={HEAD_CELL}>상태</th>
@@ -126,6 +127,8 @@ async function List({ searchParams }: { searchParams: SearchParams }) {
                     </Link>
                   </td>
                   <td className={CELL}>{row.shopName}</td>
+                  {/* 손님 이름(#375)이 들어오면 이름으로 바꾼다. 지금은 닉네임 */}
+                  <td className={CELL}>{row.customerNickname}</td>
                   <td className={CELL}>{DISPUTE_TYPE_LABELS[row.type]}</td>
                   <td className={CELL}>{DISPUTE_CHANNEL_LABELS[row.channel]}</td>
                   <td className={CELL}>

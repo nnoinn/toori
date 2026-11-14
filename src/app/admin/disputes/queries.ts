@@ -1,5 +1,7 @@
 // 운영자 이의제기 화면(A-104, W19 ②)의 조회. 이 화면에서만 쓴다(목록·상세). 처리(등록·결론)는 '@/server/disputes/admin'.
 // 고객 연락처는 읽지 않는다(#360 4번). 내용(content)·메모는 고객·운영자가 쓴 글이라 로그에 남기지 않는다.
+// 이의제기는 그 예약의 손님만 신청한다(11/13 nnoinn, DISPUTE-08). 그래서 신청한 사람은 늘 그 예약의 손님이다.
+// 손님은 아직 이름 칸이 없어서 닉네임을 보여준다. 고객 이름(#375)이 들어오면 이름으로 바꾼다
 
 import 'server-only';
 
@@ -37,6 +39,9 @@ export type DisputeRow = {
   reservationId: string;
   reservationCode: string;
   shopName: string;
+  /** 신청한 손님(그 예약의 손님) */
+  customerId: string;
+  customerNickname: string;
 };
 
 const ORDER: Record<DisputeFilter, SQL[]> = {
@@ -46,7 +51,7 @@ const ORDER: Record<DisputeFilter, SQL[]> = {
   all: [desc(disputes.receivedAt), desc(disputes.id)],
 };
 
-/** 이의제기 목록. 검색어는 예약번호·샵 이름 */
+/** 이의제기 목록. 검색어는 예약번호·샵 이름·손님 닉네임 */
 export async function selectDisputes(
   db: DbReader,
   input: { filter: DisputeFilter; query: string },
@@ -64,15 +69,24 @@ export async function selectDisputes(
       reservationId: reservations.id,
       reservationCode: reservations.code,
       shopName: shops.name,
+      customerId: customers.id,
+      customerNickname: customers.nickname,
     })
     .from(disputes)
     .innerJoin(reservations, eq(reservations.id, disputes.reservationId))
     .innerJoin(slots, eq(slots.id, reservations.slotId))
     .innerJoin(shops, eq(shops.id, slots.shopId))
+    .innerJoin(customers, eq(customers.id, reservations.customerId))
     .where(
       and(
         input.filter === 'all' ? undefined : eq(disputes.status, input.filter),
-        input.query ? or(ilike(reservations.code, pattern), ilike(shops.name, pattern)) : undefined,
+        input.query
+          ? or(
+              ilike(reservations.code, pattern),
+              ilike(shops.name, pattern),
+              ilike(customers.nickname, pattern),
+            )
+          : undefined,
       ),
     )
     .orderBy(...ORDER[input.filter])
@@ -101,7 +115,6 @@ export type DisputeDetail = DisputeRow & {
   startAt: Date;
   menuName: string;
   shopId: string;
-  customerNickname: string;
 };
 
 /** 이의제기 상세와 그 예약. 없으면 null */
@@ -131,6 +144,7 @@ export async function selectDisputeDetail(
       menuName: slots.menuName,
       shopId: shops.id,
       shopName: shops.name,
+      customerId: customers.id,
       customerNickname: customers.nickname,
     })
     .from(disputes)

@@ -3,7 +3,7 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
-import { disputes, shops } from '@/db/schema';
+import { customers, disputes, shops } from '@/db/schema';
 
 import {
   createTestCustomer,
@@ -47,13 +47,13 @@ async function addDispute(
       ...values,
     })
     .returning({ id: disputes.id });
-  return { disputeId: row.id, reservation };
+  return { disputeId: row.id, reservation, customerId };
 }
 
 describeDb('운영자 이의제기 조회 (실제 DB)', () => {
   afterAll(closeTestDb);
 
-  it('확인 중은 받은 시각이 오래된 순, 결론은 기록한 시각이 최근인 순, 전체는 받은 시각이 최근인 순. 예약번호·샵 이름으로 찾는다', async () => {
+  it('확인 중은 받은 시각이 오래된 순, 결론은 기록한 시각이 최근인 순, 전체는 받은 시각이 최근인 순. 예약번호·샵 이름·손님 닉네임으로 찾는다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
       const shopName = unique('이의샵');
@@ -92,6 +92,10 @@ describeDb('운영자 이의제기 조회 (실제 DB)', () => {
       ]);
       expect(await ids('all', newer.reservation.code)).toEqual([newer.disputeId]);
       expect(await ids('all', unique('없는샵'))).toEqual([]);
+      // 신청한 손님(그 예약의 손님) 닉네임으로도 찾는다
+      const nickname = unique('이의손님');
+      await tx.update(customers).set({ nickname }).where(eq(customers.id, doneLate.customerId));
+      expect(await ids('all', nickname)).toEqual([doneLate.disputeId]);
 
       const [row] = (await selectDisputes(tx, { filter: 'open', query: shopName })).rows;
       expect(row).toEqual({
@@ -105,15 +109,17 @@ describeDb('운영자 이의제기 조회 (실제 DB)', () => {
         reservationId: older.reservation.id,
         reservationCode: older.reservation.code,
         shopName,
+        customerId: older.customerId,
+        customerNickname: '테스트 고객',
       });
     });
   });
 
-  it('상세는 이의제기 내용·결론과 그 예약(상태·방문 결과·처리·시작 시각·메뉴)·샵·고객 닉네임을 읽고, 없는 이의제기는 null', async () => {
+  it('상세는 이의제기 내용·결론과 그 예약(상태·방문 결과·처리·시작 시각·메뉴)·샵·신청한 손님을 읽고, 없는 이의제기는 null', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved', name: '상세 이의샵' });
       const adminId = await createTestUser(tx);
-      const { disputeId, reservation } = await addDispute(tx, shop, '09:00', '10:00', {
+      const { disputeId, reservation, customerId } = await addDispute(tx, shop, '09:00', '10:00', {
         receivedAt: at(2, '09:00'),
         status: 'resolved',
         outcome: 'no_show_reversed',
@@ -142,6 +148,7 @@ describeDb('운영자 이의제기 조회 (실제 DB)', () => {
         menuName: '커트',
         shopId: shop.shopId,
         shopName: '상세 이의샵',
+        customerId,
         customerNickname: '테스트 고객',
       });
       expect(await selectDisputeDetail(tx, crypto.randomUUID())).toBeNull();
