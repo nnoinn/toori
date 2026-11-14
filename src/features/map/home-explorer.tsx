@@ -74,7 +74,7 @@ export function HomeExplorer({ center, myLocation, header, sort, serverNow }: Ho
   ) : null;
 
   return (
-    <main className="flex h-[calc(100dvh-3.5rem-env(safe-area-inset-bottom))] flex-col overflow-hidden md:h-[calc(100dvh-4rem)] md:flex-row">
+    <main className="flex h-[calc(100dvh-3.5rem-env(safe-area-inset-bottom)-var(--hold-bar-h,0px))] flex-col overflow-hidden md:h-[calc(100dvh-4rem-var(--hold-bar-h,0px))] md:flex-row">
       <div
         className={cn(
           'relative',
