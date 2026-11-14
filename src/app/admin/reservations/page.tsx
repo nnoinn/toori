@@ -57,8 +57,9 @@ const SEARCH_HINTS: Record<LookupTab, string> = {
   slots: '샵 이름, 메뉴 이름',
 };
 
-const HEAD_CELL = 'px-4 py-3 font-medium';
-const CELL = 'px-4 py-3';
+// 운영자 화면 폭(왼쪽 메뉴를 뺀 1,000px 안팎)에 예약 한 줄이 가로 스크롤 없이 들어가게 칸 여백을 좁게 둔다
+const HEAD_CELL = 'px-3 py-3 font-medium';
+const CELL = 'px-3 py-3';
 
 const slotFilterLabel = (filter: SlotFilter) =>
   filter === 'all' ? '전체' : SLOT_STATUS_LABELS[filter];
@@ -181,7 +182,8 @@ async function ReservationList({
         <EmptyState title="맞는 예약이 없어요" className="rounded-xl bg-card" />
       ) : (
         <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
-          <table className="w-full min-w-[64rem] text-sm">
+          {/* 최소 폭을 두지 않아 샵·메뉴·고객 칸이 줄바꿈되며 화면 폭에 맞춘다. 아주 좁을 때만 가로로 밀린다 */}
+          <table className="w-full text-sm">
             <thead className="text-left text-muted-foreground">
               <tr className="border-b">
                 <th className={HEAD_CELL}>예약한 시각</th>
@@ -212,7 +214,8 @@ async function ReservationList({
                     <td className={cn(CELL, 'whitespace-nowrap')}>{formatKst(row.startAt)}</td>
                     <td className={cn(CELL, 'whitespace-nowrap')}>{formatWon(row.amount)}</td>
                     <td className={CELL}>
-                      <div className="flex items-center gap-1">
+                      {/* "이용 완료"와 "확인 필요"가 같이 붙으면 옆으로 넓어지지 않고 아래로 내린다 */}
+                      <div className="flex flex-wrap items-center gap-1">
                         <Badge variant="secondary">
                           {labelReservation(row.status, row.visitResult)}
                         </Badge>
