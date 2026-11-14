@@ -55,7 +55,13 @@ export function RegionListView({
           className="mx-4 flex items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2 text-sm md:mx-0"
         >
           <span>{list.refreshError}</span>
-          <Button type="button" variant="outline" size="sm" onClick={list.retry}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="max-md:h-10"
+            onClick={list.retry}
+          >
             다시 시도
           </Button>
         </div>

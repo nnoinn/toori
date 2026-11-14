@@ -180,7 +180,7 @@ export function ShopInfoSection({
               href={link.href}
               target="_blank"
               rel="noopener noreferrer"
-              className={buttonVariants({ variant: 'outline', className: 'gap-1' })}
+              className={buttonVariants({ variant: 'outline', className: 'gap-1 max-md:h-10' })}
             >
               {link.label}
               <ExternalLink className="size-3.5" aria-hidden />
