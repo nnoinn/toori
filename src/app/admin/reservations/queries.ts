@@ -25,7 +25,7 @@ import { slotStatusIs } from '@/features/slot-status/slot-status-sql';
 import { ownerListedSlot } from '@/server/slots/visibility';
 
 import { ADMIN_LIST_LIMIT, containsPattern, type ListResult, toListResult } from '../lookup';
-import type { ReservationFilter, SlotFilter } from './format';
+import type { ReservationFilter, ReservationSort, SlotFilter } from './format';
 
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 
@@ -44,8 +44,18 @@ const RESERVATION_CONDITIONS: Record<ReservationFilter, SQL | undefined> = {
   review: needsReview,
 };
 
+/** 예약 목록 정렬(#360 1번). 같은 시각이면 예약번호 순으로 늘 같은 순서가 되게 한다 */
+const RESERVATION_ORDER: Record<ReservationSort, SQL[]> = {
+  latest: [desc(reservations.createdAt), asc(reservations.code)],
+  oldest: [asc(reservations.createdAt), asc(reservations.code)],
+  start_soon: [asc(slots.startAt), asc(reservations.code)],
+  start_late: [desc(slots.startAt), asc(reservations.code)],
+};
+
 export type ReservationRow = {
   reservationId: string;
+  /** 예약한 시각(예약이 만들어진 때). 목록 첫 칸 */
+  bookedAt: Date;
   code: string;
   status: ReservationStatus;
   visitResult: VisitResult | null;
@@ -57,10 +67,10 @@ export type ReservationRow = {
   needsReview: boolean;
 };
 
-/** 예약 목록(시작 시각이 늦은 순). 예약번호·샵 이름·고객 닉네임 일부로 찾는다 */
+/** 예약 목록(기본은 최근에 예약한 것부터, sort로 바꾼다). 예약번호·샵 이름·고객 닉네임 일부로 찾는다 */
 export async function selectReservations(
   db: DbReader,
-  input: { filter: ReservationFilter; query: string },
+  input: { filter: ReservationFilter; query: string; sort?: ReservationSort },
 ): Promise<ListResult<ReservationRow>> {
   const pattern = containsPattern(input.query);
   const search: SQL | undefined = input.query
@@ -73,6 +83,7 @@ export async function selectReservations(
   const rows = await db
     .select({
       reservationId: reservations.id,
+      bookedAt: reservations.createdAt,
       code: reservations.code,
       status: reservations.status,
       visitResult: reservations.visitResult,
@@ -89,7 +100,7 @@ export async function selectReservations(
     .innerJoin(customers, eq(customers.id, reservations.customerId))
     .innerJoin(orders, eq(orders.id, reservations.orderId))
     .where(and(RESERVATION_CONDITIONS[input.filter], search))
-    .orderBy(desc(slots.startAt), asc(reservations.code))
+    .orderBy(...RESERVATION_ORDER[input.sort ?? 'latest'])
     .limit(ADMIN_LIST_LIMIT + 1);
   // DB의 check 제약이 정해 둔 값만 허용한다
   return toListResult(

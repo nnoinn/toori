@@ -152,6 +152,9 @@
   | `BackButton` | `fallbackHref?`, `className?` | 메뉴 없는 화면의 왼쪽 위 뒤로가기. 이전 화면이 없으면(주소로 바로 들어옴) `fallbackHref`로 간다 |
   | `OwnerNav` | 원장님 레이아웃에 들어 있음. `canCreateSlot` | 대시보드 `/owner`, 매물 등록 `/owner/slots/new`(승인 전 잠금), 매장 설정 `/owner/settings`, 정산 `/owner/settlements`. PC는 왼쪽 메뉴, 폰은 메뉴 버튼 |
   | `AdminNav` | 운영자 레이아웃에 들어 있음 | 입점 승인, 회원, 매물·예약, 이의제기, 정산 |
+  | `SortSelect` | `value, options: { value, label, href }[], label?` | 목록 오른쪽 위 정렬 고르기(#360). 지금 정렬이 칸에 보이고, 고르면 그 정렬의 목록 주소로 간다. 주소는 화면(서버)이 검색어·거르기를 지켜서 만든다 |
+  | `SelectableRows`, `SelectableRow`, `DetailLink` | `<SelectableRows>`(tbody) 안에 `<SelectableRow id href>`, 줄 끝 칸에 `<DetailLink href label>` | 운영자 목록 줄(#360, 11/13). 한 번 누르면 연한 투리 색으로 선택, 두 번 누르거나 Enter·[상세]로 상세 |
+  | `NATIVE_SELECT_CLASS` | 브라우저 기본 `<select>`의 `className` | Input과 같은 높이·테두리, 오류(`aria-invalid`)면 빨간 테두리(#212 3번에서 원장님 화면 부품에서 옮김) |
   | shadcn 기본 부품 | `Button`, `Badge`, `Card`, `Sheet`, `Skeleton` | 더 필요하면 추가해도 된다 |
 
   - **화면 크기: PC 먼저(10/25 결정).** 고객·원장님·운영자 화면 모두 기능을 PC 크기에서 먼저 끝내고, 기능이 모두 끝나면 폰 화면(모바일 UI)을 한꺼번에 만든다. 화면마다 PC와 폰을 같이 만들면서 기능을 고치면 두 번 일하게 되기 때문이다. PC와 폰을 나누는 기준은 Tailwind `md`(768px) 하나다

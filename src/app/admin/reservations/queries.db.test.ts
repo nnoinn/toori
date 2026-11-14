@@ -66,7 +66,7 @@ describeDb('매물·예약 조회 (실제 DB)', () => {
         [confirmed, cancelled, visited, noShow].map(({ reservation }) => reservation.id),
       );
       const ids = async (filter: Parameters<typeof selectReservations>[1]['filter']) =>
-        (await selectReservations(tx, { filter, query: '' })).rows
+        (await selectReservations(tx, { filter, query: '', sort: 'start_late' })).rows
           .map((row) => row.reservationId)
           .filter((id) => mine.has(id));
 
@@ -87,6 +87,59 @@ describeDb('매물·예약 조회 (실제 DB)', () => {
       const flag = (id: string) => rows.find((row) => row.reservationId === id)?.needsReview;
       expect(flag(cancelled.reservation.id)).toBe(true);
       expect(flag(confirmed.reservation.id)).toBe(false);
+    });
+  });
+
+  it('예약 목록 정렬: 기본은 예약한 시각이 늦은 순이고, 오래된 예약·서비스 일시 빠른·늦은 순으로도 고른다(#360 1번)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const { customerId } = await createTestCustomer(tx);
+      const booked = (iso: string) => ({ createdAt: new Date(iso) });
+      // 서비스 일시: a < b < c, 예약한 시각: c < a < b
+      const a = await createTestReservation(
+        tx,
+        shop,
+        customerId,
+        '10:00',
+        '11:00',
+        'confirmed',
+        booked('2026-10-30T09:00:00+09:00'),
+      );
+      const b = await createTestReservation(
+        tx,
+        shop,
+        customerId,
+        '11:00',
+        '12:00',
+        'confirmed',
+        booked('2026-10-30T12:00:00+09:00'),
+      );
+      const c = await createTestReservation(
+        tx,
+        shop,
+        customerId,
+        '12:00',
+        '13:00',
+        'confirmed',
+        booked('2026-10-29T18:00:00+09:00'),
+      );
+      const mine = new Set([a, b, c].map(({ reservation }) => reservation.id));
+      const order = async (sort?: Parameters<typeof selectReservations>[1]['sort']) =>
+        (await selectReservations(tx, { filter: 'all', query: '', sort })).rows
+          .map((row) => row.reservationId)
+          .filter((id) => mine.has(id));
+      const [ida, idb, idc] = [a, b, c].map(({ reservation }) => reservation.id);
+
+      expect(await order()).toEqual([idb, ida, idc]);
+      expect(await order('latest')).toEqual([idb, ida, idc]);
+      expect(await order('oldest')).toEqual([idc, ida, idb]);
+      expect(await order('start_soon')).toEqual([ida, idb, idc]);
+      expect(await order('start_late')).toEqual([idc, idb, ida]);
+
+      const { rows } = await selectReservations(tx, { filter: 'all', query: '' });
+      expect(rows.find((row) => row.reservationId === ida)?.bookedAt).toEqual(
+        new Date('2026-10-30T09:00:00+09:00'),
+      );
     });
   });
 
