@@ -15,7 +15,7 @@ export type AdminAccess = {
   /** view: 상세 보기, search: 목록·검색 */
   action: 'view' | 'search';
   /** 목록·검색이면 list */
-  targetType: 'customer' | 'owner' | 'shop' | 'reservation' | 'list';
+  targetType: 'customer' | 'owner' | 'shop' | 'reservation' | 'dispute' | 'list';
   /** 상세면 대상 id */
   targetId?: string;
   /** 본 화면 주소. 검색어는 넣지 않고 query에 따로 둔다 */

@@ -4,7 +4,7 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
-import { customers, refunds, shops, slots, slotWindows } from '@/db/schema';
+import { customers, disputes, refunds, shops, slots, slotWindows } from '@/db/schema';
 
 import {
   createTestCustomer,
@@ -254,8 +254,41 @@ describeDb('매물·예약 조회 (실제 DB)', () => {
             processedAt: BEFORE_START,
           },
         ],
+        dispute: null,
       });
       expect(await selectReservationDetail(tx, crypto.randomUUID())).toBeNull();
+    });
+  });
+
+  it('예약 상세는 그 예약의 이의제기(있으면 id·상태·결론)를 같이 읽는다(A-104, 이의제기 등록 버튼 대신 그 상세로)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const { customerId } = await createTestCustomer(tx);
+      const { reservation } = await createTestReservation(
+        tx,
+        shop,
+        customerId,
+        '10:00',
+        '11:00',
+        'completed',
+        { visitResult: 'visited', visitRecordedAt: BEFORE_START },
+      );
+      const [dispute] = await tx
+        .insert(disputes)
+        .values({
+          reservationId: reservation.id,
+          type: 'after_start',
+          content: '시술이 약속과 달랐어요',
+          status: 'open',
+          channel: 'app',
+          receivedAt: BEFORE_START,
+        })
+        .returning({ id: disputes.id });
+      expect((await selectReservationDetail(tx, reservation.id))?.dispute).toEqual({
+        disputeId: dispute.id,
+        status: 'open',
+        outcome: null,
+      });
     });
   });
 });

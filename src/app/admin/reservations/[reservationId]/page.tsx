@@ -9,10 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
 import { formatWon } from '@/lib/format';
-import { formatKst } from '@/lib/time';
+import { getRequestNow } from '@/lib/request-time';
+import { formatKst, formatKstDateTime } from '@/lib/time';
 import { isUuid } from '@/lib/uuid';
 import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
+import { disputeDeadline, disputeOpensAt, disputeTypes } from '@/server/disputes/rules';
+import { DISPUTE_DEADLINE_BUSINESS_HOURS } from '@/server/policy/dispute';
 
 import {
   labelCancelActor,
@@ -22,8 +25,10 @@ import {
   labelRefundReason,
   labelRefundStatus,
 } from '../format';
+import { DISPUTE_TYPE_LABELS, labelDisputeStatus, toKstInputValue } from '../../disputes/format';
 import { labelReservation } from '../../lookup';
 import { selectReservationDetail } from '../queries';
+import { RegisterDispute } from './register-dispute';
 
 export const metadata: Metadata = { title: '예약 정보' };
 
@@ -31,7 +36,8 @@ type Params = Promise<{ reservationId: string }>;
 
 const when = (date: Date | null) => (date ? formatKst(date) : '-');
 
-// 예약 상세 (A-103). 주소: /admin/reservations/[reservationId]. 결제와 취소·환불 기록, 운영자 확인 이유를 본다(조회만)
+// 예약 상세 (A-103). 주소: /admin/reservations/[reservationId]. 결제와 취소·환불 기록, 운영자 확인 이유를 본다.
+// 카카오톡 채널로 받은 이의제기는 여기서 등록한다(A-104, [이의제기 등록]). 이미 있으면 그 이의제기로 보낸다
 export default function AdminReservationPage({ params }: { params: Params }) {
   return (
     <main className="flex w-full max-w-4xl flex-1 flex-col gap-4 p-6">
@@ -58,6 +64,15 @@ async function Detail({ params }: { params: Params }) {
     targetId: reservationId,
     path: `/admin/reservations/${reservationId}`,
   });
+  const now = await getRequestNow();
+  const disputeTarget = {
+    status: detail.status,
+    startAt: detail.startAt,
+    visitResult: detail.visitResult,
+    visitRecordedAt: detail.visitRecordedAt,
+    cancelledAt: detail.cancelledAt,
+  };
+  const disputeDue = disputeDeadline(disputeTarget);
 
   return (
     <div className="flex flex-col gap-4">
@@ -139,6 +154,44 @@ async function Detail({ params }: { params: Params }) {
                 ) : null}
               </dl>
             ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>이의제기</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 text-sm">
+          {detail.dispute ? (
+            <p>
+              <Link
+                href={`/admin/disputes/${detail.dispute.disputeId}`}
+                className="hover:underline"
+              >
+                {labelDisputeStatus(detail.dispute.status, detail.dispute.outcome)} · 이의제기 보기
+              </Link>
+            </p>
+          ) : (
+            <>
+              <p className="text-muted-foreground">
+                접수 기간: {formatKstDateTime(disputeOpensAt(disputeTarget))}부터{' '}
+                {disputeDue
+                  ? `${formatKstDateTime(disputeDue)}까지`
+                  : `방문·노쇼 처리 뒤 영업일 기준 ${DISPUTE_DEADLINE_BUSINESS_HOURS}시간까지`}
+                . 카카오톡 채널로 받은 이의제기를 받은 시각과 함께 남겨요.
+              </p>
+              <div>
+                <RegisterDispute
+                  reservationId={detail.reservationId}
+                  types={disputeTypes(disputeTarget).map((value) => ({
+                    value,
+                    label: DISPUTE_TYPE_LABELS[value],
+                  }))}
+                  defaultReceivedAt={toKstInputValue(now)}
+                />
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
