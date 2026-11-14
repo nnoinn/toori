@@ -61,7 +61,7 @@ async function insertWindow(
 describeDb('시간대 매물 겹침 막기 (실제 DB)', () => {
   afterAll(closeTestDb);
 
-  it('같은 샵의 예약대기·게시중 시간대끼리는 겹칠 수 없다. 이어 붙이기·마감한 시간대·다른 샵은 된다', async () => {
+  it('같은 샵의 게시예정·게시중 시간대끼리는 겹칠 수 없다. 이어 붙이기·마감한 시간대·다른 샵은 된다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
       const other = await createTestShop(tx, { status: 'approved' });
@@ -90,7 +90,7 @@ describeDb('시간대 매물 겹침 막기 (실제 DB)', () => {
     });
   });
 
-  it('한 시술 매물은 예약대기·게시중 시간대와 겹치면 slots_no_overlap으로 막힌다(마감한 시간대는 괜찮다)', async () => {
+  it('한 시술 매물은 게시예정·게시중 시간대와 겹치면 slots_no_overlap으로 막힌다(마감한 시간대는 괜찮다)', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
       const windowId = await insertWindow(tx, shop, '13:00', '18:00');
@@ -147,7 +147,7 @@ describeDb('시간대 매물 겹침 막기 (실제 DB)', () => {
     });
   });
 
-  it('시간대는 예약대기·게시중·예약됨 매물과 겹치면 막힌다(취소된 매물, 그 시간대 안 매물은 괜찮다)', async () => {
+  it('시간대는 게시예정·게시중·예약됨 매물과 겹치면 막힌다(취소된 매물, 그 시간대 안 매물은 괜찮다)', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
       await tx.insert(slots).values(testSlot(shop, '10:00', '11:00', { status: 'reserved' }));

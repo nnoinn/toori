@@ -183,7 +183,7 @@ describeDb('홈 목록·지도 조회', () => {
       const far = await createTestShop(tx, { status: 'approved', location: FAR_LOCATION });
 
       const shown = await insertSlot(tx, shop, '10:00', '11:00');
-      // 게시 시각 전(예약대기), 원장님 마감, 승인 대기 샵, 영역 밖 샵은 빠진다
+      // 게시 시각 전(게시예정), 원장님 마감, 승인 대기 샵, 영역 밖 샵은 빠진다
       await insertSlot(tx, shop, '12:00', '13:00', {
         status: 'scheduled',
         publishAt: new Date('2026-11-01T00:00:00+09:00'),

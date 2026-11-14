@@ -28,8 +28,8 @@ function slot(extra: Partial<CheckoutSlot> = {}): CheckoutSlot {
 describe('holdBlockReason', () => {
   it.each<[string, Partial<CheckoutSlot>, ReturnType<typeof holdBlockReason>]>([
     ['게시중', {}, null],
-    ['게시 시각이 지난 예약대기', { status: 'scheduled', publishAt: at(0) }, null],
-    ['게시 전 예약대기', { status: 'scheduled', publishAt: at(1) }, 'SLOT_NOT_AVAILABLE'],
+    ['게시 시각이 지난 게시예정', { status: 'scheduled', publishAt: at(0) }, null],
+    ['게시 전 게시예정', { status: 'scheduled', publishAt: at(1) }, 'SLOT_NOT_AVAILABLE'],
     ['시작 시각', { startAt: at(0) }, 'SLOT_NOT_AVAILABLE'],
     ['예약됨', { status: 'reserved' }, 'SLOT_NOT_AVAILABLE'],
     ['마감', { status: 'closed' }, 'SLOT_NOT_AVAILABLE'],

@@ -22,7 +22,7 @@ export type CreatedSlotWindow = {
   windowId: string;
   startAt: string;
   endAt: string;
-  /** 게시 시각. 시간대 시작 48시간 전보다 이르면 그때까지 예약대기 */
+  /** 게시 시각. 시간대 시작 48시간 전보다 이르면 그때까지 게시예정 */
   publishAt: string;
   status: 'scheduled' | 'published';
 };
@@ -51,7 +51,7 @@ export type LastWindowSettings = {
 };
 
 /**
- * 시간대 상태(windowStatus). scheduled: 게시 전(예약대기), published: 게시중이고 남은 시간에 들어가는 서비스가 있음,
+ * 시간대 상태(windowStatus). scheduled: 게시 전(게시예정), published: 게시중이고 남은 시간에 들어가는 서비스가 있음,
  * full: 게시중이지만 남은 시간에 들어가는 서비스가 없음(목록에서 내린다), closed: 원장님이 마감했거나 시간이 지남
  */
 export type WindowState = 'scheduled' | 'published' | 'full' | 'closed';

@@ -7,12 +7,8 @@ import { cn } from 'cn';
 
 import { Label } from '@/components/ui/label';
 
-/**
- * 고르기 칸(`<select>`) 모양. 공통 UI에 고르기 칸 부품이 없어서
- * 은행·업종 칸이 Input과 같은 높이·테두리로 보이게 이 값을 같이 쓴다. 오류면 테두리가 빨갛다.
- */
-export const NATIVE_SELECT_CLASS =
-  'h-9 rounded-lg border bg-card px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive';
+/** 고르기 칸(`<select>`) 모양. 은행·업종 칸이 Input과 같은 높이·테두리로 보인다(공통 UI로 옮김, #212 3번) */
+export { NATIVE_SELECT_CLASS } from '@/components/ui/native-select';
 
 /** 칸 id로 오류 문구 id를 만든다. 칸과 오류 문구가 같은 규칙을 써야 서로 이어진다 */
 function fieldErrorId(id: string): string {

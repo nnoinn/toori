@@ -4,10 +4,12 @@
 
 import 'server-only';
 
-import { and, asc, count, desc, eq, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, type SQL, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { adminActions, owners, payoutAccounts, shops, type ShopStatus } from '@/db/schema';
+
+import { defaultShopSort, type ShopSort } from './format';
 
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 
@@ -29,21 +31,24 @@ export type ShopReviewRow = {
   reviewedAt: Date | null;
 };
 
+/** 정렬(#360 1번). 심사 순은 아직 심사하지 않은 샵(심사 시각 없음)을 뒤에 둔다 */
+const SHOP_ORDER: Record<ShopSort, SQL[]> = {
+  applied_old: [asc(shops.appliedAt), asc(shops.id)],
+  applied_new: [desc(shops.appliedAt), asc(shops.id)],
+  reviewed_new: [sql`${shops.reviewedAt} desc nulls last`, desc(shops.appliedAt), asc(shops.id)],
+};
+
 /**
- * 입점 심사 목록. 승인 대기는 오래 기다린 순(신청 시각 오래된 것부터),
+ * 입점 심사 목록. sort가 없으면 거르기마다 기본 정렬(defaultShopSort): 승인 대기는 오래 기다린 순(신청 시각 오래된 것부터),
  * 반려·승인은 최근 심사 순, 전체는 최근 신청 순
  */
 export async function selectShopsForReview(
   db: DbReader,
   filter: ReviewFilter,
+  sort: ShopSort = defaultShopSort(filter),
 ): Promise<ShopReviewRow[]> {
   const where: SQL | undefined = filter === 'all' ? undefined : eq(shops.status, filter);
-  const order =
-    filter === 'pending'
-      ? [asc(shops.appliedAt)]
-      : filter === 'all'
-        ? [desc(shops.appliedAt)]
-        : [desc(shops.reviewedAt), desc(shops.appliedAt)];
+  const order = SHOP_ORDER[sort];
   const rows = await db
     .select({
       shopId: shops.id,

@@ -70,7 +70,7 @@ export function checkWindowDraft(input: {
   menus: readonly WindowMenuInput[];
   shopMenus: readonly ShopMenu[];
   businessHours: BusinessHours;
-  /** 그 샵에 이미 올린 예약대기·게시중·예약됨 매물과 예약대기·게시중 시간대 */
+  /** 그 샵에 이미 올린 게시예정·게시중·예약됨 매물과 게시예정·게시중 시간대 */
   busy: readonly Range[];
   now: Date;
 }): WindowDraftCheck {

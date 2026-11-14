@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DetailLink, SelectableRow, SelectableRows } from '@/components/ui/selectable-rows';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SortSelect } from '@/components/ui/sort-select';
 import { EmptyState } from '@/components/ui/state';
 import { getDb } from '@/db';
 import {
@@ -16,7 +18,7 @@ import {
 import { formatWon } from '@/lib/format';
 import { getRequestNow } from '@/lib/request-time';
 import { firstParam, type SearchValue } from '@/lib/search-params';
-import { formatKst } from '@/lib/time';
+import { formatKst, formatKstDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
@@ -28,17 +30,26 @@ import {
   lookupHref,
   RESERVATION_FILTER_LABELS,
   RESERVATION_FILTERS,
+  RESERVATION_SORT_LABELS,
+  RESERVATION_SORTS,
+  type ReservationSort,
   SLOT_FILTERS,
   type SlotFilter,
   toLookupTab,
   toReservationFilter,
+  toReservationSort,
   toSlotFilter,
 } from './format';
 import { selectReservations, selectSlots } from './queries';
 
 export const metadata: Metadata = { title: '매물·예약' };
 
-type SearchParams = Promise<{ tab?: SearchValue; status?: SearchValue; q?: SearchValue }>;
+type SearchParams = Promise<{
+  tab?: SearchValue;
+  status?: SearchValue;
+  q?: SearchValue;
+  sort?: SearchValue;
+}>;
 
 const TAB_LABELS: Record<LookupTab, string> = { reservations: '예약', slots: '매물' };
 const SEARCH_HINTS: Record<LookupTab, string> = {
@@ -46,13 +57,15 @@ const SEARCH_HINTS: Record<LookupTab, string> = {
   slots: '샵 이름, 메뉴 이름',
 };
 
-const HEAD_CELL = 'px-4 py-3 font-medium';
-const CELL = 'px-4 py-3';
+// 운영자 화면 폭(왼쪽 메뉴를 뺀 1,000px 안팎)에 예약 한 줄이 가로 스크롤 없이 들어가게 칸 여백을 좁게 둔다
+const HEAD_CELL = 'px-3 py-3 font-medium';
+const CELL = 'px-3 py-3';
 
 const slotFilterLabel = (filter: SlotFilter) =>
   filter === 'all' ? '전체' : SLOT_STATUS_LABELS[filter];
 
-// 매물·예약 조회 (A-103). 주소: /admin/reservations?tab=reservations|slots&status=...&q=검색어 (조회만)
+// 매물·예약 조회 (A-103). 주소: /admin/reservations?tab=reservations|slots&status=...&q=검색어&sort=... (조회만)
+// 예약 목록은 줄을 한 번 누르면 선택, 두 번 누르거나 Enter·[상세]로 상세가 열리고, 오른쪽 위에서 정렬을 고른다(#360 1번)
 export default function AdminReservationsPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <main className="flex flex-1 flex-col gap-4 p-6">
@@ -70,6 +83,7 @@ async function Lookup({ searchParams }: { searchParams: SearchParams }) {
   const tab = toLookupTab(firstParam(params.tab));
   const status = firstParam(params.status);
   const query = toSearchQuery(firstParam(params.q));
+  const sort = toReservationSort(firstParam(params.sort));
   await recordAdminAccess(admin.userId, {
     action: 'search',
     targetType: 'list',
@@ -98,6 +112,9 @@ async function Lookup({ searchParams }: { searchParams: SearchParams }) {
         <form action="/admin/reservations" className="flex w-full max-w-md gap-2">
           <input type="hidden" name="tab" value={tab} />
           {status ? <input type="hidden" name="status" value={status} /> : null}
+          {tab === 'reservations' && sort !== 'latest' ? (
+            <input type="hidden" name="sort" value={sort} />
+          ) : null}
           <Input
             name="q"
             defaultValue={query}
@@ -111,7 +128,7 @@ async function Lookup({ searchParams }: { searchParams: SearchParams }) {
         </form>
       </div>
       {tab === 'reservations' ? (
-        <ReservationList status={status} query={query} />
+        <ReservationList status={status} query={query} sort={sort} />
       ) : (
         <SlotList status={status} query={query} />
       )}
@@ -126,30 +143,50 @@ function chipClass(active: boolean) {
   );
 }
 
-async function ReservationList({ status, query }: { status: string | undefined; query: string }) {
+async function ReservationList({
+  status,
+  query,
+  sort,
+}: {
+  status: string | undefined;
+  query: string;
+  sort: ReservationSort;
+}) {
   const filter = toReservationFilter(status);
-  const { rows, hasMore } = await selectReservations(getDb(), { filter, query });
+  const { rows, hasMore } = await selectReservations(getDb(), { filter, query, sort });
   return (
     <>
-      <nav aria-label="예약 상태" className="flex flex-wrap gap-2">
-        {RESERVATION_FILTERS.map((value) => (
-          <Link
-            key={value}
-            href={lookupHref({ tab: 'reservations', status: value, query })}
-            aria-current={value === filter ? 'page' : undefined}
-            className={chipClass(value === filter)}
-          >
-            {RESERVATION_FILTER_LABELS[value]}
-          </Link>
-        ))}
-      </nav>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <nav aria-label="예약 상태" className="flex flex-wrap gap-2">
+          {RESERVATION_FILTERS.map((value) => (
+            <Link
+              key={value}
+              href={lookupHref({ tab: 'reservations', status: value, query, sort })}
+              aria-current={value === filter ? 'page' : undefined}
+              className={chipClass(value === filter)}
+            >
+              {RESERVATION_FILTER_LABELS[value]}
+            </Link>
+          ))}
+        </nav>
+        <SortSelect
+          value={sort}
+          options={RESERVATION_SORTS.map((value) => ({
+            value,
+            label: RESERVATION_SORT_LABELS[value],
+            href: lookupHref({ tab: 'reservations', status: filter, query, sort: value }),
+          }))}
+        />
+      </div>
       {rows.length === 0 ? (
         <EmptyState title="맞는 예약이 없어요" className="rounded-xl bg-card" />
       ) : (
         <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
-          <table className="w-full min-w-[56rem] text-sm">
+          {/* 최소 폭을 두지 않아 샵·메뉴·고객 칸이 줄바꿈되며 화면 폭에 맞춘다. 아주 좁을 때만 가로로 밀린다 */}
+          <table className="w-full text-sm">
             <thead className="text-left text-muted-foreground">
               <tr className="border-b">
+                <th className={HEAD_CELL}>예약한 시각</th>
                 <th className={HEAD_CELL}>예약번호</th>
                 <th className={HEAD_CELL}>샵</th>
                 <th className={HEAD_CELL}>메뉴</th>
@@ -157,35 +194,41 @@ async function ReservationList({ status, query }: { status: string | undefined; 
                 <th className={HEAD_CELL}>일시</th>
                 <th className={HEAD_CELL}>결제액</th>
                 <th className={HEAD_CELL}>상태</th>
+                <th className={HEAD_CELL}>
+                  <span className="sr-only">상세</span>
+                </th>
               </tr>
             </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.reservationId} className="border-b last:border-0 hover:bg-muted/50">
-                  <td className={cn(CELL, 'font-medium whitespace-nowrap')}>
-                    <Link
-                      href={`/admin/reservations/${row.reservationId}`}
-                      className="hover:underline"
-                    >
-                      {row.code}
-                    </Link>
-                  </td>
-                  <td className={CELL}>{row.shopName}</td>
-                  <td className={CELL}>{row.menuName}</td>
-                  <td className={CELL}>{row.customerNickname}</td>
-                  <td className={cn(CELL, 'whitespace-nowrap')}>{formatKst(row.startAt)}</td>
-                  <td className={cn(CELL, 'whitespace-nowrap')}>{formatWon(row.amount)}</td>
-                  <td className={CELL}>
-                    <div className="flex items-center gap-1">
-                      <Badge variant="secondary">
-                        {labelReservation(row.status, row.visitResult)}
-                      </Badge>
-                      {row.needsReview ? <Badge variant="destructive">확인 필요</Badge> : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+            <SelectableRows>
+              {rows.map((row) => {
+                const href = `/admin/reservations/${row.reservationId}`;
+                return (
+                  <SelectableRow key={row.reservationId} id={row.reservationId} href={href}>
+                    <td className={cn(CELL, 'whitespace-nowrap')}>
+                      {formatKstDateTime(row.bookedAt)}
+                    </td>
+                    <td className={cn(CELL, 'font-medium whitespace-nowrap')}>{row.code}</td>
+                    <td className={CELL}>{row.shopName}</td>
+                    <td className={CELL}>{row.menuName}</td>
+                    <td className={CELL}>{row.customerNickname}</td>
+                    <td className={cn(CELL, 'whitespace-nowrap')}>{formatKst(row.startAt)}</td>
+                    <td className={cn(CELL, 'whitespace-nowrap')}>{formatWon(row.amount)}</td>
+                    <td className={CELL}>
+                      {/* "이용 완료"와 "확인 필요"가 같이 붙으면 옆으로 넓어지지 않고 아래로 내린다 */}
+                      <div className="flex flex-wrap items-center gap-1">
+                        <Badge variant="secondary">
+                          {labelReservation(row.status, row.visitResult)}
+                        </Badge>
+                        {row.needsReview ? <Badge variant="destructive">확인 필요</Badge> : null}
+                      </div>
+                    </td>
+                    <td className={cn(CELL, 'text-right')}>
+                      <DetailLink href={href} label={`예약 ${row.code} 상세`} />
+                    </td>
+                  </SelectableRow>
+                );
+              })}
+            </SelectableRows>
           </table>
         </div>
       )}

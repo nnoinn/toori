@@ -12,6 +12,7 @@ import {
   lookupHref,
   toLookupTab,
   toReservationFilter,
+  toReservationSort,
   toSlotFilter,
 } from './format';
 
@@ -31,6 +32,17 @@ describe('매물·예약 조회 표시 모양', () => {
     expect(lookupHref({ tab: 'slots', status: 'closed', query: '샘플 & 헤어' })).toBe(
       '/admin/reservations?tab=slots&status=closed&q=%EC%83%98%ED%94%8C+%26+%ED%97%A4%EC%96%B4',
     );
+  });
+
+  it('예약 목록 정렬: 기본은 최신 예약 순이고, 주소에는 기본값을 넣지 않으며 매물 목록에는 붙지 않는다(#360 1번)', () => {
+    expect(toReservationSort('start_soon')).toBe('start_soon');
+    expect(toReservationSort(undefined)).toBe('latest');
+    expect(toReservationSort('newest')).toBe('latest');
+    expect(lookupHref({ tab: 'reservations', sort: 'latest' })).toBe('/admin/reservations');
+    expect(lookupHref({ tab: 'reservations', status: 'confirmed', sort: 'oldest' })).toBe(
+      '/admin/reservations?status=confirmed&sort=oldest',
+    );
+    expect(lookupHref({ tab: 'slots', sort: 'oldest' })).toBe('/admin/reservations?tab=slots');
   });
 
   it('주문·취소·환불 이름. 모르는 값은 그대로, 없으면 -', () => {
