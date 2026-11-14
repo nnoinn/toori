@@ -11,7 +11,7 @@ import { getDb } from '@/db';
 import { menus, shops } from '@/db/schema';
 import type { ShopCategory } from '@/server/policy';
 
-import { moveOneStep } from '../reorder';
+import { checkReorder } from '../reorder';
 import type { MenuValues } from './menu';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select' | 'insert' | 'update'>;
@@ -136,27 +136,24 @@ export async function setMenuHidden(
 }
 
 /**
- * 보이는 메뉴 중 하나를 한 칸 위·아래로 옮긴다. 보이는 메뉴 순서를 0부터 다시 매긴다.
- * 그 샵의 보이는 메뉴가 아니면 false, 맨 위·맨 아래라 못 옮기면 바꾸지 않고 true
+ * 보이는 메뉴를 끌어 놓은 전체 순서(menuIds)대로 0부터 다시 매긴다(#358 2번).
+ * menuIds가 지금 그 샵의 보이는 메뉴와 같은 것들이 아니면 바꾸지 않고 false
+ * (다른 샵 메뉴·숨긴 메뉴가 섞임, 다른 창에서 메뉴를 더하거나 숨겨서 목록이 바뀜)
  */
-export async function moveMenu(
+export async function saveMenuOrder(
   db: Pick<Db, 'select' | 'update'>,
   shopId: string,
-  menuId: string,
-  direction: 'up' | 'down',
+  menuIds: readonly string[],
 ): Promise<boolean> {
   const visible = await db
     .select({ id: menus.id })
     .from(menus)
-    .where(and(eq(menus.shopId, shopId), isNull(menus.hiddenAt)))
-    .orderBy(asc(menus.sortOrder), asc(menus.createdAt));
-  const ordered = moveOneStep(
+    .where(and(eq(menus.shopId, shopId), isNull(menus.hiddenAt)));
+  const ordered = checkReorder(
     visible.map((menu) => menu.id),
-    menuId,
-    direction,
+    menuIds,
   );
-  if (ordered === 'not-found') return false;
-  if (ordered === 'edge') return true;
+  if (ordered === 'changed') return false;
   for (const [sortOrder, id] of ordered.entries()) {
     await db.update(menus).set({ sortOrder }).where(byShopAndId(shopId, id));
   }

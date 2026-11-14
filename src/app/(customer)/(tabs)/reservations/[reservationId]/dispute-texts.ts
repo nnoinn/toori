@@ -4,11 +4,9 @@
 import { SITE_NAME } from '@/lib/site';
 import { formatKst } from '@/lib/time';
 import type { DisputeView } from '@/server/disputes';
-import {
-  DISPUTE_CONTENT_MAX_LENGTH,
-  DISPUTE_CONTENT_MIN_LENGTH,
-  DISPUTE_DEADLINE_BUSINESS_HOURS,
-} from '@/server/policy/dispute';
+import { DISPUTE_ERRORS } from '@/server/disputes/errors';
+import { disputeContentProblem } from '@/server/disputes/rules';
+import { DISPUTE_CONTENT_LIMIT, DISPUTE_DEADLINE_BUSINESS_HOURS } from '@/server/policy/dispute';
 
 export type DisputeType = DisputeView['types'][number];
 
@@ -40,14 +38,25 @@ export const DISPUTE_IN_REVIEW = `${SITE_NAME}가 확인하고 있어요. 이어
 export const DISPUTE_RESOLVED = '확인을 마쳤어요. 자세한 내용은 카카오톡 채널에서 확인해 주세요.';
 export const DISPUTE_FOLLOW_UP = `접수하면 ${SITE_NAME}가 확인하고 카카오톡 채널로 연락드려요.`;
 export const DISPUTE_PRIVACY_NOTE = '전화번호 같은 개인정보는 적지 않아도 돼요.';
-export const DISPUTE_CONTENT_HINT = `${DISPUTE_CONTENT_MIN_LENGTH}자 이상 ${DISPUTE_CONTENT_MAX_LENGTH}자 이하로 적어 주세요.`;
+/** 내용 칸 안의 안내 문구(placeholder, 11/13 nnoinn). 글자 수는 보여주지 않는다 */
+export const DISPUTE_CONTENT_PLACEHOLDER = '최대한 상세하게 설명해주세요';
+/** 보이지 않는 상한(5,000자)에 닿았을 때만 보여주는 안내. 서버 실패 문구와 같다 */
+export const DISPUTE_CONTENT_LIMIT_NOTE = DISPUTE_ERRORS.DISPUTE_CONTENT_TOO_LONG;
 export const KAKAO_CHANNEL_LABEL = `${SITE_NAME} 카카오톡 채널 열기`;
 
 /** 노쇼 예약 상세의 안내. 아래 이의제기 칸으로 이어 준다 */
 export const NO_SHOW_DISPUTE_BELOW = '잘못 처리됐다면 아래 이의제기로 알려 주세요';
 
-/** 내용 글자 수가 맞는지(서버와 같은 기준: 앞뒤 공백을 뺀 길이) */
-export function isDisputeContentValid(content: string): boolean {
-  const length = content.trim().length;
-  return length >= DISPUTE_CONTENT_MIN_LENGTH && length <= DISPUTE_CONTENT_MAX_LENGTH;
+/**
+ * [접수하기]를 눌렀을 때 내용 칸 아래에 보여줄 안내. 서버와 같은 기준(disputeContentProblem, #388):
+ * 빈칸(공백만 있는 것 포함)이면 "내용을 적어 주세요", 상한을 넘으면 "5,000자까지 쓸 수 있어요", 괜찮으면 null
+ */
+export function disputeContentError(content: string): string | null {
+  const problem = disputeContentProblem(content);
+  return problem ? DISPUTE_ERRORS[problem] : null;
+}
+
+/** 입력이 상한에서 멈췄는지. 닿았을 때만 상한 안내를 보여준다(입력 칸 maxLength와 같은 길이) */
+export function reachedContentLimit(content: string): boolean {
+  return content.length >= DISPUTE_CONTENT_LIMIT;
 }

@@ -12,7 +12,7 @@ import { SHOP_IMAGE_LIMITS } from './shop-images';
 import {
   deleteShopImage,
   insertShopImage,
-  moveStyleImage,
+  saveStyleImageOrder,
   selectShopImages,
   selectShopLinks,
   setStyleImageMenu,
@@ -83,9 +83,14 @@ describeDb('샵 사진·링크 저장 (실제 DB)', () => {
     });
   });
 
-  it('스타일 사진 순서를 바꾸고, 맨 앞은 더 앞으로 가지 않는다', async () => {
+  it('스타일 사진을 끌어 놓은 전체 순서대로 저장하고, 스타일 사진과 다르면 바꾸지 않는다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
+      const main = await insertShopImage(tx, shop.shopId, {
+        kind: 'main',
+        path: path(shop.shopId, 9),
+      });
+      if (!main.ok) throw new Error('준비 실패');
       const ids: string[] = [];
       for (const n of [1, 2, 3]) {
         const saved = await insertShopImage(tx, shop.shopId, {
@@ -94,13 +99,19 @@ describeDb('샵 사진·링크 저장 (실제 DB)', () => {
         });
         if (saved.ok) ids.push(saved.data.imageId);
       }
-      const order = async () => (await selectShopImages(tx, shop.shopId)).map((image) => image.id);
+      const order = async () =>
+        (await selectShopImages(tx, shop.shopId))
+          .filter((image) => image.kind === 'style')
+          .map((image) => image.id);
 
-      expect(await moveStyleImage(tx, shop.shopId, ids[2], 'up')).toBe(true);
-      expect(await order()).toEqual([ids[0], ids[2], ids[1]]);
-      expect(await moveStyleImage(tx, shop.shopId, ids[0], 'up')).toBe(true);
-      expect(await order()).toEqual([ids[0], ids[2], ids[1]]);
-      expect(await moveStyleImage(tx, shop.shopId, ids[0], 'down')).toBe(true);
+      expect(await saveStyleImageOrder(tx, shop.shopId, [ids[2], ids[0], ids[1]])).toBe(true);
+      expect(await order()).toEqual([ids[2], ids[0], ids[1]]);
+
+      // 대표 사진이 섞이거나 스타일 사진이 빠지면(다른 창에서 올림) 그대로다
+      expect(await saveStyleImageOrder(tx, shop.shopId, [main.data.imageId, ids[0], ids[1]])).toBe(
+        false,
+      );
+      expect(await saveStyleImageOrder(tx, shop.shopId, [ids[0], ids[1]])).toBe(false);
       expect(await order()).toEqual([ids[2], ids[0], ids[1]]);
     });
   });
@@ -117,7 +128,7 @@ describeDb('샵 사진·링크 저장 (실제 DB)', () => {
       const imageId = saved.data.imageId;
 
       expect(await deleteShopImage(tx, mine.shopId, imageId)).toBeNull();
-      expect(await moveStyleImage(tx, mine.shopId, imageId, 'up')).toBe(false);
+      expect(await saveStyleImageOrder(tx, mine.shopId, [imageId])).toBe(false);
       expect(await setStyleImageMenu(tx, mine.shopId, imageId, null)).toMatchObject({
         error: { code: 'IMAGE_NOT_FOUND' },
       });

@@ -2,16 +2,17 @@
 // 상태는 O1의 getSlotStatus로 계산한다(시간이 지나서 바뀌는 상태). "지금"은 서버 시각을 받는다.
 // 시간대 매물(#308)도 같은 목록에 시작 순서로 섞는다. 시간대 상태는 서버가 화면을 열 때 windowStatus로 계산해 넘기고,
 // 필터·숫자에서는 매물 상태 이름 6개(X-301) 중 하나로 센다(예약대기·게시중·마감).
+// 시간대를 마감할 때 손님이 결제 중이라 남긴 칸은 마감 창과 시간대 줄에서 같은 문구(keptSlotsNotice)로 알린다(WINDOW-06).
 
 import type { SlotCloseReason } from '@/db/schema/slots';
-import { startOfKstDay } from '@/lib/time';
+import { formatEndTime, formatKstTime, startOfKstDay } from '@/lib/time';
 import {
   getSlotStatus,
   isSlotOnHold,
   SLOT_STATUS_LABELS,
   type SlotStatus,
 } from '@/features/slot-status/slot-status';
-import type { WindowState } from '@/server/slot-windows/types';
+import type { KeptWindowSlot, WindowState } from '@/server/slot-windows/types';
 
 /** 대시보드 매물 한 줄(화면으로 넘기는 값이라 시각은 ISO 문자열) */
 export type DashboardSlot = {
@@ -55,10 +56,31 @@ export type DashboardWindow = {
   newCustomerOnly: boolean;
   /** 올린 서비스(메뉴 순서)와 할인율 */
   menus: { name: string; discountRate: number }[];
+  /** 원장님이 마감했을 때 손님이 결제 중이라 남긴 칸(시작 순). 결제가 끝나거나 칸이 닫히면 빠진다. 없으면 [] */
+  keptSlots: KeptSlotSummary[];
 };
 
 /** 대시보드 목록의 한 줄: 매물 또는 시간대 */
 export type DashboardEntry = DashboardSlot | DashboardWindow;
+
+/** 손님이 결제 중이라 남긴 칸에서 안내에 쓰는 값(마감 결과 closeSlotWindow의 keptSlots와 같은 모양) */
+export type KeptSlotSummary = Pick<KeptWindowSlot, 'startAt' | 'endAt' | 'menuName'>;
+
+/**
+ * 시간대를 마감할 때 손님이 결제 중이라 남긴 칸 안내(11/13 nnoinn 문구, #308, WINDOW-06). 남긴 칸이 없으면 null.
+ * 칸은 받은 순서(시작 순)대로 쉼표로 잇고, 끝 시각은 다음 날이면 "(익일)"을 붙인다(formatEndTime).
+ * 예: "손님이 결제 중인 14:00~15:00(커트)은 결제가 끝날 때까지 남아 있어요. 결제하면 예약으로 남고, 결제하지 않으면 자동으로 닫혀요."
+ */
+export function keptSlotsNotice(kept: readonly KeptSlotSummary[]): string | null {
+  if (kept.length === 0) return null;
+  const times = kept
+    .map(
+      (slot) =>
+        `${formatKstTime(new Date(slot.startAt))}~${formatEndTime(slot.startAt, slot.endAt)}(${slot.menuName})`,
+    )
+    .join(', ');
+  return `손님이 결제 중인 ${times}은 결제가 끝날 때까지 남아 있어요. 결제하면 예약으로 남고, 결제하지 않으면 자동으로 닫혀요.`;
+}
 
 /** 대시보드 상태 필터 순서(상태 이름 6개, X-301) */
 export const DASHBOARD_STATUSES: readonly SlotStatus[] = [

@@ -126,6 +126,31 @@ describeDb('원장님 대시보드 조회 (실제 DB)', () => {
     });
   });
 
+  it('시간대 안에서 손님이 결제 중인 칸은 빼고 결제가 끝난 칸은 보인다. 원장님이 올린 매물은 결제 중이어도 보인다(WINDOW-08)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx);
+      const customer = await createTestCustomer(tx);
+      const windowId = await addWindow(tx, shop, '2026-11-01 13:00', '2026-11-01 18:00');
+      const hold = {
+        holdCustomerId: customer.customerId,
+        holdExpiresAt: kst('2026-11-01 09:10'),
+      };
+      await tx.insert(slots).values([
+        // 원장님이 올린 매물: 손님이 결제 중이어도 보인다("다른 고객이 결제 중" 배지)
+        testSlot(shop, '09:00', '10:00', hold),
+        // 시간대 안: 결제 중인 칸은 빠지고, 결제가 끝난 칸(예약됨)은 보인다
+        testSlot(shop, '13:00', '14:00', { windowId, ...hold }),
+        testSlot(shop, '15:00', '16:00', { windowId, status: 'reserved' }),
+      ]);
+
+      const rows = await selectDashboardSlots(tx, shop.shopId, from);
+      expect(rows.map((row) => [row.startAt, row.status, row.windowId])).toEqual([
+        [kst('2026-11-01 09:00').toISOString(), 'published', null],
+        [kst('2026-11-01 15:00').toISOString(), 'reserved', windowId],
+      ]);
+    });
+  });
+
   it('재등록한 취소 매물은 새 매물 id를 같이 주고, 줄은 한 번씩만 나온다(O13)', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
@@ -209,6 +234,58 @@ describeDb('원장님 대시보드 조회 (실제 DB)', () => {
 
       const rows = await selectDashboardWindows(tx, shop.shopId, from, kst('2026-11-01 10:30'));
       expect(rows.map((row) => row.state)).toEqual(['full', 'scheduled']);
+    });
+  });
+
+  it('마감한 시간대에는 손님이 결제 중이라 남긴 칸을 시작 순서로 같이 준다. 열린 시간대의 결제 중인 칸, 닫힌 칸, 예약된 칸은 넣지 않는다(WINDOW-06)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx);
+      const customer = await createTestCustomer(tx);
+      const closedId = await addWindow(tx, shop, '2026-11-01 10:00', '2026-11-01 15:00', {
+        status: 'closed',
+        closedAt: kst('2026-11-01 09:00'),
+        closeReason: 'mistake',
+      });
+      const openId = await addWindow(tx, shop, '2026-11-01 16:00', '2026-11-01 18:00');
+      const hold = {
+        holdCustomerId: customer.customerId,
+        holdExpiresAt: kst('2026-11-01 09:10'),
+      };
+      await tx.insert(slots).values([
+        // 마감한 시간대: 결제 중인 두 칸은 남긴 칸(시작 순으로 나와야 해서 늦은 칸을 먼저 넣는다)
+        testSlot(shop, '13:00', '14:00', { windowId: closedId, ...hold, menuName: '펌' }),
+        testSlot(shop, '10:00', '11:00', { windowId: closedId, ...hold }),
+        // 결제 없이 닫힌 칸과 예약된 칸은 남긴 칸이 아니다
+        testSlot(shop, '11:00', '12:00', {
+          windowId: closedId,
+          status: 'closed',
+          closedAt: kst('2026-11-01 09:00'),
+          closeReason: 'hold_released',
+        }),
+        testSlot(shop, '12:00', '13:00', { windowId: closedId, status: 'reserved' }),
+        // 열린 시간대에서 손님이 결제 중인 칸은 마감 때 남긴 칸이 아니다
+        testSlot(shop, '16:00', '17:00', { windowId: openId, ...hold }),
+      ]);
+
+      const rows = await selectDashboardWindows(tx, shop.shopId, from, kst('2026-11-01 09:05'));
+      expect(rows.map((row) => [row.id, row.keptSlots])).toEqual([
+        [
+          closedId,
+          [
+            {
+              startAt: kst('2026-11-01 10:00').toISOString(),
+              endAt: kst('2026-11-01 11:00').toISOString(),
+              menuName: '커트',
+            },
+            {
+              startAt: kst('2026-11-01 13:00').toISOString(),
+              endAt: kst('2026-11-01 14:00').toISOString(),
+              menuName: '펌',
+            },
+          ],
+        ],
+        [openId, []],
+      ]);
     });
   });
 

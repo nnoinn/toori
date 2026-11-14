@@ -23,6 +23,8 @@ export const SHOP_IMAGE_ERRORS = {
   NOT_FOUND: '사진을 찾을 수 없어요. 새로고침해 주세요',
   STYLE_LIMIT: `스타일 사진은 ${SHOP_IMAGE_LIMITS.style}장까지 올릴 수 있어요`,
   MENU_NOT_FOUND: '메뉴를 다시 골라 주세요',
+  ORDER_CHANGED:
+    '그사이 스타일 사진이 바뀌어서 순서를 저장하지 못했어요. 지금 사진에서 다시 옮겨 주세요',
 } as const;
 
 /** 올린 사진 정보 저장 입력. 경로가 내 샵 폴더인지는 서버가 assertShopImagePath로 따로 확인한다 */

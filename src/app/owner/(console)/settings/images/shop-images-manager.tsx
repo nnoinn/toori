@@ -2,14 +2,16 @@
 
 // 대표 사진·스타일 사진 올리기·바꾸기·순서 바꾸기·지우기·메뉴 연결 (O6, S-104, #23 D6·D16).
 // 올리기: 브라우저에서 줄이기 → 업로드 주소 받기(createShopImageUploadUrl) → Storage에 직접 올리기 → 정보 저장(saveShopImage)
+// 스타일 사진 순서는 사진 아래 손잡이를 끌어서 바꾼다(#358 2번, 공통 UI SortableList의 여러 칸 모양). 놓으면 바로 저장한다.
 
-import { useRef, useState, useTransition } from 'react';
+import { useOptimistic, useRef, useState, useTransition } from 'react';
 import { cn } from 'cn';
 import Image from 'next/image';
-import { ArrowLeft, ArrowRight, ImageOff, ImagePlus } from 'lucide-react';
+import { ImageOff, ImagePlus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SortableList } from '@/components/ui/sortable-list';
 import {
   Dialog,
   DialogContent,
@@ -22,7 +24,7 @@ import { UPLOAD_ALLOWED_TYPES, UPLOAD_MAX_BYTES } from '@/server/policy';
 import { uploadToSignedUrl } from '@/server/storage/browser';
 import { createShopImageUploadUrl } from '@/server/storage/upload';
 
-import { deleteShopImage, moveShopImage, saveShopImage, setShopImageMenu } from './actions';
+import { deleteShopImage, reorderStyleImages, saveShopImage, setShopImageMenu } from './actions';
 import { isAllowedImageType, resizeImage } from './resize-image';
 import { SHOP_IMAGE_KIND_LABELS, SHOP_IMAGE_LIMITS } from './shop-images';
 
@@ -44,6 +46,8 @@ export function ShopImagesManager({
   const main = images.find((image) => image.kind === 'main') ?? null;
   const styles = images.filter((image) => image.kind === 'style');
   const styleLeft = SHOP_IMAGE_LIMITS.style - styles.length;
+  // 끌어 놓은 순서를 저장하는 동안 먼저 보여준다. 실패하면 원래 순서(styles)로 저절로 돌아간다
+  const [orderedStyles, setOrderedStyles] = useOptimistic(styles);
 
   const mainInput = useRef<HTMLInputElement>(null);
   const styleInput = useRef<HTMLInputElement>(null);
@@ -118,6 +122,18 @@ export function ShopImagesManager({
     });
   }
 
+  /** 손잡이를 끌어 놓은 순서를 바로 보여주고 저장한다 */
+  function reorder(imageIds: string[]) {
+    const byId = new Map(styles.map((image) => [image.id, image]));
+    run(async () => {
+      setOrderedStyles(imageIds.flatMap((id) => byId.get(id) ?? []));
+      return reorderStyleImages(shopId, imageIds);
+    });
+  }
+
+  /** 화면에 보이는 자리(1부터). 사진 이름·손잡이 이름표에 쓴다 */
+  const placeOf = (image: ImageItem) => orderedStyles.indexOf(image) + 1;
+
   return (
     <div className="flex flex-col gap-4">
       {/* 파일 고르기 칸은 숨기고 버튼으로 연다. 같은 파일을 다시 골라도 열리게 고른 뒤 값을 비운다 */}
@@ -191,8 +207,9 @@ export function ShopImagesManager({
               {SHOP_IMAGE_KIND_LABELS.style} {styles.length}/{SHOP_IMAGE_LIMITS.style}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              시술 결과 사진이에요. 상세 화면에서 대표 사진 다음에 이 순서대로 나와요. 메뉴를 골라
-              두면 어떤 메뉴의 사진인지 함께 보여줄 수 있어요(고르지 않아도 돼요).
+              시술 결과 사진이에요. 상세 화면에서 대표 사진 다음에 이 순서대로 나와요. 사진 아래
+              손잡이를 끌어서 순서를 바꿔요. 메뉴를 골라 두면 어떤 메뉴의 사진인지 함께 보여줄 수
+              있어요(고르지 않아도 돼요).
             </p>
           </div>
           <Button
@@ -210,30 +227,24 @@ export function ShopImagesManager({
               아직 스타일 사진이 없어요. 여러 장을 한 번에 골라 올릴 수 있어요.
             </p>
           ) : (
-            <ul className="grid grid-cols-3 gap-4">
-              {styles.map((image, index) => (
-                <li key={image.id} className="flex flex-col gap-2">
-                  <Photo url={image.url} alt={`${SHOP_IMAGE_KIND_LABELS.style} ${index + 1}`} />
+            <SortableList
+              layout="grid"
+              items={orderedStyles}
+              getId={(image) => image.id}
+              getName={(image) => `${placeOf(image)}번째 사진`}
+              onReorder={reorder}
+              disabled={busy}
+              className="grid-cols-3 gap-4"
+              renderItem={(image, handle) => (
+                // 끄는 사진이 다른 사진 위로 지나가도 비쳐 보이지 않게 카드 바탕색을 깐다
+                <div className="flex flex-col gap-2 bg-card">
+                  <Photo
+                    url={image.url}
+                    alt={`${SHOP_IMAGE_KIND_LABELS.style} ${placeOf(image)}`}
+                  />
                   <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`${index + 1}번째 사진 앞으로`}
-                      disabled={busy || index === 0}
-                      onClick={() => run(() => moveShopImage(shopId, image.id, 'up'))}
-                    >
-                      <ArrowLeft />
-                    </Button>
-                    <span className="text-xs text-muted-foreground">{index + 1}번째</span>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`${index + 1}번째 사진 뒤로`}
-                      disabled={busy || index === styles.length - 1}
-                      onClick={() => run(() => moveShopImage(shopId, image.id, 'down'))}
-                    >
-                      <ArrowRight />
-                    </Button>
+                    {handle}
+                    <span className="text-xs text-muted-foreground">{placeOf(image)}번째</span>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -245,7 +256,7 @@ export function ShopImagesManager({
                     </Button>
                   </div>
                   <select
-                    aria-label={`${index + 1}번째 사진 메뉴`}
+                    aria-label={`${placeOf(image)}번째 사진 메뉴`}
                     value={image.menuId ?? NO_MENU}
                     disabled={busy}
                     onChange={(event) =>
@@ -263,9 +274,9 @@ export function ShopImagesManager({
                         </option>
                       ))}
                   </select>
-                </li>
-              ))}
-            </ul>
+                </div>
+              )}
+            />
           )}
         </CardContent>
       </Card>

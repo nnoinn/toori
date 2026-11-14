@@ -16,7 +16,7 @@ import {
 import type { MenuValues } from './menu';
 import {
   insertMenu,
-  moveMenu,
+  saveMenuOrder,
   selectMenu,
   selectMenus,
   selectShopCategory,
@@ -80,7 +80,9 @@ describeDb('메뉴·가격표 (실제 DB)', () => {
       const other = await createTestShop(tx);
       expect(await updateMenu(tx, mine.shopId, other.menuId, values())).toBe(false);
       expect(await setMenuHidden(tx, mine.shopId, other.menuId, true, now)).toBe(false);
-      expect(await moveMenu(tx, mine.shopId, other.menuId, 'up')).toBe(false);
+      // 내 메뉴 대신, 또는 내 메뉴와 같이 다른 샵 메뉴를 넣은 순서는 저장하지 않는다
+      expect(await saveMenuOrder(tx, mine.shopId, [other.menuId])).toBe(false);
+      expect(await saveMenuOrder(tx, mine.shopId, [other.menuId, mine.menuId])).toBe(false);
       expect(await selectMenu(tx, mine.shopId, other.menuId)).toBeNull();
       expect(await names(tx, other.shopId)).toEqual(['커트']);
     });
@@ -104,22 +106,22 @@ describeDb('메뉴·가격표 (실제 DB)', () => {
     });
   });
 
-  it('보이는 메뉴를 한 칸씩 옮기고, 맨 위·맨 아래에서는 그대로다', async () => {
+  it('보이는 메뉴를 끌어 놓은 전체 순서대로 저장하고, 보이는 메뉴와 다르면 바꾸지 않는다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
       const perm = await insertMenu(tx, shop.shopId, values({ name: '펌' }));
       const color = await insertMenu(tx, shop.shopId, values({ name: '염색' }));
 
-      expect(await moveMenu(tx, shop.shopId, color, 'up')).toBe(true);
-      expect(await names(tx, shop.shopId)).toEqual(['커트', '염색', '펌']);
-      expect(await moveMenu(tx, shop.shopId, shop.menuId, 'down')).toBe(true);
+      expect(await saveMenuOrder(tx, shop.shopId, [color, shop.menuId, perm])).toBe(true);
       expect(await names(tx, shop.shopId)).toEqual(['염색', '커트', '펌']);
-      expect(await moveMenu(tx, shop.shopId, perm, 'down')).toBe(true);
-      expect(await names(tx, shop.shopId)).toEqual(['염색', '커트', '펌']);
+      expect(await saveMenuOrder(tx, shop.shopId, [perm, color, shop.menuId])).toBe(true);
+      expect(await names(tx, shop.shopId)).toEqual(['펌', '염색', '커트']);
 
-      // 숨긴 메뉴는 옮기지 않는다
+      // 숨긴 메뉴가 섞이거나(다른 창에서 숨김) 보이는 메뉴가 빠지면(다른 창에서 더함) 그대로다
       await setMenuHidden(tx, shop.shopId, perm, true, now);
-      expect(await moveMenu(tx, shop.shopId, perm, 'up')).toBe(false);
+      expect(await saveMenuOrder(tx, shop.shopId, [shop.menuId, perm, color])).toBe(false);
+      expect(await saveMenuOrder(tx, shop.shopId, [shop.menuId])).toBe(false);
+      expect(await names(tx, shop.shopId)).toEqual(['염색', '커트', '펌(숨김)']);
     });
   });
 });

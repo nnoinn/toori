@@ -1,9 +1,10 @@
 'use client';
 
 // 메뉴 목록·추가·수정·숨김·순서 바꾸기 (O3, S-106). 저장 전에 화면에서 한 번 검사하고, 서버 함수가 다시 검사한다.
+// 순서는 줄 왼쪽 손잡이를 끌어서 바꾼다(#358 2번, 공통 UI SortableList). 놓으면 바로 저장한다.
 
-import { useState, useTransition } from 'react';
-import { ArrowDown, ArrowUp, Plus } from 'lucide-react';
+import { useOptimistic, useState, useTransition } from 'react';
+import { Plus } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { SortableList } from '@/components/ui/sortable-list';
 import { EmptyState } from '@/components/ui/state';
 import { Textarea } from '@/components/ui/textarea';
 import { formatDuration, formatWon } from '@/lib/format';
@@ -23,7 +25,7 @@ import { serviceTypeLabel, serviceTypesOf, type ShopCategory } from '@/server/po
 
 import { fieldA11y, FormField, NATIVE_SELECT_CLASS } from '../../../form-field';
 import { ChoiceChips } from '../../choice-chips';
-import { moveMenu, saveMenu, setMenuHidden } from './actions';
+import { reorderMenus, saveMenu, setMenuHidden } from './actions';
 import {
   MENU_DURATION_OPTIONS,
   MENU_LIMITS,
@@ -52,6 +54,9 @@ export function MenuManager({
 
   const visible = menus.filter((menu) => !menu.hidden);
   const hidden = menus.filter((menu) => menu.hidden);
+  // 끌어 놓은 순서를 저장하는 동안 먼저 보여준다. 저장이 끝나면 서버가 새로 그린 목록으로,
+  // 실패하면 원래 목록(visible)으로 저절로 돌아간다
+  const [ordered, setOrdered] = useOptimistic(visible);
 
   /** [메뉴 추가]: 업종의 첫 서비스 종류, 소요 시간 60분으로 빈 창을 연다 */
   function openNew() {
@@ -85,7 +90,7 @@ export function MenuManager({
     });
   }
 
-  /** 숨김·순서 바꾸기. 실패하면 문구를 보여준다 */
+  /** 숨기기·다시 보이기. 실패하면 문구를 보여준다 */
   function run(action: () => Promise<{ ok: boolean; error?: { message: string } }>) {
     setMessage(null);
     startTransition(async () => {
@@ -94,10 +99,26 @@ export function MenuManager({
     });
   }
 
+  /** 손잡이를 끌어 놓은 순서를 바로 보여주고 저장한다 */
+  function reorder(menuIds: string[]) {
+    const byId = new Map(visible.map((menu) => [menu.id, menu]));
+    run(async () => {
+      setOrdered(menuIds.flatMap((id) => byId.get(id) ?? []));
+      return reorderMenus(shopId, menuIds);
+    });
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold">메뉴 {visible.length}개</h2>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="font-semibold">메뉴 {visible.length}개</h2>
+          {visible.length > 1 ? (
+            <p className="text-sm text-muted-foreground">
+              줄 왼쪽 손잡이를 위아래로 끌어서 순서를 바꿔요
+            </p>
+          ) : null}
+        </div>
         <Button size="lg" onClick={openNew}>
           <Plus aria-hidden />
           메뉴 추가
@@ -120,31 +141,17 @@ export function MenuManager({
         </Card>
       ) : (
         <Card className="gap-0 py-0">
-          <ul className="divide-y">
-            {visible.map((menu, index) => (
-              <li key={menu.id} className="flex items-center gap-3 px-4 py-3">
-                {/* 순서 버튼은 [수정]·[숨기기]와 같은 크기(32px) 테두리 버튼으로 나란히 둔다(#23 B3).
-                    세로로 쌓으면 줄이 너무 높아진다 */}
-                <div className="flex shrink-0 gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    aria-label={`${menu.name} 위로`}
-                    disabled={pending || index === 0}
-                    onClick={() => run(() => moveMenu(shopId, menu.id, 'up'))}
-                  >
-                    <ArrowUp />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    aria-label={`${menu.name} 아래로`}
-                    disabled={pending || index === visible.length - 1}
-                    onClick={() => run(() => moveMenu(shopId, menu.id, 'down'))}
-                  >
-                    <ArrowDown />
-                  </Button>
-                </div>
+          {/* 끄는 줄이 다른 줄 위로 지나가도 비쳐 보이지 않게 줄마다 카드 바탕색을 깐다 */}
+          <SortableList
+            items={ordered}
+            getId={(menu) => menu.id}
+            getName={(menu) => menu.name}
+            onReorder={reorder}
+            disabled={pending}
+            className="gap-0 divide-y"
+            renderItem={(menu, handle) => (
+              <div className="flex items-center gap-3 bg-card px-4 py-3">
+                {handle}
                 <MenuSummary menu={menu} />
                 <Button variant="outline" onClick={() => openEdit(menu)} disabled={pending}>
                   수정
@@ -157,9 +164,9 @@ export function MenuManager({
                 >
                   숨기기
                 </Button>
-              </li>
-            ))}
-          </ul>
+              </div>
+            )}
+          />
         </Card>
       )}
 
