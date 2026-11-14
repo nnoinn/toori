@@ -13,7 +13,7 @@ export default function SlotNotFound() {
         title="매물을 찾을 수 없어요"
         description="이미 끝났거나 지금은 볼 수 없는 매물이에요."
         action={
-          <Link href="/home/list" className={buttonVariants()}>
+          <Link href="/home/list" className={buttonVariants({ className: 'max-md:h-10' })}>
             매물 목록 보기
           </Link>
         }

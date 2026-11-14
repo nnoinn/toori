@@ -49,7 +49,7 @@ async function FavoritesContent() {
           title="아직 찜한 샵이 없어요"
           description="매물을 보다가 샵 정보의 '찜'을 누르면 그 샵의 매물을 여기서 모아 볼 수 있어요."
           action={
-            <Link href="/home/list" className={buttonVariants()}>
+            <Link href="/home/list" className={buttonVariants({ className: 'max-md:h-10' })}>
               매물 목록 보기
             </Link>
           }

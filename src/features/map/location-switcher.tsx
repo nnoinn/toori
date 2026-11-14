@@ -42,7 +42,13 @@ export function LocationSwitcher({ label, selectedCode }: LocationSwitcherProps)
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button type="button" variant="ghost" size="lg" className="gap-1 px-2 text-lg font-bold">
+        {/* 폰: 누르는 칸 40px(PC는 36px 그대로) */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="lg"
+          className="gap-1 px-2 text-lg font-bold max-md:h-10"
+        >
           {label}
           <ChevronDown aria-hidden />
         </Button>

@@ -49,7 +49,8 @@ function Chip({
     <Button
       type="button"
       variant={selected ? 'default' : 'outline'}
-      className="h-9 rounded-full px-4"
+      // 폰: 누르는 칸 40px(PC는 36px 그대로)
+      className="h-9 rounded-full px-4 max-md:h-10"
       aria-pressed={selected}
       onClick={onClick}
     >
@@ -195,7 +196,7 @@ export function FilterSheet({ filters }: { filters: HomeFilters }) {
   }
 
   const trigger = (
-    <Button type="button" variant="ghost" size="lg" className="gap-1 px-2">
+    <Button type="button" variant="ghost" size="lg" className="gap-1 px-2 max-md:h-10">
       <SlidersHorizontal aria-hidden />
       필터
       {activeCount > 0 ? (

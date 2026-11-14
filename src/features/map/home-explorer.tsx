@@ -176,7 +176,13 @@ export function HomeExplorer({ center, myLocation, header, sort, serverNow }: Ho
               className="mx-4 mb-2 flex items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2 text-sm"
             >
               <span>{home.refreshError}</span>
-              <Button type="button" variant="outline" size="sm" onClick={home.retry}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="max-md:h-10"
+                onClick={home.retry}
+              >
                 다시 시도
               </Button>
             </div>

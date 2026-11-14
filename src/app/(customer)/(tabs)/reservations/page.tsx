@@ -78,7 +78,7 @@ async function ReservationsContent({ searchParams }: { searchParams: SearchParam
         <EmptyState
           title={EMPTY_TEXT[tab]}
           action={
-            <Link href={CUSTOMER_HOME} className={buttonVariants()}>
+            <Link href={CUSTOMER_HOME} className={buttonVariants({ className: 'max-md:h-10' })}>
               매물 보러 가기
             </Link>
           }
