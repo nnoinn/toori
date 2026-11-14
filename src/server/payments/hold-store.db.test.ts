@@ -54,7 +54,7 @@ describeDb('10분 홀딩 저장 (실제 DB)', () => {
     });
   });
 
-  it('게시 시각이 지난 예약대기 매물도 게시중이라 홀딩된다', async () => {
+  it('게시 시각이 지난 게시예정 매물도 게시중이라 홀딩된다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
       const { customerId } = await createTestCustomer(tx);
@@ -64,7 +64,7 @@ describeDb('10분 홀딩 저장 (실제 DB)', () => {
   });
 
   it.each<[string, string, string, Record<string, unknown>]>([
-    ['게시 전 예약대기', '10:00', '11:00', { status: 'scheduled', publishAt: at(60) }],
+    ['게시 전 게시예정', '10:00', '11:00', { status: 'scheduled', publishAt: at(60) }],
     ['예약됨', '10:00', '11:00', { status: 'reserved' }],
     [
       '원장님 마감',

@@ -120,7 +120,7 @@ describeDb('시간대 매물 원장님 저장·지난 설정·마감 (실제 DB)
     });
   });
 
-  it('같은 샵의 예약대기·게시중·예약됨 매물이나 시간대와 겹치면 slot_windows_no_overlap으로 막는다(마감한 시간대는 괜찮다)', async () => {
+  it('같은 샵의 게시예정·게시중·예약됨 매물이나 시간대와 겹치면 slot_windows_no_overlap으로 막는다(마감한 시간대는 괜찮다)', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
       const other = await createTestShop(tx, { status: 'approved' });

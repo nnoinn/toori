@@ -31,14 +31,8 @@ export function OwnerNav({ canCreateSlot = true }: OwnerNavProps) {
         { href: '/owner/settings', label: '매장 설정', icon: Store },
         // 로그인 계정, 이 기기 알림(O12), 고객센터, 로그아웃(#307)
         { href: '/owner/account', label: '내 계정', icon: UserRound },
-        // 정산 내역(O15)을 만들면 locked를 지운다
-        {
-          href: '/owner/settlements',
-          label: '정산',
-          icon: Wallet,
-          locked: true,
-          lockedReason: '준비 중이에요',
-        },
+        // 정산 내역(O15, S-502). 정산서(S-501)도 같은 화면에 더한다
+        { href: '/owner/settlements', label: '정산', icon: Wallet },
       ]}
       footer={<OwnerSignOutButton />}
     />
