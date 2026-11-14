@@ -27,6 +27,10 @@ export const SORTABLE_ROLE_DESCRIPTION = '끌어서 순서 바꾸기';
 export const SORTABLE_INSTRUCTIONS =
   '순서를 바꾸려면 스페이스나 엔터를 누른 뒤 위·아래 화살표로 옮기고, 다시 스페이스나 엔터로 놓아요. Esc를 누르면 그만둬요';
 
+/** 여러 칸(layout="grid", 예: 사진)일 때 키보드 사용법. 위·아래뿐 아니라 왼쪽·오른쪽으로도 옮긴다 */
+export const SORTABLE_GRID_INSTRUCTIONS =
+  '순서를 바꾸려면 스페이스나 엔터를 누른 뒤 화살표로 옮기고, 다시 스페이스나 엔터로 놓아요. Esc를 누르면 그만둬요';
+
 /** 줄 이름과 자리(1부터). total은 전체 줄 수 */
 type Place = { name: string; position: number; total: number };
 

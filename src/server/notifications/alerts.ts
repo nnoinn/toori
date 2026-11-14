@@ -8,7 +8,7 @@ import { after } from 'next/server';
 
 import type { getDb } from '@/db';
 import { customers, orders, owners, reservations, shops, slots, slotWindows } from '@/db/schema';
-import { formatKst, formatKstTime } from '@/lib/time';
+import { formatEndTime, formatKst } from '@/lib/time';
 import { readReleasedKeptSlots } from '@/server/slot-windows/store';
 
 import { notify } from './notify';
@@ -100,7 +100,7 @@ export function notifyKeptWindowSlotsReleased(db: Db, slotIds: readonly string[]
           event,
           dedupeKey: `${event}:owner:${slot.slotId}`,
           title: '마감한 시간대의 남은 칸도 닫았어요',
-          body: `결제가 끝나지 않아 ${formatKst(slot.startAt)}~${formatKstTime(slot.endAt)}(${slot.menuName})도 닫았어요`,
+          body: `결제가 끝나지 않아 ${formatKst(slot.startAt)}~${formatEndTime(slot.startAt, slot.endAt)}(${slot.menuName})도 닫았어요`,
           url: '/owner',
         }),
       ),
