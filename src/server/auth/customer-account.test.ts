@@ -90,6 +90,7 @@ describe('createCustomerAccount', () => {
     ).rejects.toThrow('redirect:/slots/a');
     expect(state.saveCustomerAccount).toHaveBeenCalledWith('tx', {
       userId: 'user-1',
+      name: '김투리',
       nickname: '김투리',
       phone: PHONE,
       optionalTerms: ['marketing'],
@@ -108,6 +109,7 @@ describe('createCustomerAccount', () => {
     ).rejects.toThrow('redirect:/');
     expect(state.saveCustomerAccount).toHaveBeenCalledWith('tx', {
       userId: 'user-1',
+      name: '고객',
       nickname: '고객',
       phone: PHONE,
       optionalTerms: [],
@@ -175,6 +177,55 @@ describe('createCustomerAccount', () => {
     } as never);
     expect(result.ok === false && result.error.code).toBe('PHONE_REQUIRED');
     expect(state.saveCustomerAccount).not.toHaveBeenCalled();
+  });
+
+  it('이름을 보내면 앞뒤 공백을 빼고 예약자 이름으로 저장하고, 닉네임은 프로필 이름 그대로다(#375)', async () => {
+    await expect(
+      createCustomerAccount({
+        agreements: { ...ALL_REQUIRED, marketing: false },
+        phone: PHONE,
+        name: '  강투리  ',
+      }),
+    ).rejects.toThrow('redirect:/');
+    expect(state.saveCustomerAccount).toHaveBeenCalledWith('tx', {
+      userId: 'user-1',
+      name: '강투리',
+      nickname: '김투리',
+      phone: PHONE,
+      optionalTerms: [],
+    });
+  });
+
+  it.each(['', '   '])('이름을 비우면("%s") NAME_REQUIRED이고 저장하지 않는다', async (name) => {
+    const result = await createCustomerAccount({
+      agreements: { ...ALL_REQUIRED, marketing: false },
+      phone: PHONE,
+      name,
+    });
+    expect(result).toEqual(fail('NAME_REQUIRED', '이름을 입력해 주세요'));
+    expect(state.saveCustomerAccount).not.toHaveBeenCalled();
+  });
+
+  it('이름은 앞뒤 공백을 빼고 30자까지, 31자면 INVALID_INPUT이고 저장하지 않는다(#375)', async () => {
+    const tooLong = await createCustomerAccount({
+      agreements: { ...ALL_REQUIRED, marketing: false },
+      phone: PHONE,
+      name: '가'.repeat(31),
+    });
+    expect(tooLong).toEqual(fail('INVALID_INPUT', '이름은 30자까지 쓸 수 있어요'));
+    expect(state.saveCustomerAccount).not.toHaveBeenCalled();
+
+    await expect(
+      createCustomerAccount({
+        agreements: { ...ALL_REQUIRED, marketing: false },
+        phone: PHONE,
+        name: ` ${'가'.repeat(30)} `,
+      }),
+    ).rejects.toThrow('redirect:/');
+    expect(state.saveCustomerAccount).toHaveBeenCalledWith(
+      'tx',
+      expect.objectContaining({ name: '가'.repeat(30) }),
+    );
   });
 
   it('입력 모양이 틀리면 INVALID_INPUT', async () => {

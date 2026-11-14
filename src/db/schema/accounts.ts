@@ -46,6 +46,10 @@ export const customers = pgTable('customers', {
     .notNull()
     .unique('customers_user_id_unique')
     .references(() => profiles.id),
+  // 예약자 이름(#375, 11/13 nnoinn). 가입 화면에서 받고 내 정보에서 고친다(앞뒤 공백 빼고 1~30자, 계정 확인 함수에서 검사).
+  // 예약한 샵에는 이름과 휴대폰 번호만 주고 닉네임은 주지 않는다. 0015 전에 있던 계정은 닉네임으로 채웠다
+  name: text().notNull(),
+  // 투리 안에서만 쓰는 이름(내 정보, 운영자 회원 목록 둘째 칸)
   nickname: text().notNull(),
   // 예약 확인·노쇼 연락용. 인증 없이 형식만 검사하고, 예약 전에 꼭 입력받는다
   phone: text(),
