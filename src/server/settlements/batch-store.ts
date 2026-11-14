@@ -3,31 +3,32 @@
 
 import 'server-only';
 
-import { and, asc, desc, eq, inArray, isNull, lt, notExists, or, sql } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
+import { and, asc, desc, eq, isNull, lt, not, notExists, or, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import {
   orders,
   ownerPenalties,
   penaltyCollections,
-  refunds,
   reservations,
   settlementItems,
   settlements,
   slots,
 } from '@/db/schema';
-import type { CancelActor, ReservationStatus, VisitResult } from '@/db/schema/payments';
-import { hasOpenDispute } from '@/server/disputes/conditions';
+import { disputeHandledSince, hasOpenDispute } from '@/server/disputes/conditions';
 
 import type { ShopSettlementDraft } from './batch-rules';
 import type { OutstandingPenalty } from './calc-settlement';
+import {
+  cancelRefund,
+  cancelRefundJoin,
+  narrowSettleTarget,
+  settleableReservation,
+  settleTargetColumns,
+} from './settle-query';
 import type { SettleTarget } from './settle-rules';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select' | 'insert' | 'update'>;
-
-/** 고객 취소·합의 후 취소의 끝난 환불 기록(한 예약에 하나, refunds_cancel_unique) */
-const cancelRefund = alias(refunds, 'cancel_refund');
 
 /** 묶기 후보 하나: 아직 정산 줄이 없는 끝난 예약과 정산 규칙에 필요한 값 */
 export type BatchCandidate = SettleTarget & {
@@ -40,8 +41,9 @@ export type BatchCandidate = SettleTarget & {
 };
 
 /**
- * 묶기 후보: 모든 샵의 끝난 예약(이용 완료·취소) 중 아직 정산 줄이 없고, 방문·노쇼 처리나 취소가 cutoff 전인 것.
- * 정산할 거래인지(종류·기한·보류)는 부른 쪽이 정산 규칙으로 고른다
+ * 묶기 후보: 모든 샵의 정산할 수 있는 끝난 예약(settleableReservation: 이용 완료이거나 끝난 고객 취소·합의 후 취소) 중
+ * 아직 정산 줄이 없고, 방문·노쇼 처리나 취소가 cutoff 전이고, cutoff 뒤에 결론이 난 이의제기가 없는 것.
+ * 기한·보류는 부른 쪽이 정산 규칙으로 한 번 더 고른다(SQL과 규칙이 같은 조건이라 규칙에서 빠지는 줄은 없어야 한다)
  */
 export async function readBatchCandidates(
   db: Pick<ReturnType<typeof getDb>, 'select'>,
@@ -51,32 +53,22 @@ export async function readBatchCandidates(
     .select({
       shopId: slots.shopId,
       orderId: reservations.orderId,
-      status: reservations.status,
-      visitResult: reservations.visitResult,
-      visitRecordedAt: reservations.visitRecordedAt,
-      cancelledAt: reservations.cancelledAt,
-      cancelActor: reservations.cancelActor,
-      startAt: slots.startAt,
+      // 정산 규칙에 넘길 칸은 원장님 정산 내역과 같은 조각(#394 리뷰 1번)
+      ...settleTargetColumns,
       salePrice: slots.salePrice,
       discountRate: slots.discountRate,
       couponAmount: orders.couponAmount,
-      cancelPenaltyRate: cancelRefund.penaltyRate,
-      hasAdminRefund: sql<boolean>`exists (select 1 from ${refunds} where ${refunds.reservationId} = ${reservations.id} and ${refunds.reason} = 'admin_exception')`,
       hasOpenDispute: sql<boolean>`${hasOpenDispute(reservations.id)}`,
     })
     .from(reservations)
     .innerJoin(slots, eq(slots.id, reservations.slotId))
     .innerJoin(orders, eq(orders.id, reservations.orderId))
-    .leftJoin(
-      cancelRefund,
-      and(
-        eq(cancelRefund.reservationId, reservations.id),
-        inArray(cancelRefund.reason, ['customer_cancel', 'agreed_cancel']),
-        eq(cancelRefund.status, 'done'),
-      ),
-    )
+    .leftJoin(cancelRefund, cancelRefundJoin)
     .where(
       and(
+        settleableReservation,
+        // 지급일 기준 시각에 확인 중이었던 이의제기(그 뒤에 결론)는 그날 묶지 않는다
+        not(disputeHandledSince(reservations.id, input.cutoff)),
         or(
           and(eq(reservations.status, 'completed'), lt(reservations.visitRecordedAt, input.cutoff)),
           and(eq(reservations.status, 'cancelled'), lt(reservations.cancelledAt, input.cutoff)),
@@ -91,13 +83,7 @@ export async function readBatchCandidates(
     )
     .orderBy(asc(slots.shopId), asc(reservations.id));
 
-  return rows.map((row) => ({
-    ...row,
-    // DB의 check 제약이 정해진 값만 허용한다
-    status: row.status as ReservationStatus,
-    visitResult: row.visitResult as VisitResult | null,
-    cancelActor: row.cancelActor as CancelActor | null,
-  }));
+  return rows.map(narrowSettleTarget);
 }
 
 /** 그 샵의 직전 정산 지급일(가장 늦은 period_end). 없으면 null(첫 정산) */
