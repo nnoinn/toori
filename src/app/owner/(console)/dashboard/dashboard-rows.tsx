@@ -6,6 +6,8 @@
 // 예약이 있는 매물은 [상세](O11). 결제 중(홀딩)이면 [수정]·[마감]을 잠근다.
 // 시간대 매물(#308)은 WindowRow가 그린다: 시간·서비스·최대 할인율·상태와 [마감]. 시간대 안에서 손님이 만든 매물(windowId)은
 // "시간대 예약"으로 표시하고, 원장님이 올린 매물이 아니라서 [수정]·[마감]·[재등록]을 두지 않는다(취소되면 그 시간은 시간대에 저절로 다시 열린다).
+// 손님이 아직 결제 중인 시간대 칸은 매물 줄로 나오지 않는다(ownerListedSlot). 마감한 시간대에 그런 칸이 남아 있으면
+// 시간대 줄에 마감 창과 같은 안내(keptSlotsNotice)를 붙인다(WINDOW-06).
 
 import Link from 'next/link';
 import { ClipboardCheck } from 'lucide-react';
@@ -27,6 +29,7 @@ import { SLOT_STATUS_STYLE } from '../status-style';
 import {
   type DashboardSlot,
   type DashboardWindow,
+  keptSlotsNotice,
   onHold,
   SLOT_STATUS_LABELS,
   viewStatus,
@@ -170,7 +173,7 @@ function windowMenuSummary(menus: DashboardWindow['menus']): string {
 /**
  * 시간대 매물 한 줄(#308): 시간, "시간대 매물" 표시·서비스·최대 할인율(서비스별 할인율), 상태와 덧붙임(게시 시각·마감 사유), [마감].
  * 상태는 서버가 화면을 열 때 계산한 값이다. 남은 시간에 들어가는 서비스가 없으면(full) 게시중으로 두고 고객 목록에서 내려갔다고 알려 준다.
- * 안에서 들어온 예약은 매물 줄("시간대 예약")로 따로 나온다
+ * 안에서 들어온 예약은 매물 줄("시간대 예약")로 따로 나온다. 마감했는데 손님이 결제 중이라 남긴 칸이 있으면 그 안내를 붙인다
  */
 export function WindowRow({
   window,
@@ -181,6 +184,7 @@ export function WindowRow({
 }) {
   const status = WINDOW_VIEW_STATUS[window.state];
   const maxRate = Math.max(0, ...window.menus.map((menu) => menu.discountRate));
+  const keptNotice = keptSlotsNotice(window.keptSlots);
   return (
     <li className="flex items-center gap-4 px-4 py-3">
       <div className="w-36 shrink-0 text-sm">
@@ -205,6 +209,7 @@ export function WindowRow({
             남은 시간에 들어가는 서비스가 없어 고객 목록에서 내려갔어요
           </span>
         ) : null}
+        {keptNotice ? <span className="text-xs text-warning-foreground">{keptNotice}</span> : null}
         <SlotBadges kinds={window.newCustomerOnly ? ['newCustomerOnly'] : []} />
       </div>
       <div className="flex flex-col items-end gap-1">
