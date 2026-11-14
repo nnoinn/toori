@@ -36,6 +36,7 @@ const DETAIL: MyReservationDetail = {
     lng: 126.8,
   },
   durationMinutes: 60,
+  booker: { name: '김투리', phone: '010-0000-0000' },
   payment: { salePrice: 20_000, couponAmount: 3_000, amount: 17_000, paidAt: null },
   refund: null,
 };

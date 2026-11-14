@@ -30,6 +30,7 @@ import { NO_SHOW_PENALTY_RATE, OWNER_FAULT_COUPON_AMOUNT, REFUND_BANDS } from '@
 
 import {
   BOOKER_INFO_REFUSAL_NOTE,
+  BOOKER_NAME_NOTE,
   bookerInfoConsentLabel,
   bookerInfoRows,
   HOLD_ENDED_HINT,
@@ -49,6 +50,8 @@ const PRICE_FAILED_MESSAGE = '금액을 다시 계산하지 못했어요. 잠시
 type CheckoutViewProps = {
   slot: SlotDetail;
   hold: MyHold;
+  /** 예약자 이름(#375). 예약한 샵에 알리는 이름이고 내 정보에서 고친다 */
+  bookerName: string;
   /** 저장된 연락처. 없으면 이 화면에서 받는다(C-401) */
   phone: string | null;
   /** 이 매물에 쓸 수 있는 쿠폰(할인 큰 순, 못 쓰는 쿠폰은 뒤에). 없으면 쿠폰 칸을 그리지 않는다(C-407) */
@@ -61,7 +64,7 @@ const isCouponFailure = (code: string) => code.startsWith('COUPON_');
 
 /**
  * 예약 확인 (J10, C-401·C-402·C-404).
- * 매물 요약, 쿠폰 고르기(C-407, 기본 쿠폰을 골라 둔 채로), 결제 금액(서버 계산), 연락처, 전체 환불 규정,
+ * 매물 요약, 쿠폰 고르기(C-407, 기본 쿠폰을 골라 둔 채로), 결제 금액(서버 계산), 예약자 이름(#375)·연락처, 전체 환불 규정,
  * 결제 버튼 바로 위 필수 동의 2개(동의 문구 3장).
  * 오른쪽 위 10분 타이머는 서버가 준 홀딩 만료 시각 기준이고, 끝나면 결제할 수 없다고 안내한다.
  * '취소'는 홀딩을 바로 푼다. 뒤로가기로 나가면 홀딩은 남아서 상세의 '결제 이어서 하기'로 돌아올 수 있다(D12)
@@ -69,6 +72,7 @@ const isCouponFailure = (code: string) => code.startsWith('COUPON_');
 export function CheckoutView({
   slot,
   hold,
+  bookerName,
   phone: savedPhone,
   coupons: initialCoupons,
   initialCoupon,
@@ -274,6 +278,8 @@ export function CheckoutView({
         </div>
       </dl>
 
+      <BookerName name={bookerName} />
+
       <PhoneField phone={phone} />
 
       <section
@@ -351,6 +357,17 @@ export function CheckoutView({
           </Button>
         </div>
       )}
+    </section>
+  );
+}
+
+/** 예약자 이름(#375). 예약한 샵에 이 이름과 연락처를 알린다. 이 화면에서는 보기만 하고 내 정보에서 고친다 */
+function BookerName({ name }: { name: string }) {
+  return (
+    <section className="flex flex-col gap-1.5" aria-label="예약자 이름">
+      <h2 className="text-sm font-semibold">예약자 이름</h2>
+      <p className="text-base break-words">{name}</p>
+      <p className="text-xs text-muted-foreground">{BOOKER_NAME_NOTE}</p>
     </section>
   );
 }

@@ -34,7 +34,7 @@ async function MyInfoContent() {
   const [account, [customer], noShows, consents, interest, coupons] = await Promise.all([
     getCurrentAccount(),
     getDb()
-      .select({ nickname: customers.nickname, phone: customers.phone })
+      .select({ name: customers.name, nickname: customers.nickname, phone: customers.phone })
       .from(customers)
       .where(eq(customers.id, customerId))
       .limit(1),
@@ -51,7 +51,11 @@ async function MyInfoContent() {
         {account?.email ? <p className="text-sm text-muted-foreground">{account.email}</p> : null}
       </div>
 
-      <ProfileForm nickname={customer?.nickname ?? ''} phone={customer?.phone ?? ''} />
+      <ProfileForm
+        name={customer?.name ?? ''}
+        nickname={customer?.nickname ?? ''}
+        phone={customer?.phone ?? ''}
+      />
 
       <NoShowRecord history={noShows} />
 

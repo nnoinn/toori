@@ -87,7 +87,8 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
         ['age14', 'location', 'privacy', 'service'].map((termsType) => ({
           accountType: 'customer',
           termsType,
-          version: 'draft-2026-10',
+          // 개인정보 동의는 수집 항목에 이름을 더해 버전을 올렸다(동의 문구 1-1, #375)
+          version: termsType === 'privacy' ? 'draft-2026-11' : 'draft-2026-10',
           withdrawnAt: null,
         })),
       );

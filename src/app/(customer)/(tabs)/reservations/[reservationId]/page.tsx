@@ -16,6 +16,7 @@ import { getAgreedCancelRequest } from '@/server/refunds/agreed-cancel';
 import { previewRefund } from '@/server/refunds/cancel';
 import { REFUND_ERRORS } from '@/server/refunds/errors';
 
+import { BOOKER_INFO_NOTE } from '../../me/profile-rules';
 import { formatDuration, kakaoDirectionsLink } from '../../slots/[slotId]/detail-format';
 import { NO_SHOW_DISPUTE_NOTE, noShowRefundNote } from '../no-show-texts';
 import { getMyReservationDetail } from '../queries';
@@ -148,6 +149,16 @@ async function DetailContent({ params }: { params: Params }) {
             {r.shop.phone}
           </a>
         ) : null}
+      </DetailCard>
+
+      {/* 예약한 샵이 받는 예약자 정보(#375, 11/13): 이름과 휴대폰 번호만. 지금 내 정보 값이다 */}
+      <DetailCard aria-label="예약자 정보">
+        <h3 className="font-semibold">예약자 정보</h3>
+        <dl className="flex flex-col gap-1">
+          <Row label="이름" value={<span className="break-words">{r.booker.name}</span>} />
+          <Row label="휴대폰 번호" value={r.booker.phone ?? '없음'} />
+        </dl>
+        <p className="text-xs text-muted-foreground">{BOOKER_INFO_NOTE}</p>
       </DetailCard>
 
       <DetailCard aria-label="결제 내역">

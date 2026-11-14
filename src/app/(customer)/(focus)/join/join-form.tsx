@@ -4,23 +4,25 @@ import { useId, useState, useTransition } from 'react';
 import { unstable_rethrow, useRouter } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 
+import { BOOKER_NAME_HELP } from '@/app/(customer)/(tabs)/me/profile-rules';
 import { BackButton } from '@/components/ui/back-button';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { isPhoneInputFull, normalizePhone, PHONE_FORMAT_MESSAGE } from '@/lib/phone';
 import { SITE_NAME } from '@/lib/site';
 import { createCustomerAccount } from '@/server/auth/customer-account';
+import { CUSTOMER_NAME_MAX_LENGTH, customerNameSchema } from '@/server/auth/customer-name';
 
 import {
   AGREEMENT_ITEMS,
   allChecked,
-  allRequiredChecked,
   EMPTY_AGREEMENTS,
-  toAgreementsInput,
   toggleAll,
   type AgreementState,
 } from './agreements';
+import { buildJoinRequest } from './join-request';
 
 const JOIN_FAILED_MESSAGE = '가입하지 못했어요. 잠시 후 다시 시도해 주세요.';
 
@@ -30,12 +32,17 @@ type JoinFormProps = {
 };
 
 /**
- * 첫 로그인 고객의 약관 동의와 휴대폰 번호 (C-104, J8). 주소: /join?next=... (D16)
+ * 첫 로그인 고객의 이름·휴대폰 번호와 약관 동의 (C-104, J8). 주소: /join?next=... (D16)
+ * 이름은 예약자 이름이라 필수다(#375, 11/13). 닉네임은 지금처럼 카카오·구글 프로필 이름으로 시작하고 내 정보에서 고친다.
  * 휴대폰 번호는 필수이고 문자 인증은 하지 않는다(11/2 결정, #183). 저장은 '시작하기'를 누를 때 가입과 함께 한다
  */
 export function JoinForm({ next }: JoinFormProps) {
+  const nameId = useId();
   const phoneId = useId();
   const [state, setState] = useState<AgreementState>(EMPTY_AGREEMENTS);
+  const [name, setName] = useState('');
+  // 칸을 벗어났는데 공백뿐이면 이유를 보여 준다. 다시 고치기 시작하면 지운다
+  const [nameError, setNameError] = useState<string | null>(null);
   const [phone, setPhone] = useState('');
   // 끝까지 쳤거나 칸을 벗어났는데 틀린 번호면 빨간 테두리. 다시 고치기 시작하면 지운다
   const [phoneInvalid, setPhoneInvalid] = useState(false);
@@ -43,8 +50,14 @@ export function JoinForm({ next }: JoinFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
-  const phoneToSave = normalizePhone(phone, 'mobile');
-  const canSubmit = allRequiredChecked(state) && phoneToSave !== null && !pending;
+  const request = buildJoinRequest({ agreements: state, name, phone, next });
+  const canSubmit = request !== null && !pending;
+
+  function checkName(value: string) {
+    if (value === '') return;
+    const checked = customerNameSchema.safeParse(value);
+    if (!checked.success) setNameError(checked.error.issues[0]?.message ?? null);
+  }
 
   function checkPhone(value: string) {
     if (value !== '' && !normalizePhone(value, 'mobile')) setPhoneInvalid(true);
@@ -57,15 +70,14 @@ export function JoinForm({ next }: JoinFormProps) {
   }
 
   function handleSubmit() {
-    const agreements = toAgreementsInput(state);
-    if (!agreements || !phoneToSave) return;
+    if (!request) return;
     setNotice(null);
     setError(null);
     startTransition(async () => {
       try {
         // 성공하면 서버가 next로 보내서 돌아오지 않는다(#47 4장)
-        // 휴대폰 번호는 가입과 함께 저장한다(#183, 강규민 #192). 서버도 같은 규칙으로 다시 확인한다
-        const result = await createCustomerAccount({ agreements, phone: phoneToSave, next });
+        // 이름(#375, 강규민 #409)과 휴대폰 번호(#183, 강규민 #192)는 가입과 함께 저장한다. 서버도 같은 규칙으로 다시 확인한다
+        const result = await createCustomerAccount(request);
         if (result.ok) return;
         // 다른 창에서 먼저 가입을 마친 경우. 이미 계정이 있으니 보던 화면으로 보낸다
         if (result.error.code === 'ALREADY_EXISTS') {
@@ -86,9 +98,39 @@ export function JoinForm({ next }: JoinFormProps) {
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold">{SITE_NAME} 이용을 위해 동의해 주세요</h1>
         <p className="text-sm text-muted-foreground">
-          휴대폰 번호를 입력하고 필수 항목에 모두 동의하면 시작할 수 있어요. 선택 항목은 동의하지
-          않아도 돼요.
+          이름과 휴대폰 번호를 입력하고 필수 항목에 모두 동의하면 시작할 수 있어요. 선택 항목은
+          동의하지 않아도 돼요.
         </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor={nameId}>
+          <span className="text-primary">[필수]</span> 이름
+        </Label>
+        <Input
+          id={nameId}
+          // 휴대폰 번호 칸과 같은 크기
+          className="h-11 text-base"
+          value={name}
+          maxLength={CUSTOMER_NAME_MAX_LENGTH}
+          autoComplete="name"
+          aria-describedby={`${nameId}-help`}
+          aria-invalid={nameError ? true : undefined}
+          onChange={(e) => {
+            setName(e.target.value);
+            setNameError(null);
+          }}
+          onBlur={() => checkName(name)}
+        />
+        {nameError ? (
+          <p id={`${nameId}-help`} role="alert" className="text-sm text-destructive">
+            {nameError}
+          </p>
+        ) : (
+          <p id={`${nameId}-help`} className="text-xs text-muted-foreground">
+            {BOOKER_NAME_HELP}
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col gap-2">

@@ -8,7 +8,15 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { getDb } from '@/db';
-import { agreedCancelRequests, orders, refunds, reservations, shops, slots } from '@/db/schema';
+import {
+  agreedCancelRequests,
+  customers,
+  orders,
+  refunds,
+  reservations,
+  shops,
+  slots,
+} from '@/db/schema';
 import type { ReservationStatus, VisitResult } from '@/db/schema/payments';
 import type { AgreedCancelRequestStatus } from '@/db/schema/refunds';
 import type { Result } from '@/lib/result';
@@ -63,6 +71,12 @@ export type MyReservationDetail = MyReservationItem & {
     lng: number;
   };
   durationMinutes: number;
+  /** 예약한 샵에 주는 예약자 정보(#375, 11/13): 이름과 휴대폰 번호만. 닉네임은 주지 않는다 */
+  booker: {
+    name: string;
+    /** 내 정보에서 지웠으면 null */
+    phone: string | null;
+  };
   payment: {
     salePrice: number;
     couponAmount: number;
@@ -175,11 +189,14 @@ export async function selectMyReservationDetail(
       couponAmount: orders.couponAmount,
       amount: orders.amount,
       paidAt: orders.paidAt,
+      bookerName: customers.name,
+      bookerPhone: customers.phone,
     })
     .from(reservations)
     .innerJoin(slots, eq(slots.id, reservations.slotId))
     .innerJoin(shops, eq(shops.id, slots.shopId))
     .innerJoin(orders, eq(orders.id, reservations.orderId))
+    .innerJoin(customers, eq(customers.id, reservations.customerId))
     .where(and(eq(reservations.id, reservationId), eq(reservations.customerId, customerId)))
     .limit(1);
   if (!row) return null;
@@ -217,6 +234,7 @@ export async function selectMyReservationDetail(
       lng: row.lng,
     },
     durationMinutes: row.durationMinutes,
+    booker: { name: row.bookerName, phone: row.bookerPhone },
     payment: {
       salePrice: row.salePrice,
       couponAmount: row.couponAmount,

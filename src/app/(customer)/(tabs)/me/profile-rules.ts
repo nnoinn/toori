@@ -8,9 +8,20 @@ import { normalizePhone, PHONE_FORMAT_MESSAGE } from '@/lib/phone';
 import { SITE_NAME } from '@/lib/site';
 import { utcToKst } from '@/lib/time';
 import type { OptionalTerms } from '@/server/auth';
+import { customerNameSchema } from '@/server/auth/customer-name';
 
 /** 닉네임 최대 글자 수 */
 export const NICKNAME_MAX_LENGTH = 20;
+
+/** 이름 칸 아래 안내(#375). 예약한 샵에는 이름과 휴대폰 번호만 주고 닉네임은 주지 않는다(11/13 nnoinn) */
+export const BOOKER_NAME_HELP = '예약한 샵에 예약자 이름으로 알려요.';
+
+/** 내 예약 상세의 예약자 정보 안내(#375) */
+export const BOOKER_INFO_NOTE =
+  '예약한 샵에는 이름과 휴대폰 번호만 알려요. 내 정보에서 고칠 수 있어요.';
+
+/** 닉네임 칸 아래 안내(#375). 닉네임은 투리 안에서만 쓴다 */
+export const NICKNAME_HELP = `${SITE_NAME} 안에서만 써요. 샵에는 알리지 않아요.`;
 
 /**
  * 고객 연락처. 비우면 null(지운다). 휴대폰만 받고(#19 D31) 저장 모양은 고객·원장님·샵 공통(010-1234-5678, 10/28 결정).
@@ -30,6 +41,8 @@ export const customerPhoneSchema = z
   });
 
 export const profileSchema = z.object({
+  // 예약자 이름(#375). 가입 저장과 같은 규칙(앞뒤 공백 빼고 1~30자, 강규민 #409)
+  name: customerNameSchema,
   nickname: z
     .string()
     .trim()

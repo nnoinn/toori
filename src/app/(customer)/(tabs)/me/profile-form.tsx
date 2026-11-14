@@ -6,31 +6,40 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PhoneInput } from '@/components/ui/phone-input';
+import { CUSTOMER_NAME_MAX_LENGTH } from '@/server/auth/customer-name';
 
 import { updateMyProfile } from './actions';
-import { NICKNAME_MAX_LENGTH, profileSchema } from './profile-rules';
+import {
+  BOOKER_NAME_HELP,
+  NICKNAME_HELP,
+  NICKNAME_MAX_LENGTH,
+  profileSchema,
+} from './profile-rules';
 
 // 공통 Input은 h-9·text-sm이다. 이 화면은 손가락으로도 누르기 쉽게 조금 크게 쓴다
 const FIELD_SIZE = 'h-11 text-base';
 
-type Field = 'nickname' | 'phone';
+type Field = 'name' | 'nickname' | 'phone';
+type Values = Record<Field, string>;
 
-/** 닉네임·연락처 고치기 (C-103). 저장 전에 화면에서도 같은 규칙으로 먼저 확인한다 */
-export function ProfileForm({ nickname, phone }: { nickname: string; phone: string }) {
+const FIELDS: readonly Field[] = ['name', 'nickname', 'phone'];
+
+/** 이름·닉네임·연락처 고치기 (C-103, 이름은 #375). 저장 전에 화면에서도 같은 규칙으로 먼저 확인한다 */
+export function ProfileForm({ name, nickname, phone }: Values) {
   const id = useId();
-  const [values, setValues] = useState({ nickname, phone });
+  const [values, setValues] = useState<Values>({ name, nickname, phone });
   const [message, setMessage] = useState<{ kind: 'error' | 'done'; text: string } | null>(null);
   // 화면 확인에서 틀린 칸. 그 칸에 빨간 테두리를 준다
   const [invalidField, setInvalidField] = useState<Field | null>(null);
   const [pending, startTransition] = useTransition();
   // 화면을 떠났다 와도 Next.js는 이 화면의 입력값을 그대로 남겨 둔다(Activity).
   // 다른 화면(예약 확인)에서 연락처를 바꿔 서버 값이 달라졌으면 입력칸도 맞춘다. 안 맞추면 옛 번호로 덮어쓴다
-  const [server, setServer] = useState({ nickname, phone });
-  if (server.nickname !== nickname || server.phone !== phone) {
-    setServer({ nickname, phone });
-    setValues({ nickname, phone });
+  const [server, setServer] = useState<Values>({ name, nickname, phone });
+  if (server.name !== name || server.nickname !== nickname || server.phone !== phone) {
+    setServer({ name, nickname, phone });
+    setValues({ name, nickname, phone });
   }
-  const changed = values.nickname !== nickname || values.phone !== phone;
+  const changed = values.name !== name || values.nickname !== nickname || values.phone !== phone;
 
   function change(field: Field, value: string) {
     setValues((prev) => ({ ...prev, [field]: value }));
@@ -42,8 +51,8 @@ export function ProfileForm({ nickname, phone }: { nickname: string; phone: stri
     const parsed = profileSchema.safeParse(values);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
-      const field = issue?.path[0];
-      setInvalidField(field === 'nickname' || field === 'phone' ? field : null);
+      const field = FIELDS.find((key) => key === issue?.path[0]);
+      setInvalidField(field ?? null);
       setMessage({ kind: 'error', text: issue?.message ?? '입력한 내용을 확인해 주세요' });
       return;
     }
@@ -55,14 +64,34 @@ export function ProfileForm({ nickname, phone }: { nickname: string; phone: stri
         setMessage({ kind: 'error', text: result.error.message });
         return;
       }
-      // 저장된 모양(예: 010-1234-5678)으로 맞춘다
-      setValues({ nickname: parsed.data.nickname, phone: parsed.data.phone ?? '' });
+      // 저장된 모양(앞뒤 공백 뺌, 010-1234-5678)으로 맞춘다
+      setValues({
+        name: parsed.data.name,
+        nickname: parsed.data.nickname,
+        phone: parsed.data.phone ?? '',
+      });
       setMessage({ kind: 'done', text: '저장했어요' });
     });
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4" aria-label="내 정보 고치기">
+      <div className="flex flex-col gap-2">
+        <Label htmlFor={`${id}-name`}>이름</Label>
+        <Input
+          id={`${id}-name`}
+          className={FIELD_SIZE}
+          value={values.name}
+          maxLength={CUSTOMER_NAME_MAX_LENGTH}
+          autoComplete="name"
+          aria-describedby={`${id}-name-help`}
+          aria-invalid={invalidField === 'name' || undefined}
+          onChange={(e) => change('name', e.target.value)}
+        />
+        <p id={`${id}-name-help`} className="text-xs text-muted-foreground">
+          {BOOKER_NAME_HELP}
+        </p>
+      </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor={`${id}-nickname`}>닉네임</Label>
         <Input
@@ -71,13 +100,17 @@ export function ProfileForm({ nickname, phone }: { nickname: string; phone: stri
           value={values.nickname}
           maxLength={NICKNAME_MAX_LENGTH}
           autoComplete="nickname"
+          aria-describedby={`${id}-nickname-help`}
           aria-invalid={invalidField === 'nickname' || undefined}
           onChange={(e) => change('nickname', e.target.value)}
         />
+        <p id={`${id}-nickname-help`} className="text-xs text-muted-foreground">
+          {NICKNAME_HELP}
+        </p>
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor={`${id}-phone`}>연락처</Label>
-        {/* 숫자만 쳐도 하이픈이 붙는다(#183). 닉네임과 같이 저장하는 화면이라 저장은 [저장]으로 */}
+        {/* 숫자만 쳐도 하이픈이 붙는다(#183). 이름·닉네임과 같이 저장하는 화면이라 저장은 [저장]으로 */}
         <PhoneInput
           id={`${id}-phone`}
           className={FIELD_SIZE}

@@ -3,7 +3,9 @@
 
 import { afterAll, expect, it } from 'vitest';
 
-import { agreedCancelRequests, refunds } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+
+import { agreedCancelRequests, customers, refunds } from '@/db/schema';
 
 import {
   createTestCustomer,
@@ -204,6 +206,13 @@ describeDb('내 예약 조회', () => {
       expect(mine?.shop.shopId).toBe(shop.shopId);
       expect(mine?.shop.lat).toBeCloseTo(TEST_LOCATION.lat, 6);
       expect(mine?.shop.lng).toBeCloseTo(TEST_LOCATION.lng, 6);
+      // 예약한 샵에 주는 예약자 정보(이름·휴대폰 번호, #375). 닉네임은 주지 않는다
+      await tx
+        .update(customers)
+        .set({ name: '김예약', nickname: '닉네임', phone: '010-0000-0000' })
+        .where(eq(customers.id, me.customerId));
+      const withBooker = await selectMyReservationDetail(tx, me.customerId, reservation.id);
+      expect(withBooker?.booker).toEqual({ name: '김예약', phone: '010-0000-0000' });
 
       expect(await selectMyReservationDetail(tx, other.customerId, reservation.id)).toBeNull();
     });
