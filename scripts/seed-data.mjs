@@ -59,14 +59,14 @@ export const SEED_SHOPS = [
       { menu: 'perm', at: 5, rate: 40, newOnly: true },
       { menu: 'cut', at: 8, rate: 30, status: 'closed', closeReason: 'other_channel' },
       { menu: 'clinic', at: 10, rate: 20, hold: true },
-      // 저장 값은 예약대기지만 게시 시각이 지나서 화면에서는 게시중으로 계산된다(#57)
+      // 저장 값은 게시예정이지만 게시 시각이 지나서 화면에서는 게시중으로 계산된다(#57)
       { menu: 'cut', at: 12, rate: 10, status: 'scheduled' },
       { menu: 'color', at: 20, rate: 20 },
       { id: 'a-cancelled', menu: 'perm', at: 26, rate: 30, status: 'cancelled', book: 'c' },
       { menu: 'perm', at: 26, rate: 30, relistOf: 'a-cancelled' },
       { menu: 'clinic', at: 30, rate: 10 },
       { menu: 'cut', at: 47, rate: 50 },
-      // 게시 시각(시작 48시간 전)이 아직 안 와서 예약대기
+      // 게시 시각(시작 48시간 전)이 아직 안 와서 게시예정
       { menu: 'cut', at: 72, rate: 30, status: 'scheduled' },
       // 시작 시각이 지났는데 방문·노쇼 처리를 안 한 예약
       { menu: 'cut', at: -2, rate: 20, status: 'reserved', book: 'b' },
@@ -297,7 +297,7 @@ export const SEED_SHOPS = [
 /**
  * 계속 쓰는 시험 매물(11/2). 위 매물은 시드를 넣는 시각 기준이라 이틀쯤 지나면 대부분 지나간다.
  * 그래서 매물이 있는 승인된 샵마다 넣은 날(한국 날짜)로부터 fromDay~toDay일째의 times시(쉬는 요일 제외)에
- * 예약대기 매물을 더 넣는다. 게시 시각(시작 48시간 전)이 되면 차례로 게시중이 되어 3주 동안 예약해 볼 매물이 이어진다.
+ * 게시예정 매물을 더 넣는다. 게시 시각(시작 48시간 전)이 되면 차례로 게시중이 되어 3주 동안 예약해 볼 매물이 이어진다.
  * fromDay는 위 매물(최대 72시간 뒤)과 시간이 겹치지 않게 4일째부터다. 메뉴·할인율은 돌아가며 쓰고 newOnlyEvery번째마다 신규 고객 전용
  */
 export const ROLLING_SLOTS = {
