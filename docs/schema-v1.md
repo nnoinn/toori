@@ -629,8 +629,22 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | action | text | 예: `shop.approve`, `shop.reject`, `visit.override`, `refund.exception`, `dispute.register`, `dispute.resolve`, `settlement.payout_request`, `settlement.payout_retry` |
 | target_type | text | 예: `shop`, `reservation`, `settlement` |
 | target_id | uuid | |
-| memo | text, null | |
+| memo | text, null | 사유 |
 | created_at | timestamptz | |
+
+운영자가 데이터를 바꾸면 같은 트랜잭션에서 남기고 사유는 `memo`에 적는다. 열람 기록처럼 DB 트리거로 고치기·지우기·비우기를 막는다(#372 5장, 0016, AUTH-10).
+
+### admin_profiles — 운영자 프로필
+
+운영자 화면 위 이름과 운영자 기록 화면(`/admin/logs`)에 보일 이름이다(#372 4장, 11/13 nnoinn). 권한을 켜고 끄는 것은 `profiles.is_admin`이고, 맡은 일로 권한 차이를 두지 않는다. 그만둔 운영자도 기록 화면에 이름이 보여야 해서 지우지 않는다(DB 트리거가 지우기·비우기를 막는다, 이름은 고칠 수 있다). 새 운영자는 당분간 강규민이 SQL로 `is_admin`과 프로필을 같이 넣는다.
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| user_id | uuid PK → profiles | |
+| name | text | 화면과 기록에 보일 이름(필수) |
+| role | text, null | 맡은 일(예: 정산, 고객 응대) |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
 
 ### admin_access_logs — 운영자 열람 기록
 
@@ -663,6 +677,8 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | slot_window_menus | unique(window_id, menu_id), check: discount_rate 10~50, duration_minutes > 0 | 한 시간대에 같은 메뉴 한 번 |
 | location_use_logs | (created_at) | 6개월 지난 기록 정리 |
 | admin_access_logs | (created_at), (admin_id, created_at), UPDATE·DELETE·TRUNCATE 막는 트리거 | 보관 기간 확인, 운영자별 월 1회 점검, 기록 위·변조 방지 |
+| admin_actions | UPDATE·DELETE·TRUNCATE 막는 트리거 | 작업 기록 위·변조 방지(#372) |
+| admin_profiles | DELETE·TRUNCATE 막는 트리거 | 그만둔 운영자도 기록에 이름 남기기(#372) |
 | payout_account_changes | (shop_id, created_at) | 샵별 계좌 변경 이력 |
 | slots | check: discount_rate 10~50, end_at > start_at | |
 | reservations | unique(code), unique(slot_id), (customer_id), (status) | 예약번호, 매물당 하나, 내 예약 |
@@ -716,3 +732,4 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | 2026-11-11 | 합의 후 취소 요청 `agreed_cancel_requests`를 더하고, `reservations.cancel_actor`에 `agreed`, `refunds.reason`에 `agreed_cancel`, `settlement_items.kind`에 `agreed_cancel`을 더한다. 취소 환불 unique를 고객 취소와 합의 후 취소에 같이 건다(`refunds_cancel_unique`, #320 승인). `slots.close_reason`에 `hold_released`(결제 없이 홀딩 끝남, #308 ④)를 더한다. 마이그레이션 0012 |
 | 2026-11-12 | `disputes`에 `channel`(접수 경로)·`received_at`(접수 시각)·`registered_by`(카카오톡 채널 건을 등록한 운영자)·`outcome`(결론 종류 6개)을 더하고 unique(`reservation_id`)를 건다. 지금 있는 기록은 `app`, `created_at`으로 채운다. check는 양쪽으로: `kakao` ⇔ 등록한 운영자 있음, `resolved` ⇔ 결론 종류 있음. 돈이 오가는 결론 셋은 처리 기능이 생길 때까지 서버가 막는다. 정산 보류는 칸 없이 "`open` 이의제기가 있으면"으로 본다(#350, 11/12 nnoinn). 마이그레이션 0013 |
 | 2026-11-12 | 정산 묶는 방식: 정산 줄은 목요일 새벽 묶기 작업이 지급일 0시(한국 시간) 기준으로 만들고 그날의 결제 수수료율을 쓴다(플랫폼 수수료 방식도 같다. 법인 전환 때는 공급자 약관 시행일 뒤 첫 정산일 묶음부터). 묶음은 샵 하나 × 지급일 하나, 기간은 직전 지급일 다음 날 ~ 지급일. 패널티를 떼고 0원이면 지급 요청 없이 지급 완료(0원)로 끝내고 S-501에 이유를 보인다. `settlement_items`에 unique(`order_id`), `pg_fee_actual` null 허용(#353, 11/12 nnoinn). 마이그레이션 0014 |
+| 2026-11-15 | `admin_profiles`(운영자 프로필: 이름·맡은 일)를 더하고, `admin_actions`(운영자 작업 기록)도 열람 기록처럼 DB 트리거로 고치기·지우기·비우기를 막는다. 프로필은 지우지 않는다(#372 4·5장, 11/13 nnoinn). 마이그레이션 0016 |
