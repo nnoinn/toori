@@ -1,14 +1,17 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { isUuid } from '@/lib/uuid';
 
 import { BackButton } from '@/components/ui/back-button';
+import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
 import { formatBusinessNumber } from '@/lib/business-number';
 import { formatKst } from '@/lib/time';
+import { cn } from '@/lib/utils';
 import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
 import { getBusinessDocUrl } from '@/server/storage/upload';
@@ -116,6 +119,13 @@ async function ReviewDetail({ params }: { params: Params }) {
               ['연락처', detail.owner.phone],
             ]}
           />
+          {/* 원장님 계정에서 일어난 일(입점·매물·예약·정산 계좌 등)을 시각 순으로(#374) */}
+          <Link
+            href={`/admin/users/owners/${detail.owner.id}/history`}
+            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'self-start')}
+          >
+            원장님 이력 보기
+          </Link>
         </Section>
 
         <Section title="샵">

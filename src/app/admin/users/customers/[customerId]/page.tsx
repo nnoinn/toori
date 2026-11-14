@@ -1,14 +1,17 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { isUuid } from '@/lib/uuid';
 
 import { BackButton } from '@/components/ui/back-button';
+import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
 import { formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';
+import { cn } from '@/lib/utils';
 import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage, type OptionalConsent } from '@/server/auth';
 
@@ -55,6 +58,13 @@ async function Detail({ params }: { params: Params }) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* 이 고객 계정에서 일어난 일(가입·예약·취소·환불·쿠폰·이의제기·동의)을 시각 순으로(#374) */}
+      <Link
+        href={`/admin/users/customers/${customerId}/history`}
+        className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'self-end')}
+      >
+        이력 보기
+      </Link>
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">{detail.nickname}</CardTitle>
