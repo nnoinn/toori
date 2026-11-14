@@ -1,5 +1,6 @@
 // 목요일 정산 묶기(runSettlementBatch)를 실제 DB(TEST_DATABASE_URL이 있을 때만)로 처음부터 끝까지 확인한다 (#353, W20 ③).
-// 묶을 거래 고르기(종류·기한·보류), 정산 묶음·줄·패널티 저장, 0원 정산, 다시 돌려도 두 번 묶지 않기를 본다.
+// 묶을 거래 고르기(종류·기한·보류), 정산 묶음·줄·패널티 저장, 0원 정산, 다시 돌려도 두 번 묶지 않기,
+// 지급일 다음 날 따라잡기, 묶기 후보 줄이기(#394 리뷰 2·3번)를 본다.
 // 금액 기댓값은 docs/settlement-examples.md 3장(정가 50,000원 10% 할인, 결제 수수료 3.0% 가정).
 
 import { and, eq, inArray } from 'drizzle-orm';
@@ -22,10 +23,12 @@ import {
   createTestCustomer,
   createTestReservation,
   createTestShop,
+  createTestUser,
   type TestShop,
 } from '../../../tests/db/fixtures';
 import { closeTestDb, describeDb, type TestTx, withRollback } from '../../../tests/db/test-db';
 import { runSettlementBatch } from './batch';
+import { readBatchCandidates } from './batch-store';
 
 type Db = Parameters<typeof runSettlementBatch>[0];
 
@@ -314,6 +317,159 @@ describeDb('목요일 정산 묶기 (실제 DB)', () => {
         payoutDate: '2026-11-05',
       });
       expect(await settlementsOf(tx, shop.shopId)).toEqual([]);
+    });
+  });
+
+  it('지급일 새벽 작업이 실패했으면 다음 날 새벽에 그 지급일 기준(그날 0시)으로 아직 묶지 않은 샵을 묶고, 이틀 뒤에는 따라잡지 않는다', async () => {
+    await withRollback(async (tx) => {
+      const db = tx as unknown as Db;
+      const shopA = await createTestShop(tx, { status: 'approved' });
+      const shopB = await createTestShop(tx, { status: 'approved' });
+      // 11/05(목) 새벽에 묶였어야 할 거래(11/01 처리, 기한 11/04 0시)
+      await finished(tx, shopA, '09:00', '10:00', 'completed', visited(kst('2026-11-01', '11:00')));
+      await finished(tx, shopB, '10:00', '11:00', 'completed', visited(kst('2026-11-01', '12:00')));
+      // 11/04(수) 10시 처리는 기한이 11/06이라 11/05 기준으로는 묶이지 않는다(기준 시각은 그대로 11/05 0시)
+      const late = await finished(
+        tx,
+        shopA,
+        '11:00',
+        '12:00',
+        'completed',
+        visited(kst('2026-11-04', '10:00')),
+      );
+
+      // 11/05(목) 작업은 돌지 못했고, 11/06(금) 새벽에 따라잡는다
+      const friday = kst('2026-11-06', '00:30');
+      const caught = await runSettlementBatch(db, {
+        now: friday,
+        paymentFeeRate: PAYMENT_FEE_RATE,
+      });
+      expect(caught).toMatchObject({
+        status: 'done',
+        payoutDate: '2026-11-05',
+        catchUp: true,
+        shops: 2,
+        items: 2,
+        failed: 0,
+      });
+      const [a] = await settlementsOf(tx, shopA.shopId);
+      expect(a).toMatchObject({ periodEnd: '2026-11-05', itemCount: 1 });
+      const lateItem = await tx
+        .select()
+        .from(settlementItems)
+        .where(eq(settlementItems.orderId, late.order.id));
+      expect(lateItem).toEqual([]);
+
+      // 같은 날 다시 돌아도 두 번 묶지 않는다
+      expect(
+        await runSettlementBatch(db, { now: friday, paymentFeeRate: PAYMENT_FEE_RATE }),
+      ).toMatchObject({ status: 'done', catchUp: true, shops: 0, skipped: 2 });
+      // 이틀 뒤(11/07 토)는 따라잡지 않는다(SETTLEMENT_CATCH_UP_DAYS = 1)
+      expect(
+        await runSettlementBatch(db, {
+          now: kst('2026-11-07', '00:30'),
+          paymentFeeRate: PAYMENT_FEE_RATE,
+        }),
+      ).toEqual({ status: 'not_payout_day' });
+    });
+  });
+
+  it('묶기 후보는 정산할 수 있는 거래만 읽고(원장님 사정·운영자·자동 취소 제외), 지급일 0시 뒤에 결론이 난 이의제기 거래는 그날 묶지 않는다', async () => {
+    await withRollback(async (tx) => {
+      const db = tx as unknown as Db;
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const adminId = await createTestUser(tx);
+      const ok = await finished(
+        tx,
+        shop,
+        '09:00',
+        '10:00',
+        'completed',
+        visited(kst('2026-11-01', '11:00')),
+      );
+      const cancelled = await customerCancel(tx, shop, '10:00', '11:00');
+      const ownerFault = await finished(tx, shop, '11:00', '12:00', 'cancelled', {
+        cancelActor: 'owner_fault',
+        cancelledAt: kst('2026-10-30', '10:00'),
+      });
+      const autoCancel = await finished(tx, shop, '12:00', '13:00', 'cancelled', {
+        cancelActor: 'system',
+        cancelledAt: kst('2026-10-30', '10:00'),
+      });
+      const adminRefunded = await finished(
+        tx,
+        shop,
+        '13:00',
+        '14:00',
+        'completed',
+        visited(kst('2026-11-01', '15:00')),
+      );
+      await tx.insert(refunds).values({
+        orderId: adminRefunded.order.id,
+        reservationId: adminRefunded.reservation.id,
+        reason: 'admin_exception',
+        status: 'done',
+        penaltyRate: 0,
+        refundAmount: 45_000,
+        penaltyAmount: 0,
+        processedAt: kst('2026-11-02', '10:00'),
+      });
+      // 이의제기: 지급일 0시 전에 결론(그날 묶는다) / 0시 뒤에 결론(그날은 아직 확인 중이었다)
+      const resolvedBefore = await finished(
+        tx,
+        shop,
+        '14:00',
+        '15:00',
+        'completed',
+        visited(kst('2026-11-01', '16:00')),
+      );
+      const resolvedAfter = await finished(
+        tx,
+        shop,
+        '15:00',
+        '16:00',
+        'completed',
+        visited(kst('2026-11-01', '17:00')),
+      );
+      const dispute = (reservationId: string, handledAt: Date) => ({
+        reservationId,
+        type: 'after_start',
+        content: '테스트 이의제기',
+        status: 'resolved',
+        channel: 'app',
+        receivedAt: kst('2026-11-02', '10:00'),
+        outcome: 'no_change',
+        handledBy: adminId,
+        handledAt,
+      });
+      await tx
+        .insert(disputes)
+        .values([
+          dispute(resolvedBefore.reservation.id, kst('2026-11-04', '18:00')),
+          dispute(resolvedAfter.reservation.id, kst('2026-11-05', '00:10')),
+        ]);
+
+      const cutoff = kst('2026-11-05', '00:00');
+      const candidates = (await readBatchCandidates(tx, { cutoff })).filter(
+        (candidate) => candidate.shopId === shop.shopId,
+      );
+      expect(candidates.map((candidate) => candidate.orderId).sort()).toEqual(
+        [ok.order.id, cancelled.order.id, resolvedBefore.order.id].sort(),
+      );
+      expect(candidates.map((candidate) => candidate.orderId)).not.toContain(ownerFault.order.id);
+      expect(candidates.map((candidate) => candidate.orderId)).not.toContain(autoCancel.order.id);
+
+      const result = await runSettlementBatch(db, {
+        now: PAYOUT_NOW,
+        paymentFeeRate: PAYMENT_FEE_RATE,
+      });
+      expect(result).toMatchObject({ status: 'done', catchUp: false, shops: 1, items: 3 });
+      // 0시 뒤에 결론이 난 거래는 다음 지급일에 묶인다
+      const after = await tx
+        .select()
+        .from(settlementItems)
+        .where(eq(settlementItems.orderId, resolvedAfter.order.id));
+      expect(after).toEqual([]);
     });
   });
 });

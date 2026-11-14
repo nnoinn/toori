@@ -1,5 +1,6 @@
 // 목요일 정산 묶기 (X-206, #353, W20 ③). 서버에서만 부른다. 예약 작업(/api/cron/settlement-batch)이 매일 새벽 부르고,
-// 오늘이 지급일(매주 목요일, 공휴일이면 다음 영업일)일 때만 묶는다.
+// 오늘이 지급일(매주 목요일, 공휴일이면 다음 영업일)일 때 묶는다. 지급일 새벽 작업이 통째로 실패했을 때를 위해
+// 지급일 다음 날(SETTLEMENT_CATCH_UP_DAYS) 새벽에도 그 지급일 기준(그날 0시)으로 아직 묶지 않은 샵을 묶는다(따라잡기, #394 리뷰 3번).
 //
 // 1. 기준 시각 = 지급일 0시(한국 시간). 아직 정산 줄이 없는 끝난 거래 중 정산할 종류이고(settlementKindOf),
 //    이의제기 접수 기한이 기준 시각까지 지났고 확인 중 이의제기가 없는 것(isReadyToSettle)을 고른다
@@ -14,9 +15,9 @@ import 'server-only';
 
 import type { getDb } from '@/db';
 import { violatedConstraint } from '@/lib/db-error';
-import type { PlatformFeeMode } from '@/server/policy';
+import { type PlatformFeeMode, SETTLEMENT_CATCH_UP_DAYS } from '@/server/policy';
 
-import { buildShopSettlement, kstDateStart, payoutDateOn } from './batch-rules';
+import { buildShopSettlement, catchUpPayoutDate, kstDateStart, payoutDateOn } from './batch-rules';
 import {
   type BatchCandidate,
   hasSettlementOn,
@@ -35,6 +36,8 @@ export type SettlementBatchResult =
   | {
       status: 'done';
       payoutDate: string;
+      /** 지난 지급일을 따라잡은 실행(지급일 다음 날 새벽). 그날 이미 묶은 샵은 skipped로 센다 */
+      catchUp: boolean;
       /** 이번에 묶은 샵 수와 거래 수 */
       shops: number;
       items: number;
@@ -48,12 +51,13 @@ export type SettlementBatchResult =
 
 type ReadyItem = { candidate: BatchCandidate; kind: SettleKind; occurredAt: Date };
 
-/** 오늘이 지급일이면 그날 묶을 거래를 샵별로 묶어 저장한다 */
+/** 오늘이 지급일이면 그날, 지급일 다음 날이면 그 지급일(따라잡기)로 묶을 거래를 샵별로 묶어 저장한다 */
 export async function runSettlementBatch(
   db: Db,
   input: { now: Date; paymentFeeRate: number | null; mode?: PlatformFeeMode },
 ): Promise<SettlementBatchResult> {
-  const payoutDate = payoutDateOn(input.now);
+  const today = payoutDateOn(input.now);
+  const payoutDate = today ?? catchUpPayoutDate(input.now, SETTLEMENT_CATCH_UP_DAYS);
   if (!payoutDate) return { status: 'not_payout_day' };
   const { paymentFeeRate } = input;
   if (paymentFeeRate === null) return { status: 'payment_fee_rate_missing', payoutDate };
@@ -123,5 +127,5 @@ export async function runSettlementBatch(
       );
     }
   }
-  return { status: 'done', payoutDate, ...result };
+  return { status: 'done', payoutDate, catchUp: today === null, ...result };
 }
