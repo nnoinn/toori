@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NATIVE_SELECT_CLASS } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import type { DisputeType } from '@/db/schema';
 import { formatKstDateTime } from '@/lib/time';
@@ -21,9 +22,6 @@ import { DISPUTE_CONTENT_LIMIT } from '@/server/policy/dispute';
 
 import { registerKakaoDisputeAction } from '../../disputes/actions';
 import { fromKstInputValue } from '../../disputes/format';
-
-const SELECT_CLASS =
-  'h-9 rounded-lg border bg-card px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50';
 
 // 운영자 예약 상세의 [이의제기 등록](A-104, W19 ②). 카카오톡 채널로 받은 이의제기를 받은 시각과 함께 남긴다.
 // 고를 수 있는 종류는 서버가 이 예약 기준으로 계산해서 넘긴다. 접수 기한이 지난 뒤에 받은 문의는 서버가 막는다
@@ -92,7 +90,7 @@ export function RegisterDispute({
               <Label htmlFor="dispute-type">종류</Label>
               <select
                 id="dispute-type"
-                className={SELECT_CLASS}
+                className={NATIVE_SELECT_CLASS}
                 value={type}
                 onChange={(event) => setType(event.target.value as DisputeType)}
               >
