@@ -52,8 +52,8 @@ export function SortTabs({ sort }: { sort: SlotSort }) {
           role="tab"
           aria-selected={sort === item.key}
           className={cn(
-            // 폰에서는 손가락으로 누르기 쉽게 높이를 키운다(36px)
-            'rounded-full px-3 py-1 text-sm max-md:py-2',
+            // 폰에서는 손가락으로 누르기 쉽게 높이를 키운다(40px)
+            'rounded-full px-3 py-1 text-sm max-md:min-h-10',
             sort === item.key
               ? 'bg-foreground font-semibold text-background'
               : 'text-muted-foreground',
@@ -110,7 +110,7 @@ export function SlotList({
           description={errorMessage}
           action={
             onRetry ? (
-              <Button type="button" variant="outline" onClick={onRetry}>
+              <Button type="button" variant="outline" className="max-md:h-10" onClick={onRetry}>
                 다시 시도
               </Button>
             ) : undefined

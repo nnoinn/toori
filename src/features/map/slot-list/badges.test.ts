@@ -48,6 +48,9 @@ describe('매물 배지', () => {
     expect(isHeldByOther(slot(heldBy(ME)), ME, NOW)).toBe(false);
     expect(isHeldByOther(slot(heldBy(ME)), SOMEONE, NOW)).toBe(true);
     expect(isHeldByMe(slot(), ME, NOW)).toBe(false);
+    // 10분이 지난 내 홀딩, 다른 고객의 홀딩은 '결제 이어서 하기'가 아니다(C-404)
+    expect(isHeldByMe(slot(heldBy(ME, -1)), ME, NOW)).toBe(false);
+    expect(isHeldByMe(slot(heldBy(SOMEONE)), ME, NOW)).toBe(false);
   });
 });
 
