@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { buttonVariants } from '@/components/ui/button';
-import { EmptyState, LoadingCards } from '@/components/ui/state';
+import { EmptyState, LoadingTiles } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { getCustomerLocation } from '@/features/map/location';
 import { FAVORITE_SLOT_LIMIT, selectFavoriteSlots } from '@/features/map/slot-list/queries';
@@ -22,8 +22,10 @@ const PATH = '/home/favorites';
 // 찜은 고객 계정에 저장하므로 로그인이 필요하다. 로그인 뒤 이 화면으로 돌아온다
 export default function FavoritesPage() {
   return (
-    <main className="flex flex-1 flex-col gap-3 py-3 md:mx-auto md:w-full md:max-w-3xl md:px-6 md:py-6">
-      <Suspense fallback={<LoadingCards count={3} className="px-4 md:px-0" />}>
+    <main className="flex flex-1 flex-col gap-3 py-3 md:mx-auto md:w-full md:max-w-6xl md:px-6 md:py-6">
+      <Suspense
+        fallback={<LoadingTiles count={4} className="px-4 md:grid-cols-3 md:px-0 lg:grid-cols-4" />}
+      >
         <FavoritesContent />
       </Suspense>
     </main>

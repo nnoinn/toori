@@ -6,7 +6,7 @@ import { cn } from 'cn';
 
 import { Button } from '@/components/ui/button';
 import { SlotCard } from '@/components/ui/slot-card';
-import { ErrorState, LoadingCards } from '@/components/ui/state';
+import { ErrorState, LoadingTiles } from '@/components/ui/state';
 
 import { formatDistance } from './distance';
 import { applySortToSearch, SLOT_SORTS, type SlotSort } from './sort';
@@ -29,7 +29,22 @@ type SlotListProps = {
   onLoadMore?: () => void;
   /** 매물이 없을 때 보여줄 것 */
   empty: React.ReactNode;
+  /**
+   * 카드를 몇 칸으로 놓을지(11/15 회의, 위에 사진이 있는 카드).
+   * page: 폰 2칸, 태블릿 3칸, PC 4칸(매물 목록·찜한 샵 매물). panel: 늘 2칸(지도 옆 칸, 폰의 지도 아래 목록)
+   */
+  columns?: 'page' | 'panel';
 };
+
+const GRID_CLASS = {
+  page: 'px-4 md:grid-cols-3 md:px-0 lg:grid-cols-4',
+  panel: 'px-4',
+} as const;
+
+const IMAGE_SIZES = {
+  page: '(min-width: 1024px) 270px, (min-width: 768px) 33vw, 50vw',
+  panel: '(min-width: 1024px) 240px, (min-width: 768px) 190px, 50vw',
+} as const;
 
 /** 정렬 탭 (C-205). 고른 정렬은 주소창에 저장한다 */
 export function SortTabs({ sort }: { sort: SlotSort }) {
@@ -79,6 +94,7 @@ export function SlotList({
   loadingMore = false,
   onLoadMore,
   empty,
+  columns = 'page',
 }: SlotListProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const onLoadMoreRef = useRef(onLoadMore);
@@ -104,7 +120,7 @@ export function SlotList({
     <div className="flex flex-col gap-2">
       {sort ? <SortTabs sort={sort} /> : null}
       {status === 'loading' ? (
-        <LoadingCards count={3} className="max-md:px-4" />
+        <LoadingTiles count={4} className={GRID_CLASS[columns]} />
       ) : status === 'error' ? (
         <ErrorState
           description={errorMessage}
@@ -119,12 +135,14 @@ export function SlotList({
       ) : items.length === 0 ? (
         empty
       ) : (
-        // 폰에서는 카드가 화면 끝에 붙어 둥근 모서리가 잘려 보여서, 양옆 16px 여백과 카드 사이 간격을 둔다
-        <ul className="flex flex-col divide-y max-md:gap-2 max-md:divide-y-0 max-md:px-4">
+        // 위에 사진이 있는 카드를 여러 칸으로 놓는다(11/15 회의). 폰은 화면 끝에 붙지 않게 양옆 16px 여백을 둔다
+        <ul className={cn('grid grid-cols-2 gap-3', GRID_CLASS[columns])}>
           {items.map((item) => (
             <li key={listItemKey(item)}>
               {item.kind === 'slot' ? (
                 <SlotCard
+                  layout="tile"
+                  imageSizes={IMAGE_SIZES[columns]}
                   href={`/slots/${item.slotId}`}
                   imageUrl={item.imageUrl}
                   shopName={item.shopName}
@@ -139,6 +157,7 @@ export function SlotList({
                 />
               ) : (
                 <WindowCard
+                  imageSizes={IMAGE_SIZES[columns]}
                   href={`/windows/${item.windowId}`}
                   imageUrl={item.imageUrl}
                   shopName={item.shopName}
@@ -158,7 +177,7 @@ export function SlotList({
       )}
       {status === 'ready' && hasMore ? (
         <div ref={sentinelRef} className="py-2">
-          {loadingMore ? <LoadingCards count={1} className="max-md:px-4" /> : null}
+          {loadingMore ? <LoadingTiles count={2} className={GRID_CLASS[columns]} /> : null}
         </div>
       ) : null}
     </div>

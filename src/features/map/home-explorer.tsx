@@ -122,7 +122,8 @@ export function HomeExplorer({ center, myLocation, header, sort, serverNow }: Ho
           // 내림은 손잡이 높이만(아래 목록을 숨김). 크게(flex-1)는 min-h-0이 있어야 화면 높이 안에 머물고
           // 목록이 그 안에서 스크롤된다(없으면 목록 길이만큼 늘어나 화면 아래로 넘쳐 아래 매물을 못 본다)
           dragging || sheet === 'min' ? 'flex-none' : sheet === 'half' ? 'h-1/2' : 'min-h-0 flex-1',
-          'md:h-auto md:w-[400px] md:flex-none md:rounded-none md:border-t-0 md:border-l md:shadow-none',
+          // PC 오른쪽 칸: 1024px부터 500px(예전 400px의 1.25배, 11/15 회의). 그보다 좁은 화면은 지도가 너무 좁아져서 400px
+          'md:h-auto md:w-[400px] md:flex-none md:rounded-none md:border-t-0 md:border-l md:shadow-none lg:w-[500px]',
         )}
       >
         <button
@@ -188,6 +189,7 @@ export function HomeExplorer({ center, myLocation, header, sort, serverNow }: Ho
             </div>
           ) : null}
           <SlotList
+            columns="panel"
             items={home.items}
             serverNow={home.serverNow ?? serverNow}
             sort={sort}

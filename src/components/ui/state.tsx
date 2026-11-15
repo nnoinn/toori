@@ -45,6 +45,32 @@ export function ErrorState({
   );
 }
 
+/**
+ * 로딩 중. 위에 사진이 있는 카드(SlotCard tile) 모양의 회색 틀을 count개 보여준다. 기본 2칸이고,
+ * 칸 수는 className으로 바꾼다. 예: className="md:grid-cols-3 lg:grid-cols-4"
+ */
+export function LoadingTiles({ count = 4, className }: { count?: number; className?: string }) {
+  return (
+    <div
+      className={cn('grid grid-cols-2 gap-3', className)}
+      aria-busy="true"
+      aria-label="불러오는 중"
+    >
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="flex flex-col rounded-xl ring-1 ring-foreground/10">
+          <Skeleton className="aspect-square w-full rounded-b-none" />
+          <div className="flex flex-col gap-2 p-3">
+            <Skeleton className="h-3 w-1/2" />
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-3 w-2/3" />
+            <Skeleton className="h-5 w-1/2" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** 로딩 중. 매물 카드 모양의 회색 틀을 count개 보여준다 */
 export function LoadingCards({ count = 3, className }: { count?: number; className?: string }) {
   return (

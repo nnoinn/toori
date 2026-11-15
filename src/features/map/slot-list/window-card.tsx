@@ -1,8 +1,7 @@
-import Image from 'next/image';
 import Link from 'next/link';
-import { ImageOff } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { PhotoFrame } from '@/components/ui/photo-frame';
 import { type SlotBadgeKind, SlotBadges } from '@/components/ui/slot-badge';
 import { formatWon } from '@/lib/format';
 
@@ -23,6 +22,8 @@ type WindowCardProps = {
   /** 서버가 정한 배지(임박, 신규 고객 전용) */
   badges: SlotBadgeKind[];
   distanceText?: string;
+  /** 사진의 next/image sizes. 몇 칸으로 놓는지에 맞춘다 */
+  imageSizes?: string;
 };
 
 /** "여성 커트", "여성 커트 외 3개" */
@@ -33,7 +34,8 @@ export function windowMenuText(firstMenuName: string, menuCount: number): string
 /**
  * 시간대 매물 카드(#308). 매물 카드(공통 UI SlotCard)와 같은 모양에 '시간대' 배지를 단다.
  * 시작 시각 하나가 아니라 시간대 범위, 정가→할인가 대신 "최대 30% 17,500원부터"를 보여준다.
- * 서비스마다 할인율·가격이 달라 가장 큰 할인율과 가장 낮은 할인가만 보여주고, 정가는 상세에서 서비스를 고르면 보인다
+ * 서비스마다 할인율·가격이 달라 가장 큰 할인율과 가장 낮은 할인가만 보여주고, 정가는 상세에서 서비스를 고르면 보인다.
+ * 매물 카드의 tile 모양(위에 정사각형 사진, 11/15 회의)과 같이 놓인다
  */
 export function WindowCard({
   href,
@@ -47,27 +49,22 @@ export function WindowCard({
   minSalePrice,
   badges,
   distanceText,
+  imageSizes = '50vw',
 }: WindowCardProps) {
   return (
-    <div className="rounded-xl bg-card ring-1 ring-foreground/10">
-      <Link href={href} className="block rounded-xl focus-visible:ring-2 focus-visible:ring-ring">
-        <div className="flex gap-3 p-3">
-          <div className="relative size-22 shrink-0 overflow-hidden rounded-lg bg-muted">
-            {imageUrl ? (
-              <Image
-                src={imageUrl}
-                alt={`${shopName} 대표 이미지`}
-                fill
-                sizes="88px"
-                className="object-cover"
-              />
-            ) : (
-              <div className="flex size-full items-center justify-center text-muted-foreground">
-                <ImageOff className="size-6" aria-hidden />
-              </div>
-            )}
-          </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
+    <div className="h-full rounded-xl bg-card ring-1 ring-foreground/10">
+      <Link
+        href={href}
+        className="block h-full rounded-xl focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <div className="flex h-full flex-col">
+          <PhotoFrame
+            src={imageUrl}
+            alt={`${shopName} 대표 이미지`}
+            sizes={imageSizes}
+            className="aspect-square w-full rounded-t-xl"
+          />
+          <div className="flex min-w-0 flex-1 flex-col gap-1 p-3">
             <p className="flex items-center gap-1 text-xs text-muted-foreground">
               <span className="truncate">{shopName}</span>
               {distanceText ? <span className="shrink-0">· {distanceText}</span> : null}
