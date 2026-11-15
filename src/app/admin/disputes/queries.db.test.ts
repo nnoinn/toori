@@ -91,6 +91,16 @@ describeDb('운영자 이의제기 조회 (실제 DB)', () => {
         older.disputeId,
       ]);
       expect(await ids('all', newer.reservation.code)).toEqual([newer.disputeId]);
+      // 정렬을 고르면 그 순서: 전체를 최근 결론 순으로 보면 결론 없는 확인 중은 뒤로
+      const sorted = async (filter: 'open' | 'all', sort: 'received_new' | 'handled_new') =>
+        (await selectDisputes(tx, { filter, query: shopName, sort })).rows.map(
+          (row) => row.disputeId,
+        );
+      expect(await sorted('open', 'received_new')).toEqual([newer.disputeId, older.disputeId]);
+      expect((await sorted('all', 'handled_new')).slice(0, 2)).toEqual([
+        doneLate.disputeId,
+        doneEarly.disputeId,
+      ]);
       expect(await ids('all', unique('없는샵'))).toEqual([]);
       // 신청한 손님(그 예약의 손님) 닉네임으로도 찾는다
       const nickname = unique('이의손님');

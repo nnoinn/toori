@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DetailLink, SelectableRow, SelectableRows } from '@/components/ui/selectable-rows';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SortSelect } from '@/components/ui/sort-select';
 import { EmptyState } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { maskPhone } from '@/lib/phone';
@@ -17,12 +19,21 @@ import { ensureAdminPage } from '@/server/auth';
 
 import { ADMIN_LIST_LIMIT, type ListResult, toSearchQuery } from '../lookup';
 import { StatusBadge } from '../shops/status-badge';
-import { toUserTab, USER_TABS, type UserTab } from './format';
+import {
+  toUserSort,
+  toUserTab,
+  USER_SORT_LABELS,
+  USER_SORTS,
+  USER_TABS,
+  type UserSort,
+  type UserTab,
+  usersHref,
+} from './format';
 import { selectCustomers, selectOwners } from './queries';
 
 export const metadata: Metadata = { title: '회원' };
 
-type SearchParams = Promise<{ tab?: SearchValue; q?: SearchValue }>;
+type SearchParams = Promise<{ tab?: SearchValue; q?: SearchValue; sort?: SearchValue }>;
 
 const TAB_LABELS: Record<UserTab, string> = { customers: '고객', owners: '원장님' };
 const SEARCH_HINTS: Record<UserTab, string> = {
@@ -30,10 +41,11 @@ const SEARCH_HINTS: Record<UserTab, string> = {
   owners: '이름, 샵 이름, 이메일, 휴대폰 전체 번호',
 };
 
-const HEAD_CELL = 'px-4 py-3 font-medium';
-const CELL = 'px-4 py-3';
+const HEAD_CELL = 'px-3 py-3 font-medium';
+const CELL = 'px-3 py-3';
 
-// 회원 조회 (A-102). 주소: /admin/users?tab=customers|owners&q=검색어. 고객 계정과 원장님 계정을 나눠서 보여준다(조회만)
+// 회원 조회 (A-102). 주소: /admin/users?tab=customers|owners&q=검색어&sort=정렬. 고객 계정과 원장님 계정을 나눠서 보여준다(조회만)
+// 줄을 한 번 누르면 선택, 두 번 누르거나 줄 끝 [상세]를 누르면 상세(#360 1번, 11/15 nnoinn). 원장님 상세는 그 샵의 입점 심사 상세다
 export default function AdminUsersPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <main className="flex flex-1 flex-col gap-4 p-6">
@@ -50,6 +62,7 @@ async function UserList({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const tab = toUserTab(firstParam(params.tab));
   const query = toSearchQuery(firstParam(params.q));
+  const sort = toUserSort(firstParam(params.sort));
   await recordAdminAccess(admin.userId, {
     action: 'search',
     targetType: 'list',
@@ -64,7 +77,7 @@ async function UserList({ searchParams }: { searchParams: SearchParams }) {
           {USER_TABS.map((value) => (
             <Link
               key={value}
-              href={`/admin/users?tab=${value}`}
+              href={usersHref({ tab: value })}
               aria-current={value === tab ? 'page' : undefined}
               className={cn(
                 'rounded-full px-3 py-1 text-sm ring-1 ring-foreground/10',
@@ -77,6 +90,7 @@ async function UserList({ searchParams }: { searchParams: SearchParams }) {
         </nav>
         <form action="/admin/users" className="flex w-full max-w-md gap-2">
           <input type="hidden" name="tab" value={tab} />
+          {sort !== 'latest' ? <input type="hidden" name="sort" value={sort} /> : null}
           <Input
             name="q"
             defaultValue={query}
@@ -89,13 +103,27 @@ async function UserList({ searchParams }: { searchParams: SearchParams }) {
           </Button>
         </form>
       </div>
-      {tab === 'customers' ? <CustomerList query={query} /> : <OwnerList query={query} />}
+      <div className="flex justify-end">
+        <SortSelect
+          value={sort}
+          options={USER_SORTS.map((value) => ({
+            value,
+            label: USER_SORT_LABELS[value],
+            href: usersHref({ tab, query, sort: value }),
+          }))}
+        />
+      </div>
+      {tab === 'customers' ? (
+        <CustomerList query={query} sort={sort} />
+      ) : (
+        <OwnerList query={query} sort={sort} />
+      )}
     </div>
   );
 }
 
-async function CustomerList({ query }: { query: string }) {
-  const result = await selectCustomers(getDb(), query);
+async function CustomerList({ query, sort }: { query: string; sort: UserSort }) {
+  const result = await selectCustomers(getDb(), query, sort);
   if (result.rows.length === 0) return <NoUsers query={query} label="고객" />;
   return (
     <UserTable result={result} minWidth="min-w-[52rem]">
@@ -108,35 +136,40 @@ async function CustomerList({ query }: { query: string }) {
           <th className={HEAD_CELL}>취소</th>
           <th className={HEAD_CELL}>노쇼</th>
           <th className={HEAD_CELL}>상태</th>
+          <th className={HEAD_CELL}>
+            <span className="sr-only">상세</span>
+          </th>
         </tr>
       </thead>
-      <tbody>
-        {result.rows.map((row) => (
-          <tr key={row.customerId} className="border-b last:border-0 hover:bg-muted/50">
-            <td className={cn(CELL, 'font-medium')}>
-              <Link href={`/admin/users/customers/${row.customerId}`} className="hover:underline">
-                {row.nickname}
-              </Link>
-            </td>
-            <td className={cn(CELL, 'whitespace-nowrap')}>{maskPhone(row.phone)}</td>
-            <td className={cn(CELL, 'whitespace-nowrap')}>{formatKstDateTime(row.createdAt)}</td>
-            <td className={CELL}>{row.reservationCount}</td>
-            <td className={CELL}>{row.cancelCount}</td>
-            <td className={cn(CELL, row.noShowCount > 0 && 'font-medium text-destructive')}>
-              {row.noShowCount}
-            </td>
-            <td className={CELL}>
-              <AccountBadge withdrawnAt={row.withdrawnAt} />
-            </td>
-          </tr>
-        ))}
-      </tbody>
+      <SelectableRows>
+        {result.rows.map((row) => {
+          const href = `/admin/users/customers/${row.customerId}`;
+          return (
+            <SelectableRow key={row.customerId} id={row.customerId} href={href}>
+              <td className={cn(CELL, 'font-medium')}>{row.nickname}</td>
+              <td className={cn(CELL, 'whitespace-nowrap')}>{maskPhone(row.phone)}</td>
+              <td className={cn(CELL, 'whitespace-nowrap')}>{formatKstDateTime(row.createdAt)}</td>
+              <td className={CELL}>{row.reservationCount}</td>
+              <td className={CELL}>{row.cancelCount}</td>
+              <td className={cn(CELL, row.noShowCount > 0 && 'font-medium text-destructive')}>
+                {row.noShowCount}
+              </td>
+              <td className={CELL}>
+                <AccountBadge withdrawnAt={row.withdrawnAt} />
+              </td>
+              <td className={cn(CELL, 'text-right')}>
+                <DetailLink href={href} label={`${row.nickname} 상세`} />
+              </td>
+            </SelectableRow>
+          );
+        })}
+      </SelectableRows>
     </UserTable>
   );
 }
 
-async function OwnerList({ query }: { query: string }) {
-  const result = await selectOwners(getDb(), query);
+async function OwnerList({ query, sort }: { query: string; sort: UserSort }) {
+  const result = await selectOwners(getDb(), query, sort);
   if (result.rows.length === 0) return <NoUsers query={query} label="원장님" />;
   return (
     <UserTable result={result} minWidth="min-w-[52rem]">
@@ -149,33 +182,48 @@ async function OwnerList({ query }: { query: string }) {
           <th className={HEAD_CELL}>매물</th>
           <th className={HEAD_CELL}>가입</th>
           <th className={HEAD_CELL}>상태</th>
+          <th className={HEAD_CELL}>
+            <span className="sr-only">상세</span>
+          </th>
         </tr>
       </thead>
-      <tbody>
-        {result.rows.map((row) => (
-          <tr key={row.ownerId} className="border-b last:border-0 hover:bg-muted/50">
-            <td className={cn(CELL, 'font-medium')}>{row.name}</td>
-            <td className={CELL}>
-              {row.shopId ? (
-                <Link href={`/admin/shops/${row.shopId}`} className="hover:underline">
-                  {row.shopName}
-                </Link>
-              ) : (
-                '-'
-              )}
-            </td>
-            <td className={CELL}>
-              {row.shopStatus ? <StatusBadge status={row.shopStatus} /> : '-'}
-            </td>
-            <td className={cn(CELL, 'whitespace-nowrap')}>{maskPhone(row.phone)}</td>
-            <td className={CELL}>{row.slotCount}</td>
-            <td className={cn(CELL, 'whitespace-nowrap')}>{formatKstDateTime(row.createdAt)}</td>
-            <td className={CELL}>
-              <AccountBadge withdrawnAt={row.withdrawnAt} />
-            </td>
-          </tr>
-        ))}
-      </tbody>
+      <SelectableRows>
+        {result.rows.map((row) => {
+          const cells = (
+            <>
+              <td className={cn(CELL, 'font-medium')}>{row.name}</td>
+              <td className={CELL}>{row.shopName ?? '-'}</td>
+              <td className={CELL}>
+                {row.shopStatus ? <StatusBadge status={row.shopStatus} /> : '-'}
+              </td>
+              <td className={cn(CELL, 'whitespace-nowrap')}>{maskPhone(row.phone)}</td>
+              <td className={CELL}>{row.slotCount}</td>
+              <td className={cn(CELL, 'whitespace-nowrap')}>{formatKstDateTime(row.createdAt)}</td>
+              <td className={CELL}>
+                <AccountBadge withdrawnAt={row.withdrawnAt} />
+              </td>
+            </>
+          );
+          // 원장님 상세는 그 샵의 입점 심사 상세다. 샵이 없는 계정(드묾)은 고를 수 없는 줄로 둔다
+          if (!row.shopId) {
+            return (
+              <tr key={row.ownerId} className="border-b last:border-0">
+                {cells}
+                <td className={CELL} />
+              </tr>
+            );
+          }
+          const href = `/admin/shops/${row.shopId}`;
+          return (
+            <SelectableRow key={row.ownerId} id={row.ownerId} href={href}>
+              {cells}
+              <td className={cn(CELL, 'text-right')}>
+                <DetailLink href={href} label={`${row.name} 상세`} />
+              </td>
+            </SelectableRow>
+          );
+        })}
+      </SelectableRows>
     </UserTable>
   );
 }

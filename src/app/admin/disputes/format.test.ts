@@ -5,12 +5,14 @@ import { describe, expect, it } from 'vitest';
 import { DISPUTE_OUTCOMES } from '@/db/schema';
 
 import {
+  defaultDisputeSort,
   DISPUTE_CHANNEL_DETAIL_LABELS,
   DISPUTE_OUTCOME_LABELS,
   disputesHref,
   fromKstInputValue,
   labelDisputeStatus,
   toDisputeFilter,
+  toDisputeSort,
   toKstInputValue,
 } from './format';
 
@@ -24,6 +26,21 @@ describe('목록 탭과 주소', () => {
     expect(disputesHref({ filter: 'open', query: '' })).toBe('/admin/disputes');
     expect(disputesHref({ filter: 'resolved', query: 'T1234' })).toBe(
       '/admin/disputes?status=resolved&q=T1234',
+    );
+  });
+
+  it('정렬: 탭마다 기본 정렬은 주소에 넣지 않고, 모르는 값이면 그 탭의 기본 정렬', () => {
+    expect(defaultDisputeSort('open')).toBe('received_old');
+    expect(defaultDisputeSort('resolved')).toBe('handled_new');
+    expect(defaultDisputeSort('all')).toBe('received_new');
+    expect(toDisputeSort('nope')).toBeNull();
+    expect(toDisputeSort('handled_new')).toBe('handled_new');
+    expect(disputesHref({ filter: 'open', sort: 'received_old' })).toBe('/admin/disputes');
+    expect(disputesHref({ filter: 'open', sort: 'received_new' })).toBe(
+      '/admin/disputes?sort=received_new',
+    );
+    expect(disputesHref({ filter: 'all', query: '샘플', sort: 'handled_new' })).toBe(
+      `/admin/disputes?status=all&q=${encodeURIComponent('샘플')}&sort=handled_new`,
     );
   });
 });

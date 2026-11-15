@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DetailLink, SelectableRow, SelectableRows } from '@/components/ui/selectable-rows';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SortSelect } from '@/components/ui/sort-select';
 import { EmptyState } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { firstParam, type SearchValue } from '@/lib/search-params';
@@ -16,25 +18,29 @@ import { ensureAdminPage } from '@/server/auth';
 
 import { ADMIN_LIST_LIMIT, toSearchQuery } from '../lookup';
 import {
+  defaultDisputeSort,
   DISPUTE_CHANNEL_LABELS,
   DISPUTE_FILTER_LABELS,
   DISPUTE_FILTERS,
   DISPUTE_SORT_LABELS,
+  DISPUTE_SORTS,
   DISPUTE_TYPE_LABELS,
   disputesHref,
   labelDisputeStatus,
   toDisputeFilter,
+  toDisputeSort,
 } from './format';
 import { selectDisputes } from './queries';
 
 export const metadata: Metadata = { title: '이의제기' };
 
-type SearchParams = Promise<{ status?: SearchValue; q?: SearchValue }>;
+type SearchParams = Promise<{ status?: SearchValue; q?: SearchValue; sort?: SearchValue }>;
 
-const HEAD_CELL = 'px-4 py-3 font-medium';
-const CELL = 'px-4 py-3';
+const HEAD_CELL = 'px-3 py-3 font-medium';
+const CELL = 'px-3 py-3';
 
-// 이의제기 목록 (A-104, W19 ②). 주소: /admin/disputes?status=open|resolved|all&q=검색어.
+// 이의제기 목록 (A-104, W19 ②). 주소: /admin/disputes?status=open|resolved|all&q=검색어&sort=정렬.
+// 줄을 한 번 누르면 선택, 두 번 누르거나 줄 끝 [상세]를 누르면 상세(#360 1번, 11/15 nnoinn).
 // 확인 중(open)인 이의제기가 있는 거래는 정산이 보류된다(#350). 카카오톡 채널 건은 예약 상세의 [이의제기 등록]에서 등록한다
 export default function AdminDisputesPage({ searchParams }: { searchParams: SearchParams }) {
   return (
@@ -58,13 +64,14 @@ async function List({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const filter = toDisputeFilter(firstParam(params.status));
   const query = toSearchQuery(firstParam(params.q));
+  const sort = toDisputeSort(firstParam(params.sort)) ?? defaultDisputeSort(filter);
   await recordAdminAccess(admin.userId, {
     action: 'search',
     targetType: 'list',
     path: disputesHref({ filter }),
     query,
   });
-  const { rows, hasMore } = await selectDisputes(getDb(), { filter, query });
+  const { rows, hasMore } = await selectDisputes(getDb(), { filter, query, sort });
 
   return (
     <div className="flex flex-col gap-4">
@@ -83,6 +90,9 @@ async function List({ searchParams }: { searchParams: SearchParams }) {
         </nav>
         <form action="/admin/disputes" className="flex w-full max-w-md gap-2">
           {filter !== 'open' ? <input type="hidden" name="status" value={filter} /> : null}
+          {sort !== defaultDisputeSort(filter) ? (
+            <input type="hidden" name="sort" value={sort} />
+          ) : null}
           <Input
             name="q"
             defaultValue={query}
@@ -95,7 +105,16 @@ async function List({ searchParams }: { searchParams: SearchParams }) {
           </Button>
         </form>
       </div>
-      <p className="text-sm text-muted-foreground">정렬: {DISPUTE_SORT_LABELS[filter]}</p>
+      <div className="flex justify-end">
+        <SortSelect
+          value={sort}
+          options={DISPUTE_SORTS.map((value) => ({
+            value,
+            label: DISPUTE_SORT_LABELS[value],
+            href: disputesHref({ filter, query, sort: value }),
+          }))}
+        />
+      </div>
       {rows.length === 0 ? (
         <EmptyState
           title={filter === 'open' ? '확인 중인 이의제기가 없어요' : '맞는 이의제기가 없어요'}
@@ -103,7 +122,8 @@ async function List({ searchParams }: { searchParams: SearchParams }) {
         />
       ) : (
         <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
-          <table className="w-full min-w-[64rem] text-sm">
+          {/* 최소 폭을 두지 않아 샵·손님 칸이 줄바꿈되며 화면 폭에 맞춘다(1280 화면에서 가로로 밀리지 않게) */}
+          <table className="w-full text-sm">
             <thead className="text-left text-muted-foreground">
               <tr className="border-b">
                 <th className={HEAD_CELL}>받은 시각</th>
@@ -113,32 +133,39 @@ async function List({ searchParams }: { searchParams: SearchParams }) {
                 <th className={HEAD_CELL}>종류</th>
                 <th className={HEAD_CELL}>경로</th>
                 <th className={HEAD_CELL}>상태</th>
+                <th className={HEAD_CELL}>
+                  <span className="sr-only">상세</span>
+                </th>
               </tr>
             </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.disputeId} className="border-b last:border-0 hover:bg-muted/50">
-                  <td className={cn(CELL, 'whitespace-nowrap')}>
-                    {formatKstDateTime(row.receivedAt)}
-                  </td>
-                  <td className={cn(CELL, 'font-medium whitespace-nowrap')}>
-                    <Link href={`/admin/disputes/${row.disputeId}`} className="hover:underline">
+            <SelectableRows>
+              {rows.map((row) => {
+                const href = `/admin/disputes/${row.disputeId}`;
+                return (
+                  <SelectableRow key={row.disputeId} id={row.disputeId} href={href}>
+                    <td className={cn(CELL, 'whitespace-nowrap')}>
+                      {formatKstDateTime(row.receivedAt)}
+                    </td>
+                    <td className={cn(CELL, 'font-medium whitespace-nowrap')}>
                       {row.reservationCode}
-                    </Link>
-                  </td>
-                  <td className={CELL}>{row.shopName}</td>
-                  {/* 손님 이름(#375)이 들어오면 이름으로 바꾼다. 지금은 닉네임 */}
-                  <td className={CELL}>{row.customerNickname}</td>
-                  <td className={CELL}>{DISPUTE_TYPE_LABELS[row.type]}</td>
-                  <td className={CELL}>{DISPUTE_CHANNEL_LABELS[row.channel]}</td>
-                  <td className={CELL}>
-                    <Badge variant={row.status === 'open' ? 'default' : 'secondary'}>
-                      {labelDisputeStatus(row.status, row.outcome)}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+                    </td>
+                    <td className={CELL}>{row.shopName}</td>
+                    {/* 손님 이름(#375)이 들어오면 이름으로 바꾼다. 지금은 닉네임 */}
+                    <td className={CELL}>{row.customerNickname}</td>
+                    <td className={CELL}>{DISPUTE_TYPE_LABELS[row.type]}</td>
+                    <td className={CELL}>{DISPUTE_CHANNEL_LABELS[row.channel]}</td>
+                    <td className={CELL}>
+                      <Badge variant={row.status === 'open' ? 'default' : 'secondary'}>
+                        {labelDisputeStatus(row.status, row.outcome)}
+                      </Badge>
+                    </td>
+                    <td className={cn(CELL, 'text-right')}>
+                      <DetailLink href={href} label={`이의제기 ${row.reservationCode} 상세`} />
+                    </td>
+                  </SelectableRow>
+                );
+              })}
+            </SelectableRows>
           </table>
         </div>
       )}

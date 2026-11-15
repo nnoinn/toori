@@ -13,12 +13,25 @@ export const DISPUTE_FILTER_LABELS: Record<DisputeFilter, string> = {
   all: '전체',
 };
 
-/** 목록이 지금 어떤 순서로 보이는지(정렬 고르기 공통 부품이 들어오기 전에는 글로 알린다, #360 1번) */
-export const DISPUTE_SORT_LABELS: Record<DisputeFilter, string> = {
-  open: '받은 시각이 오래된 순(오래 기다린 것부터)',
-  resolved: '결론을 기록한 시각이 최근인 순',
-  all: '받은 시각이 최근인 순',
+/** 목록 정렬. 주소 ?sort= 값(#360 1번, 목록 오른쪽 위 정렬 고르기) */
+export const DISPUTE_SORTS = ['received_old', 'received_new', 'handled_new'] as const;
+export type DisputeSort = (typeof DISPUTE_SORTS)[number];
+
+export const DISPUTE_SORT_LABELS: Record<DisputeSort, string> = {
+  received_old: '오래된 접수 순',
+  received_new: '최신 접수 순',
+  handled_new: '최신 결론 순',
 };
+
+/**
+ * 탭마다 기본 정렬. 확인 중은 오래 기다린 것부터(정산 보류가 길어지지 않게), 결론은 최근에 결론 낸 것부터,
+ * 전체는 최근에 받은 것부터(정렬 고르기 전과 같은 순서)
+ */
+export function defaultDisputeSort(filter: DisputeFilter): DisputeSort {
+  if (filter === 'open') return 'received_old';
+  if (filter === 'resolved') return 'handled_new';
+  return 'received_new';
+}
 
 export function toDisputeFilter(value: string | undefined): DisputeFilter {
   return (DISPUTE_FILTERS as readonly string[]).includes(value ?? '')
@@ -26,11 +39,20 @@ export function toDisputeFilter(value: string | undefined): DisputeFilter {
     : 'open';
 }
 
-/** 목록 주소. 기본값(확인 중, 검색어 없음)은 주소에 넣지 않는다 */
-export function disputesHref(input: { filter?: DisputeFilter; query?: string } = {}): string {
+/** 주소의 정렬 값. 없거나 모르는 값이면 null(그 탭의 기본 정렬을 쓴다) */
+export function toDisputeSort(value: string | undefined): DisputeSort | null {
+  return DISPUTE_SORTS.find((sort) => sort === value) ?? null;
+}
+
+/** 목록 주소. 기본값(확인 중, 검색어 없음, 그 탭의 기본 정렬)은 주소에 넣지 않는다 */
+export function disputesHref(
+  input: { filter?: DisputeFilter; query?: string; sort?: DisputeSort | null } = {},
+): string {
+  const filter = input.filter ?? 'open';
   const params = new URLSearchParams();
-  if (input.filter && input.filter !== 'open') params.set('status', input.filter);
+  if (filter !== 'open') params.set('status', filter);
   if (input.query) params.set('q', input.query);
+  if (input.sort && input.sort !== defaultDisputeSort(filter)) params.set('sort', input.sort);
   const search = params.toString();
   return search ? `/admin/disputes?${search}` : '/admin/disputes';
 }

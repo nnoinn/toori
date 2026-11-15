@@ -54,6 +54,33 @@ describeDb('회원 조회 (실제 DB)', () => {
     });
   });
 
+  it('고객 목록 정렬: 최신 가입 순(기본), 오래된 가입 순, 가나다 순', async () => {
+    await withRollback(async (tx) => {
+      const prefix = unique('정렬고객');
+      const older = await namedCustomer(tx, `${prefix}나`);
+      const newer = await namedCustomer(tx, `${prefix}가`);
+      await tx
+        .update(customers)
+        .set({ createdAt: new Date('2026-10-01T00:00:00Z') })
+        .where(eq(customers.id, older.customerId));
+      await tx
+        .update(customers)
+        .set({ createdAt: new Date('2026-10-02T00:00:00Z') })
+        .where(eq(customers.id, newer.customerId));
+      const ids = async (sort?: 'latest' | 'oldest' | 'name') =>
+        (await selectCustomers(tx, prefix, sort)).rows.map((row) => row.customerId);
+
+      expect(await ids()).toEqual([newer.customerId, older.customerId]);
+      expect(await ids('oldest')).toEqual([older.customerId, newer.customerId]);
+      expect(await ids('name')).toEqual([newer.customerId, older.customerId]);
+      await tx
+        .update(customers)
+        .set({ nickname: `${prefix}다` })
+        .where(eq(customers.id, newer.customerId));
+      expect(await ids('name')).toEqual([older.customerId, newer.customerId]);
+    });
+  });
+
   it('검색어의 % _ 는 글자 그대로 찾는다', async () => {
     await withRollback(async (tx) => {
       const me = await namedCustomer(tx, unique('할인_100%고객'));
