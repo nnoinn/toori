@@ -29,7 +29,7 @@ import {
 
 export const metadata: Metadata = { title: '결제·환불 확인' };
 
-const HEAD_CELL = 'px-4 py-3 font-medium';
+const HEAD_CELL = 'px-4 py-3 font-medium whitespace-nowrap';
 const CELL = 'px-4 py-3';
 
 // 결제·환불 확인 (#373 ①). 결제 정리 작업(10분마다)이 고치지 못하고 남은 주문·환불과, 금액 확인이 필요한 환불을 한 화면에 모은다.
@@ -128,7 +128,7 @@ function Section({
 
 function TableFrame({ minWidth, children }: { minWidth: string; children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
+    <div className="relative overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
       <table className={cn('w-full text-sm', minWidth)}>{children}</table>
     </div>
   );
@@ -136,7 +136,7 @@ function TableFrame({ minWidth, children }: { minWidth: string; children: React.
 
 function StuckOrdersTable({ rows }: { rows: StuckOrderRow[] }) {
   return (
-    <TableFrame minWidth="min-w-[72rem]">
+    <TableFrame minWidth="min-w-[60rem]">
       <thead className="text-left text-muted-foreground">
         <tr className="border-b">
           <th className={HEAD_CELL}>주문 시각</th>
@@ -145,7 +145,7 @@ function StuckOrdersTable({ rows }: { rows: StuckOrderRow[] }) {
           <th className={HEAD_CELL}>손님</th>
           <th className={HEAD_CELL}>샵 · 매물</th>
           <th className={cn(HEAD_CELL, 'text-right')}>결제액</th>
-          <th className={HEAD_CELL}>정리 작업이 마지막으로 본 시각</th>
+          <th className={HEAD_CELL}>마지막 확인</th>
           <th className={HEAD_CELL}>
             <span className="sr-only">처리</span>
           </th>
@@ -164,7 +164,7 @@ function StuckOrdersTable({ rows }: { rows: StuckOrderRow[] }) {
               <td className={cn(CELL, 'font-mono text-xs break-all')}>{row.paymentId}</td>
               <td className={CELL}>
                 <Link href={`/admin/users/customers/${row.customerId}`} className="hover:underline">
-                  {row.customerName}
+                  <span className="whitespace-nowrap">{row.customerName}</span>
                 </Link>
               </td>
               <td className={CELL}>
@@ -181,7 +181,7 @@ function StuckOrdersTable({ rows }: { rows: StuckOrderRow[] }) {
                   ? formatKstDateTime(row.checkedAt)
                   : '아직 안 봄'}
               </td>
-              <td className={cn(CELL, 'text-right')}>
+              <td className={cn(CELL, 'text-right whitespace-nowrap')}>
                 <IssueAction kind="order" targetId={row.orderId} label={row.paymentId} />
               </td>
             </tr>
@@ -194,7 +194,7 @@ function StuckOrdersTable({ rows }: { rows: StuckOrderRow[] }) {
 
 function StuckCancelsTable({ rows }: { rows: StuckCancelRow[] }) {
   return (
-    <TableFrame minWidth="min-w-[64rem]">
+    <TableFrame minWidth="min-w-[52rem]">
       <thead className="text-left text-muted-foreground">
         <tr className="border-b">
           <th className={HEAD_CELL}>요청 시각</th>
@@ -219,14 +219,14 @@ function StuckCancelsTable({ rows }: { rows: StuckCancelRow[] }) {
             </td>
             <td className={cn(CELL, 'whitespace-nowrap')}>{labelRefundReason(row.reason)}</td>
             <td className={CELL}>
-              {row.customerName}
+              <span className="whitespace-nowrap">{row.customerName}</span>
               <span className="block text-xs text-muted-foreground">{row.shopName}</span>
             </td>
             <td className={cn(CELL, 'font-mono text-xs break-all')}>{row.paymentId}</td>
             <td className={cn(CELL, 'text-right whitespace-nowrap')}>
               {formatWon(row.refundAmount)}
             </td>
-            <td className={cn(CELL, 'text-right')}>
+            <td className={cn(CELL, 'text-right whitespace-nowrap')}>
               <IssueAction kind="cancel" targetId={row.reservationId} label={row.reservationCode} />
             </td>
           </tr>
@@ -238,7 +238,7 @@ function StuckCancelsTable({ rows }: { rows: StuckCancelRow[] }) {
 
 function RefundReviewsTable({ rows }: { rows: RefundReviewRow[] }) {
   return (
-    <TableFrame minWidth="min-w-[72rem]">
+    <TableFrame minWidth="min-w-[60rem]">
       <thead className="text-left text-muted-foreground">
         <tr className="border-b">
           <th className={HEAD_CELL}>환불 시각</th>
@@ -270,15 +270,15 @@ function RefundReviewsTable({ rows }: { rows: RefundReviewRow[] }) {
             </td>
             <td className={cn(CELL, 'whitespace-nowrap')}>{labelRefundReason(row.reason)}</td>
             <td className={CELL}>
-              {row.customerName}
+              <span className="whitespace-nowrap">{row.customerName}</span>
               <span className="block text-xs text-muted-foreground">{row.shopName}</span>
             </td>
             <td className={cn(CELL, 'font-mono text-xs break-all')}>{row.paymentId}</td>
             <td className={cn(CELL, 'text-right whitespace-nowrap')}>
               {formatWon(row.refundAmount)}
             </td>
-            <td className={CELL}>{row.reviewReason}</td>
-            <td className={cn(CELL, 'text-right')}>
+            <td className={cn(CELL, 'min-w-48')}>{row.reviewReason}</td>
+            <td className={cn(CELL, 'text-right whitespace-nowrap')}>
               <IssueAction
                 kind="review"
                 targetId={row.refundId}

@@ -35,7 +35,7 @@ async function PendingShopsCard() {
   await ensureAdminPage();
   const pending = await countPendingShops(getDb());
   return (
-    <Link href="/admin/shops" className="max-w-sm">
+    <Link href="/admin/shops" className="w-full max-w-sm">
       <Card className="transition-colors hover:bg-muted/50">
         <CardHeader>
           <CardTitle>입점 승인</CardTitle>

@@ -43,7 +43,7 @@ export const REVIEW_CHECKED_TEXT = '확인했다고 기록했어요. 이 환불�
 export const ISSUE_ACTION_TEXT = {
   order: {
     button: '다시 시도',
-    title: (label: string) => `주문 ${label}을(를) 다시 정리할까요?`,
+    title: (label: string) => `결제 번호 ${label} 주문을 다시 정리할까요?`,
     description:
       '결제 정리 작업과 같은 처리를 한 번 더 해요. 결제가 됐는데 예약이 안 된 주문은 결제를 취소하고, 결과를 모르는 주문은 포트원에 물어 예약을 확정하거나 정리해요. 손님 알림은 결과에 따라 평소처럼 가요.',
     submit: '다시 시도',
