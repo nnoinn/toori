@@ -48,7 +48,10 @@ export async function requireShopOwner(shopId: string): Promise<Result<OwnerAuth
 export async function requireAdmin(): Promise<Result<{ userId: string }>> {
   const account = await getCurrentAccount();
   if (!account) return fail('UNAUTHENTICATED', AUTH_ERRORS.UNAUTHENTICATED);
-  if (!account.isAdmin) return fail('FORBIDDEN', AUTH_ERRORS.FORBIDDEN);
+  // 운영자 입구(/admin/login)로 들어온 운영자 모드에서만 통과한다. 고객·원장님으로 들어와 있으면 운영자여도 막는다(#372 2장, AUTH-03)
+  if (account.mode !== 'admin' || !account.isAdmin) {
+    return fail('FORBIDDEN', AUTH_ERRORS.FORBIDDEN);
+  }
   return ok({ userId: account.userId });
 }
 
