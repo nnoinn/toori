@@ -38,6 +38,18 @@ export function payoutDateOn(now: Date): string | null {
   return payoutDateFor(kstDateStart(today)) === today ? today : null;
 }
 
+/**
+ * 따라잡을 지급일: now가 든 한국 날짜 전 days일 안에 지급일이 있으면 그중 가장 가까운 날, 없으면 null.
+ * 지급일 새벽 작업이 통째로 실패했을 때 다음 날 새벽에 그 지급일로 다시 묶는다(#394 리뷰 3번)
+ */
+export function catchUpPayoutDate(now: Date, days: number): string | null {
+  for (let back = 1; back <= days; back += 1) {
+    const payoutDate = payoutDateOn(new Date(now.getTime() - back * DAY_MS));
+    if (payoutDate) return payoutDate;
+  }
+  return null;
+}
+
 /** 다음 날('YYYY-MM-DD') */
 function nextDate(date: string): string {
   return kstDateKey(new Date(kstDateStart(date).getTime() + DAY_MS));

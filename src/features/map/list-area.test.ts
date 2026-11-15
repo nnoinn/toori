@@ -25,6 +25,9 @@ describe('내 위치가 속한 시·군·구 (#215)', () => {
     expect(legalSigunguCode({ documents: [] })).toBeNull();
     expect(legalSigunguCode({ documents: [{ region_type: 'H', code: '4127355000' }] })).toBeNull();
     expect(legalSigunguCode({ documents: [{ region_type: 'B', code: '41273' }] })).toBeNull();
+    // 법정동 코드는 숫자 10자리 그대로만
+    expect(legalSigunguCode({ documents: [{ region_type: 'B', code: '41273101001' }] })).toBeNull();
+    expect(legalSigunguCode({ documents: [{ region_type: 'B', code: 'x4127310100' }] })).toBeNull();
   });
 });
 
@@ -72,6 +75,11 @@ describe('매물 목록 범위', () => {
       origin: point,
       fromMyLocation: true,
     });
+    // 카카오 좌표→행정구역은 x가 경도, y가 위도다(둘을 바꾸면 엉뚱한 곳을 찾는다)
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.pathname).toBe('/v2/local/geo/coord2regioncode.json');
+    expect(url.searchParams.get('x')).toBe(String(point.lng));
+    expect(url.searchParams.get('y')).toBe(String(point.lat));
   });
 
   it('카카오가 답하지 않으면(시간 초과) 찾지 못한 것으로 본다', async () => {

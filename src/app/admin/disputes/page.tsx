@@ -127,8 +127,7 @@ async function List({ searchParams }: { searchParams: SearchParams }) {
                     </Link>
                   </td>
                   <td className={CELL}>{row.shopName}</td>
-                  {/* 손님 이름(#375)이 들어오면 이름으로 바꾼다. 지금은 닉네임 */}
-                  <td className={CELL}>{row.customerNickname}</td>
+                  <td className={CELL}>{row.customerName}</td>
                   <td className={CELL}>{DISPUTE_TYPE_LABELS[row.type]}</td>
                   <td className={CELL}>{DISPUTE_CHANNEL_LABELS[row.channel]}</td>
                   <td className={CELL}>
