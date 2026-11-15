@@ -3,7 +3,7 @@
 import { z } from 'zod';
 
 import type { SettlementStatus } from '@/db/schema/settlements';
-import type { SettlementItemViewKind } from '@/server/settlements/types';
+import type { SettlementItemViewKind, SettlementStatementStatus } from '@/server/settlements/types';
 
 /** 목록 탭. 주소 ?status= 값. 기본은 지급 전(지급 요청 전에 확인할 것) */
 export const SETTLEMENT_FILTERS = ['pending', 'requested', 'paid', 'failed', 'all'] as const;
@@ -15,6 +15,15 @@ export const SETTLEMENT_STATUS_LABELS: Record<SettlementStatus, string> = {
   paid: '지급 완료',
   failed: '지급 실패',
 };
+
+/** 정산서 상태 이름. 지급 예정(scheduled)은 아직 목요일에 묶이지 않은 장이다 */
+export const STATEMENT_STATUS_LABELS: Record<SettlementStatementStatus, string> = {
+  scheduled: '지급 예정',
+  ...SETTLEMENT_STATUS_LABELS,
+};
+
+/** 지급 예정 정산서의 뗄 패널티·실지급액에 붙이는 표시(11/14 nnoinn, 묶기 전에 바뀔 수 있다) */
+export const ESTIMATE_MARK = '(예상)';
 
 export const SETTLEMENT_FILTER_LABELS: Record<SettlementFilter, string> = {
   ...SETTLEMENT_STATUS_LABELS,
@@ -90,4 +99,23 @@ export function settlementsHref(input: SettlementListParams): string {
   if (input.to) params.set('to', input.to);
   const search = params.toString();
   return search ? `/admin/settlements?${search}` : '/admin/settlements';
+}
+
+/** 샵별 정산서 목록 주소 */
+export function shopStatementsHref(shopId: string): string {
+  return `/admin/settlements/shops/${shopId}`;
+}
+
+/**
+ * 정산서 한 장 주소. 묶인 정산서는 정산 묶음 id로(운영자 칸까지 보이는 화면),
+ * 아직 묶이지 않은 지급 예정 정산서는 샵·지급일로 연다
+ */
+export function statementHref(input: {
+  shopId: string;
+  payoutDate: string;
+  settlementId?: string | null;
+}): string {
+  return input.settlementId
+    ? `/admin/settlements/${input.settlementId}`
+    : `${shopStatementsHref(input.shopId)}/${input.payoutDate}`;
 }
