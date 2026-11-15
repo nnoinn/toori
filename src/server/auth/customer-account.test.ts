@@ -90,6 +90,7 @@ describe('createCustomerAccount', () => {
     ).rejects.toThrow('redirect:/slots/a');
     expect(state.saveCustomerAccount).toHaveBeenCalledWith('tx', {
       userId: 'user-1',
+      name: '김투리',
       nickname: '김투리',
       phone: PHONE,
       optionalTerms: ['marketing'],
@@ -108,6 +109,7 @@ describe('createCustomerAccount', () => {
     ).rejects.toThrow('redirect:/');
     expect(state.saveCustomerAccount).toHaveBeenCalledWith('tx', {
       userId: 'user-1',
+      name: '고객',
       nickname: '고객',
       phone: PHONE,
       optionalTerms: [],
