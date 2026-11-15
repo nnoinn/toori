@@ -25,6 +25,7 @@ const config = {
     'src/server/settlements/settlement-view.ts',
     'src/server/settlements/statement-view.ts',
     'src/server/coupons/rules.ts',
+    'src/server/auth/customer-name.ts',
     'src/server/disputes/rules.ts',
     'src/server/visits/rules.ts',
     'src/server/slot-windows/rules.ts',
