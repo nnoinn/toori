@@ -5,20 +5,28 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
+import { getRequestNow } from '@/lib/request-time';
 import { ensureAdminPage } from '@/server/auth';
 
+import { countPaymentIssues } from './payment-issues/queries';
 import { countPendingShops } from './shops/queries';
 
 export const metadata: Metadata = { title: '운영자' };
 
-// 운영자 첫 화면. 지금은 입점 승인(A-101) 대기 수만 보여준다. 관리자가 아니면 404(<Suspense> 안에서 확인). PC 기준
+// 운영자 첫 화면. 입점 승인(A-101) 대기 수와 결제·환불 확인(#373 ①)이 필요한 건수를 보여준다.
+// 관리자가 아니면 404(<Suspense> 안에서 확인). PC 기준
 export default function AdminHomePage() {
   return (
     <main className="flex flex-1 flex-col gap-4 p-6">
       <h1 className="text-xl font-bold">운영자 화면</h1>
-      <Suspense fallback={<Skeleton className="h-28 w-full max-w-sm rounded-xl" />}>
-        <PendingShopsCard />
-      </Suspense>
+      <div className="flex flex-wrap gap-4">
+        <Suspense fallback={<Skeleton className="h-28 w-full max-w-sm rounded-xl" />}>
+          <PendingShopsCard />
+        </Suspense>
+        <Suspense fallback={<Skeleton className="h-28 w-full max-w-sm rounded-xl" />}>
+          <PaymentIssuesCard />
+        </Suspense>
+      </div>
     </main>
   );
 }
@@ -36,6 +44,27 @@ async function PendingShopsCard() {
         <CardContent>
           <p className="text-2xl font-bold">
             승인 대기 <span className="text-primary">{pending}</span>곳
+          </p>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
+async function PaymentIssuesCard() {
+  await ensureAdminPage();
+  const issues = await countPaymentIssues(getDb(), await getRequestNow());
+  return (
+    <Link href="/admin/payment-issues" className="w-full max-w-sm">
+      <Card className="transition-colors hover:bg-muted/50">
+        <CardHeader>
+          <CardTitle>결제·환불 확인</CardTitle>
+          <CardDescription>정리 작업이 고치지 못한 결제·환불을 다시 시도해요</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-2xl font-bold">
+            확인할 건{' '}
+            <span className={issues > 0 ? 'text-destructive' : 'text-primary'}>{issues}</span>건
           </p>
         </CardContent>
       </Card>

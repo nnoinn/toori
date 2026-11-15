@@ -1,6 +1,13 @@
 'use client';
 
-import { BadgeCheck, ClipboardList, MessageSquareWarning, Users, Wallet } from 'lucide-react';
+import {
+  BadgeCheck,
+  CircleAlert,
+  ClipboardList,
+  MessageSquareWarning,
+  Users,
+  Wallet,
+} from 'lucide-react';
 
 import { SideNav } from '@/components/ui/side-nav';
 
@@ -16,6 +23,7 @@ export function AdminNav() {
         { href: '/admin/users', label: '회원', icon: Users },
         { href: '/admin/reservations', label: '매물·예약', icon: ClipboardList },
         { href: '/admin/disputes', label: '이의제기', icon: MessageSquareWarning },
+        { href: '/admin/payment-issues', label: '결제·환불 확인', icon: CircleAlert },
         { href: '/admin/settlements', label: '정산', icon: Wallet },
       ]}
     />
