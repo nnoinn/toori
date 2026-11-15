@@ -199,7 +199,7 @@ PR 검사가 자동으로 막는 것:
 | AUTH-09 | 운영자 화면은 운영자 입구(/admin/login)에서 운영자로 로그인해야 열린다. 고객·원장님으로 로그인해 있어도 열리지 않고, 운영자 권한이 없으면 운영자 로그인을 거절한다. 운영자 함수도 운영자 모드에서만 통과한다(AUTH-03의 "관리자"가 이렇게 바뀐다) | #372, 11/13 nnoinn | ✅ | `src/server/auth/proxy-rules.test.ts` 운영자 모드면 통과하고<br>`src/app/api/auth/callback/route.test.ts` 운영자 입구로 들어왔는데 관리자가 아니면 바로 로그아웃시키고<br>`src/server/auth/session.test.ts` 운영자 모드로는 바꿀 수 없고 |
 | AUTH-10 | 운영자가 데이터를 바꾸면 같은 트랜잭션에서 처리 기록(누가·언제·무엇을·사유)이 남고, 처리 기록과 열람 기록은 앱에서 고치거나 지울 수 없다 | #372·#373 | ⏳ | |
 | AUTH-11 | 운영자 회원 상세에서도 휴대폰 번호·이메일은 가려서 보여주고, [번호 보기]를 누를 때만 서버에서 받아 보여준다. 누른 것도 열람 기록에 남는다 | 11/12 점검 8-2, 11/13 nnoinn | ⏳ | |
-| AUTH-12 | 고객 계정을 만들 때 이름이 필수다(앞뒤 공백 빼고 1~30자). 예약한 샵에는 예약자 이름과 휴대폰 번호만 보인다(닉네임은 주지 않는다) | #375, 11/13 nnoinn | ⏳ | |
+| AUTH-12 | 고객 계정을 만들 때 이름이 필수다(앞뒤 공백 빼고 1~30자). 예약한 샵에는 예약자 이름과 휴대폰 번호만 보인다(닉네임은 주지 않는다) | #375, 11/13 nnoinn | ✅ | `src/server/auth/customer-account.test.ts` 이름을 보내지 않은 요청도 NAME_REQUIRED<br>`src/server/auth/customer-account.test.ts` 이름을 비우면<br>`src/app/owner/(console)/reservations/reservation-detail-store.db.test.ts` 그 샵 예약을 매물·예약자 정보(이름·휴대폰, 닉네임은 빼고)와 같이 읽는다 |
 | AUTH-13 | 원장님은 자기 계정 이력만 보고, 운영자는 원장님·고객 계정 이력을 모두 본다. 운영자가 이력을 보면 열람 기록에 남는다 | #374, 11/13 nnoinn | ✅ | `src/server/accounts/history.test.ts` 지금 들어온 원장님 계정의 샵 이력만 읽는다<br>`src/server/accounts/history.test.ts` 원장님 이력: 그 원장님의 샵 이력을 읽고, 열람 기록을 남긴다<br>`src/server/accounts/history.test.ts` 운영자가 아니면 읽지도 기록하지도 않는다<br>`src/server/accounts/history-store.db.test.ts` 다른 샵과 시간대 안 손님 칸은 빼고 |
 
 ## 15. 시간대 매물 (#308, 진행 중)
