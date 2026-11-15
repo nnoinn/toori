@@ -189,13 +189,13 @@ PR 검사가 자동으로 막는 것:
 | --- | --- | --- | --- | --- |
 | AUTH-01 | 고객 계정을 만들 때 휴대폰 번호가 필수다(문자 인증은 하지 않는다) | C-104 | ✅ | `src/server/auth/customer-account.test.ts` PHONE_REQUIRED이고 저장하지 않는다 |
 | AUTH-02 | 같은 로그인 정보 아래 고객 계정과 원장님 계정을 따로 만들고, 어느 계정으로 들어왔는지는 로그인 때 고른 모드로 서버가 판단한다 | X-101 | ✅ | `src/server/auth/current-account.test.ts` 같은 로그인 정보의 고객 계정도 같이 읽는다<br>`src/server/auth/require.test.ts` 고객 모드면 WRONG_MODE |
-| AUTH-03 | 고객은 본인 예약만, 원장님은 본인 샵·예약만, 관리자는 전체를 본다 | X-102 | ✅ | `src/server/refunds/cancel.test.ts` 없거나 남의 예약이면 RESERVATION_NOT_FOUND<br>`src/server/auth/require.test.ts` 다른 샵이면 FORBIDDEN<br>`src/server/auth/require.test.ts` 관리자면 계정 종류와 상관없이 통과한다 |
+| AUTH-03 | 고객은 본인 예약만, 원장님은 본인 샵·예약만, 관리자는 운영자 모드에서만 전체를 본다(#372) | X-102 | ✅ | `src/server/refunds/cancel.test.ts` 없거나 남의 예약이면 RESERVATION_NOT_FOUND<br>`src/server/auth/require.test.ts` 다른 샵이면 FORBIDDEN<br>`src/server/auth/require.test.ts` 운영자 모드로 들어온 관리자만 통과하고 |
 | AUTH-04 | 원장님은 다른 샵의 메뉴·사진·예약을 보거나 바꿀 수 없다 | X-102 | ✅ | `src/app/owner/(console)/settings/menu/menu-store.db.test.ts` 다른 샵의 메뉴는 고치거나 숨기거나 옮길 수 없다<br>`src/app/owner/(console)/settings/images/shop-images-store.db.test.ts` 다른 샵 사진은 지우거나 옮기거나 메뉴를 바꿀 수 없다<br>`src/app/owner/(console)/reservations/reservation-detail-store.db.test.ts` 다른 샵 예약, 없는 id, 모양이 틀린 id는 null |
 | AUTH-05 | 운영자가 개인정보가 보이는 화면을 볼 때마다 열람 기록을 남기고, 기록을 못 남기면 화면이 개인정보를 보여 주지 않는다 | #269 | ✅ | `src/server/admin/access-log.test.ts` 기록을 넣지 못하면 오류를 던진다 |
 | AUTH-06 | 팀 접속 코드가 켜져 있으면 코드를 넣기 전에는 모든 화면이 잠금 화면으로 간다. 코드를 바꾸면 전에 받은 입장은 통하지 않는다 | #303 | ✅ | `src/lib/site-lock.test.ts` 입장하지 않았으면 화면 요청을 잠금 화면으로 보내고<br>`src/proxy.test.ts` 코드를 바꾸면 전에 받은 쿠키로는 들어오지 못한다 |
 | AUTH-07 | 카카오·구글 간편 로그인으로 실제로 들어가고 나온다(외부 로그인 화면이라 로봇이 누르지 않는다) | C-101 | 🖐 | |
 | AUTH-08 | 로그아웃하면 고객·원장님 모두 첫 화면(/, 로그인과 로그인 없이 둘러보기)이 새로 열리고, 뒤로 가기로 로그인한 화면이 다시 보이지 않는다 | 11/12 점검 9-1 | ⏳ | |
-| AUTH-09 | 운영자 화면은 운영자 입구(/admin/login)에서 운영자로 로그인해야 열린다. 고객·원장님으로 로그인해 있어도 열리지 않고, 운영자 권한이 없으면 운영자 로그인을 거절한다. 운영자 함수도 운영자 모드에서만 통과한다(AUTH-03의 "관리자"가 이렇게 바뀐다) | #372, 11/13 nnoinn | ⏳ | |
+| AUTH-09 | 운영자 화면은 운영자 입구(/admin/login)에서 운영자로 로그인해야 열린다. 고객·원장님으로 로그인해 있어도 열리지 않고, 운영자 권한이 없으면 운영자 로그인을 거절한다. 운영자 함수도 운영자 모드에서만 통과한다(AUTH-03의 "관리자"가 이렇게 바뀐다) | #372, 11/13 nnoinn | ✅ | `src/server/auth/proxy-rules.test.ts` 운영자 모드면 통과하고<br>`src/app/api/auth/callback/route.test.ts` 운영자 입구로 들어왔는데 관리자가 아니면 바로 로그아웃시키고<br>`src/server/auth/session.test.ts` 운영자 모드로는 바꿀 수 없고 |
 | AUTH-10 | 운영자가 데이터를 바꾸면 같은 트랜잭션에서 처리 기록(누가·언제·무엇을·사유)이 남고, 처리 기록과 열람 기록은 앱에서 고치거나 지울 수 없다 | #372·#373 | ⏳ | |
 | AUTH-11 | 운영자 회원 상세에서도 휴대폰 번호·이메일은 가려서 보여주고, [번호 보기]를 누를 때만 서버에서 받아 보여준다. 누른 것도 열람 기록에 남는다 | 11/12 점검 8-2, 11/13 nnoinn | ⏳ | |
 | AUTH-12 | 고객 계정을 만들 때 이름이 필수다(앞뒤 공백 빼고 1~30자). 예약한 샵에는 예약자 이름과 휴대폰 번호만 보인다(닉네임은 주지 않는다) | #375, 11/13 nnoinn | ⏳ | |

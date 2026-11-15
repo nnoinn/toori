@@ -4,8 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 import { decideProxy } from './proxy-rules';
 
-const visit = (pathname: string, loggedIn: boolean, mode: 'customer' | 'owner', search = '') =>
-  decideProxy({ pathname, search, loggedIn, mode });
+const visit = (
+  pathname: string,
+  loggedIn: boolean,
+  mode: 'customer' | 'owner' | 'admin',
+  search = '',
+) => decideProxy({ pathname, search, loggedIn, mode });
 
 describe('원장님 화면(/owner)', () => {
   it('원장님 모드로 로그인했으면 통과한다', () => {
@@ -41,10 +45,27 @@ describe('원장님 가입(/owner/join)', () => {
   });
 });
 
-describe('운영자 화면(/admin)', () => {
-  it('로그인하지 않았으면 404, 로그인했으면 통과(관리자인지는 ensureAdminPage가 본다)', () => {
-    expect(visit('/admin', false, 'customer')).toEqual({ type: 'not_found' });
-    expect(visit('/admin/shops', true, 'owner')).toEqual({ type: 'next' });
+describe('운영자 화면(/admin, #372)', () => {
+  it('운영자 모드면 통과하고(운영자 권한은 ensureAdminPage가 본다), 아니면 고객·원장님으로 들어와 있어도 운영자 입구로 보낸다', () => {
+    expect(visit('/admin/shops', true, 'admin')).toEqual({ type: 'next' });
+    expect(visit('/admin/shops', true, 'owner')).toEqual({
+      type: 'redirect',
+      to: '/admin/login?next=%2Fadmin%2Fshops',
+    });
+    expect(visit('/admin', true, 'customer')).toEqual({
+      type: 'redirect',
+      to: '/admin/login?next=%2Fadmin',
+    });
+    expect(visit('/admin/disputes', false, 'customer')).toEqual({
+      type: 'redirect',
+      to: '/admin/login?next=%2Fadmin%2Fdisputes',
+    });
+  });
+
+  it('운영자 입구는 누구나 열고, 이미 운영자로 들어와 있으면 운영자 화면으로 보낸다', () => {
+    expect(visit('/admin/login', false, 'customer')).toEqual({ type: 'next' });
+    expect(visit('/admin/login', true, 'owner')).toEqual({ type: 'next' });
+    expect(visit('/admin/login', true, 'admin')).toEqual({ type: 'redirect', to: '/admin' });
   });
 });
 
