@@ -48,7 +48,7 @@ async function heldSlot(tx: TestTx, shop: TestShop) {
 }
 
 describeDb('매물 마감 (실제 DB)', () => {
-  it('게시중·예약대기 매물을 사유·시각과 함께 마감하고, 그 시간에 새 매물을 올릴 수 있다', async () => {
+  it('게시중·게시예정 매물을 사유·시각과 함께 마감하고, 그 시간에 새 매물을 올릴 수 있다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
       const [published, scheduled] = await tx
@@ -174,7 +174,7 @@ describeDb('매물 수정 (실제 DB)', () => {
     });
   });
 
-  it('예약대기 매물을 48시간 안으로 고치면 지금 게시중으로 바뀐다', async () => {
+  it('게시예정 매물을 48시간 안으로 고치면 지금 게시중으로 바뀐다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
       const [slot] = await tx
@@ -208,7 +208,7 @@ describeDb('매물 수정 (실제 DB)', () => {
     });
   });
 
-  it('예약대기 매물은 14일 안의 먼 시각으로 옮기면 게시 시각을 새 시작 48시간 전으로 다시 정한다(S-205)', async () => {
+  it('게시예정 매물은 14일 안의 먼 시각으로 옮기면 게시 시각을 새 시작 48시간 전으로 다시 정한다(S-205)', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
       const [slot] = await tx
@@ -239,7 +239,7 @@ describeDb('매물 수정 (실제 DB)', () => {
     });
   });
 
-  it('게시중 매물은 48시간 밖으로 옮기지 못한다(다시 예약대기로 숨지 않게, 11/9)', async () => {
+  it('게시중 매물은 48시간 밖으로 옮기지 못한다(다시 게시예정으로 숨지 않게, 11/9)', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
       const [slot] = await tx

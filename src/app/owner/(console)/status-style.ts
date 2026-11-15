@@ -7,7 +7,7 @@ import type { ReservationView } from './reservations/reservation-detail';
 // 같은 뜻이면 같은 색: 예약됨 = 예정, 완료 = 방문 완료, 취소 = 취소. 판매 중·예약은 눈에 띄게, 끝난 것은 흐리게.
 
 const TONE = {
-  /** 아직 판매 전(예약대기) */
+  /** 아직 판매 전(게시예정) */
   waiting: 'border-border bg-background text-foreground',
   /** 판매 중(게시중) */
   onSale: 'bg-primary/15 text-primary',

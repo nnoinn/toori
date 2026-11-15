@@ -2,7 +2,7 @@
 
 // 원장님 프로필(샵 정보) 저장 서버 함수 (O2, S-103). 화면(shop-profile-form.tsx)에서 부른다.
 // 승인 전에도 고칠 수 있다(#23 D11). 사업자 정보는 여기서 고치지 않는다(D19).
-// 업종은 예약대기·게시중·예약됨 매물이 없을 때만 바꿀 수 있고, 바꾸면 메뉴를 초기화한다(category-change-store.ts, 10/29 결정).
+// 업종은 게시예정·게시중·예약됨 매물이 없을 때만 바꿀 수 있고, 바꾸면 메뉴를 초기화한다(category-change-store.ts, 10/29 결정).
 // 화면에서 2단계로 확인받은 뒤에만 한다.
 
 import { TransactionRollbackError } from 'drizzle-orm';

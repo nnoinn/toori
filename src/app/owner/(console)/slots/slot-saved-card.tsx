@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Price } from '@/components/ui/price';
+import { SLOT_STATUS_LABELS } from '@/features/slot-status/slot-status';
 import { formatKst, formatKstTime } from '@/lib/time';
 
 /** 완료 카드에 보여줄 저장한 매물 */
@@ -22,7 +23,7 @@ export type SavedSummary = {
   salePrice: number;
   discountRate: number;
   newCustomerOnly: boolean;
-  /** 예약대기로 저장했으면 고객에게 보이기 시작하는 시각(서버가 돌려준 값). 지금 게시중이면 null(S-205) */
+  /** 게시예정으로 저장했으면 고객에게 보이기 시작하는 시각(서버가 돌려준 값). 지금 게시중이면 null(S-205) */
   publishAt: Date | null;
 };
 
@@ -45,7 +46,7 @@ export function SavedCard({
         </CardTitle>
         <p className="text-sm text-muted-foreground">
           {saved.publishAt
-            ? `예약대기로 저장했어요. ${formatKst(saved.publishAt)}부터 고객 화면에 게시중으로 보여요.`
+            ? `${SLOT_STATUS_LABELS.scheduled} 상태로 저장했어요. ${formatKst(saved.publishAt)}부터 ${SLOT_STATUS_LABELS.published} 상태로 고객 화면에 보여요.`
             : edited
               ? '고친 내용이 바로 고객 화면에 보여요.'
               : '지금부터 고객 화면에 게시중으로 보여요.'}

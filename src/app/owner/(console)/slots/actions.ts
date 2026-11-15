@@ -35,7 +35,7 @@ export async function closeSlot(
 
 /**
  * 수정 ①② 고른 메뉴·시작 시각이 올릴 수 있는 것인지 본다. 고치는 매물 자신과는 겹쳐도 된다.
- * 게시중 매물은 48시간 안, 예약대기 매물은 14일 안의 시각만 받는다(editStartWindow)
+ * 게시중 매물은 48시간 안, 게시예정 매물은 14일 안의 시각만 받는다(editStartWindow)
  */
 export async function checkSlotEdit(
   shopId: string,

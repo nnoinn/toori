@@ -1,5 +1,5 @@
 // 매물 수정·마감 규칙 (O10, S-206). 화면('use client')과 서버가 같이 쓴다.
-// 판매 전(예약대기·게시중)이고 홀딩 중이 아닌 매물만 고치거나 마감할 수 있다(O1 canEditSlot과 같은 답).
+// 판매 전(게시예정·게시중)이고 홀딩 중이 아닌 매물만 고치거나 마감할 수 있다(O1 canEditSlot과 같은 답).
 // 막히면 이유를 원장님에게 알려준다. 매물을 지우는 기능은 없다.
 
 import type { SlotCloseReason } from '@/db/schema/slots';
@@ -68,7 +68,7 @@ export function slotEditProblem(
 
 /**
  * 고칠 때 고를 수 있는 시작 시각 범위(S-205, 11/9 정민석). 이미 고객에게 보이는(게시중) 매물은 48시간 안으로만
- * 옮길 수 있어서 다시 예약대기로 숨지 않는다. 예약대기 매물은 새로 올릴 때처럼 14일 안에서 고른다
+ * 옮길 수 있어서 다시 게시예정으로 숨지 않는다. 게시예정 매물은 새로 올릴 때처럼 14일 안에서 고른다
  */
 export function editStartWindow(slot: SlotStatusInput, now: Date): StartWindow {
   return getSlotStatus(slot, now) === 'published' ? 'published' : 'advance';

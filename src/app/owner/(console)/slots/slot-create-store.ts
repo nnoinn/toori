@@ -19,11 +19,11 @@ type Db = Pick<ReturnType<typeof getDb>, 'transaction'>;
 export type SavedSlot = {
   slotId: string;
   salePrice: number;
-  /** 예약대기로 저장했으면 고객에게 보이기 시작하는 게시 시각(ISO). 지금 게시중이면 null(S-205) */
+  /** 게시예정으로 저장했으면 고객에게 보이기 시작하는 게시 시각(ISO). 지금 게시중이면 null(S-205) */
   publishAt: string | null;
 };
 
-/** 저장한 게시 상태를 완료 화면 값으로. 예약대기일 때만 게시 시각을 알려 준다 */
+/** 저장한 게시 상태를 완료 화면 값으로. 게시예정일 때만 게시 시각을 알려 준다 */
 export function scheduledPublishAt(plan: PublishPlan): string | null {
   return plan.status === 'scheduled' ? plan.publishAt.toISOString() : null;
 }
@@ -32,7 +32,7 @@ export function scheduledPublishAt(plan: PublishPlan): string | null {
 export type CreateSlotOptions = { relistedFromSlotId?: string };
 
 /**
- * ①②③ 고른 값으로 매물을 저장한다. 시작이 48시간보다 멀면 예약대기로, 시작 48시간 전을 게시 시각으로
+ * ①②③ 고른 값으로 매물을 저장한다. 시작이 48시간보다 멀면 게시예정으로, 시작 48시간 전을 게시 시각으로
  * 저장하고, 그 안이면 지금 게시중으로 저장한다(publishPlan, S-205). 메뉴 값은 등록 당시 값을 복사한다(D12).
  * 취소 시간대 재등록(relist-store.ts)도 같은 확인을 거치도록 이 함수를 쓰고, 원래 매물을 relistedFromSlotId로 넘긴다
  */
