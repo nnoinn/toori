@@ -74,6 +74,7 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
       const userId = await createTestUser(tx);
       const saved = await saveCustomerAccount(tx, {
         userId,
+        name: '김투리',
         nickname: '김투리',
         phone: PHONE,
         optionalTerms: [],
@@ -81,7 +82,7 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
 
       const [customer] = await tx.select().from(customers).where(eq(customers.userId, userId));
       expect(saved).toEqual({ customerId: customer.id, consentNotices: [] });
-      expect(customer).toMatchObject({ nickname: '김투리', phone: PHONE });
+      expect(customer).toMatchObject({ name: '김투리', nickname: '김투리', phone: PHONE });
       expect(await termsOf(tx, userId)).toEqual(
         ['age14', 'location', 'privacy', 'service'].map((termsType) => ({
           accountType: 'customer',
@@ -98,6 +99,7 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
       const userId = await createTestUser(tx);
       const saved = await saveCustomerAccount(tx, {
         userId,
+        name: '김투리',
         nickname: '김투리',
         phone: PHONE,
         optionalTerms: ['marketing', 'interest_alert'],
@@ -120,6 +122,7 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
       const userId = await createTestUser(tx);
       await saveCustomerAccount(tx, {
         userId,
+        name: '김투리',
         nickname: '김투리',
         phone: PHONE,
         optionalTerms: ['interest_alert'],
@@ -138,6 +141,7 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
       expect(
         await saveCustomerAccount(tx, {
           userId,
+          name: '다시',
           nickname: '다시',
           phone: PHONE,
           optionalTerms: ['marketing'],
@@ -155,6 +159,7 @@ describeDb('계정·약관 동의 저장 (실제 DB)', () => {
         const userId = await createTestUser(tx);
         const saved = await saveCustomerAccount(tx, {
           userId,
+          name: nickname,
           nickname,
           phone: PHONE,
           optionalTerms: [],

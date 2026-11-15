@@ -91,7 +91,7 @@ export function FavoriteButton({
         aria-pressed={shown}
         disabled={pending}
         onClick={toggle}
-        className="gap-1 max-md:h-9 max-md:px-3"
+        className="gap-1 max-md:h-10 max-md:px-3"
       >
         <Heart className={cn('size-4', shown && 'fill-primary text-primary')} aria-hidden />찜
       </Button>
@@ -111,6 +111,7 @@ export function FavoriteButton({
               <Button
                 type="button"
                 size="sm"
+                className="max-md:h-10"
                 disabled={consent.pending}
                 onClick={() => consent.change(true)}
               >

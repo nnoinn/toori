@@ -50,6 +50,8 @@ export async function saveCustomerAccount(
   tx: Db,
   input: {
     userId: string;
+    /** 예약자 이름(#375) */
+    name: string;
     nickname: string;
     phone: string;
     optionalTerms: readonly OptionalTerms[];
@@ -57,7 +59,12 @@ export async function saveCustomerAccount(
 ): Promise<{ customerId: string; consentNotices: ConsentNotice[] } | null> {
   const [customer] = await tx
     .insert(customers)
-    .values({ userId: input.userId, nickname: input.nickname, phone: input.phone })
+    .values({
+      userId: input.userId,
+      name: input.name,
+      nickname: input.nickname,
+      phone: input.phone,
+    })
     .onConflictDoNothing({ target: customers.userId })
     .returning({ id: customers.id });
   if (!customer) return null;

@@ -86,4 +86,13 @@ describe('로그인하고 갈 곳: 고른 모드와 next가 맞지 않으면 그
     expect(isPathForMode('/owners', 'customer')).toBe(true);
     expect(isPathForMode('/administrator', 'customer')).toBe(true);
   });
+
+  it('원장님·운영자 화면은 주소 맨 앞으로만 가린다', () => {
+    // 고객 화면 주소 뒤쪽에 /owner·/admin이 있어도 고객 화면이다
+    expect(isPathForMode('/home/list?from=/owner', 'customer')).toBe(true);
+    expect(isPathForMode('/home/list?from=/owner', 'owner')).toBe(false);
+    expect(isPathForMode('/home/list?from=/admin', 'customer')).toBe(true);
+    // /admin 그 자체는 운영자 화면이라 고객 화면이 아니다
+    expect(isPathForMode('/admin', 'customer')).toBe(false);
+  });
 });

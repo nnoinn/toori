@@ -47,7 +47,13 @@ export function AreaDevicePush() {
   return (
     <>
       <p>이 기기에서 푸시 알림을 켜면 새 매물 알림을 바로 받을 수 있어요.</p>
-      <Button type="button" size="sm" disabled={push.pending} onClick={push.turnOn}>
+      <Button
+        type="button"
+        size="sm"
+        className="max-md:h-10"
+        disabled={push.pending}
+        onClick={push.turnOn}
+      >
         {push.pending ? '푸시 알림을 켜는 중…' : '이 기기 푸시 알림 켜기'}
       </Button>
       {push.message ? (
