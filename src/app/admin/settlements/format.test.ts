@@ -8,6 +8,8 @@ import {
   defaultSettlementSort,
   SETTLEMENT_STATUS_LABELS,
   settlementsHref,
+  STATEMENT_STATUS_LABELS,
+  statementHref,
   toPayoutDate,
   toSettlementFilter,
   toSettlementSort,
@@ -30,10 +32,12 @@ describe('탭과 정렬', () => {
     expect(defaultSettlementSort('all')).toBe('payout_new');
   });
 
-  it('정산 상태 4개 모두 이름이 있다', () => {
+  it('정산 상태 4개 모두 이름이 있고, 정산서에는 아직 묶이지 않은 "지급 예정"이 더 있다', () => {
     for (const status of SETTLEMENT_STATUSES) {
       expect(SETTLEMENT_STATUS_LABELS[status], status).toBeTruthy();
+      expect(STATEMENT_STATUS_LABELS[status]).toBe(SETTLEMENT_STATUS_LABELS[status]);
     }
+    expect(STATEMENT_STATUS_LABELS.scheduled).toBe('지급 예정');
   });
 });
 
@@ -57,6 +61,18 @@ describe('목록 주소', () => {
       }),
     ).toBe(
       '/admin/settlements?status=failed&sort=amount_high&q=%EC%83%98%ED%94%8C+%ED%97%A4%EC%96%B4&from=2026-11-01&to=2026-11-30',
+    );
+  });
+
+  it('정산서 한 장: 묶인 정산서는 정산 묶음 id로, 지급 예정 정산서는 샵·지급일로 연다', () => {
+    expect(
+      statementHref({ shopId: 'shop-1', payoutDate: '2026-11-19', settlementId: 'set-1' }),
+    ).toBe('/admin/settlements/set-1');
+    expect(statementHref({ shopId: 'shop-1', payoutDate: '2026-11-26' })).toBe(
+      '/admin/settlements/shops/shop-1/2026-11-26',
+    );
+    expect(statementHref({ shopId: 'shop-1', payoutDate: '2026-11-26', settlementId: null })).toBe(
+      '/admin/settlements/shops/shop-1/2026-11-26',
     );
   });
 
