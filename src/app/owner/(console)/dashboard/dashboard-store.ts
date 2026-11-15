@@ -6,7 +6,7 @@
 
 import 'server-only';
 
-import { and, asc, eq, gte, inArray, isNotNull, isNull, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, lte } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 import { getDb } from '@/db';
@@ -120,13 +120,15 @@ export async function selectNeedsVisitRecord(
  * 상태는 지금(now) 기준 windowStatus: 게시 전이면 게시예정, 남은 시간에 들어가는 서비스가 없으면 full, 끝났거나 마감했으면 마감.
  * 이미 찬 시간은 그 샵의 게시예정·게시중·예약됨 매물이다(결제 없이 끝난 홀딩 칸은 비어 있는 것으로 본다).
  * 원장님이 마감한 시간대에는 손님이 결제 중이라 남긴 칸(keptSlots)을 같이 준다. 결제하면 예약 줄로 옮겨 가고, 결제 없이 끝나면
- * 결제 정리 작업(10분마다)이 닫아서 빠진다
+ * 결제 정리 작업(10분마다)이 닫아서 빠진다.
+ * before를 주면 그 시각 전에 시작하는 시간대만 읽는다(예약 현황 캘린더 S-402가 한 주·하루씩 읽는다)
  */
 export async function selectDashboardWindows(
   db: Db,
   shopId: string,
   from: Date,
   now: Date,
+  { before }: { before?: Date } = {},
 ): Promise<DashboardWindow[]> {
   const rows = await db
     .select({
@@ -139,7 +141,13 @@ export async function selectDashboardWindows(
       newCustomerOnly: slotWindows.newCustomerOnly,
     })
     .from(slotWindows)
-    .where(and(eq(slotWindows.shopId, shopId), gte(slotWindows.startAt, from)))
+    .where(
+      and(
+        eq(slotWindows.shopId, shopId),
+        gte(slotWindows.startAt, from),
+        before ? lt(slotWindows.startAt, before) : undefined,
+      ),
+    )
     .orderBy(asc(slotWindows.startAt));
   if (rows.length === 0) return [];
 
