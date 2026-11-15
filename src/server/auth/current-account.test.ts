@@ -81,7 +81,7 @@ describeDb('loadAccount·ensureProfile (실제 DB)', () => {
       const shop = await createTestShop(tx);
       const [customer] = await tx
         .insert(customers)
-        .values({ userId: shop.createdBy, nickname: '같은 사람' })
+        .values({ userId: shop.createdBy, name: '같은 사람', nickname: '같은 사람' })
         .returning();
       const [owner] = await tx.select().from(owners).where(eq(owners.userId, shop.createdBy));
 

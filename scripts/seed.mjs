@@ -137,6 +137,8 @@ export async function seedDevData(sql, { now, userIds }) {
   const customers = SEED_CUSTOMERS.map((c, i) => ({
     id: crypto.randomUUID(),
     user_id: userIds[`customer-${c.key}`],
+    // 예약자 이름(#375). 시드 이름은 현동훈이 넣기 전까지 닉네임과 같게 둔다
+    name: c.nickname,
     nickname: c.nickname,
     // 가입 때 휴대폰 번호를 받는다(11/2, #183). 원장님 예약 상세에 연락처가 보이게
     phone: `010-0001-${pad(i + 1, 4)}`,
