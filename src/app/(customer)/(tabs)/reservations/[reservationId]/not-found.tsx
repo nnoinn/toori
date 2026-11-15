@@ -13,7 +13,7 @@ export default function ReservationNotFound() {
         title="예약을 찾을 수 없어요"
         description="주소를 다시 확인하거나 내 예약에서 찾아 주세요."
         action={
-          <Link href="/reservations" className={buttonVariants()}>
+          <Link href="/reservations" className={buttonVariants({ className: 'max-md:h-10' })}>
             내 예약으로
           </Link>
         }

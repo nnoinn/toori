@@ -13,7 +13,7 @@ export default function WindowNotFound() {
         title="시간대를 찾을 수 없어요"
         description="이미 끝났거나 지금은 예약할 수 있는 시각이 없는 시간대예요."
         action={
-          <Link href="/home/list" className={buttonVariants()}>
+          <Link href="/home/list" className={buttonVariants({ className: 'max-md:h-10' })}>
             매물 목록 보기
           </Link>
         }
