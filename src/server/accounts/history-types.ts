@@ -63,12 +63,58 @@ export type AccountHistoryEvent = {
   result: string | null;
 };
 
-/** 이력 한 쪽. 더 앞선 이력이 있으면 nextBefore를 다음에 before로 넘긴다 */
+/** 이력 한 쪽. 쪽 번호는 1부터. 이력이 없어도 쪽 수는 1이다 */
 export type AccountHistoryPage = {
   events: AccountHistoryEvent[];
-  nextBefore: string | null;
+  page: number;
+  pageCount: number;
+  /** 조건(기간·종류)에 맞는 이력 전체 수 */
+  total: number;
 };
 
-/** 한 번에 보여주는 기본 줄 수와 최대 줄 수 */
-export const HISTORY_DEFAULT_LIMIT = 30;
-export const HISTORY_MAX_LIMIT = 100;
+/** 한 쪽에 보여주는 줄 수(11/15 nnoinn: 20건쯤, 아래에 쪽 번호) */
+export const HISTORY_PAGE_SIZE = 20;
+/** 고를 수 있는 가장 뒤 쪽. 쪽마다 기록별로 (쪽 × 줄 수)개까지 읽어서, 더 앞선 이력은 기간으로 좁혀 본다 */
+export const HISTORY_MAX_PAGE = 250;
+
+/**
+ * 이력 종류 묶음(종류 고르기, 11/15 nnoinn). 원래 기록 하나에서 나오는 일(매물 등록·재등록, 입점 승인·반려)은
+ * 같은 묶음에 둔다(기록별로 읽고 세기 때문).
+ */
+export const HISTORY_CATEGORY_KINDS = {
+  shop: ['shop_applied', 'shop_approved', 'shop_rejected'],
+  slot: [
+    'slot_created',
+    'slot_relisted',
+    'slot_published',
+    'slot_closed',
+    'window_created',
+    'window_closed',
+  ],
+  reservation: ['reservation_created', 'visit_recorded'],
+  cancel: [
+    'reservation_cancelled',
+    'agreed_cancel_requested',
+    'agreed_cancel_resolved',
+    'refund_done',
+  ],
+  settlement: ['payout_account_changed', 'settlement_paid'],
+  account: ['signed_up', 'consent_agreed', 'consent_withdrawn'],
+  coupon: ['coupon_issued', 'coupon_used'],
+  dispute: ['dispute_filed', 'dispute_resolved'],
+} as const satisfies Record<string, readonly AccountHistoryKind[]>;
+export type HistoryCategory = keyof typeof HISTORY_CATEGORY_KINDS;
+
+/** 계정 종류마다 고를 수 있는 종류 묶음(화면 순서) */
+export const ACCOUNT_HISTORY_CATEGORIES: Record<AccountType, readonly HistoryCategory[]> = {
+  owner: ['shop', 'slot', 'reservation', 'cancel', 'settlement'],
+  customer: ['account', 'reservation', 'cancel', 'coupon', 'dispute'],
+};
+
+/** 이력 고르기: 쪽 번호, 기간(한국 날짜 'YYYY-MM-DD', 시작일·끝일 모두 포함), 종류 묶음. 모두 없어도 된다 */
+export type AccountHistoryQuery = {
+  page?: number;
+  from?: string;
+  to?: string;
+  category?: HistoryCategory;
+};

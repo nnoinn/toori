@@ -9,7 +9,19 @@ import {
   type AgreedCancelReason,
 } from '@/server/refunds/agreed-cancel-types';
 
-import type { AccountHistoryEvent, AccountType } from './history-types';
+import type { AccountHistoryEvent, AccountType, HistoryCategory } from './history-types';
+
+/** 종류 묶음 이름(이력 화면의 종류 고르기, 11/15 nnoinn) */
+export const HISTORY_CATEGORY_LABELS: Record<HistoryCategory, string> = {
+  shop: '입점',
+  slot: '매물·시간대',
+  reservation: '예약·방문',
+  cancel: '취소·환불',
+  settlement: '정산',
+  account: '가입·알림 동의',
+  coupon: '쿠폰',
+  dispute: '이의제기',
+};
 
 /** 누가 보는 화면인지(원장님 내 계정 / 운영자). 누르면 열 화면 주소가 다르다 */
 export type HistoryAudience = 'owner' | 'admin';

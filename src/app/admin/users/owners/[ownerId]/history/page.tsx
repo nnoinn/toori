@@ -4,18 +4,18 @@ import { notFound } from 'next/navigation';
 
 import { BackButton } from '@/components/ui/back-button';
 import { LoadingCards } from '@/components/ui/state';
-import { firstParam, type SearchValue } from '@/lib/search-params';
 import { isUuid } from '@/lib/uuid';
 import { ensureAdminPage } from '@/server/auth';
 
 import { AdminHistoryList } from '../../../history-list';
+import { type HistorySearch, readHistorySearch } from '../../../history-query';
 
 export const metadata: Metadata = { title: '원장님 이력' };
 
 type Params = Promise<{ ownerId: string }>;
-type SearchParams = Promise<{ before?: SearchValue }>;
+type SearchParams = Promise<HistorySearch>;
 
-// 원장님 계정 이력 (#374, AUTH-13). 주소: /admin/users/owners/[ownerId]/history?before=… (조회만, 볼 때마다 열람 기록)
+// 원장님 계정 이력 (#374, AUTH-13). 주소: /admin/users/owners/[ownerId]/history?from=…&to=…&kind=…&page=… (조회만, 볼 때마다 열람 기록)
 // 입점 심사 상세의 [원장님 이력 보기]에서 들어온다. 원장님 내 계정의 계정 이력(정민석)과 같은 함수·문구를 쓴다
 export default function AdminOwnerHistoryPage({
   params,
@@ -45,7 +45,7 @@ async function History({ params, searchParams }: { params: Params; searchParams:
     <AdminHistoryList
       accountType="owner"
       accountId={ownerId}
-      before={firstParam((await searchParams).before)}
+      query={readHistorySearch(await searchParams, 'owner')}
       path={`/admin/users/owners/${ownerId}/history`}
     />
   );

@@ -4,18 +4,18 @@ import { notFound } from 'next/navigation';
 
 import { BackButton } from '@/components/ui/back-button';
 import { LoadingCards } from '@/components/ui/state';
-import { firstParam, type SearchValue } from '@/lib/search-params';
 import { isUuid } from '@/lib/uuid';
 import { ensureAdminPage } from '@/server/auth';
 
 import { AdminHistoryList } from '../../../history-list';
+import { type HistorySearch, readHistorySearch } from '../../../history-query';
 
 export const metadata: Metadata = { title: '고객 이력' };
 
 type Params = Promise<{ customerId: string }>;
-type SearchParams = Promise<{ before?: SearchValue }>;
+type SearchParams = Promise<HistorySearch>;
 
-// 고객 계정 이력 (#374, AUTH-13). 주소: /admin/users/customers/[customerId]/history?before=… (조회만, 볼 때마다 열람 기록)
+// 고객 계정 이력 (#374, AUTH-13). 주소: /admin/users/customers/[customerId]/history?from=…&to=…&kind=…&page=… (조회만, 볼 때마다 열람 기록)
 export default function AdminCustomerHistoryPage({
   params,
   searchParams,
@@ -44,7 +44,7 @@ async function History({ params, searchParams }: { params: Params; searchParams:
     <AdminHistoryList
       accountType="customer"
       accountId={customerId}
-      before={firstParam((await searchParams).before)}
+      query={readHistorySearch(await searchParams, 'customer')}
       path={`/admin/users/customers/${customerId}/history`}
     />
   );

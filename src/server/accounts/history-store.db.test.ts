@@ -1,5 +1,6 @@
 // 계정 이력 DB 읽기(#374)를 실제 DB(TEST_DATABASE_URL이 있을 때만)로 확인한다.
-// 원장님 이력은 그 샵 것만(다른 샵·손님이 시간대 안에서 만든 칸은 빼고), 고객 이력은 그 고객 것만 최신 순으로 읽는지 본다.
+// 원장님 이력은 그 샵 것만(다른 샵·손님이 시간대 안에서 만든 칸은 빼고), 고객 이력은 그 고객 것만 최신 순으로 읽는지,
+// 기간·종류로 고르면 그것만 읽고 세는지, 시각이 같은 일이 많아도 쪽을 넘길 때 겹치거나 빠지지 않는지 본다.
 // 테스트 데이터는 한 트랜잭션이라 기본 시각(now())이 같아서, 비교할 기록은 시각을 직접 넣고 before로 그 뒤 기록은 뺀다.
 
 import { eq } from 'drizzle-orm';
@@ -23,8 +24,9 @@ import {
   testSlot,
 } from '../../../tests/db/fixtures';
 import { closeTestDb, describeDb, withRollback } from '../../../tests/db/test-db';
-import { type HistoryReader, readHistoryPage, toHistoryPage } from './history-page';
+import { toHistoryPage } from './history-page';
 import { readCustomerHistory, readOwnerHistory, readOwnerShopId } from './history-store';
+import { HISTORY_CATEGORY_KINDS } from './history-types';
 
 const at = (iso: string) => new Date(iso);
 /** 이 시각 뒤에 생긴 기록(테스트가 시각을 넣지 않은 것)은 보지 않는다 */
@@ -130,17 +132,22 @@ describeDb('계정 이력 (실제 DB)', () => {
         createdAt: at('2026-10-31T00:00:00Z'),
       });
 
-      const lists = await readOwnerHistory(tx, {
-        shopId: shop.shopId,
-        before: BEFORE,
-        limit: 30,
-        now: at('2026-11-14T00:00:00Z'),
-      });
-      const page = toHistoryPage(lists, 30);
+      const read = (range: Partial<Parameters<typeof readOwnerHistory>[1]> = {}) =>
+        readOwnerHistory(tx, {
+          shopId: shop.shopId,
+          now: at('2026-11-14T00:00:00Z'),
+          from: null,
+          before: BEFORE,
+          kinds: null,
+          take: 30,
+          ...range,
+        });
+      const page = toHistoryPage(await read(), 1, 30);
       expect(page.events.map((event) => event.key)).toEqual([
         expect.stringMatching(/^payout_account_changed:/),
         `reservation_cancelled:${booked.reservation.id}`,
         `reservation_created:${booked.reservation.id}`,
+        `window_created:${window.id}`,
         `slot_published:${scheduled.id}`,
         `slot_closed:${closed.id}`,
         `slot_created:${closed.id}`,
@@ -157,17 +164,34 @@ describeDb('계정 이력 (실제 DB)', () => {
         rate: 30,
         hoursBeforeStart: 43,
       });
-      expect(page.events[4]).toMatchObject({ kind: 'slot_closed', reason: 'other_channel' });
+      expect(page.events[5]).toMatchObject({ kind: 'slot_closed', reason: 'other_channel' });
+      expect(page.total).toBe(10);
+
+      // 매물·시간대 묶음, 한국 10/21 9시 ~ 10/24 9시 전: 10/21 등록, 10/22 등록, 10/23 마감만
+      const slotOnly = toHistoryPage(
+        await read({
+          kinds: HISTORY_CATEGORY_KINDS.slot,
+          from: at('2026-10-21T00:00:00Z'),
+          before: at('2026-10-24T00:00:00Z'),
+        }),
+        1,
+        30,
+      );
+      expect(slotOnly.events.map((event) => event.key)).toEqual([
+        `slot_closed:${closed.id}`,
+        `slot_created:${closed.id}`,
+        `slot_created:${scheduled.id}`,
+      ]);
+      expect(slotOnly.total).toBe(3);
     });
   });
 
-  it('한 번에 만든 매물이 한 쪽 줄 수보다 많아도 [더보기]로 넘길 때 빠지지 않는다', async () => {
+  it('한 번에 만든 매물처럼 시각이 같은 일이 한 쪽보다 많아도, 쪽을 넘길 때 겹치거나 빠지지 않는다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, {
         status: 'approved',
         appliedAt: at('2026-10-01T00:00:00Z'),
       });
-      // 등록 시각이 같은 매물 4개. 한 쪽 2줄이면 처음 읽기(기록마다 3개)에서 하나가 빠지므로 그 시각만 다시 읽어야 한다
       const sameTime = at('2026-10-20T00:00:00Z');
       const made = await tx
         .insert(slots)
@@ -184,18 +208,25 @@ describeDb('계정 이력 (실제 DB)', () => {
           })),
         )
         .returning({ id: slots.id });
-      const read: HistoryReader = (range) =>
-        readOwnerHistory(tx, { shopId: shop.shopId, ...range, now: at('2026-11-14T00:00:00Z') });
-
-      const first = await readHistoryPage(read, BEFORE, 2);
-      expect(first.events.map((event) => event.key).sort()).toEqual(
-        made.map((slot) => `slot_created:${slot.id}`).sort(),
-      );
-      expect(first.nextBefore).toBe(sameTime.toISOString());
-
-      const second = await readHistoryPage(read, new Date(first.nextBefore as string), 2);
-      expect(second.events.map((event) => event.key)).toEqual([`shop_applied:${shop.shopId}`]);
-      expect(second.nextBefore).toBeNull();
+      // 한 쪽 2줄: 쪽마다 기록별로 (쪽 × 2)개까지 읽는다
+      const pageOf = async (page: number) =>
+        toHistoryPage(
+          await readOwnerHistory(tx, {
+            shopId: shop.shopId,
+            now: at('2026-11-14T00:00:00Z'),
+            from: null,
+            before: BEFORE,
+            kinds: null,
+            take: page * 2,
+          }),
+          page,
+          2,
+        );
+      const [first, second, third] = [await pageOf(1), await pageOf(2), await pageOf(3)];
+      expect(first).toMatchObject({ page: 1, pageCount: 3, total: 5 });
+      const slotKeys = [...first.events, ...second.events].map((event) => event.key);
+      expect(slotKeys.toSorted()).toEqual(made.map((slot) => `slot_created:${slot.id}`).toSorted());
+      expect(third.events.map((event) => event.key)).toEqual([`shop_applied:${shop.shopId}`]);
     });
   });
 
@@ -253,11 +284,10 @@ describeDb('계정 이력 (실제 DB)', () => {
         withdrawnAt: at('2026-10-29T00:00:00Z'),
       });
 
+      const read = (before: Date) =>
+        readCustomerHistory(tx, { customerId, userId, from: null, before, kinds: null, take: 30 });
       const kinds = async (before: Date) =>
-        toHistoryPage(
-          await readCustomerHistory(tx, { customerId, userId, before, limit: 30 }),
-          30,
-        ).events.map((event) => event.kind);
+        toHistoryPage(await read(before), 1, 30).events.map((event) => event.kind);
       expect(await kinds(BEFORE)).toEqual([
         'consent_withdrawn',
         'coupon_used',
@@ -276,10 +306,8 @@ describeDb('계정 이력 (실제 DB)', () => {
         'signed_up',
       ]);
 
-      const [refund] = (
-        await readCustomerHistory(tx, { customerId, userId, before: BEFORE, limit: 30 })
-      )
-        .flat()
+      const [refund] = (await read(BEFORE))
+        .flatMap((list) => list.events)
         .filter((event) => event.kind === 'refund_done');
       expect(refund).toMatchObject({
         reservationCode: booked.reservation.code,
