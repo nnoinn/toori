@@ -6,9 +6,11 @@
 import 'server-only';
 
 import { and, asc, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 import type { getDb } from '@/db';
 import {
+  adminProfiles,
   customers,
   type DisputeChannel,
   type DisputeOutcome,
@@ -116,7 +118,14 @@ export type DisputeDetail = DisputeRow & {
   startAt: Date;
   menuName: string;
   shopId: string;
+  /** 카카오톡 채널 건을 등록한 운영자 이름(#372). 앱 접수거나 프로필이 없으면 null */
+  registeredByName: string | null;
+  /** 결론을 기록한 운영자 이름(#372). 확인 중이거나 프로필이 없으면 null */
+  handledByName: string | null;
 };
+
+const registeredByProfile = alias(adminProfiles, 'registered_by_profile');
+const handledByProfile = alias(adminProfiles, 'handled_by_profile');
 
 /** 이의제기 상세와 그 예약. 없으면 null */
 export async function selectDisputeDetail(
@@ -147,12 +156,16 @@ export async function selectDisputeDetail(
       shopName: shops.name,
       customerId: customers.id,
       customerName: customers.name,
+      registeredByName: registeredByProfile.name,
+      handledByName: handledByProfile.name,
     })
     .from(disputes)
     .innerJoin(reservations, eq(reservations.id, disputes.reservationId))
     .innerJoin(slots, eq(slots.id, reservations.slotId))
     .innerJoin(shops, eq(shops.id, slots.shopId))
     .innerJoin(customers, eq(customers.id, reservations.customerId))
+    .leftJoin(registeredByProfile, eq(registeredByProfile.userId, disputes.registeredBy))
+    .leftJoin(handledByProfile, eq(handledByProfile.userId, disputes.handledBy))
     .where(eq(disputes.id, disputeId));
   if (!row) return null;
   // DB의 check 제약이 정해 둔 값만 허용한다
