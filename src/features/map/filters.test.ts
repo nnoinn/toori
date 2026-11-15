@@ -126,6 +126,8 @@ describe('선택 바꾸기', () => {
     const on = toggleService(hair(), 'perm');
     expect(on.services).toEqual(['perm']);
     expect(toggleService(on, 'perm').services).toEqual([]);
+    // 여러 개를 골랐으면 누른 것만 끈다
+    expect(toggleService(toggleService(on, 'cut'), 'perm').services).toEqual(['cut']);
     expect(togglePrice(EMPTY_FILTERS, 'under_30k').prices).toEqual(['under_30k']);
     expect(toggleTime(EMPTY_FILTERS, 'morning').times).toEqual(['morning']);
     expect(selectMinDiscount(EMPTY_FILTERS, 30).minDiscount).toBe(30);

@@ -11,7 +11,7 @@ import { z } from 'zod';
 
 import { getDb } from '@/db';
 import { fail, ok, type Result } from '@/lib/result';
-import { AUTH_ERRORS, getCurrentAccount } from '@/server/auth';
+import { type AccountMode, AUTH_ERRORS, getCurrentAccount } from '@/server/auth';
 
 import { NOTIFICATION_ERRORS } from './errors';
 import {
@@ -43,6 +43,14 @@ export type PushSubscriptionInput = {
 
 const USER_AGENT_MAX = 300;
 
+/** 알림을 받는 계정 종류. 운영자로 들어와 있으면 알림을 켤 계정이 없다(#372, 운영자 알림은 따로 없다) */
+function pushAccountType(mode: AccountMode): 'customer' | 'owner' | null {
+  return mode === 'admin' ? null : mode;
+}
+
+const ADMIN_MODE_PUSH_MESSAGE =
+  '운영자로 들어와 있을 때는 알림을 켤 수 없어요. 고객·원장님으로 들어와 켜 주세요';
+
 /**
  * 이 기기의 푸시 구독을 지금 모드(고객/원장님) 계정의 것으로 저장한다. 같은 기기·같은 계정 종류로 다시 부르면 덮어쓰고,
  * 내 다른 계정의 구독은 그대로 둔다. 같은 기기에 다른 로그인의 구독이 있으면 지운다
@@ -56,6 +64,8 @@ export async function savePushSubscription(input: PushSubscriptionInput): Promis
   if (account.mode === 'owner' && !account.ownerId) {
     return fail('NO_OWNER_ACCOUNT', AUTH_ERRORS.NO_OWNER_ACCOUNT);
   }
+  const accountType = pushAccountType(account.mode);
+  if (!accountType) return fail('WRONG_MODE', ADMIN_MODE_PUSH_MESSAGE);
   const parsed = subscriptionSchema.safeParse(input);
   if (!parsed.success) return fail('INVALID_INPUT', NOTIFICATION_ERRORS.INVALID_INPUT);
 
@@ -63,7 +73,7 @@ export async function savePushSubscription(input: PushSubscriptionInput): Promis
   await getDb().transaction((tx) =>
     upsertPushSubscription(tx, {
       userId: account.userId,
-      accountType: account.mode,
+      accountType,
       endpoint: parsed.data.endpoint,
       p256dh: parsed.data.keys.p256dh,
       auth: parsed.data.keys.auth,
@@ -78,10 +88,11 @@ export async function removePushSubscription(endpoint: string): Promise<Result<n
   const account = await getCurrentAccount();
   if (!account) return fail('UNAUTHENTICATED', AUTH_ERRORS.UNAUTHENTICATED);
   const parsed = endpointSchema.safeParse(endpoint);
-  if (!parsed.success) return ok(null);
+  const accountType = pushAccountType(account.mode);
+  if (!parsed.success || !accountType) return ok(null);
   await deletePushSubscription(getDb(), {
     userId: account.userId,
-    accountType: account.mode,
+    accountType,
     endpoint: parsed.data,
   });
   return ok(null);
@@ -104,10 +115,11 @@ export async function getPushSubscriptionStatus(
   const account = await getCurrentAccount();
   if (!account) return fail('UNAUTHENTICATED', AUTH_ERRORS.UNAUTHENTICATED);
   const parsed = endpointSchema.safeParse(endpoint);
-  if (!parsed.success) return ok({ subscribed: false });
+  const accountType = pushAccountType(account.mode);
+  if (!parsed.success || !accountType) return ok({ subscribed: false });
   const subscribed = await hasPushSubscription(getDb(), {
     userId: account.userId,
-    accountType: account.mode,
+    accountType,
     endpoint: parsed.data,
   });
   return ok({ subscribed });

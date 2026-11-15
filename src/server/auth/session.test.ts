@@ -58,6 +58,18 @@ describe('signInWithProvider', () => {
     });
   });
 
+  it('운영자 입구에서는 운영자 모드로 시작하고, 돌아갈 주소가 없으면 운영자 첫 화면(#372)', async () => {
+    state.signInWithOAuth.mockResolvedValue({ data: { url: 'https://kauth.example/c' } });
+
+    await expect(signInWithProvider({ provider: 'kakao', mode: 'admin' })).rejects.toThrow(
+      'redirect:https://kauth.example/c',
+    );
+    expect(state.signInWithOAuth).toHaveBeenCalledWith({
+      provider: 'kakao',
+      options: { redirectTo: 'http://localhost:3000/api/auth/callback?mode=admin&next=%2Fadmin' },
+    });
+  });
+
   it('다른 사이트 주소는 돌아갈 주소로 쓰지 않는다(고객 기본 /home, #215)', async () => {
     state.signInWithOAuth.mockResolvedValue({ data: { url: 'https://accounts.example/b' } });
 
@@ -132,9 +144,12 @@ describe('switchAccountMode', () => {
     });
   });
 
-  it('이상한 모드 값이면 INVALID_INPUT', async () => {
+  it('운영자 모드로는 바꿀 수 없고(운영자 입구로만 들어온다, #372) 이상한 모드 값도 INVALID_INPUT', async () => {
     state.userId = 'user-1';
-    const result = await switchAccountMode('admin' as 'owner');
+    let result = await switchAccountMode('admin');
     expect(result.ok || result.error.code).toBe('INVALID_INPUT');
+    result = await switchAccountMode('root' as 'owner');
+    expect(result.ok || result.error.code).toBe('INVALID_INPUT');
+    expect(state.cookieSet).not.toHaveBeenCalled();
   });
 });
