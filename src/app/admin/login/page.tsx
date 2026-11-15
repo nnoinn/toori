@@ -17,7 +17,8 @@ type SearchParams = Promise<{ next?: SearchValue; error?: SearchValue }>;
 // 운영자 권한(profiles.is_admin)이 없으면 로그인 콜백이 바로 로그아웃시키고 여기로 돌려보낸다(not_admin)
 export default function AdminLoginPage({ searchParams }: { searchParams: SearchParams }) {
   return (
-    <main className="flex flex-1 items-center justify-center p-6">
+    // data-admin-login: 운영자 레이아웃이 이 표시를 보고 메뉴를 숨긴다(layout.tsx)
+    <main data-admin-login className="flex flex-1 items-center justify-center p-6">
       <div className="flex w-full max-w-sm flex-col gap-6 rounded-xl bg-card p-8 ring-1 ring-foreground/10">
         <div className="flex flex-col items-center gap-2">
           <Logo className="h-8 w-auto" />

@@ -4,7 +4,7 @@
 
 import 'server-only';
 
-import { and, count, desc, eq, ilike, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, or, type SQL, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import {
@@ -24,6 +24,7 @@ import { type OptionalConsents, readOptionalConsents } from '@/server/auth/accou
 import { ownerListedSlot } from '@/server/slots/visibility';
 
 import { ADMIN_LIST_LIMIT, containsPattern, type ListResult, toListResult } from '../lookup';
+import type { UserSort } from './format';
 
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 
@@ -54,10 +55,18 @@ export type CustomerRow = {
   noShowCount: number;
 };
 
-/** 고객 목록(최근 가입 순). 이름·닉네임·이메일은 일부만 맞아도, 휴대폰은 전체 번호가 맞으면 찾는다 */
+/** 고객 목록 정렬(가나다 순은 이름) */
+const CUSTOMER_ORDER: Record<UserSort, SQL[]> = {
+  latest: [desc(customers.createdAt), desc(customers.id)],
+  oldest: [asc(customers.createdAt), asc(customers.id)],
+  name: [asc(customers.name), desc(customers.createdAt)],
+};
+
+/** 고객 목록(기본은 최근 가입 순). 이름·닉네임·이메일은 일부만 맞아도, 휴대폰은 전체 번호가 맞으면 찾는다 */
 export async function selectCustomers(
   db: DbReader,
   query: string,
+  sort: UserSort = 'latest',
 ): Promise<ListResult<CustomerRow>> {
   const pattern = containsPattern(query);
   const phone = normalizePhone(query);
@@ -84,7 +93,7 @@ export async function selectCustomers(
     .leftJoin(reservations, eq(reservations.customerId, customers.id))
     .where(where)
     .groupBy(customers.id)
-    .orderBy(desc(customers.createdAt))
+    .orderBy(...CUSTOMER_ORDER[sort])
     .limit(ADMIN_LIST_LIMIT + 1);
   return toListResult(rows);
 }
@@ -106,8 +115,18 @@ export type OwnerRow = {
   slotCount: number;
 };
 
-/** 원장님 목록(최근 가입 순). 이름·샵 이름·이메일은 일부만 맞아도, 휴대폰은 전체 번호가 맞으면 찾는다 */
-export async function selectOwners(db: DbReader, query: string): Promise<ListResult<OwnerRow>> {
+const OWNER_ORDER: Record<UserSort, SQL[]> = {
+  latest: [desc(owners.createdAt), desc(owners.id)],
+  oldest: [asc(owners.createdAt), asc(owners.id)],
+  name: [asc(owners.name), desc(owners.createdAt)],
+};
+
+/** 원장님 목록(기본은 최근 가입 순). 이름·샵 이름·이메일은 일부만 맞아도, 휴대폰은 전체 번호가 맞으면 찾는다 */
+export async function selectOwners(
+  db: DbReader,
+  query: string,
+  sort: UserSort = 'latest',
+): Promise<ListResult<OwnerRow>> {
   const pattern = containsPattern(query);
   const phone = normalizePhone(query);
   const where: SQL | undefined = query
@@ -136,7 +155,7 @@ export async function selectOwners(db: DbReader, query: string): Promise<ListRes
     .leftJoin(slots, and(eq(slots.shopId, shops.id), ownerListedSlot()))
     .where(where)
     .groupBy(owners.id, shops.id)
-    .orderBy(desc(owners.createdAt))
+    .orderBy(...OWNER_ORDER[sort])
     .limit(ADMIN_LIST_LIMIT + 1);
   // DB의 check 제약이 정해 둔 상태만 허용한다
   return toListResult(rows.map((row) => ({ ...row, shopStatus: row.shopStatus as ShopStatus })));
