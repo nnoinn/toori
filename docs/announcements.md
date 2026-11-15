@@ -13,6 +13,11 @@ nnoinn이 팀원에게 알릴 내용을 PR과 함께 이 파일에 추가한다.
 
 ---
 
+## 2026-11-15 · 전원 (운영자 화면은 운영자 입구 `/admin/login`으로)
+- 바뀜: 운영자 화면은 운영자 입구 `/admin/login`에서 카카오·구글로 로그인해야 열린다(#425, #372 2단계, AUTH-09). 고객·원장님으로 로그인해 있으면 관리자 계정이어도 `/admin`이 운영자 입구로 보낸다. 운영자 화면 위 오른쪽에 운영자 이름과 [로그아웃]이 있다. 첫 화면과 `/login`은 그대로 고객·원장님만이다
+- 바뀜(코드): 계정 모드에 `admin`이 더해졌다. `requireAdmin()`은 운영자 모드이고 `is_admin`일 때만 통과한다(AUTH-03 바뀜). 계정 바꾸기(`switchAccountMode`)로는 운영자 모드가 되지 않는다. 운영자 모드에서는 고객·원장님 함수가 WRONG_MODE다. 간편 로그인 버튼(`ProviderButton`)은 공통 UI(`src/components/ui/`)로 옮겨졌다
+- 할 일: 운영자 화면을 확인할 때는 `/admin/login`으로 들어온다. 사진은 그대로 `npm run screenshot -- capture --as admin-a /admin/...`(시드 운영자는 저절로 운영자 모드로 찍는다)
+
 ## 2026-11-14 · 전원 (운영자 화면 사진은 시드 운영자 `admin-a`로)
 - 바뀜: 개발 DB에 시드 운영자 계정 `admin-a@seed.test`가 생겼다(운영자 권한만 있고 고객·원장님 계정은 없다). 운영자 화면을 바꾼 PR의 사진은 `npm run screenshot -- capture --as admin-a /admin/...`로 찍는다. 시드를 다시 넣어도 남고, 없으면 `npm run db:seed -- --admin-only`로 그것만 만든다
 - 할 일: 없음. 운영자 화면 PR에서 실제 계정 대신 이 계정으로 찍어 주세요
