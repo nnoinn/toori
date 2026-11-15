@@ -179,8 +179,12 @@ describe('createBusinessDocUploadUrl', () => {
 });
 
 describe('getBusinessDocUrl', () => {
-  it('관리자는 어느 샵이든 5분짜리 주소를 받는다', async () => {
+  it('운영자 모드로 들어온 관리자는 어느 샵이든 5분짜리 주소를 받고, 고객 모드면 관리자여도 막는다(#372)', async () => {
     state.account = { userId: 'admin-1', mode: 'customer', shopId: null, isAdmin: true };
+    const wrongMode = await getBusinessDocUrl(SHOP);
+    expect(wrongMode.ok === false && wrongMode.error.code).toBe('FORBIDDEN');
+
+    state.account = { userId: 'admin-1', mode: 'admin', shopId: null, isAdmin: true };
     expect(await getBusinessDocUrl(SHOP)).toEqual(
       ok({
         url: 'https://storage.example/doc?token=x',
@@ -206,7 +210,7 @@ describe('getBusinessDocUrl', () => {
     state.account = null;
     expect((await getBusinessDocUrl(SHOP)).ok === false).toBe(true);
 
-    state.account = { userId: 'admin-1', mode: 'customer', shopId: null, isAdmin: true };
+    state.account = { userId: 'admin-1', mode: 'admin', shopId: null, isAdmin: true };
     state.docRows = [];
     const missing = await getBusinessDocUrl(SHOP);
     expect(missing.ok === false && missing.error.code).toBe('SHOP_NOT_FOUND');

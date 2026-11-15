@@ -27,7 +27,7 @@ describe('간편 로그인 버튼', () => {
     expect(css).toMatch(/--kakao-font:\s*system-ui,/);
     expect(css).toMatch(/--font-google:\s*var\(--font-google-sans\),/);
     const source = readFileSync(
-      join(process.cwd(), 'src/app/(customer)/(focus)/login/provider-button.tsx'),
+      join(process.cwd(), 'src/components/ui/provider-button.tsx'),
       'utf8',
     );
     // Google Sans Medium(500) 14/20

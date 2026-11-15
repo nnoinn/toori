@@ -79,7 +79,13 @@ export function AreaAlert({
     return (
       <div className="flex w-full max-w-sm flex-col items-center gap-3 rounded-xl border bg-card p-4 text-sm">
         <p className="font-medium">{areaLabel}에 새 매물이 올라오면 알려 드릴까요?</p>
-        <Button type="button" size="sm" className="gap-1" disabled={pending} onClick={watch}>
+        <Button
+          type="button"
+          size="sm"
+          className="gap-1 max-md:h-10"
+          disabled={pending}
+          onClick={watch}
+        >
           <Bell className="size-4" aria-hidden />
           {pending ? '등록하는 중…' : '새 매물 알림 받기'}
         </Button>
@@ -105,6 +111,7 @@ export function AreaAlert({
           <Button
             type="button"
             size="sm"
+            className="max-md:h-10"
             disabled={consent.pending}
             onClick={() => consent.change(true)}
           >

@@ -41,6 +41,7 @@ describe('영업시간', () => {
     const rows = formatBusinessHours([
       { weekday: 1, open: '10:00', close: '20:00' },
       { weekday: 0, closed: true },
+      { weekday: 6, closed: true },
     ]);
     expect(rows?.map((row) => `${row.label} ${row.text}`)).toEqual([
       '월 10:00 ~ 20:00',
@@ -48,7 +49,7 @@ describe('영업시간', () => {
       '수 정보 없음',
       '목 정보 없음',
       '금 정보 없음',
-      '토 정보 없음',
+      '토 휴무',
       '일 휴무',
     ]);
   });
@@ -58,6 +59,11 @@ describe('영업시간', () => {
     expect(formatBusinessHours(null)).toBeNull();
     expect(formatBusinessHours([{ weekday: 9, open: '10:00', close: '20:00' }])).toBeNull();
     expect(formatBusinessHours([{ weekday: 1, open: '25:00', close: '20:00' }])).toBeNull();
+    // 시각은 HH:MM 그대로만(앞뒤에 글자가 더 붙으면 버린다), 요일은 0(일)~6(토)만
+    expect(formatBusinessHours([{ weekday: 1, open: '110:00', close: '20:00' }])).toBeNull();
+    expect(formatBusinessHours([{ weekday: 1, open: '10:00', close: '20:005' }])).toBeNull();
+    expect(formatBusinessHours([{ weekday: -1, closed: true }])).toBeNull();
+    expect(formatBusinessHours([{ weekday: 7, closed: true }])).toBeNull();
   });
 
   it('같은 요일이 두 번 있으면 앞의 것만', () => {
@@ -123,6 +129,9 @@ describe('전화 링크', () => {
   it('숫자만 남긴다', () => {
     expect(telHref('031-123-4567')).toBe('tel:0311234567');
     expect(telHref('123')).toBeNull();
+    // 8자리 대표번호(예: 1588-1234)까지 건다. 7자리 이하는 전화번호로 보지 않는다
+    expect(telHref('1588-1234')).toBe('tel:15881234');
+    expect(telHref('123-4567')).toBeNull();
   });
 });
 

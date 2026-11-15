@@ -16,7 +16,7 @@ export function AdminNav() {
         { href: '/admin/users', label: '회원', icon: Users },
         { href: '/admin/reservations', label: '매물·예약', icon: ClipboardList },
         { href: '/admin/disputes', label: '이의제기', icon: MessageSquareWarning },
-        { href: '/admin/settlements', label: '정산', icon: Wallet, locked: true },
+        { href: '/admin/settlements', label: '정산', icon: Wallet },
       ]}
     />
   );

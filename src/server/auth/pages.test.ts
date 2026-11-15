@@ -102,8 +102,10 @@ describe('ensureAdminPage', () => {
     await expect(ensureAdminPage()).rejects.toThrow('notFound');
   });
 
-  it('관리자면 userId를 돌려준다', async () => {
-    current.account = account({ isAdmin: true });
+  it('운영자 모드로 들어온 관리자면 userId를 돌려주고, 고객 모드면 관리자여도 404(#372)', async () => {
+    current.account = account({ mode: 'admin', isAdmin: true });
     expect(await ensureAdminPage()).toEqual({ userId: 'user-1' });
+    current.account = account({ isAdmin: true });
+    await expect(ensureAdminPage()).rejects.toThrow('notFound');
   });
 });

@@ -2,7 +2,7 @@
 // 2차 확인은 화면의 ensure…Page()와 서버 함수의 require…()가 DB를 보고 한다.
 
 import type { AccountMode } from './account-mode';
-import { loginPath, OWNER_JOIN_PATH } from './paths';
+import { ADMIN_LOGIN_PATH, DEFAULT_NEXT, loginPath, OWNER_JOIN_PATH } from './paths';
 
 export type ProxyDecision =
   { type: 'next' } | { type: 'redirect'; to: string } | { type: 'not_found' };
@@ -36,9 +36,14 @@ export function decideProxy({
   if (under(pathname, '/owner')) {
     return loggedIn && mode === 'owner' ? NEXT : { type: 'redirect', to: loginPath('owner', here) };
   }
-  // 운영자 화면: 로그인하지 않았으면 화면이 있다는 것도 알리지 않는다(관리자 여부는 ensureAdminPage가 본다)
+  // 운영자 입구: 누구나 열 수 있고, 이미 운영자로 들어와 있으면 운영자 화면으로 보낸다(#372 2장)
+  if (under(pathname, ADMIN_LOGIN_PATH)) {
+    return loggedIn && mode === 'admin' ? { type: 'redirect', to: DEFAULT_NEXT.admin } : NEXT;
+  }
+  // 그 밖의 운영자 화면: 운영자 모드가 아니면(고객·원장님으로 들어와 있어도) 운영자 입구로 보낸다.
+  // 운영자 권한(is_admin)은 DB를 봐야 해서 ensureAdminPage가 본다
   if (under(pathname, '/admin')) {
-    return loggedIn ? NEXT : { type: 'not_found' };
+    return loggedIn && mode === 'admin' ? NEXT : { type: 'redirect', to: loginPath('admin', here) };
   }
   return NEXT;
 }

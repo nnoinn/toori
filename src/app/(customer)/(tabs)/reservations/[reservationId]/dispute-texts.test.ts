@@ -10,6 +10,7 @@ import {
   disputeClosedText,
   disputeContentError,
   disputeDeadlineText,
+  disputeSubmittedText,
   reachedContentLimit,
 } from './dispute-texts';
 
@@ -26,6 +27,11 @@ describe('이의제기 칸 문구', () => {
     expect(disputeDeadlineText(null)).toBe(
       '원장님이 방문 처리한 뒤 영업일 기준 48시간까지 접수할 수 있어요.',
     );
+  });
+
+  it('접수한 시각은 한국 시각으로 알린다', () => {
+    // 2026-11-13(금) 18:00 KST
+    expect(disputeSubmittedText('2026-11-13T09:00:00.000Z')).toBe('11/13(금) 18:00에 접수했어요.');
   });
 
   it('기한이 지나도 카카오톡 채널로 문의를 받는다고 알린다', () => {
