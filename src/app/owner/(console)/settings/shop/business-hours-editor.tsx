@@ -5,9 +5,13 @@
 // 여는·닫는 시각 순서로 막지 않는다: 닫는 시각이 여는 시각보다 이르면 다음 날 새벽까지, 같으면 24시간 영업이다.
 // 저장할 때는 둘 다 골랐는지만 본다(shop-profile.ts).
 // 맨 위 "전체 요일" 줄로 쉬는 날이 아닌 요일에 한 번에 넣고, [초기화]로 모든 요일을 비운다(저장을 눌러야 반영된다).
+// [표로 보기]를 누르면 요일별 칸 대신 표(business-hours-table.tsx)가 보이고, [돌아가기]를 누르면 다시 요일별 칸이 보인다
+// (#358 3번, 11/14 nnoinn). 두 화면은 같은 값이라 저장 전 값도 서로 그대로 보인다. 요일별 칸은 숨기기만 해서
+// "전체 요일"에 골라 두던 시각도 남는다.
 // 값과 저장할 때의 오류는 shop-profile-form.tsx가 갖는다.
 
 import { useState } from 'react';
+import { cn } from 'cn';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +19,7 @@ import { TimeSelect } from '@/components/ui/time-select';
 import { SLOT_START_STEP_MINUTES } from '@/server/policy';
 
 import { errorA11y, FieldError } from '../../../form-field';
+import { BusinessHoursTable } from './business-hours-table';
 import { type HoursRow, type ShopProfileFieldErrors, WEEKDAY_LABELS } from './shop-profile';
 
 /** 모든 요일을 빈 값(쉬는 날 아님)으로 */
@@ -27,7 +32,7 @@ export function BusinessHoursEditor({
   onChange,
   onChangeAll,
 }: {
-  /** 일요일(0)부터 토요일(6)까지 7줄 */
+  /** 7줄(화면 순서는 월요일부터, 요일은 weekday로 안다) */
   hours: HoursRow[];
   /** 샵 정보 칸 오류 전체. 이 중 `hours.{줄 번호}`만 쓴다 */
   errors: ShopProfileFieldErrors;
@@ -38,6 +43,8 @@ export function BusinessHoursEditor({
 }) {
   // [초기화]를 누를 때마다 올려서 칸을 새로 그린다. "전체 요일" 줄에 골라 두던 값도 비워진다
   const [resetCount, setResetCount] = useState(0);
+  // 요일별 시각 칸(rows)과 표(table) 중 지금 보이는 것
+  const [view, setView] = useState<'rows' | 'table'>('rows');
 
   function reset() {
     onChangeAll(emptyRows(hours));
@@ -49,78 +56,126 @@ export function BusinessHoursEditor({
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div className="flex flex-col gap-1.5">
           <CardTitle>영업시간</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            비워 둔 요일은 고객에게 &quot;정보 없음&quot;으로 보여요. 닫는 시각이 여는 시각보다
-            이르면 다음 날 새벽까지 영업하는 것으로 봐요(예: 18:00 ~ 02:00). 두 시각이 같으면 24시간
-            영업이에요.
-          </p>
+          {view === 'rows' ? (
+            <p className="text-sm text-muted-foreground">
+              비워 둔 요일은 고객에게 &quot;정보 없음&quot;으로 보여요. 닫는 시각이 여는 시각보다
+              이르면 다음 날 새벽까지 영업하는 것으로 봐요(예: 18:00 ~ 02:00). 두 시각이 같으면
+              24시간 영업이에요.
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              칸을 끌어서 켜고 꺼요. 한 칸은 {SLOT_START_STEP_MINUTES}분이에요. 요일 이름을 누르면
+              쉬는 날이 되고, 다시 누르면 돌아와요. 24:00까지 켜고 다음 날 00:00부터 이어서 켜면
+              새벽까지 영업하는 거예요.
+            </p>
+          )}
         </div>
-        <Button type="button" variant="outline" onClick={reset}>
-          초기화
-        </Button>
+        {/* 같은 버튼의 이름만 바꿔서 누른 뒤에도 포커스가 그 자리에 남는다 */}
+        <div className="flex shrink-0 gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setView(view === 'rows' ? 'table' : 'rows')}
+          >
+            {view === 'rows' ? '표로 보기' : '돌아가기'}
+          </Button>
+          <Button type="button" variant="outline" onClick={reset}>
+            초기화
+          </Button>
+        </div>
       </CardHeader>
       <CardContent key={resetCount} className="flex flex-col gap-2">
-        {/* 열 이름. 시각 칸(w-32)과 같은 자리에 둔다 */}
-        <div
-          aria-hidden
-          className="flex items-center gap-3 px-3 text-xs font-medium text-muted-foreground"
-        >
-          <span className="w-[7.5rem] shrink-0" />
-          <span className="w-32">여는 시각</span>
-          <span className="invisible">~</span>
-          <span className="w-32">닫는 시각</span>
-        </div>
-        <AllDaysRow
-          onApply={(open, close) =>
-            onChangeAll(hours.map((row) => (row.closed ? row : { ...row, open, close })))
-          }
+        {view === 'table' ? (
+          <BusinessHoursTable hours={hours} errors={errors} onChange={onChangeAll} />
+        ) : null}
+        <HoursRowsView
+          hidden={view !== 'rows'}
+          hours={hours}
+          errors={errors}
+          onChange={onChange}
+          onChangeAll={onChangeAll}
         />
-        <ul className="mt-2 flex flex-col gap-2">
-          {hours.map((row, index) => {
-            // 오류는 칸이 아니라 요일 한 줄에 붙는다(저장할 때 둘 다 골랐는지)
-            const field = `hours.${index}` as const;
-            const error = errors[field];
-            const label = `${WEEKDAY_LABELS[row.weekday]}요일`;
-            return (
-              <li key={row.weekday} className="flex flex-col gap-1">
-                <div className="flex items-center gap-3">
-                  <span className="w-6 font-medium">{WEEKDAY_LABELS[row.weekday]}</span>
-                  <label className="flex w-24 items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={row.closed}
-                      onChange={(event) => onChange(index, { closed: event.target.checked })}
-                      className="size-4 accent-primary"
-                    />
-                    쉬는 날
-                  </label>
-                  <TimeSelect
-                    label={`${label} 여는 시각`}
-                    value={row.open}
-                    onChange={(open) => onChange(index, { open })}
-                    stepMinutes={SLOT_START_STEP_MINUTES}
-                    disabled={row.closed}
-                    a11y={errorA11y(field, error)}
-                  />
-                  <span aria-hidden>~</span>
-                  <TimeSelect
-                    label={`${label} 닫는 시각`}
-                    value={row.close}
-                    onChange={(close) => onChange(index, { close })}
-                    stepMinutes={SLOT_START_STEP_MINUTES}
-                    closing
-                    openValue={row.open}
-                    disabled={row.closed}
-                    a11y={errorA11y(field, error)}
-                  />
-                </div>
-                <FieldError id={field} error={error} className="pl-9" />
-              </li>
-            );
-          })}
-        </ul>
       </CardContent>
     </Card>
+  );
+}
+
+/** 요일별 시각 칸. [표로 보기]일 때는 숨기기만 해서 "전체 요일"에 골라 두던 시각이 남는다 */
+function HoursRowsView({
+  hidden,
+  hours,
+  errors,
+  onChange,
+  onChangeAll,
+}: {
+  hidden: boolean;
+  hours: HoursRow[];
+  errors: ShopProfileFieldErrors;
+  onChange: (index: number, row: Partial<HoursRow>) => void;
+  onChangeAll: (rows: HoursRow[]) => void;
+}) {
+  return (
+    <div className={cn('flex flex-col gap-2', hidden && 'hidden')}>
+      {/* 열 이름. 시각 칸(w-32)과 같은 자리에 둔다 */}
+      <div
+        aria-hidden
+        className="flex items-center gap-3 px-3 text-xs font-medium text-muted-foreground"
+      >
+        <span className="w-[7.5rem] shrink-0" />
+        <span className="w-32">여는 시각</span>
+        <span className="invisible">~</span>
+        <span className="w-32">닫는 시각</span>
+      </div>
+      <AllDaysRow
+        onApply={(open, close) =>
+          onChangeAll(hours.map((row) => (row.closed ? row : { ...row, open, close })))
+        }
+      />
+      <ul className="mt-2 flex flex-col gap-2">
+        {hours.map((row, index) => {
+          // 오류는 칸이 아니라 요일 한 줄에 붙는다(저장할 때 둘 다 골랐는지)
+          const field = `hours.${index}` as const;
+          const error = errors[field];
+          const label = `${WEEKDAY_LABELS[row.weekday]}요일`;
+          return (
+            <li key={row.weekday} className="flex flex-col gap-1">
+              <div className="flex items-center gap-3">
+                <span className="w-6 font-medium">{WEEKDAY_LABELS[row.weekday]}</span>
+                <label className="flex w-24 items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={row.closed}
+                    onChange={(event) => onChange(index, { closed: event.target.checked })}
+                    className="size-4 accent-primary"
+                  />
+                  쉬는 날
+                </label>
+                <TimeSelect
+                  label={`${label} 여는 시각`}
+                  value={row.open}
+                  onChange={(open) => onChange(index, { open })}
+                  stepMinutes={SLOT_START_STEP_MINUTES}
+                  disabled={row.closed}
+                  a11y={errorA11y(field, error)}
+                />
+                <span aria-hidden>~</span>
+                <TimeSelect
+                  label={`${label} 닫는 시각`}
+                  value={row.close}
+                  onChange={(close) => onChange(index, { close })}
+                  stepMinutes={SLOT_START_STEP_MINUTES}
+                  closing
+                  openValue={row.open}
+                  disabled={row.closed}
+                  a11y={errorA11y(field, error)}
+                />
+              </div>
+              <FieldError id={field} error={error} className="pl-9" />
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 

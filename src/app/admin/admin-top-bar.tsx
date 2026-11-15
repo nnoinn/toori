@@ -22,9 +22,3 @@ export async function AdminTopBar() {
     </div>
   );
 }
-
-/** 운영자 모드로 들어온 운영자인지(메뉴를 보일지). 운영자 입구에서는 메뉴를 숨긴다 */
-export async function isAdminSession(): Promise<boolean> {
-  const account = await getCurrentAccount();
-  return account?.mode === 'admin' && account.isAdmin;
-}
