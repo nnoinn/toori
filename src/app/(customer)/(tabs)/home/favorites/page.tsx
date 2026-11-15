@@ -24,7 +24,12 @@ export default function FavoritesPage() {
   return (
     <main className="flex flex-1 flex-col gap-3 py-3 md:mx-auto md:w-full md:max-w-6xl md:px-6 md:py-6">
       <Suspense
-        fallback={<LoadingTiles count={4} className="px-4 md:grid-cols-3 md:px-0 lg:grid-cols-4" />}
+        fallback={
+          <LoadingTiles
+            count={5}
+            className="px-4 md:grid-cols-3 md:px-0 lg:grid-cols-4 xl:grid-cols-5"
+          />
+        }
       >
         <FavoritesContent />
       </Suspense>

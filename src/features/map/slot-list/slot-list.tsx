@@ -31,18 +31,19 @@ type SlotListProps = {
   empty: React.ReactNode;
   /**
    * 카드를 몇 칸으로 놓을지(11/15 회의, 위에 사진이 있는 카드).
-   * page: 폰 2칸, 태블릿 3칸, PC 4칸(매물 목록·찜한 샵 매물). panel: 늘 2칸(지도 옆 칸, 폰의 지도 아래 목록)
+   * page: 폰 2칸, 태블릿 3칸, 1024px 4칸, 1280px 5칸(매물 목록·찜한 샵 매물). panel: 늘 2칸(지도 옆 칸, 폰의 지도 아래 목록).
+   * PC는 카드가 너무 커 보이지 않게 사진을 4:3으로 낮춘다(폰은 정사각형)
    */
   columns?: 'page' | 'panel';
 };
 
 const GRID_CLASS = {
-  page: 'px-4 md:grid-cols-3 md:px-0 lg:grid-cols-4',
+  page: 'px-4 md:grid-cols-3 md:px-0 lg:grid-cols-4 xl:grid-cols-5',
   panel: 'px-4',
 } as const;
 
 const IMAGE_SIZES = {
-  page: '(min-width: 1024px) 270px, (min-width: 768px) 33vw, 50vw',
+  page: '(min-width: 1280px) 220px, (min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw',
   panel: '(min-width: 1024px) 240px, (min-width: 768px) 190px, 50vw',
 } as const;
 

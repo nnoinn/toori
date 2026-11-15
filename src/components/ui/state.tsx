@@ -58,7 +58,7 @@ export function LoadingTiles({ count = 4, className }: { count?: number; classNa
     >
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="flex flex-col rounded-xl ring-1 ring-foreground/10">
-          <Skeleton className="aspect-square w-full rounded-b-none" />
+          <Skeleton className="aspect-square w-full rounded-b-none md:aspect-[4/3]" />
           <div className="flex flex-col gap-2 p-3">
             <Skeleton className="h-3 w-1/2" />
             <Skeleton className="h-4 w-3/4" />

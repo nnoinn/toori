@@ -62,7 +62,7 @@ export function WindowCard({
             src={imageUrl}
             alt={`${shopName} 대표 이미지`}
             sizes={imageSizes}
-            className="aspect-square w-full rounded-t-xl"
+            className="aspect-square w-full rounded-t-xl md:aspect-[4/3]"
           />
           <div className="flex min-w-0 flex-1 flex-col gap-1 p-3">
             <p className="flex items-center gap-1 text-xs text-muted-foreground">

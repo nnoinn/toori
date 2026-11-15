@@ -27,7 +27,7 @@ export type SlotCardProps = {
   distanceText?: string;
   /**
    * row: 왼쪽 작은 사진 + 오른쪽 글(기본, 예전 모양).
-   * tile: 위에 정사각형 사진 + 아래 글. 여러 칸으로 늘어놓는 목록에 쓴다(11/15 회의, 거래 사이트의 상품 카드처럼)
+   * tile: 위에 사진 + 아래 글(사진은 폰 정사각형, PC 4:3). 여러 칸으로 늘어놓는 목록에 쓴다(11/15 회의, 거래 사이트의 상품 카드처럼)
    */
   layout?: 'row' | 'tile';
   /** tile 사진의 next/image sizes. 몇 칸으로 놓는지에 맞춘다 */
@@ -84,7 +84,7 @@ export function SlotCard({
         src={imageUrl}
         alt={`${shopName} 대표 이미지`}
         sizes={imageSizes}
-        className="aspect-square w-full rounded-t-xl"
+        className="aspect-square w-full rounded-t-xl md:aspect-[4/3]"
       />
       {text}
     </div>
