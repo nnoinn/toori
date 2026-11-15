@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 
 import { Skeleton } from '@/components/ui/skeleton';
-import { getCurrentAccount } from '@/server/auth';
+import { getCurrentAccount, toSwitchableMode } from '@/server/auth';
 
 import { LoginForm } from './login/login-form';
 
@@ -22,7 +22,7 @@ async function FirstContent() {
   return (
     <LoginForm
       variant="first"
-      initialMode={account?.mode ?? 'customer'}
+      initialMode={toSwitchableMode(account?.mode)}
       nextParam={null}
       error={null}
       signedInEmail={account?.email ?? null}

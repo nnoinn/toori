@@ -5,7 +5,7 @@
 // - 고객 가입·선택 동의(createCustomerAccount, takeConsentNotices, setOptionalConsent, getOptionalConsents.
 //   예전 함수 takeMarketingConsentNotice, setMarketingConsent, getMarketingConsent): '@/server/auth/customer-account'
 
-export { type AccountMode } from './account-mode';
+export { type AccountMode, toSwitchableMode } from './account-mode';
 export {
   type ConsentNotice,
   type MarketingConsent,

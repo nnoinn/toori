@@ -126,8 +126,19 @@ describe('requireAdmin', () => {
     expect(result.ok || result.error.code).toBe('FORBIDDEN');
   });
 
-  it('관리자면 계정 종류와 상관없이 통과한다', async () => {
-    current.account = owner({ isAdmin: true });
+  it('운영자 모드로 들어온 관리자만 통과하고, 고객·원장님으로 들어와 있으면 관리자여도 FORBIDDEN(#372, AUTH-03)', async () => {
+    current.account = account({ mode: 'admin', isAdmin: true });
     expect(await requireAdmin()).toEqual({ ok: true, data: { userId: 'user-1' } });
+
+    current.account = owner({ isAdmin: true });
+    let result = await requireAdmin();
+    expect(result.ok || result.error.code).toBe('FORBIDDEN');
+    current.account = account({ isAdmin: true });
+    result = await requireAdmin();
+    expect(result.ok || result.error.code).toBe('FORBIDDEN');
+    // 운영자 모드여도 운영자 권한이 없으면 막는다(쿠키만 믿지 않는다)
+    current.account = account({ mode: 'admin', isAdmin: false });
+    result = await requireAdmin();
+    expect(result.ok || result.error.code).toBe('FORBIDDEN');
   });
 });

@@ -13,9 +13,12 @@ const state = vi.hoisted(() => ({
   ensureProfile: vi.fn(),
   account: null as Partial<CurrentAccount> | null,
   cookieSet: vi.fn(),
+  cookieDelete: vi.fn(),
 }));
 
-vi.mock('next/headers', () => ({ cookies: async () => ({ set: state.cookieSet }) }));
+vi.mock('next/headers', () => ({
+  cookies: async () => ({ set: state.cookieSet, delete: state.cookieDelete }),
+}));
 vi.mock('@/db', () => ({ getDb: () => ({}) }));
 vi.mock('@/server/supabase/server', () => ({
   createSupabaseServerClient: async () => ({
@@ -93,5 +96,30 @@ describe('GET /api/auth/callback', () => {
 
     res = await callback('code=abc&mode=owner&next=%2F%2Fevil.example');
     expect(res.headers.get('location')).toBe('http://localhost:3000/owner');
+  });
+
+  it('운영자 입구로 들어온 관리자는 운영자 모드로 보던 운영자 화면에 간다(#372)', async () => {
+    loggedIn();
+    state.account = { isAdmin: true, customerId: null, ownerId: null, shopId: null };
+    const res = await callback('code=abc&mode=admin&next=%2Fadmin%2Fdisputes');
+    expect(state.cookieSet).toHaveBeenCalledWith(
+      'account_mode',
+      'admin',
+      expect.objectContaining({ httpOnly: true }),
+    );
+    expect(state.signOut).not.toHaveBeenCalled();
+    expect(res.headers.get('location')).toBe('http://localhost:3000/admin/disputes');
+  });
+
+  it('운영자 입구로 들어왔는데 관리자가 아니면 바로 로그아웃시키고 운영자 입구에 not_admin을 알린다(#372)', async () => {
+    loggedIn();
+    // 고객·원장님 계정이 있어도 관리자가 아니면 운영자로 들어오지 못한다
+    state.account = { isAdmin: false, customerId: 'customer-1', ownerId: 'owner-1', shopId: 's' };
+    const res = await callback('code=abc&mode=admin&next=%2Fadmin%2Fshops');
+    expect(state.signOut).toHaveBeenCalledWith({ scope: 'local' });
+    expect(state.cookieDelete).toHaveBeenCalledWith('account_mode');
+    expect(res.headers.get('location')).toBe(
+      'http://localhost:3000/admin/login?next=%2Fadmin%2Fshops&error=not_admin',
+    );
   });
 });

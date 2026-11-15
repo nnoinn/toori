@@ -42,5 +42,11 @@ export async function GET(request: NextRequest) {
   await ensureProfile(db, data.user.id, data.user.email);
   (await cookies()).set(ACCOUNT_MODE_COOKIE, mode, ACCOUNT_MODE_COOKIE_OPTIONS);
   const account = await loadAccount(db, data.user.id, mode);
+  // 운영자 입구로 들어왔는데 운영자 권한이 없으면 바로 로그아웃시키고 운영자 입구에 알린다(#372 1장)
+  if (mode === 'admin' && !account?.isAdmin) {
+    await supabase.auth.signOut({ scope: 'local' });
+    (await cookies()).delete(ACCOUNT_MODE_COOKIE);
+    return go(loginPath('admin', next, 'not_admin'));
+  }
   return go(afterLoginPath(account, mode, next));
 }

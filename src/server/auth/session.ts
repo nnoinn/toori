@@ -18,6 +18,7 @@ import {
   ACCOUNT_MODES,
   type AccountMode,
   hasAccountFor,
+  SWITCHABLE_ACCOUNT_MODES,
 } from './account-mode';
 import { MARKETING_NOTICE_COOKIE } from './consent-notice';
 import { getSessionUserId, loadAccount } from './current-account';
@@ -85,7 +86,8 @@ export async function signOut(): Promise<Result<null>> {
 export async function switchAccountMode(
   mode: AccountMode,
 ): Promise<Result<{ mode: AccountMode; hasAccount: boolean }>> {
-  const parsed = z.enum(ACCOUNT_MODES).safeParse(mode);
+  // 운영자 모드로는 바꿀 수 없다. 운영자 입구(/admin/login)로 로그인해야 한다(#372 1장)
+  const parsed = z.enum(SWITCHABLE_ACCOUNT_MODES).safeParse(mode);
   if (!parsed.success) return fail('INVALID_INPUT', '바꿀 계정을 다시 골라 주세요');
   const userId = await getSessionUserId();
   if (!userId) return fail('UNAUTHENTICATED', AUTH_ERRORS.UNAUTHENTICATED);
