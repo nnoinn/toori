@@ -1,7 +1,7 @@
 // 운영자 이의제기 화면(A-104, W19 ②)의 조회. 이 화면에서만 쓴다(목록·상세). 처리(등록·결론)는 '@/server/disputes/admin'.
 // 고객 연락처는 읽지 않는다(#360 4번). 내용(content)·메모는 고객·운영자가 쓴 글이라 로그에 남기지 않는다.
 // 이의제기는 그 예약의 손님만 신청한다(11/13 nnoinn, DISPUTE-08). 그래서 신청한 사람은 늘 그 예약의 손님이다.
-// 손님은 아직 이름 칸이 없어서 닉네임을 보여준다. 고객 이름(#375)이 들어오면 이름으로 바꾼다
+// 손님은 예약자 이름(#375)으로 보여주고 찾는다. 닉네임으로도 찾을 수 있다
 
 import 'server-only';
 
@@ -39,9 +39,9 @@ export type DisputeRow = {
   reservationId: string;
   reservationCode: string;
   shopName: string;
-  /** 신청한 손님(그 예약의 손님) */
+  /** 신청한 손님(그 예약의 손님)과 그 예약자 이름 */
   customerId: string;
-  customerNickname: string;
+  customerName: string;
 };
 
 const ORDER: Record<DisputeFilter, SQL[]> = {
@@ -51,7 +51,7 @@ const ORDER: Record<DisputeFilter, SQL[]> = {
   all: [desc(disputes.receivedAt), desc(disputes.id)],
 };
 
-/** 이의제기 목록. 검색어는 예약번호·샵 이름·손님 닉네임 */
+/** 이의제기 목록. 검색어는 예약번호·샵 이름·손님 이름·닉네임 */
 export async function selectDisputes(
   db: DbReader,
   input: { filter: DisputeFilter; query: string },
@@ -70,7 +70,7 @@ export async function selectDisputes(
       reservationCode: reservations.code,
       shopName: shops.name,
       customerId: customers.id,
-      customerNickname: customers.nickname,
+      customerName: customers.name,
     })
     .from(disputes)
     .innerJoin(reservations, eq(reservations.id, disputes.reservationId))
@@ -84,6 +84,7 @@ export async function selectDisputes(
           ? or(
               ilike(reservations.code, pattern),
               ilike(shops.name, pattern),
+              ilike(customers.name, pattern),
               ilike(customers.nickname, pattern),
             )
           : undefined,
@@ -145,7 +146,7 @@ export async function selectDisputeDetail(
       shopId: shops.id,
       shopName: shops.name,
       customerId: customers.id,
-      customerNickname: customers.nickname,
+      customerName: customers.name,
     })
     .from(disputes)
     .innerJoin(reservations, eq(reservations.id, disputes.reservationId))

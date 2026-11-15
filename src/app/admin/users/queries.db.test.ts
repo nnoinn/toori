@@ -18,16 +18,20 @@ import { selectCustomerDetail, selectCustomers, selectOwners } from './queries';
 /** 다른 테스트와 겹치지 않는 값 */
 const unique = (prefix: string) => `${prefix}${crypto.randomUUID().slice(0, 8)}`;
 
+/** 닉네임·연락처를 정한 고객. 이름은 닉네임 앞에 "이름"을 붙여서 따로 둔다 */
 async function namedCustomer(tx: TestTx, nickname: string, phone: string | null = null) {
   const customer = await createTestCustomer(tx);
-  await tx.update(customers).set({ nickname, phone }).where(eq(customers.id, customer.customerId));
+  await tx
+    .update(customers)
+    .set({ name: `이름${nickname}`, nickname, phone })
+    .where(eq(customers.id, customer.customerId));
   return customer;
 }
 
 describeDb('회원 조회 (실제 DB)', () => {
   afterAll(closeTestDb);
 
-  it('고객을 닉네임 일부, 이메일 일부, 휴대폰 전체 번호로 찾는다', async () => {
+  it('고객을 이름 일부, 닉네임 일부, 이메일 일부, 휴대폰 전체 번호로 찾고, 목록에 이름과 닉네임을 따로 준다', async () => {
     await withRollback(async (tx) => {
       const nickname = unique('찾는고객');
       const phone = '010-9876-5432';
@@ -44,6 +48,10 @@ describeDb('회원 조회 (실제 DB)', () => {
 
       expect(await ids(nickname.slice(0, 8))).toContain(me.customerId);
       expect(await ids(nickname.slice(0, 8))).not.toContain(other.customerId);
+      // 예약자 이름(#375)으로도 찾는다. 닉네임에는 없는 "이름"을 붙인 검색어
+      expect(await ids(`이름${nickname}`)).toEqual([me.customerId]);
+      const [row] = (await selectCustomers(tx, `이름${nickname}`)).rows;
+      expect(row).toMatchObject({ name: `이름${nickname}`, nickname });
       expect(await ids(email)).toEqual([me.customerId]);
       expect(await ids('01098765432')).toContain(me.customerId);
       // 휴대폰은 일부만 맞으면 찾지 않는다
@@ -143,7 +151,8 @@ describeDb('회원 조회 (실제 DB)', () => {
   it('고객 상세는 전체 번호·이메일·선택 동의 두 개·최근 예약을 읽고, 없는 고객은 null', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
-      const me = await namedCustomer(tx, unique('상세'), '010-1111-2222');
+      const nickname = unique('상세');
+      const me = await namedCustomer(tx, nickname, '010-1111-2222');
       const { reservation, order, slot } = await createTestReservation(
         tx,
         shop,
@@ -164,6 +173,8 @@ describeDb('회원 조회 (실제 DB)', () => {
 
       const detail = await selectCustomerDetail(tx, me.customerId);
       expect(detail).toMatchObject({
+        name: `이름${nickname}`,
+        nickname,
         phone: '010-1111-2222',
         email: `${me.userId}@test.invalid`,
         consents: {

@@ -26,7 +26,7 @@ type SearchParams = Promise<{ tab?: SearchValue; q?: SearchValue }>;
 
 const TAB_LABELS: Record<UserTab, string> = { customers: '고객', owners: '원장님' };
 const SEARCH_HINTS: Record<UserTab, string> = {
-  customers: '닉네임, 이메일, 휴대폰 전체 번호',
+  customers: '이름, 닉네임, 이메일, 휴대폰 전체 번호',
   owners: '이름, 샵 이름, 이메일, 휴대폰 전체 번호',
 };
 
@@ -98,9 +98,10 @@ async function CustomerList({ query }: { query: string }) {
   const result = await selectCustomers(getDb(), query);
   if (result.rows.length === 0) return <NoUsers query={query} label="고객" />;
   return (
-    <UserTable result={result} minWidth="min-w-[52rem]">
+    <UserTable result={result} minWidth="min-w-[60rem]">
       <thead className="text-left text-muted-foreground">
         <tr className="border-b">
+          <th className={HEAD_CELL}>이름</th>
           <th className={HEAD_CELL}>닉네임</th>
           <th className={HEAD_CELL}>휴대폰</th>
           <th className={HEAD_CELL}>가입</th>
@@ -115,9 +116,10 @@ async function CustomerList({ query }: { query: string }) {
           <tr key={row.customerId} className="border-b last:border-0 hover:bg-muted/50">
             <td className={cn(CELL, 'font-medium')}>
               <Link href={`/admin/users/customers/${row.customerId}`} className="hover:underline">
-                {row.nickname}
+                {row.name}
               </Link>
             </td>
+            <td className={CELL}>{row.nickname}</td>
             <td className={cn(CELL, 'whitespace-nowrap')}>{maskPhone(row.phone)}</td>
             <td className={cn(CELL, 'whitespace-nowrap')}>{formatKstDateTime(row.createdAt)}</td>
             <td className={CELL}>{row.reservationCount}</td>
