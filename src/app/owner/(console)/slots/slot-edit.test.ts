@@ -47,7 +47,7 @@ describe('고칠 때 고를 수 있는 시작 시각 범위 (S-205, 11/9)', () =
   const now = new Date('2026-10-31T12:00:00+09:00');
   const startAt = new Date('2026-11-05T14:00:00+09:00');
 
-  it('게시중이면 48시간 안, 예약대기면 14일 안', () => {
+  it('게시중이면 48시간 안, 게시예정이면 14일 안', () => {
     expect(editStartWindow({ status: 'published', publishAt: now, startAt }, now)).toBe(
       'published',
     );
@@ -59,7 +59,7 @@ describe('고칠 때 고를 수 있는 시작 시각 범위 (S-205, 11/9)', () =
     ).toBe('advance');
   });
 
-  it('게시 시각이 지나 저절로 게시중이 된 예약대기 매물은 게시중으로 본다', () => {
+  it('게시 시각이 지나 저절로 게시중이 된 게시예정 매물은 게시중으로 본다', () => {
     expect(
       editStartWindow(
         { status: 'scheduled', publishAt: new Date('2026-10-31T11:00:00+09:00'), startAt },

@@ -53,12 +53,12 @@ PR 검사가 자동으로 막는 것:
 | --- | --- | --- | --- | --- |
 | SLOT-01 | 시작이 48시간보다 멀면 게시예정으로 저장하고 시작 48시간 전에 게시한다. 딱 48시간이거나 더 가까우면 바로 게시중이다 | S-204·S-205 | ✅ | `src/app/owner/(console)/slots/slot-time.test.ts` 시작 48시간 전이 아직 오지 않았으면<br>`src/app/owner/(console)/slots/slot-time.test.ts` 딱 48시간 남았거나 그보다 가까우면 지금 게시중<br>`src/app/owner/(console)/slots/slot-create-store.db.test.ts` 미리 올리기 |
 | SLOT-02 | 시작 시각은 지금 뒤, 14일 안, 30분 단위만 받는다 | S-205·#108 | ✅ | `src/app/owner/(console)/slots/slot-time.test.ts` 14일 정각까지 받고, 넘으면 막는다<br>`src/app/owner/(console)/slots/slot-draft-store.db.test.ts` 지난 시각, 14일 밖, 단위가 안 맞는 시각 |
-| SLOT-03 | 같은 샵의 게시예정·게시중·예약됨 매물과 시간이 겹치면 등록할 수 없다. 마감·취소·완료와는 겹쳐도 되고, 끝 시각에 바로 이어지면 겹치지 않는다 | S-209 | ✅ | `src/app/owner/(console)/slots/slot-draft-store.db.test.ts` 예약대기·게시중·예약됨과 겹치면 막고<br>`src/app/owner/(console)/slots/slot-time.test.ts` 끝 시각에 바로 이어지면 겹치지 않는다<br>`src/db/slot-windows.db.test.ts` 한 시술 매물은 게시예정·게시중 시간대와 겹치면 |
+| SLOT-03 | 같은 샵의 게시예정·게시중·예약됨 매물과 시간이 겹치면 등록할 수 없다. 마감·취소·완료와는 겹쳐도 되고, 끝 시각에 바로 이어지면 겹치지 않는다 | S-209 | ✅ | `src/app/owner/(console)/slots/slot-draft-store.db.test.ts` 게시예정·게시중·예약됨과 겹치면 막고<br>`src/app/owner/(console)/slots/slot-time.test.ts` 끝 시각에 바로 이어지면 겹치지 않는다<br>`src/db/slot-windows.db.test.ts` 한 시술 매물은 게시예정·게시중 시간대와 겹치면 |
 | SLOT-04 | 매물은 영업시간 안에서 끝나야 한다. 쉬는 날은 막고, 영업시간을 입력하지 않은 요일은 막지 않는다. 새벽 영업(18:00~02:00), 자정 마감(닫는 시각 00:00), 24시간(여는 시각 = 닫는 시각)을 받는다 | #332 | ✅ | `src/app/owner/(console)/slots/slot-draft-store.db.test.ts` 영업시간을 입력한 요일은 영업시간 안에 끝나야 하고<br>`src/app/owner/(console)/slots/slot-time.test.ts` 다음 날 새벽까지<br>`src/app/owner/(console)/slots/slot-time.test.ts` 자정 마감: 닫는 시각 00:00은 그 날 밤 12시<br>`src/app/owner/(console)/slots/slot-time.test.ts` 24시간: 여는 시각부터 다음 날 같은 시각까지 |
 | SLOT-05 | 입점 승인된 샵만 매물을 등록한다. 고객에게는 승인 샵의 매물만 보이고 홀딩된다 | S-102·A-101 | ✅ | `src/server/shops/review-store.test.ts` assertShopApproved는 승인된 샵만 통과시킨다<br>`src/features/map/slot-list/queries.db.test.ts` 승인 샵의 게시중 매물만<br>`src/server/payments/hold-store.db.test.ts` 승인되지 않은 샵의 매물 |
 | SLOT-06 | 게시예정·게시중 매물만 수정·마감할 수 있다. 예약됨, 다른 고객이 결제 중, 시작이 지난 매물은 막는다 | S-206 | ✅ | `src/features/slot-status/slot-status.test.ts` 게시중이어도 다른 고객이 홀딩 중이면<br>`src/app/owner/(console)/slots/slot-edit-store.db.test.ts` 예약됨·결제 중·이미 마감·시작 지남 |
-| SLOT-07 | 마감은 사유(다른 곳 예약·잘못 올림·기타)와 시각을 남기고, 지우기는 없다. 마감한 시간에는 새 매물을 올릴 수 있다 | S-206 | ✅ | `src/app/owner/(console)/slots/slot-edit-store.db.test.ts` 게시중·예약대기 매물을 사유·시각과 함께 마감하고 |
-| SLOT-08 | 게시중 매물은 48시간 밖으로 옮기지 못한다. 게시예정 매물을 옮기면 게시 시각을 새 시작 48시간 전으로 다시 정한다 | S-205 | ✅ | `src/app/owner/(console)/slots/slot-edit-store.db.test.ts` 게시중 매물은 48시간 밖으로 옮기지 못한다<br>`src/app/owner/(console)/slots/slot-edit-store.db.test.ts` 예약대기 매물은 14일 안의 먼 시각으로 옮기면 |
+| SLOT-07 | 마감은 사유(다른 곳 예약·잘못 올림·기타)와 시각을 남기고, 지우기는 없다. 마감한 시간에는 새 매물을 올릴 수 있다 | S-206 | ✅ | `src/app/owner/(console)/slots/slot-edit-store.db.test.ts` 게시중·게시예정 매물을 사유·시각과 함께 마감하고 |
+| SLOT-08 | 게시중 매물은 48시간 밖으로 옮기지 못한다. 게시예정 매물을 옮기면 게시 시각을 새 시작 48시간 전으로 다시 정한다 | S-205 | ✅ | `src/app/owner/(console)/slots/slot-edit-store.db.test.ts` 게시중 매물은 48시간 밖으로 옮기지 못한다<br>`src/app/owner/(console)/slots/slot-edit-store.db.test.ts` 게시예정 매물은 14일 안의 먼 시각으로 옮기면 |
 
 ## 3. 매물 상태
 

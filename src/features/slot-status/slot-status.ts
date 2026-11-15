@@ -2,8 +2,8 @@
 // 입출력 약속은 Issue #57을 따른다. 바꿀 일이 생기면 #57에 먼저 알린다.
 //
 // DB에는 일이 일어날 때만 상태를 저장하고, 시간이 지나서 바뀌는 상태는 여기서 계산한다(docs/schema-v1.md 3장).
-// - 예약대기(scheduled)로 저장됐어도 게시 시각이 지나면 게시중
-// - 예약대기·게시중으로 저장됐어도 시작 시각이 지나면 마감(팔리지 않고 시작이 지남)
+// - 게시예정(scheduled)으로 저장됐어도 게시 시각이 지나면 게시중
+// - 게시예정·게시중으로 저장됐어도 시작 시각이 지나면 마감(팔리지 않고 시작이 지남)
 // 같은 규칙의 DB 조건은 slot-status-sql.ts에 있다. 두 파일은 늘 같은 답을 내야 한다.
 // "지금"은 함수 안에서 만들지 않고 서버 시각(getRequestNow())을 받는다.
 
@@ -13,7 +13,7 @@ export type { SlotStatus };
 
 /** 화면에 보여줄 상태 이름 */
 export const SLOT_STATUS_LABELS: Record<SlotStatus, string> = {
-  scheduled: '예약대기',
+  scheduled: '게시예정',
   published: '게시중',
   reserved: '예약됨',
   closed: '마감',
@@ -48,7 +48,7 @@ export function isSlotOnHold(slot: SlotHoldInput, now: Date): boolean {
   );
 }
 
-/** 원장님이 수정·마감할 수 있으면 true. 판매 전(예약대기·게시중)이고 홀딩 중이 아닐 때만 (S-206) */
+/** 원장님이 수정·마감할 수 있으면 true. 판매 전(게시예정·게시중)이고 홀딩 중이 아닐 때만 (S-206) */
 export function canEditSlot(slot: SlotStatusInput & SlotHoldInput, now: Date): boolean {
   const status = getSlotStatus(slot, now);
   return (status === 'scheduled' || status === 'published') && !isSlotOnHold(slot, now);
