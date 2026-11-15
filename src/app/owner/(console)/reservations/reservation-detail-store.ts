@@ -43,12 +43,13 @@ export type OwnerReservation = {
   /** 판매가. 쿠폰을 써도 원장님 정산은 이 금액 기준이다 */
   salePrice: number;
   newCustomerOnly: boolean;
-  customerNickname: string;
+  /** 예약자 이름. 샵에는 이름과 휴대폰만 주고 닉네임은 읽지 않는다(#375) */
+  customerName: string;
   /** 예약 전에 꼭 받지만 W11 전 시드 예약은 비어 있을 수 있다 */
   customerPhone: string | null;
 };
 
-/** 그 샵 매물의 예약 한 건과 예약자 닉네임·휴대폰. 없거나 다른 샵 예약이거나 id 모양이 틀리면 null */
+/** 그 샵 매물의 예약 한 건과 예약자 이름·휴대폰. 없거나 다른 샵 예약이거나 id 모양이 틀리면 null */
 export async function selectOwnerReservation(
   db: Db,
   shopId: string,
@@ -75,7 +76,7 @@ export async function selectOwnerReservation(
       discountRate: slots.discountRate,
       salePrice: slots.salePrice,
       newCustomerOnly: slots.newCustomerOnly,
-      customerNickname: customers.nickname,
+      customerName: customers.name,
       customerPhone: customers.phone,
     })
     .from(reservations)
