@@ -4,28 +4,28 @@
 import 'server-only';
 
 import { and, desc, eq, gte, inArray, isNull, lt, or, sql } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
 
 import type { getDb } from '@/db';
 import {
   orders,
   ownerPenalties,
-  refunds,
   reservations,
   settlementItems,
   settlements,
   slots,
 } from '@/db/schema';
-import type { CancelActor, ReservationStatus, VisitResult } from '@/db/schema/payments';
 import type { SettlementItemKind, SettlementStatus } from '@/db/schema/settlements';
 import { hasOpenDispute, openDisputeReceivedAt } from '@/server/disputes/conditions';
 
 import type { SettlementRow } from './settlement-view';
+import {
+  cancelRefund,
+  cancelRefundJoin,
+  narrowSettleTarget,
+  settleTargetColumns,
+} from './settle-query';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select'>;
-
-/** 고객 취소·합의 후 취소의 끝난 환불 기록(한 예약에 하나, refunds_cancel_unique) */
-const cancelRefund = alias(refunds, 'cancel_refund');
 
 /**
  * 샵의 끝난 예약(이용 완료·취소)과 정산에 필요한 값.
@@ -47,19 +47,13 @@ export async function readShopSettlementRows(
     .select({
       reservationId: reservations.id,
       reservationCode: reservations.code,
-      status: reservations.status,
-      visitResult: reservations.visitResult,
-      visitRecordedAt: reservations.visitRecordedAt,
-      cancelledAt: reservations.cancelledAt,
-      cancelActor: reservations.cancelActor,
-      startAt: slots.startAt,
+      // 정산 규칙에 넘길 칸은 목요일 묶기와 같은 조각(#394 리뷰 1번)
+      ...settleTargetColumns,
       menuName: slots.menuName,
       listPrice: slots.listPrice,
       salePrice: slots.salePrice,
       discountRate: slots.discountRate,
       couponUsed: sql<boolean>`${orders.couponId} is not null`,
-      cancelPenaltyRate: cancelRefund.penaltyRate,
-      hasAdminRefund: sql<boolean>`exists (select 1 from ${refunds} where ${refunds.reservationId} = ${reservations.id} and ${refunds.reason} = 'admin_exception')`,
       // 확인 중 이의제기가 있으면 정산 보류(#350 3장, 이의제기 쪽 조건 하나를 같이 쓴다)
       hasOpenDispute: sql<boolean>`${hasOpenDispute(reservations.id)}`,
       openDisputeReceivedAt: openDisputeReceivedAt(reservations.id),
@@ -83,14 +77,7 @@ export async function readShopSettlementRows(
     .innerJoin(slots, eq(slots.id, reservations.slotId))
     .innerJoin(orders, eq(orders.id, reservations.orderId))
     .leftJoin(ownerPenalties, eq(ownerPenalties.reservationId, reservations.id))
-    .leftJoin(
-      cancelRefund,
-      and(
-        eq(cancelRefund.reservationId, reservations.id),
-        inArray(cancelRefund.reason, ['customer_cancel', 'agreed_cancel']),
-        eq(cancelRefund.status, 'done'),
-      ),
-    )
+    .leftJoin(cancelRefund, cancelRefundJoin)
     .leftJoin(settlementItems, eq(settlementItems.orderId, reservations.orderId))
     .leftJoin(settlements, eq(settlements.id, settlementItems.settlementId))
     .where(
@@ -119,15 +106,14 @@ export async function readShopSettlementRows(
     )
     .orderBy(desc(sql`coalesce(${reservations.visitRecordedAt}, ${reservations.cancelledAt})`));
 
-  return rows.map((row) => ({
+  return rows.map(narrowSettleTarget).map((row) => ({
     reservationId: row.reservationId,
     reservationCode: row.reservationCode,
-    // DB의 check 제약이 정해진 값만 허용한다
-    status: row.status as ReservationStatus,
-    visitResult: row.visitResult as VisitResult | null,
+    status: row.status,
+    visitResult: row.visitResult,
     visitRecordedAt: row.visitRecordedAt,
     cancelledAt: row.cancelledAt,
-    cancelActor: row.cancelActor as CancelActor | null,
+    cancelActor: row.cancelActor,
     startAt: row.startAt,
     menuName: row.menuName,
     listPrice: row.listPrice,
