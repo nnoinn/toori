@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  bookerName,
   reservationView,
   showsFullPhone,
   VISIT_ACTIONS,
@@ -33,6 +34,13 @@ describe('원장님 예약 상세 (O11, S-403)', () => {
     expect(showsFullPhone({ status: 'completed', visitResult: 'visited', startAt })).toBe(false);
     expect(showsFullPhone({ status: 'completed', visitResult: 'no_show', startAt })).toBe(false);
     expect(showsFullPhone({ status: 'cancelled', visitResult: null, startAt })).toBe(false);
+  });
+
+  it('예약자 이름은 앞뒤 공백을 빼고, 비어 있으면 없음(null)이다(#375)', () => {
+    expect(bookerName('김투리')).toBe('김투리');
+    expect(bookerName('  김투리  ')).toBe('김투리');
+    expect(bookerName('')).toBeNull();
+    expect(bookerName('   ')).toBeNull();
   });
 });
 

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { SITE_NAME } from '@/lib/site';
+import { CHECKOUT_CONSENT_VERSIONS } from '@/server/policy';
 
 import {
   bookerInfoConsentLabel,
@@ -26,6 +27,15 @@ describe('예약 확인 동의 문구 (동의 문구 3장)', () => {
       .map((item) => item.value)
       .join(' | ');
     expect(consentDoc).toContain(`| ${row} |`);
+  });
+
+  it('예약한 샵에는 이름·휴대폰 번호·예약 내용만 주고 닉네임은 주지 않는다(#375, 11/13)', () => {
+    const items = bookerInfoRows('샘플 헤어').find((row) => row.label === '항목');
+    expect(items?.value).toBe('이름, 휴대폰 번호, 예약 내용');
+  });
+
+  it('예약자 정보 항목이 바뀌었으니 동의 문구 버전을 올렸다(#375)', () => {
+    expect(CHECKOUT_CONSENT_VERSIONS.bookerInfo).toBe('draft-2026-11');
   });
 
   it('통신판매중개자 안내에 서비스 이름과 샵 이름이 들어간다', () => {

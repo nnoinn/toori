@@ -37,7 +37,7 @@ describeDb('매물 등록 ①② 검증 (실제 DB)', () => {
     });
   });
 
-  it('예약대기·게시중·예약됨과 겹치면 막고, 마감·취소·완료와는 겹쳐도 된다', async () => {
+  it('게시예정·게시중·예약됨과 겹치면 막고, 마감·취소·완료와는 겹쳐도 된다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
       await tx
@@ -70,7 +70,7 @@ describeDb('매물 등록 ①② 검증 (실제 DB)', () => {
     });
   });
 
-  it('예약대기·게시중 시간대 매물(#308)과 겹치면 막고, 마감한 시간대와는 겹쳐도 된다', async () => {
+  it('게시예정·게시중 시간대 매물(#308)과 겹치면 막고, 마감한 시간대와는 겹쳐도 된다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
       const windowRow = (start: string, end: string, status: string) => ({

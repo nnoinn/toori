@@ -1,4 +1,5 @@
 // 원장님 예약 상세 규칙 (O11, S-403). 서버와 화면이 같이 쓴다.
+// 샵에는 예약자 이름과 휴대폰 번호만 주고 닉네임은 주지 않는다(#375, 11/13 nnoinn).
 // 예약자 연락처는 방문·노쇼를 처리했거나 취소된 예약이면 뒷자리만 보여준다(#21 Q11).
 // 샵에 연락처를 주는 기간이 "예약한 서비스 이용이 끝날 때까지"라서다(동의 문구 3-1).
 // 방문 완료·노쇼 처리(O14, S-405)는 누른 뒤 확인 창에서 한 번 더 눌러야 하고, 처리한 뒤에는 바꿀 수 없다(#130).
@@ -40,6 +41,15 @@ export function reservationView(reservation: ReservationViewInput, now: Date): R
   if (reservation.visitResult === 'no_show') return 'noShow';
   if (reservation.visitResult === 'visited' || reservation.status === 'completed') return 'visited';
   return canRecordVisit(reservation, now) ? 'needsVisit' : 'upcoming';
+}
+
+/**
+ * 예약자 칸에 보여줄 이름. 앞뒤 공백을 빼고, 비어 있으면 null(화면에는 "없음").
+ * DB가 이름을 비워 둘 수 없게 막지만(0015) 공백만 들어 있을 때를 대비한다. 닉네임으로 대신하지 않는다(#375)
+ */
+export function bookerName(name: string): string | null {
+  const trimmed = name.trim();
+  return trimmed === '' ? null : trimmed;
 }
 
 /** 연락처를 다 보여줄지: 취소되지 않았고 방문·노쇼를 아직 처리하지 않은 예약만 */

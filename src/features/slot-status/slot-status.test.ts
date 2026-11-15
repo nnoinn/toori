@@ -8,7 +8,7 @@ const at = (iso: string) => new Date(`${iso}+09:00`);
 describe('SLOT_STATUS_LABELS', () => {
   it('6개 상태를 화면 이름으로 보여준다', () => {
     expect(SLOT_STATUS_LABELS).toEqual({
-      scheduled: '예약대기',
+      scheduled: '게시예정',
       published: '게시중',
       reserved: '예약됨',
       closed: '마감',
@@ -63,7 +63,7 @@ describe('canEditSlot', () => {
   };
   const now = at('2026-10-31T12:00:00');
 
-  it('예약대기·게시중이면 수정·마감할 수 있다', () => {
+  it('게시예정·게시중이면 수정·마감할 수 있다', () => {
     expect(
       canEditSlot({ ...base, status: 'scheduled', publishAt: at('2026-11-01T00:00:00') }, now),
     ).toBe(true);

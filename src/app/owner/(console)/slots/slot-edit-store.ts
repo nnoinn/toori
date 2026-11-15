@@ -45,7 +45,7 @@ export type SlotForEdit = {
 const slotIdSchema = z.uuid();
 const closeReasonSchema = z.enum(SLOT_CLOSE_REASON_OPTIONS);
 
-/** 지금 판매 전(예약대기·게시중)이고 홀딩 중이 아닌 매물만. slot-edit.ts slotEditProblem과 같은 답 */
+/** 지금 판매 전(게시예정·게시중)이고 홀딩 중이 아닌 매물만. slot-edit.ts slotEditProblem과 같은 답 */
 function editableNow(now: Date): SQL {
   return and(
     or(slotStatusIs('scheduled', now), slotStatusIs('published', now)),
@@ -139,7 +139,7 @@ export async function closeSlotInDb(
  * 메뉴 값은 고칠 때의 값을 다시 복사하고 할인가는 서버가 다시 계산한다.
  * 게시 시각: 이미 게시중인 매물은 그대로 둔다. 관심 지역 새 매물 알림(C-601)이 publish_at으로 "그날 새로 올라온 매물"을
  * 모으므로, 고칠 때마다 바꾸면 며칠 전 매물이 새 매물로 다시 알려진다(#169 리뷰). 그래서 게시중 매물은 48시간 안으로만
- * 옮길 수 있다(editStartWindow). 예약대기 매물은 등록처럼 새 시작 시각으로 게시 시각을 다시 정한다(publishPlan, S-205)
+ * 옮길 수 있다(editStartWindow). 게시예정 매물은 등록처럼 새 시작 시각으로 게시 시각을 다시 정한다(publishPlan, S-205)
  */
 export async function updateSlotInDb(
   db: Pick<Db, 'transaction'>,
@@ -164,7 +164,7 @@ export async function updateSlotInDb(
       });
       if (!draft.ok) return draft;
       const values = slotValuesFrom(draft.data, pricing);
-      // 게시중이면 게시 시각은 그대로 두고 상태만 게시중으로 적는다(게시 시각이 지나 저절로 게시중이 된 예약대기 매물 포함)
+      // 게시중이면 게시 시각은 그대로 두고 상태만 게시중으로 적는다(게시 시각이 지나 저절로 게시중이 된 게시예정 매물 포함)
       const plan = window === 'advance' ? publishPlan(draft.data.start, now) : null;
       const [row] = await tx
         .update(slots)

@@ -5,7 +5,8 @@ import type { TermsType } from '@/db/schema/accounts';
 
 export const TERMS_VERSIONS = {
   service: 'draft-2026-10',
-  privacy: 'draft-2026-10',
+  // 동의 문구 1-1에 이름을 더함(#375, 11/14)
+  privacy: 'draft-2026-11',
   location: 'draft-2026-10',
   supplier: 'draft-2026-10',
   // 동의 문구 1-2장(이벤트·혜택, #266·#284 리뷰, 11/8)
@@ -21,5 +22,6 @@ export const TERMS_VERSIONS = {
  */
 export const CHECKOUT_CONSENT_VERSIONS = {
   refundPolicy: 'draft-2026-10',
-  bookerInfo: 'draft-2026-10',
+  // 동의 문구 3-1 항목을 닉네임에서 이름으로(#375, 11/14)
+  bookerInfo: 'draft-2026-11',
 } as const;

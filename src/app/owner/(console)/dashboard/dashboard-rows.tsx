@@ -47,7 +47,7 @@ export function SlotRow({
   onClose: (slot: DashboardSlot) => void;
 }) {
   const status = viewStatus(slot, now);
-  // 판매 전(예약대기·게시중)만 고치거나 마감할 수 있고, 결제 중이면 잠근다(O1 canEditSlot과 같은 기준).
+  // 판매 전(게시예정·게시중)만 고치거나 마감할 수 있고, 결제 중이면 잠근다(O1 canEditSlot과 같은 기준).
   // 시간대 안에서 손님이 만든 매물은 원장님이 올린 매물이 아니라서 고치거나 마감하지 않는다
   const inWindow = slot.windowId !== null;
   const beforeSale = (status === 'scheduled' || status === 'published') && !inWindow;

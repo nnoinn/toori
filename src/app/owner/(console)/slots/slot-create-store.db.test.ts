@@ -80,7 +80,7 @@ describeDb('매물 등록 저장 (실제 DB)', () => {
     });
   });
 
-  it('미리 올리기: 시작이 48시간보다 멀면 예약대기로, 시작 48시간 전을 게시 시각으로 저장한다(S-205)', async () => {
+  it('미리 올리기: 시작이 48시간보다 멀면 게시예정으로, 시작 48시간 전을 게시 시각으로 저장한다(S-205)', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
       const startAt = '2026-11-05T05:00:00.000Z'; // 11/05(목) 14:00

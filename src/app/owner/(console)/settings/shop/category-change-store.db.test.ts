@@ -21,13 +21,13 @@ afterAll(closeTestDb);
 const now = new Date('2026-10-31T12:00:00+09:00');
 
 describeDb('업종 변경 (실제 DB)', () => {
-  it('예약대기·게시중·시작 전 예약됨 매물만 막는 매물로 센다', async () => {
+  it('게시예정·게시중·시작 전 예약됨 매물만 막는 매물로 센다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
       const customer = await createTestCustomer(tx);
       await tx.insert(slots).values([
         testSlot(shop, '09:00', '10:00'),
-        // 게시 시각 전(예약대기)
+        // 게시 시각 전(게시예정)
         testSlot(shop, '10:00', '11:00', {
           status: 'scheduled',
           publishAt: new Date('2026-11-01T00:00:00+09:00'),

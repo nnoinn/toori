@@ -17,13 +17,14 @@ import { selectOwnerReservation } from './reservation-detail-store';
 afterAll(closeTestDb);
 
 describeDb('원장님 예약 상세 조회 (실제 DB)', () => {
-  it('그 샵 예약을 매물·예약자 정보와 같이 읽는다', async () => {
+  it('그 샵 예약을 매물·예약자 정보(이름·휴대폰, 닉네임은 빼고)와 같이 읽는다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
       const customer = await createTestCustomer(tx);
+      // 이름과 닉네임을 다르게 넣어, 샵에 닉네임이 아니라 이름을 주는지 본다(#375)
       await tx
         .update(customers)
-        .set({ phone: '010-1234-5678' })
+        .set({ name: '김투리', nickname: '투리팬', phone: '010-1234-5678' })
         .where(eq(customers.id, customer.customerId));
       const { slot, reservation } = await createTestReservation(
         tx,
@@ -54,9 +55,11 @@ describeDb('원장님 예약 상세 조회 (실제 DB)', () => {
         discountRate: slot.discountRate,
         salePrice: slot.salePrice,
         newCustomerOnly: slot.newCustomerOnly,
-        customerNickname: '테스트 고객',
+        customerName: '김투리',
         customerPhone: '010-1234-5678',
       });
+      // toEqual이 칸을 모두 맞춰 보지만, 닉네임 값이 어느 칸에도 없다는 것을 한 번 더 적어 둔다
+      expect(Object.values(found ?? {})).not.toContain('투리팬');
     });
   });
 
