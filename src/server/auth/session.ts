@@ -25,7 +25,17 @@ import { getSessionUserId, loadAccount } from './current-account';
 import { DEFAULT_NEXT } from './paths';
 import { AUTH_ERRORS } from './require';
 
-const PROVIDERS = ['kakao', 'google'] as const;
+const PROVIDERS = ['kakao', 'google', 'naver'] as const;
+
+/**
+ * Supabase에 넘기는 제공자 이름. 카카오·구글은 Supabase 기본 제공자이고, 네이버는 커스텀 OAuth 제공자다(W21, 기술 가이드 3-3).
+ * custom:naver는 nnoinn이 Supabase 대시보드에 만든다(UserInfo URL은 /api/auth/naver/userinfo)
+ */
+const SUPABASE_PROVIDER = {
+  kakao: 'kakao',
+  google: 'google',
+  naver: 'custom:naver',
+} as const satisfies Record<(typeof PROVIDERS)[number], string>;
 
 const signInSchema = z.object({
   provider: z.enum(PROVIDERS),
@@ -53,7 +63,7 @@ export async function signInWithProvider(input: {
 
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
-    provider,
+    provider: SUPABASE_PROVIDER[provider],
     options: { redirectTo: `${origin}/api/auth/callback?${new URLSearchParams({ mode, next })}` },
   });
   if (error || !data.url) {
