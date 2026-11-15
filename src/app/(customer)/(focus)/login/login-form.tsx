@@ -18,7 +18,7 @@ import {
   type LoginMode,
   nextForMode,
 } from './login-params';
-import { ProviderButton, type ProviderKey } from '@/components/ui/provider-button';
+import { PROVIDER_ORDER, ProviderButton, type ProviderKey } from '@/components/ui/provider-button';
 
 const MODES: { mode: LoginMode; label: string }[] = [
   { mode: 'customer', label: '고객' },
@@ -26,9 +26,6 @@ const MODES: { mode: LoginMode; label: string }[] = [
 ];
 
 const MODE_LABEL: Record<LoginMode, string> = { customer: '고객', owner: '원장님' };
-
-// 카카오·구글·네이버(C-101). 네이버는 Supabase 커스텀 제공자 custom:naver로 들어간다(W21, session.ts)
-const PROVIDERS: ProviderKey[] = ['kakao', 'google', 'naver'];
 
 type LoginFormProps = {
   /**
@@ -175,7 +172,8 @@ export function LoginForm({
     </p>
   ) : null;
 
-  const providers = PROVIDERS.map((provider) => (
+  // 카카오·네이버·구글(C-101, 11/15 순서). 네이버는 Supabase 커스텀 제공자 custom:naver로 들어간다(W21, session.ts)
+  const providers = PROVIDER_ORDER.map((provider) => (
     <ProviderButton
       key={provider}
       provider={provider}

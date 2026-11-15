@@ -3,6 +3,9 @@
 
 export type ProviderKey = 'kakao' | 'google' | 'naver';
 
+/** 로그인 버튼 순서. 버튼이 있는 화면(첫 화면, 로그인 화면, 운영자 입구)은 모두 이 순서를 쓴다(11/15 nnoinn) */
+export const PROVIDER_ORDER: readonly ProviderKey[] = ['kakao', 'naver', 'google'];
+
 export const PROVIDER_LABELS: Record<ProviderKey, string> = {
   // 카카오 가이드가 허용하는 완성형 문구
   kakao: '카카오 로그인',

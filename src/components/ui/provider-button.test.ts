@@ -3,9 +3,22 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { PROVIDER_LABELS } from './provider-labels';
+import { PROVIDER_LABELS, PROVIDER_ORDER } from './provider-labels';
 
 describe('간편 로그인 버튼', () => {
+  it('버튼 순서는 카카오·네이버·구글이고, 버튼이 있는 화면은 모두 이 순서를 쓴다(11/15 nnoinn)', () => {
+    expect(PROVIDER_ORDER).toEqual(['kakao', 'naver', 'google']);
+    for (const file of [
+      'src/app/(customer)/(focus)/login/login-form.tsx',
+      'src/app/admin/login/admin-login-form.tsx',
+    ]) {
+      const source = readFileSync(join(process.cwd(), file), 'utf8');
+      expect(source).toContain('PROVIDER_ORDER.map(');
+      // 화면마다 따로 적은 순서가 없다
+      expect(source).not.toMatch(/\[\s*'kakao',\s*'(google|naver)'/);
+    }
+  });
+
   it('문구는 카카오·구글·네이버 디자인 가이드가 허용하는 것만 쓴다', () => {
     // 카카오: 완성형 "카카오 로그인"(축약형 "로그인"), 구글: "Sign in with Google"의 한국어, 네이버: 완성형 "네이버 로그인"
     expect(PROVIDER_LABELS.kakao).toBe('카카오 로그인');
