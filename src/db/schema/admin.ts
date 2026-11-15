@@ -5,7 +5,7 @@ import { check, index, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
 
 import { profiles } from './accounts';
 import { reservations } from './payments';
-import { createdAt, inValues, timestamptz } from './types';
+import { createdAt, inValues, timestamptz, updatedAt } from './types';
 
 /** 이의제기 종류: 노쇼 이의 / 환불 예외 / 시작 후 문제 */
 export const DISPUTE_TYPES = ['no_show', 'refund_exception', 'after_start'] as const;
@@ -87,6 +87,7 @@ export const disputes = pgTable(
  * 운영자 작업 기록. 누가, 언제, 무엇을 했는지 남긴다.
  * action·target_type은 종류가 계속 늘어나서 check를 두지 않는다(#64).
  * 예: shop.approve, shop.reject, visit.override, refund.exception, settlement.payout_request
+ * 운영자가 데이터를 바꾸면 같은 트랜잭션에서 남기고 사유는 memo에 적는다. 앱에서 고치거나 지울 수 없다(0016 트리거, #372 5장)
  */
 export const adminActions = pgTable('admin_actions', {
   id: uuid().primaryKey().defaultRandom(),
@@ -99,6 +100,23 @@ export const adminActions = pgTable('admin_actions', {
   targetId: uuid().notNull(),
   memo: text(),
   createdAt: createdAt(),
+}).enableRLS();
+
+/**
+ * 운영자 프로필 (#372 4장, 11/13 nnoinn). 운영자 화면 위 이름과 운영자 기록 화면에 보일 이름이다.
+ * 권한을 켜고 끄는 것은 profiles.is_admin이고, 여기는 이름·맡은 일만 둔다(맡은 일로 권한 차이를 두지 않는다).
+ * 지우지 않는다. 그만둔 운영자도 기록 화면에 이름이 보여야 해서다. 새 운영자는 당분간 강규민이 SQL로 is_admin과 같이 넣는다
+ */
+export const adminProfiles = pgTable('admin_profiles', {
+  userId: uuid()
+    .primaryKey()
+    .references(() => profiles.id),
+  // 화면과 기록에 보일 이름(필수)
+  name: text().notNull(),
+  // 맡은 일(선택, 예: 정산, 고객 응대)
+  role: text(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
 }).enableRLS();
 
 /**
