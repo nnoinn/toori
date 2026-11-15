@@ -81,9 +81,18 @@ describe('signInWithProvider', () => {
     );
   });
 
+  it('네이버는 Supabase 커스텀 제공자 custom:naver로 시작한다(W21)', async () => {
+    state.signInWithOAuth.mockResolvedValue({ data: { url: 'https://nid.example/d' } });
+
+    await expect(signInWithProvider({ provider: 'naver', mode: 'customer' })).rejects.toThrow(
+      'redirect:https://nid.example/d',
+    );
+    expect(state.signInWithOAuth.mock.calls[0][0].provider).toBe('custom:naver');
+  });
+
   it('지원하지 않는 로그인 방법이면 INVALID_INPUT', async () => {
     const result = await signInWithProvider({
-      provider: 'naver' as 'kakao',
+      provider: 'toss' as 'kakao',
       mode: 'customer',
     });
     expect(result.ok || result.error.code).toBe('INVALID_INPUT');
