@@ -1,7 +1,7 @@
 'use server';
 
 // 로그인 시작·로그아웃·계정 전환 (X-101, C-101, #47 3장). 로그인 화면(정찬형)과 내 정보 화면에서 부른다.
-// 카카오·구글 로그인을 마치고 돌아오는 처리는 src/app/api/auth/callback/route.ts가 한다.
+// 카카오·구글·네이버 로그인을 마치고 돌아오는 처리는 src/app/api/auth/callback/route.ts가 한다.
 
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -44,7 +44,7 @@ const signInSchema = z.object({
 });
 
 /**
- * 카카오·구글 로그인 화면으로 보낸다. 로그인을 마치면 /api/auth/callback으로 돌아와서 mode·next대로 처리한다.
+ * 카카오·구글·네이버 로그인 화면으로 보낸다. 로그인을 마치면 /api/auth/callback으로 돌아와서 mode·next대로 처리한다.
  * 성공하면 돌아오지 않고(redirect), 시작하지 못했을 때만 실패 결과를 돌려준다
  */
 export async function signInWithProvider(input: {

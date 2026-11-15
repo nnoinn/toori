@@ -7,12 +7,15 @@ import { PROVIDER_LABELS, type ProviderKey } from './provider-labels';
 
 export type { ProviderKey };
 
-// 간편 로그인 버튼 (C-101). 카카오·구글 공식 버튼 디자인 가이드를 따른다(10/28).
+// 간편 로그인 버튼 (C-101). 카카오·구글·네이버 공식 버튼 디자인 가이드를 따른다(10/28, 네이버 11/15).
 // - 카카오: 배경 #FEE500, 말풍선 심볼(모양·비율·색 변경 불가, 심볼 없이 쓰지 않음), 문구 "카카오 로그인", 글자 85%, 모서리 12px
 //   https://developers.kakao.com/docs/latest/ko/kakaologin/design-guide
 // - 구글(Light): 흰 배경, 테두리 #747775, 글자 #1F1F1F, 표준 색 "G" 로고(색·크기 변경 불가), 현지화한 "Sign in with Google"
 //   https://developers.google.com/identity/branding-guidelines
-// 색과 글꼴은 globals.css의 kakao·google 토큰에서만 가져온다.
+// - 네이버: 배경 #03A94D(지정 컬러, 변경 불가), 흰 로고·흰 글자 "네이버 로그인"
+//   https://developers.naver.com/docs/login/bi/bi.md
+//   공식 로고(N)는 버튼 애셋 파일(NAVER_login_KR)을 받으면 넣는다. 지금은 시험용으로 글자만 둔다(검수 요청 전에 꼭 넣는다)
+// 색과 글꼴은 globals.css의 kakao·google·naver 토큰에서만 가져온다.
 // 글꼴: 카카오 "OS 기본 시스템 서체"(30pt ≒ 웹 15px), 구글 "Google Sans Medium 14/20"
 
 // Google Sans에는 한글이 없어서 라틴 글자만 받는다. 한글은 globals.css --font-google의 기기 기본 서체로 보인다.
@@ -46,8 +49,18 @@ type ProviderButtonProps = {
   onClick: () => void;
 };
 
+/** 제공자마다 다른 모양(배경·글자·글꼴). 둥근 모서리와 높이는 같다 */
+const PROVIDER_STYLES: Record<ProviderKey, string> = {
+  kakao: 'bg-kakao font-kakao text-[15px] font-semibold text-kakao-foreground hover:opacity-90',
+  google: cn(
+    googleSans.variable,
+    'border border-google-border bg-google font-google text-[14px] leading-5 font-medium text-google-foreground hover:bg-muted',
+  ),
+  // 네이버 가이드에 글꼴 지정이 없어서 카카오처럼 기기 기본 서체를 쓴다
+  naver: 'bg-naver font-kakao text-[15px] font-semibold text-naver-foreground hover:opacity-90',
+};
+
 export function ProviderButton({ provider, disabled, pending, onClick }: ProviderButtonProps) {
-  const isKakao = provider === 'kakao';
   return (
     <button
       type="button"
@@ -56,20 +69,15 @@ export function ProviderButton({ provider, disabled, pending, onClick }: Provide
       onClick={onClick}
       className={cn(
         'relative flex h-12 w-full items-center justify-center gap-2.5 rounded-[12px] px-4 transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60',
-        isKakao
-          ? 'bg-kakao font-kakao text-[15px] font-semibold text-kakao-foreground hover:opacity-90'
-          : cn(
-              googleSans.variable,
-              'border border-google-border bg-google font-google text-[14px] leading-5 font-medium text-google-foreground hover:bg-muted',
-            ),
+        PROVIDER_STYLES[provider],
       )}
     >
-      {isKakao ? (
+      {provider === 'kakao' ? (
         <KakaoSymbol className="size-[18px] shrink-0 text-kakao-symbol" />
-      ) : (
+      ) : provider === 'google' ? (
         // 가로·세로를 CSS로 같이 정한다. 기본 스타일(height: auto)만 바뀌면 Next.js가 비율 경고를 낸다
         <Image src={googleLogo} alt="" width={18} height={18} className="size-[18px] shrink-0" />
-      )}
+      ) : null}
       <span>{pending ? '로그인 화면으로 이동 중…' : PROVIDER_LABELS[provider]}</span>
     </button>
   );

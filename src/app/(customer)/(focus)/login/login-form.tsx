@@ -27,8 +27,8 @@ const MODES: { mode: LoginMode; label: string }[] = [
 
 const MODE_LABEL: Record<LoginMode, string> = { customer: '고객', owner: '원장님' };
 
-// 카카오·구글을 먼저 만든다(C-101). 네이버는 강규민님 W21 뒤에 더한다
-const PROVIDERS: ProviderKey[] = ['kakao', 'google'];
+// 카카오·구글·네이버(C-101). 네이버는 Supabase 커스텀 제공자 custom:naver로 들어간다(W21, session.ts)
+const PROVIDERS: ProviderKey[] = ['kakao', 'google', 'naver'];
 
 type LoginFormProps = {
   /**
@@ -54,7 +54,7 @@ const LOGIN_START_FAILED_MESSAGE = '로그인을 시작하지 못했어요. 잠�
 
 /**
  * 로그인 화면 (J8, C-101)과 첫 화면(#215). 고객/원장님 토글과 간편 로그인 버튼.
- * 버튼을 누르면 signInWithProvider(#47 3장)가 카카오·구글 로그인 화면으로 보낸다.
+ * 버튼을 누르면 signInWithProvider(#47 3장)가 카카오·구글·네이버 로그인 화면으로 보낸다.
  * 성공하면 이 화면으로 돌아오지 않고, 시작하지 못했을 때만 실패 문구를 보여준다
  */
 export function LoginForm({
@@ -123,7 +123,7 @@ export function LoginForm({
     setPendingProvider(provider);
     startTransition(async () => {
       try {
-        // 성공하면 서버가 카카오·구글로 보내서 아래로 내려오지 않는다
+        // 성공하면 서버가 카카오·구글·네이버로 보내서 아래로 내려오지 않는다
         const result = await signInWithProvider({ provider, mode, next });
         if (!result.ok) {
           setMessage(result.error.message);
