@@ -190,7 +190,8 @@ function PayoutSection({ item, now }: { item: SettlementItemView; now: Date }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/** 펼친 줄의 칸 묶음(제목 + 줄들). 정산서 펼치기(statement-list.tsx)도 같이 쓴다 */
+export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-2 text-sm">
       <h3 className="text-xs font-semibold text-muted-foreground">{title}</h3>
@@ -200,7 +201,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 /** 이름 — 값 한 줄. note는 값 아래 흐린 글자(기준 금액 식, 시작 몇 시간 전 등) */
-function Row({
+export function Row({
   label,
   value,
   note,

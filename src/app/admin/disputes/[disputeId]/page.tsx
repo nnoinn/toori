@@ -12,6 +12,7 @@ import { getDb } from '@/db';
 import { formatKst, formatKstDateTime } from '@/lib/time';
 import { isUuid } from '@/lib/uuid';
 import { recordAdminAccess } from '@/server/admin/access-log';
+import { FALLBACK_ADMIN_NAME } from '@/server/admin/admin-profile';
 import { ensureAdminPage } from '@/server/auth';
 import { disputeDeadline, outcomeBlockReason } from '@/server/disputes/rules';
 
@@ -117,6 +118,9 @@ async function Detail({ params }: { params: Params }) {
             </Field>
             <Field label="종류">{DISPUTE_TYPE_LABELS[detail.type]}</Field>
             <Field label="경로">{DISPUTE_CHANNEL_DETAIL_LABELS[detail.channel]}</Field>
+            {detail.channel === 'kakao' ? (
+              <Field label="등록한 운영자">{detail.registeredByName ?? FALLBACK_ADMIN_NAME}</Field>
+            ) : null}
             <Field label="받은 시각">{formatKstDateTime(detail.receivedAt)}</Field>
             <Field label="접수 기한">
               {deadline
@@ -155,6 +159,7 @@ async function Detail({ params }: { params: Params }) {
               <Field label="기록한 시각">
                 {detail.handledAt ? formatKstDateTime(detail.handledAt) : '-'}
               </Field>
+              <Field label="기록한 운영자">{detail.handledByName ?? FALLBACK_ADMIN_NAME}</Field>
             </dl>
           )}
         </CardContent>

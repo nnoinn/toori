@@ -15,7 +15,7 @@ import { PHONE_FORMAT_MESSAGE } from '@/lib/phone';
 
 import { customerPhoneSchema, profileSchema } from './profile-rules';
 
-/** 닉네임·연락처를 저장한다. 형식이 틀리면 첫 번째 이유를 돌려준다 */
+/** 이름(예약자 이름, #375)·닉네임·연락처를 저장한다. 형식이 틀리면 첫 번째 이유를 돌려준다 */
 export async function updateMyProfile(input: unknown): Promise<Result<null>> {
   const auth = await requireCustomer();
   if (!auth.ok) return auth;
@@ -26,7 +26,7 @@ export async function updateMyProfile(input: unknown): Promise<Result<null>> {
   try {
     await getDb()
       .update(customers)
-      .set({ nickname: parsed.data.nickname, phone: parsed.data.phone })
+      .set({ name: parsed.data.name, nickname: parsed.data.nickname, phone: parsed.data.phone })
       .where(eq(customers.id, auth.data.customerId));
   } catch (error) {
     // 입력값(연락처)은 남기지 않고 오류 이름만 남긴다

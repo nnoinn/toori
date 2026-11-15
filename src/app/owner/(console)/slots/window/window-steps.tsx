@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Price } from '@/components/ui/price';
+import { SLOT_STATUS_LABELS } from '@/features/slot-status/slot-status';
 import { formatDuration, formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';
 import {
@@ -228,11 +229,11 @@ export function RatesStep({
   );
 }
 
-/** 게시 안내. 예약대기면 언제부터 보이는지(S-205). 서버가 등록할 때 그때 시각으로 다시 정한다 */
+/** 게시 안내. 게시예정이면 언제부터 보이는지(S-205). 서버가 등록할 때 그때 시각으로 다시 정한다 */
 function publishNote(start: Date, now: Date): string {
   const plan = publishPlan(start, now);
   return plan.status === 'scheduled'
-    ? `예약대기 · ${formatKst(plan.publishAt)}부터 고객에게 보여요`
+    ? `${SLOT_STATUS_LABELS.scheduled} · ${formatKst(plan.publishAt)}부터 고객에게 보여요`
     : '등록하면 바로 고객에게 보여요';
 }
 
@@ -391,8 +392,8 @@ export function SavedWindowsCard({ saved, onAgain }: { saved: SavedWindows; onAg
                 </span>
                 <span className="text-muted-foreground">
                   {window.status === 'scheduled'
-                    ? `예약대기 · ${formatKst(new Date(window.publishAt))}부터 고객에게 보여요`
-                    : '게시중 · 지금 고객에게 보여요'}
+                    ? `${SLOT_STATUS_LABELS.scheduled} · ${formatKst(new Date(window.publishAt))}부터 고객에게 보여요`
+                    : `${SLOT_STATUS_LABELS.published} · 지금 고객에게 보여요`}
                 </span>
               </li>
             ))}

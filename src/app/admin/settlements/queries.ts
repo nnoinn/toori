@@ -174,3 +174,15 @@ export async function selectSettlementItemExtras(
     .where(eq(settlementItems.settlementId, settlementId));
   return new Map(rows.map(({ reservationId, ...extra }) => [reservationId, extra] as const));
 }
+
+/** 샵 이름(샵별 정산서 목록 머리). 없으면 null */
+export async function selectShopName(
+  db: DbReader,
+  shopId: string,
+): Promise<{ shopId: string; shopName: string } | null> {
+  const [row] = await db
+    .select({ shopId: shops.id, shopName: shops.name })
+    .from(shops)
+    .where(eq(shops.id, shopId));
+  return row ?? null;
+}

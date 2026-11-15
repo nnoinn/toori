@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState, ErrorState, LoadingCards } from '@/components/ui/state';
 import { getDb } from '@/db';
+import { SLOT_STATUS_LABELS } from '@/features/slot-status/slot-status';
 import { getRequestNow } from '@/lib/request-time';
 import { ensureOwnerPage } from '@/server/auth';
 import { readShopReviewStatus } from '@/server/shops/review-store';
@@ -56,7 +57,7 @@ async function SlotEditContent({ params }: { params: Params }) {
     return (
       <CannotEdit
         message={SLOT_EDIT_MESSAGES[problem]}
-        description="예약대기·게시중이고 고객이 결제 중이 아닌 매물만 고칠 수 있어요"
+        description={`판매 전(${SLOT_STATUS_LABELS.scheduled}·${SLOT_STATUS_LABELS.published})이고 고객이 결제 중이 아닌 매물만 고칠 수 있어요`}
       />
     );
   }
@@ -68,7 +69,7 @@ async function SlotEditContent({ params }: { params: Params }) {
     return <CannotEdit message="고를 수 있는 메뉴가 없어요. 메뉴를 먼저 등록해 주세요" />;
   }
 
-  // 게시중이면 48시간 안, 예약대기면 14일 안의 시각만 보여준다(S-205)
+  // 게시중이면 48시간 안, 게시예정이면 14일 안의 시각만 보여준다(S-205)
   const startWindow = editStartWindow(slot, now);
   // 매물 메뉴를 숨겼거나 업종을 바꿨으면 메뉴부터 다시 고른다
   const menuId = data.menus.some((menu) => menu.id === slot.menuId) ? slot.menuId : null;

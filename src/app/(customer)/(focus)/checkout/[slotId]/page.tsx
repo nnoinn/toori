@@ -41,7 +41,7 @@ async function CheckoutContent({ params }: { params: Params }) {
     getMyHold(slotId),
     selectSlotDetail(getDb(), { slotId, customerId, now }),
     getDb()
-      .select({ phone: customers.phone })
+      .select({ name: customers.name, phone: customers.phone })
       .from(customers)
       .where(eq(customers.id, customerId))
       .limit(1),
@@ -70,6 +70,7 @@ async function CheckoutContent({ params }: { params: Params }) {
       key={hold.data.holdExpiresAt}
       slot={slot}
       hold={myHold}
+      bookerName={customer?.name ?? ''}
       phone={customer?.phone ?? null}
       coupons={couponList}
       initialCoupon={initialCoupon}

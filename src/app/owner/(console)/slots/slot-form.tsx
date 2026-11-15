@@ -11,6 +11,7 @@ import { useMemo, useState, useTransition } from 'react';
 
 import { Button } from '@/components/ui/button';
 import type { BusinessHours } from '@/db/schema/shops';
+import { SLOT_STATUS_LABELS } from '@/features/slot-status/slot-status';
 import { formatKst, kstDateKey } from '@/lib/time';
 import type { DiscountRate } from '@/server/policy';
 import { previewSettlement } from '@/server/settlements';
@@ -74,7 +75,7 @@ export function SlotForm({
   /** 샵 영업시간(O2). 입력하지 않은 요일은 24시간 다 보여준다 */
   businessHours: BusinessHours;
   menus: SlotMenuOption[];
-  /** 같은 샵의 예약대기·게시중·예약됨 매물 시간(ISO). 수정이면 고치는 매물은 뺀다 */
+  /** 같은 샵의 게시예정·게시중·예약됨 매물 시간(ISO). 수정이면 고치는 매물은 뺀다 */
   busy: { start: string; end: string }[];
   edit?: SlotEditTarget;
 }) {
@@ -296,6 +297,6 @@ function publishNoteOf(
 ): string {
   const plan = startWindow === 'advance' ? publishPlan(start, now) : null;
   return plan?.status === 'scheduled'
-    ? `예약대기로 올라가요. ${formatKst(plan.publishAt)}부터 고객에게 보여요`
+    ? `${SLOT_STATUS_LABELS.scheduled} 상태로 올라가요. ${formatKst(plan.publishAt)}부터 고객에게 보여요`
     : `${saveLabel}하면 바로 고객에게 보여요`;
 }

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Price } from '@/components/ui/price';
 import type { BusinessHours } from '@/db/schema/shops';
+import { SLOT_STATUS_LABELS } from '@/features/slot-status/slot-status';
 import { formatDuration, formatWon } from '@/lib/format';
 import { formatKst, formatKstTime } from '@/lib/time';
 import {
@@ -39,6 +40,11 @@ export type StepNumber = 1 | 2 | 3;
 export type StepDone = Record<StepNumber, boolean>;
 
 const STEPS = ['서비스', '시간', '할인율'] as const;
+
+/** 시간이 겹치면 새 매물을 막는 상태 이름(S-209). 예: "게시예정·게시중·예약됨" */
+const BLOCKING_STATUS_NAMES = (['scheduled', 'published', 'reserved'] as const)
+  .map((status) => SLOT_STATUS_LABELS[status])
+  .join('·');
 
 /**
  * 그 단계로 갈 수 있는지. 앞 단계를 다 골라야 다음 단계를 열 수 있다.
@@ -160,12 +166,12 @@ export function TimeStep({
   days: { dateKey: string; starts: Date[] }[];
   /** 오늘(한국 날짜, 서버 시각 기준). 달력 위에 알려 주고 그 칸을 표시한다 */
   todayKey: string;
-  /** 고를 수 있는 범위. 새로 올리기·예약대기 수정은 14일, 게시중 매물 수정은 48시간 */
+  /** 고를 수 있는 범위. 새로 올리기·게시예정 수정은 14일, 게시중 매물 수정은 48시간 */
   startWindow: StartWindow;
   /** 고른 날짜. 아직 안 골랐으면 빈 값이고, 달력 아래 시작 시각을 보여주지 않는다 */
   dateKey: string;
   businessHours: BusinessHours;
-  /** 같은 샵의 예약대기·게시중·예약됨 매물 시간 */
+  /** 같은 샵의 게시예정·게시중·예약됨 매물 시간 */
   busyRanges: TimeRange[];
   startIso: string | null;
   onChooseDate: (dateKey: string) => void;
@@ -186,7 +192,7 @@ export function TimeStep({
         <p className="text-sm text-muted-foreground">
           {startWindow === 'published'
             ? `고객에게 이미 보이는 매물이라 지금부터 ${PUBLISH_WINDOW_HOURS}시간 안의 시각으로만 바꿀 수 있어요.`
-            : `지금부터 ${ADVANCE_LISTING_DAYS}일 안의 시각을 올릴 수 있어요. 고객에게는 시작 ${PUBLISH_WINDOW_HOURS}시간 전부터 보이고, 그 전에는 예약대기예요.`}{' '}
+            : `지금부터 ${ADVANCE_LISTING_DAYS}일 안의 시각을 올릴 수 있어요. 고객에게는 시작 ${PUBLISH_WINDOW_HOURS}시간 전부터 보이고, 그 전에는 ${SLOT_STATUS_LABELS.scheduled} 상태예요.`}{' '}
           끝 시각은 {menu.name} 소요 시간({formatDuration(menu.durationMinutes)})으로 정해져요.
         </p>
       </CardHeader>
@@ -228,8 +234,8 @@ export function TimeStep({
               })}
             </div>
             <p className="text-xs text-muted-foreground">
-              매장 설정의 영업시간 안에 끝나는 시각만 보여요. 줄이 그어진 시각은 이미 올린
-              매물(예약대기·게시중·예약됨)과 시간이 겹쳐서 고를 수 없어요.
+              매장 설정의 영업시간 안에 끝나는 시각만 보여요. 줄이 그어진 시각은 이미 올린 매물(
+              {BLOCKING_STATUS_NAMES})과 시간이 겹쳐서 고를 수 없어요.
             </p>
           </section>
         ) : (
@@ -332,7 +338,7 @@ export function ChosenSummary({
 }: {
   menu: SlotMenuOption;
   start: Date | null;
-  /** 시각을 골랐으면 언제 고객에게 보이는지(S-205). 예: "예약대기로 올라가요. 11/18(수) 14:00부터 고객에게 보여요" */
+  /** 시각을 골랐으면 언제 고객에게 보이는지(S-205). 예: "게시예정 상태로 올라가요. 11/18(수) 14:00부터 고객에게 보여요" */
   publishNote: string | null;
 }) {
   return (
