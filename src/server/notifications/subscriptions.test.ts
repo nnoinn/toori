@@ -58,7 +58,7 @@ const SUBSCRIPTION = {
   keys: { p256dh: 'BPublicKeyBase64', auth: 'AuthSecret' },
 };
 
-const account = (mode: 'customer' | 'owner', extra = {}) => ({
+const account = (mode: 'customer' | 'owner' | 'admin', extra = {}) => ({
   userId: 'user-1',
   mode,
   customerId: 'customer-1',
@@ -157,6 +157,21 @@ describe('removePushSubscription', () => {
     state.account = account('customer');
     expect(await removePushSubscription('x'.repeat(3000))).toEqual(ok(null));
     expect(state.deletes).toEqual([]);
+  });
+});
+
+describe('운영자 모드(#372)', () => {
+  it('운영자로 들어와 있으면 알림을 켤 계정이 없어서 켜기는 WRONG_MODE, 끄기·상태는 DB를 보지 않고 꺼짐', async () => {
+    state.account = account('admin', { isAdmin: true });
+    const saved = await savePushSubscription(SUBSCRIPTION);
+    expect(saved.ok === false && saved.error.code).toBe('WRONG_MODE');
+    expect(state.upserts).toEqual([]);
+    expect(await removePushSubscription(SUBSCRIPTION.endpoint)).toEqual(ok(null));
+    expect(state.deletes).toEqual([]);
+    expect(await getPushSubscriptionStatus(SUBSCRIPTION.endpoint)).toEqual(
+      ok({ subscribed: false }),
+    );
+    expect(state.lookups).toEqual([]);
   });
 });
 

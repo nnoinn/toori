@@ -86,7 +86,10 @@ function fileName(path) {
 async function capture(args) {
   const key = flag(args, '--as');
   const email = key ? `${key}@${SEED_EMAIL_DOMAIN}` : flag(args, '--email');
-  const mode = flag(args, '--mode') ?? (key?.startsWith('owner') ? 'owner' : 'customer');
+  // 시드 계정 이름으로 모드를 고른다. 운영자 화면은 운영자 모드여야 열린다(#372, admin-a → admin)
+  const mode =
+    flag(args, '--mode') ??
+    (key?.startsWith('owner') ? 'owner' : key?.startsWith('admin') ? 'admin' : 'customer');
   const paths = positional(args).map(screenPath);
   if (paths.length === 0) throw new Error('찍을 화면 주소를 넣어 주세요. 예: /owner');
   const server = await fetch(BASE_URL).catch(() => null);

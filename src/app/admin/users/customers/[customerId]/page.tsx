@@ -57,11 +57,12 @@ async function Detail({ params }: { params: Params }) {
     <div className="flex flex-col gap-4">
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">{detail.nickname}</CardTitle>
+          <CardTitle className="text-lg">{detail.name}</CardTitle>
         </CardHeader>
         <CardContent>
           <Fields
             rows={[
+              ['닉네임', detail.nickname],
               ['이메일', detail.email],
               ['휴대폰', detail.phone ?? '-'],
               ['가입', formatKst(detail.createdAt)],

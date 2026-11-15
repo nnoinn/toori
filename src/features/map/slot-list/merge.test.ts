@@ -162,6 +162,11 @@ describe('지도 핀에 시간대 더하기', () => {
     });
   });
 
+  it('매물 수가 같으면 샵 id 순이라 상한에서 잘리는 핀이 늘 같다(selectMapShops와 같은 순서)', () => {
+    const result = addWindowPins([shop(3, 1), shop(1, 1)], [pin(2)], 2);
+    expect(result.map((item) => item.shopId)).toEqual([uuid(1), uuid(2)]);
+  });
+
   it('매물 많은 순으로 다시 세우고 상한까지만 준다. 받은 핀은 바꾸지 않는다', () => {
     const before = [shop(1, 1), shop(2, 1)];
     const result = addWindowPins(before, [pin(2)], 1);

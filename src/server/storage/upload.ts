@@ -132,7 +132,9 @@ export async function getBusinessDocUrl(
   if (!account) return fail('UNAUTHENTICATED', AUTH_ERRORS.UNAUTHENTICATED);
   const isShopOwner =
     account.mode === 'owner' && account.shopId !== null && account.shopId === shopId;
-  if (!account.isAdmin && !isShopOwner) return fail('FORBIDDEN', AUTH_ERRORS.FORBIDDEN);
+  // 운영자는 운영자 모드로 들어와 있을 때만(#372 2장)
+  const isAdmin = account.mode === 'admin' && account.isAdmin;
+  if (!isAdmin && !isShopOwner) return fail('FORBIDDEN', AUTH_ERRORS.FORBIDDEN);
 
   const id = z.uuid().safeParse(shopId);
   if (!id.success) return fail('SHOP_NOT_FOUND', SHOP_REVIEW_ERRORS.SHOP_NOT_FOUND);

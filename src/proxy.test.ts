@@ -96,8 +96,9 @@ describe('잠금이 켜져 있을 때', () => {
     expect(owner.headers.get('location')).toBe(`${ORIGIN}/login?mode=owner&next=%2Fowner`);
     expect(owner.headers.get('x-robots-tag')).toBe('noindex, nofollow');
 
+    // 운영자 화면은 운영자 모드가 아니면 운영자 입구로 보낸다(#372)
     const admin = await visit('/admin', { cookie });
-    expect(admin.status).toBe(404);
+    expect(admin.headers.get('location')).toBe(`${ORIGIN}/admin/login?next=%2Fadmin`);
     expect(admin.headers.get('x-robots-tag')).toBe('noindex, nofollow');
   });
 

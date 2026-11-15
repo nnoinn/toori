@@ -43,6 +43,8 @@ const reservationCounts = {
 
 export type CustomerRow = {
   customerId: string;
+  /** 예약자 이름(#375). 목록 첫 칸 */
+  name: string;
   nickname: string;
   phone: string | null;
   createdAt: Date;
@@ -52,7 +54,7 @@ export type CustomerRow = {
   noShowCount: number;
 };
 
-/** 고객 목록(최근 가입 순). 닉네임·이메일은 일부만 맞아도, 휴대폰은 전체 번호가 맞으면 찾는다 */
+/** 고객 목록(최근 가입 순). 이름·닉네임·이메일은 일부만 맞아도, 휴대폰은 전체 번호가 맞으면 찾는다 */
 export async function selectCustomers(
   db: DbReader,
   query: string,
@@ -61,6 +63,7 @@ export async function selectCustomers(
   const phone = normalizePhone(query);
   const where: SQL | undefined = query
     ? or(
+        ilike(customers.name, pattern),
         ilike(customers.nickname, pattern),
         ilike(profiles.email, pattern),
         phone ? eq(customers.phone, phone) : undefined,
@@ -69,6 +72,7 @@ export async function selectCustomers(
   const rows = await db
     .select({
       customerId: customers.id,
+      name: customers.name,
       nickname: customers.nickname,
       phone: customers.phone,
       createdAt: customers.createdAt,
@@ -151,6 +155,7 @@ export type CustomerReservationRow = {
 
 export type CustomerDetail = {
   customerId: string;
+  name: string;
   nickname: string;
   phone: string | null;
   email: string;
@@ -174,6 +179,7 @@ export async function selectCustomerDetail(
     .select({
       customerId: customers.id,
       userId: customers.userId,
+      name: customers.name,
       nickname: customers.nickname,
       phone: customers.phone,
       email: profiles.email,

@@ -6,7 +6,12 @@ import { describe, expect, it } from 'vitest';
 import { kstToUtc } from '@/lib/time';
 import { OWNER_FAULT_PENALTY_AMOUNT } from '@/server/policy';
 
-import { buildShopSettlement, payoutDateOn, ZERO_PAYOUT_MEMO } from './batch-rules';
+import {
+  buildShopSettlement,
+  catchUpPayoutDate,
+  payoutDateOn,
+  ZERO_PAYOUT_MEMO,
+} from './batch-rules';
 import type { OutstandingPenalty } from './calc-settlement';
 
 function kst(value: string): Date {
@@ -58,6 +63,23 @@ describe('payoutDateOn', () => {
     expect(payoutDateOn(kst('2026-09-24 00:30'))).toBeNull();
     expect(payoutDateOn(kst('2026-09-25 00:30'))).toBeNull();
     expect(payoutDateOn(kst('2026-09-28 00:30'))).toBe('2026-09-28');
+  });
+});
+
+describe('catchUpPayoutDate: 지급일 새벽 작업이 실패했을 때 따라잡을 지급일(#394 리뷰 3번)', () => {
+  it('지급일 다음 날(1일 안)이면 그 지급일, 지급일 당일·이틀 뒤·다른 날은 없다', () => {
+    expect(catchUpPayoutDate(kst('2026-11-20 00:30'), 1)).toBe('2026-11-19');
+    expect(catchUpPayoutDate(kst('2026-11-19 00:30'), 1)).toBeNull();
+    expect(catchUpPayoutDate(kst('2026-11-21 00:30'), 1)).toBeNull();
+    expect(catchUpPayoutDate(kst('2026-11-18 00:30'), 1)).toBeNull();
+    // 2일까지 보면 이틀 뒤도 그 지급일
+    expect(catchUpPayoutDate(kst('2026-11-21 00:30'), 2)).toBe('2026-11-19');
+  });
+
+  it('공휴일로 밀린 지급일도 그다음 날 따라잡는다(2027-05-13 부처님오신날 → 금요일 5/14 지급 → 5/15)', () => {
+    expect(catchUpPayoutDate(kst('2027-05-15 00:30'), 1)).toBe('2027-05-14');
+    // 공휴일 목요일 다음 날(지급일 당일)은 따라잡기가 아니다
+    expect(catchUpPayoutDate(kst('2027-05-14 00:30'), 1)).toBeNull();
   });
 });
 

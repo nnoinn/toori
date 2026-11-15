@@ -112,7 +112,7 @@ async function Detail({ params }: { params: Params }) {
                 href={`/admin/users/customers/${detail.customerId}`}
                 className="hover:underline"
               >
-                {detail.customerNickname}
+                {detail.customerName}
               </Link>
             </Field>
             <Field label="종류">{DISPUTE_TYPE_LABELS[detail.type]}</Field>
