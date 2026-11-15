@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ChevronRight, Heart, List, Map as MapIcon } from 'lucide-react';
 
+import { CustomerNotificationBell } from '../customer-notification-bell';
+
 export const metadata: Metadata = { title: '홈' };
 
 /** 고객 홈에서 골라 들어가는 탐색 방법(#215, 기술 가이드 7장 "홈과 메뉴" 순서) */
@@ -32,11 +34,15 @@ const WAYS = [
 export default function CustomerHomePage() {
   return (
     <main className="flex flex-1 flex-col gap-6 px-4 py-6 md:mx-auto md:w-full md:max-w-3xl md:px-6 md:py-10">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold">어떻게 찾아볼까요?</h1>
-        <p className="text-sm text-muted-foreground">
-          취소·빈 시간이 생긴 매물을 할인된 가격으로 예약해요.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold">어떻게 찾아볼까요?</h1>
+          <p className="text-sm text-muted-foreground">
+            취소·빈 시간이 생긴 매물을 할인된 가격으로 예약해요.
+          </p>
+        </div>
+        {/* 폰의 알림 종은 이 화면 위 오른쪽에만 둔다(#371, 11/15 nnoinn). PC는 위쪽 메뉴의 종을 쓴다 */}
+        <CustomerNotificationBell className="-mt-2 -mr-2 md:hidden" />
       </div>
       <ul className="grid gap-3 md:grid-cols-3">
         {WAYS.map(({ href, icon: Icon, title, description }) => (
