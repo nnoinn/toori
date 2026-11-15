@@ -14,7 +14,12 @@ import { formatKst } from '@/lib/time';
 import { maskPhone } from '@/lib/phone';
 import { serviceTypeLabel } from '@/server/policy';
 
-import { CANCEL_ACTOR_LABELS, type ReservationView, showsFullPhone } from '../reservation-detail';
+import {
+  bookerName,
+  CANCEL_ACTOR_LABELS,
+  type ReservationView,
+  showsFullPhone,
+} from '../reservation-detail';
 import type { OwnerReservation } from '../reservation-detail-store';
 
 /** 시작 전에는 다른 채널에서 시간 막기(D16), 시작이 지났으면 방문·노쇼 처리 안내, 처리한 뒤에는 바꿀 수 없다는 안내 */
@@ -70,11 +75,13 @@ function NoticeBox({
 }
 
 /**
- * 예약자 닉네임·휴대폰. 휴대폰은 이용이 끝날 때까지만 다 보여주고(동의 문구 3-1),
+ * 예약자 이름·휴대폰. 샵에는 닉네임을 주지 않는다(#375). 이름이 공백뿐이면 "없음".
+ * 휴대폰은 이용이 끝날 때까지만 다 보여주고(동의 문구 3-1),
  * 방문·노쇼를 처리했거나 취소된 예약은 가운데를 가린다(#21 Q11). 번호를 받기 전에 만든 시드 예약처럼 번호가 없으면 "없음"
  */
 export function BookerCard({ reservation }: { reservation: OwnerReservation }) {
   const full = showsFullPhone(reservation);
+  const name = bookerName(reservation.customerName);
   const phone = reservation.customerPhone;
   return (
     <Card>
@@ -83,8 +90,10 @@ export function BookerCard({ reservation }: { reservation: OwnerReservation }) {
       </CardHeader>
       <CardContent>
         <dl className="grid grid-cols-[6rem_1fr] gap-y-2 text-sm">
-          <dt className="text-muted-foreground">닉네임</dt>
-          <dd className="font-medium">{reservation.customerNickname}</dd>
+          <dt className="text-muted-foreground">이름</dt>
+          <dd className="font-medium">
+            {name ?? <span className="text-muted-foreground">없음</span>}
+          </dd>
           <dt className="text-muted-foreground">휴대폰</dt>
           <dd className="font-medium tabular-nums">
             {phone === null ? (

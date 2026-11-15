@@ -70,7 +70,7 @@ export async function selectSlotShop(
 }
 
 /**
- * 그 샵에서 [from, to)와 겹치는 매물 시간(예약대기·게시중·예약됨)과 시간대 매물 시간(예약대기·게시중), 시작 순서.
+ * 그 샵에서 [from, to)와 겹치는 매물 시간(게시예정·게시중·예약됨)과 시간대 매물 시간(게시예정·게시중), 시작 순서.
  * 시간대 안에서 만든 매물(window_id)은 그 시간대 안에 있어서 같이 읽어도 결과가 달라지지 않는다
  */
 export async function selectBusyRanges(

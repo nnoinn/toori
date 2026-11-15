@@ -25,49 +25,49 @@ const slot = (status: SlotStatus): SlotStatusInput => ({ status, publishAt, star
 export const SLOT_STATUS_CASES: SlotStatusCase[] = [
   // 저장 값 scheduled
   {
-    name: '예약대기: 게시 시각 전이면 예약대기',
+    name: '게시예정: 게시 시각 전이면 게시예정',
     slot: slot('scheduled'),
     now: beforePublish,
     expected: 'scheduled',
   },
   {
-    name: '예약대기: 게시 시각 1ms 전이면 예약대기',
+    name: '게시예정: 게시 시각 1ms 전이면 게시예정',
     slot: slot('scheduled'),
     now: ms(publishAt, -1),
     expected: 'scheduled',
   },
   {
-    name: '예약대기: 게시 시각과 같으면 게시중',
+    name: '게시예정: 게시 시각과 같으면 게시중',
     slot: slot('scheduled'),
     now: publishAt,
     expected: 'published',
   },
   {
-    name: '예약대기: 게시 시각 1ms 뒤면 게시중',
+    name: '게시예정: 게시 시각 1ms 뒤면 게시중',
     slot: slot('scheduled'),
     now: ms(publishAt, 1),
     expected: 'published',
   },
   {
-    name: '예약대기: 게시~시작 사이면 게시중',
+    name: '게시예정: 게시~시작 사이면 게시중',
     slot: slot('scheduled'),
     now: betweenPublishAndStart,
     expected: 'published',
   },
   {
-    name: '예약대기: 시작 시각 1ms 전이면 게시중',
+    name: '게시예정: 시작 시각 1ms 전이면 게시중',
     slot: slot('scheduled'),
     now: ms(startAt, -1),
     expected: 'published',
   },
   {
-    name: '예약대기: 시작 시각과 같으면 마감',
+    name: '게시예정: 시작 시각과 같으면 마감',
     slot: slot('scheduled'),
     now: startAt,
     expected: 'closed',
   },
   {
-    name: '예약대기: 시작 시각이 지나면 마감',
+    name: '게시예정: 시작 시각이 지나면 마감',
     slot: slot('scheduled'),
     now: afterStart,
     expected: 'closed',

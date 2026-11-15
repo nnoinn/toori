@@ -34,34 +34,55 @@ beforeEach(() => {
 });
 
 describe('updateMyProfile', () => {
-  it('내 고객 계정의 닉네임·연락처를 저장하고, 연락처는 하이픈 모양으로 맞춘다', async () => {
-    const result = await updateMyProfile({ nickname: '  줍줍  ', phone: '01012345678' });
+  it('내 고객 계정의 이름·닉네임·연락처를 저장하고, 이름·닉네임은 앞뒤 공백을 빼고 연락처는 하이픈 모양으로 맞춘다', async () => {
+    const result = await updateMyProfile({
+      name: ' 김투리 ',
+      nickname: '  줍줍  ',
+      phone: '01012345678',
+    });
     expect(result).toEqual(ok(null));
     expect(update.table).toHaveBeenCalledWith(customers);
-    expect(update.set).toHaveBeenCalledWith({ nickname: '줍줍', phone: '010-1234-5678' });
+    expect(update.set).toHaveBeenCalledWith({
+      name: '김투리',
+      nickname: '줍줍',
+      phone: '010-1234-5678',
+    });
     expect(update.where).toHaveBeenCalledWith(eq(customers.id, 'customer-1'));
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
   it('연락처를 비우면 지운다(null)', async () => {
-    await updateMyProfile({ nickname: '줍줍', phone: '' });
-    expect(update.set).toHaveBeenCalledWith({ nickname: '줍줍', phone: null });
+    await updateMyProfile({ name: '김투리', nickname: '줍줍', phone: '' });
+    expect(update.set).toHaveBeenCalledWith({ name: '김투리', nickname: '줍줍', phone: null });
   });
 
   it('형식이 틀리면 저장하지 않고 첫 번째 이유를 보여 준다', async () => {
-    const empty = await updateMyProfile({ nickname: '   ', phone: '' });
+    const empty = await updateMyProfile({ name: '김투리', nickname: '   ', phone: '' });
     expect(!empty.ok && empty.error).toEqual({
       code: 'INVALID_INPUT',
       message: '닉네임을 입력해 주세요',
     });
-    const badPhone = await updateMyProfile({ nickname: '줍줍', phone: '031-123-4567' });
+    const badPhone = await updateMyProfile({
+      name: '김투리',
+      nickname: '줍줍',
+      phone: '031-123-4567',
+    });
     expect(!badPhone.ok && badPhone.error.message).toBe(PHONE_FORMAT_MESSAGE);
+    expect(update.table).not.toHaveBeenCalled();
+  });
+
+  it('이름을 비우면 저장하지 않는다(예약자 이름은 꼭 있어야 한다, #375)', async () => {
+    const result = await updateMyProfile({ name: '  ', nickname: '줍줍', phone: '' });
+    expect(!result.ok && result.error).toEqual({
+      code: 'INVALID_INPUT',
+      message: '이름을 입력해 주세요',
+    });
     expect(update.table).not.toHaveBeenCalled();
   });
 
   it('고객으로 로그인하지 않았으면 저장하지 않는다', async () => {
     authMock.mockResolvedValueOnce(fail('WRONG_MODE', '고객으로 로그인해 주세요'));
-    const result = await updateMyProfile({ nickname: '줍줍', phone: '' });
+    const result = await updateMyProfile({ name: '김투리', nickname: '줍줍', phone: '' });
     expect(!result.ok && result.error.code).toBe('WRONG_MODE');
     expect(update.table).not.toHaveBeenCalled();
   });
@@ -69,7 +90,11 @@ describe('updateMyProfile', () => {
   it('저장이 실패하면 다시 시도하라고 알리고, 로그에는 연락처 없이 오류 이름만 남긴다', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     update.where.mockRejectedValueOnce(new Error('value 010-1234-5678 violates constraint'));
-    const result = await updateMyProfile({ nickname: '줍줍', phone: '01012345678' });
+    const result = await updateMyProfile({
+      name: '김투리',
+      nickname: '줍줍',
+      phone: '01012345678',
+    });
     expect(!result.ok && result.error.code).toBe('SAVE_FAILED');
     expect(log).toHaveBeenCalledWith('[updateMyProfile] 저장 실패:', 'Error');
     expect(JSON.stringify(log.mock.calls)).not.toContain('1234');

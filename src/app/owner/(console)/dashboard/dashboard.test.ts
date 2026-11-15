@@ -68,7 +68,7 @@ describe('대시보드 날짜 나누기 (S-401)', () => {
 });
 
 describe('대시보드 상태 (O1 getSlotStatus)', () => {
-  it('시작이 지난 게시중은 마감, 게시 시각 전 예약대기는 예약대기', () => {
+  it('시작이 지난 게시중은 마감, 게시 시각 전 게시예정은 게시예정', () => {
     expect(viewStatus(slot('2026-10-31T09:00:00'), now)).toBe('closed');
     expect(
       viewStatus(
