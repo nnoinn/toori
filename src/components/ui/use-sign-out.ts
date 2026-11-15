@@ -18,8 +18,9 @@ export const AFTER_SIGN_OUT_PATH = '/';
  * 3) 첫 화면(AFTER_SIGN_OUT_PATH)을 화면 전체로 새로 연다. 앱 안 이동(router)으로 가면 브라우저에 남아 있던 로그인 상태 화면이 잠깐 보였다가
  *    조금 뒤에야 로그아웃된 모습으로 바뀌고, 뒤로 가기로 내 정보가 다시 보일 수도 있다. 새로 열면 남은 화면이 모두 지워진다
  * pending은 새 화면이 열릴 때까지 true라서 버튼이 그동안 '로그아웃 중…'으로 잠겨 있다
+ * afterPath: 로그아웃 뒤 열 화면(선택). 운영자는 운영자 입구(/admin/login)로 간다(#372 3장). 넘기지 않으면 첫 화면
  */
-export function useSignOut() {
+export function useSignOut(afterPath: string = AFTER_SIGN_OUT_PATH) {
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -36,7 +37,7 @@ export function useSignOut() {
         }
         setLeaving(true);
         // 지금 화면은 기록에서 빼서 뒤로 가기로 돌아오지 않게 한다
-        window.location.replace(AFTER_SIGN_OUT_PATH);
+        window.location.replace(afterPath);
       } catch (caught) {
         unstable_rethrow(caught);
         setError(FAILED_MESSAGE);

@@ -18,7 +18,7 @@ import {
   type LoginMode,
   nextForMode,
 } from './login-params';
-import { ProviderButton, type ProviderKey } from './provider-button';
+import { ProviderButton, type ProviderKey } from '@/components/ui/provider-button';
 
 const MODES: { mode: LoginMode; label: string }[] = [
   { mode: 'customer', label: '고객' },
