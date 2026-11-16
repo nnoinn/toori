@@ -18,7 +18,7 @@ import { autoCancelOrder } from './settle-order';
 type Db = ReturnType<typeof getDb>;
 
 /** 주문 하나의 결과. left: 이번에는 정하지 못해 다음 실행이 다시 본다 */
-type SweepResult = 'confirmed' | 'autoCancelled' | 'failed' | 'abandoned' | 'left';
+export type SweepResult = 'confirmed' | 'autoCancelled' | 'failed' | 'abandoned' | 'left';
 
 export type SweepSummary = { checked: number } & Record<SweepResult, number>;
 
@@ -35,20 +35,28 @@ export async function sweepStaleOrders(db: Db, now: Date): Promise<SweepSummary>
     left: 0,
   };
   for (const order of stale) {
-    let result: SweepResult = 'left';
-    try {
-      result = await sweepOrder(db, order, now);
-    } catch (error) {
-      logSweepError(order.orderId, error);
-    }
-    summary[result] += 1;
-    if (result === 'left') {
-      await markOrderChecked(db, order.orderId, now).catch((error: unknown) => {
-        logSweepError(order.orderId, error);
-      });
-    }
+    summary[await sweepOneOrder(db, order, now)] += 1;
   }
   return summary;
+}
+
+/**
+ * 오래된 주문 하나를 정리한다. 실패하면 left로 보고 로그만 남긴다(던지지 않는다).
+ * 정하지 못한 주문은 뒤로 보내서 다음 실행이 안 본 주문부터 보게 한다. 운영자 [다시 시도](#373 ①)도 이 함수를 부른다
+ */
+export async function sweepOneOrder(db: Db, order: StaleOrder, now: Date): Promise<SweepResult> {
+  let result: SweepResult = 'left';
+  try {
+    result = await sweepOrder(db, order, now);
+  } catch (error) {
+    logSweepError(order.orderId, error);
+  }
+  if (result === 'left') {
+    await markOrderChecked(db, order.orderId, now).catch((error: unknown) => {
+      logSweepError(order.orderId, error);
+    });
+  }
+  return result;
 }
 
 function logSweepError(orderId: string, error: unknown) {

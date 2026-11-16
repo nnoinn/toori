@@ -135,6 +135,49 @@ describeDb('주문 저장 (실제 DB)', () => {
     });
   });
 
+  it('readStaleOrders에 주문 하나를 주면 그 주문만, 정리 대상일 때만 고른다(운영자 [다시 시도], #373 ①)', async () => {
+    await withRollback(async (tx) => {
+      const { slotId, customerId } = await setup(tx);
+      const make = async (status: string, createdAt: string) => {
+        const paymentId = newPaymentId();
+        const orderId = await createPendingOrder(tx, {
+          paymentId,
+          slotId,
+          customerId,
+          salePrice: 14_000,
+          couponAmount: 0,
+          amount: 14_000,
+          agreedAt: AGREED_AT,
+        });
+        await tx
+          .update(orders)
+          .set({ status, createdAt: new Date(createdAt) })
+          .where(eq(orders.id, orderId));
+        return { orderId, paymentId };
+      };
+      const older = await make('pending', '2020-01-01T00:00:00Z');
+      const paid = await make('paid', '2020-01-02T00:00:00Z');
+      const confirmed = await make('confirmed', '2020-01-03T00:00:00Z');
+      const fresh = await make('paid', '2020-06-01T00:00:00Z');
+
+      const createdBefore = new Date('2020-03-01T00:00:00Z');
+      // 더 오래된 주문이 있어도 고른 주문만
+      expect(await readStaleOrders(tx, { createdBefore, limit: 1, orderId: paid.orderId })).toEqual(
+        [{ ...paid, amount: 14_000, status: 'paid' }],
+      );
+      expect(
+        await readStaleOrders(tx, { createdBefore, limit: 1, orderId: older.orderId }),
+      ).toEqual([{ ...older, amount: 14_000, status: 'pending' }]);
+      // 이미 정리된 주문, 아직 결제 중일 수 있는 최근 주문은 고르지 않는다
+      expect(
+        await readStaleOrders(tx, { createdBefore, limit: 1, orderId: confirmed.orderId }),
+      ).toEqual([]);
+      expect(
+        await readStaleOrders(tx, { createdBefore, limit: 1, orderId: fresh.orderId }),
+      ).toEqual([]);
+    });
+  });
+
   it('readOrderByPaymentId는 결제 번호로 주문을 읽고, 없으면 null', async () => {
     await withRollback(async (tx) => {
       const { slotId, customerId } = await setup(tx);

@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { Logo } from '@/components/ui/logo';
 import { Skeleton } from '@/components/ui/skeleton';
 import { firstParam, type SearchValue } from '@/lib/search-params';
+import { readRecentProvider } from '@/server/auth/recent-provider';
 
 import { AdminLoginForm } from './admin-login-form';
 import { ADMIN_LOGIN_ERROR_MESSAGES, toAdminLoginError, toAdminNext } from './admin-login-texts';
@@ -36,12 +37,13 @@ export default function AdminLoginPage({ searchParams }: { searchParams: SearchP
 }
 
 async function LoginButtons({ searchParams }: { searchParams: SearchParams }) {
-  const params = await searchParams;
+  const [params, recentProvider] = await Promise.all([searchParams, readRecentProvider()]);
   const error = toAdminLoginError(firstParam(params.error));
   return (
     <AdminLoginForm
       next={toAdminNext(firstParam(params.next))}
       error={error ? ADMIN_LOGIN_ERROR_MESSAGES[error] : null}
+      recentProvider={recentProvider}
     />
   );
 }

@@ -59,6 +59,32 @@ describeDb('알림 기록 (실제 DB)', () => {
     });
   });
 
+  it('켠 기기가 없어도 알림함에 남는다(no_device, 보내지 않음)', async () => {
+    await withRollback(async (tx) => {
+      const userId = await createTestUser(tx);
+      const dedupeKey = `test:no-device:${userId}`;
+      await notify(tx as unknown as Parameters<typeof notify>[0], {
+        userId,
+        accountType: 'customer',
+        event: 'reservation.confirmed',
+        dedupeKey,
+        title: '예약이 확정됐어요',
+        body: '내용',
+        url: '/reservations/r-1',
+      });
+      expect(state.sent).toBe(0);
+      const [row] = await tx
+        .select()
+        .from(notifications)
+        .where(eq(notifications.dedupeKey, dedupeKey));
+      expect(row).toMatchObject({
+        status: 'no_device',
+        readAt: null,
+        payload: { title: '예약이 확정됐어요', body: '내용', url: '/reservations/r-1' },
+      });
+    });
+  });
+
   it('구독이 끝났으면 지우고 failed로 남긴다', async () => {
     await withRollback(async (tx) => {
       const userId = await createTestUser(tx);

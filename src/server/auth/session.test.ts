@@ -44,7 +44,7 @@ beforeEach(() => {
 });
 
 describe('signInWithProvider', () => {
-  it('고른 모드와 돌아갈 주소를 콜백 주소에 붙여 카카오·구글 로그인 화면으로 보낸다', async () => {
+  it('고른 모드·돌아갈 주소·로그인 방식을 콜백 주소에 붙여 카카오·구글 로그인 화면으로 보낸다', async () => {
     state.signInWithOAuth.mockResolvedValue({ data: { url: 'https://kauth.example/a' } });
 
     await expect(
@@ -53,7 +53,8 @@ describe('signInWithProvider', () => {
     expect(state.signInWithOAuth).toHaveBeenCalledWith({
       provider: 'kakao',
       options: {
-        redirectTo: 'http://localhost:3000/api/auth/callback?mode=owner&next=%2Fowner%2Fslots',
+        redirectTo:
+          'http://localhost:3000/api/auth/callback?mode=owner&next=%2Fowner%2Fslots&provider=kakao',
       },
     });
   });
@@ -66,7 +67,10 @@ describe('signInWithProvider', () => {
     );
     expect(state.signInWithOAuth).toHaveBeenCalledWith({
       provider: 'kakao',
-      options: { redirectTo: 'http://localhost:3000/api/auth/callback?mode=admin&next=%2Fadmin' },
+      options: {
+        redirectTo:
+          'http://localhost:3000/api/auth/callback?mode=admin&next=%2Fadmin&provider=kakao',
+      },
     });
   });
 
@@ -77,7 +81,7 @@ describe('signInWithProvider', () => {
       signInWithProvider({ provider: 'google', mode: 'customer', next: '//evil.example' }),
     ).rejects.toThrow('redirect:');
     expect(state.signInWithOAuth.mock.calls[0][0].options.redirectTo).toBe(
-      'http://localhost:3000/api/auth/callback?mode=customer&next=%2Fhome',
+      'http://localhost:3000/api/auth/callback?mode=customer&next=%2Fhome&provider=google',
     );
   });
 
@@ -88,6 +92,10 @@ describe('signInWithProvider', () => {
       'redirect:https://nid.example/d',
     );
     expect(state.signInWithOAuth.mock.calls[0][0].provider).toBe('custom:naver');
+    // 최근 로그인 표시는 화면의 버튼 이름(naver)으로 기억한다(AUTH-15)
+    expect(state.signInWithOAuth.mock.calls[0][0].options.redirectTo).toBe(
+      'http://localhost:3000/api/auth/callback?mode=customer&next=%2Fhome&provider=naver',
+    );
   });
 
   it('지원하지 않는 로그인 방법이면 INVALID_INPUT', async () => {

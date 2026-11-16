@@ -77,7 +77,7 @@ PR 검사가 자동으로 막는 것:
 | SHOW-02 | 시작까지 6시간 미만이면 임박·환불 불가로 표시하고, 딱 6시간이면 표시하지 않는다 | C-203·C-308 | ✅ | `src/features/map/slot-list/badges.test.ts` 6시간 미만이면 환불 불가·임박, 딱 6시간이면 없음<br>`src/server/policy/slot-time.test.ts` 딱 6시간 남았으면 임박·환불 불가가 아니다 |
 | SHOW-03 | 다른 고객이 홀딩 중인 매물은 목록에 그대로 두고 "결제 중"으로 표시한다. 내 홀딩과 끝난 홀딩은 표시하지 않고, 서버 시각으로 판단한다 | C-404 | ✅ | `src/features/map/slot-list/badges.test.ts` 다른 고객이 홀딩 중이면 결제 중 배지<br>`src/features/map/slot-list/queries.db.test.ts` 배지는 서버 시각으로 |
 | SHOW-04 | 매물 상세에는 접힌 "환불 규정" 한 줄만 두고, 규정 문구는 결제 동의 문구와 글자까지 같다 | C-305·C-402 | ✅ | `src/app/(customer)/(tabs)/slots/[slotId]/detail-format.test.ts` 결제 동의 문구(consent-texts.md 3장)와 글자까지 같다 |
-| SHOW-05 | 샵 영업시간은 일~토 순서로 보여 준다(고객 매물 상세, 원장님 매장 설정의 표와 요일별 칸) | 11/15 nnoinn, #431, #437 | ⏳ | |
+| SHOW-05 | 샵 영업시간은 일~토 순서로 보여 준다(고객 매물 상세, 원장님 매장 설정의 표와 요일별 칸) | 11/15 nnoinn, #431, #437 | ⏳ | `src/app/owner/(console)/settings/shop/shop-profile.test.ts` 저장된 영업시간을 일~토 7줄로 바꾸고 |
 
 ## 5. 홀딩·결제
 
@@ -178,11 +178,11 @@ PR 검사가 자동으로 막는 것:
 | --- | --- | --- | --- | --- |
 | NOTI-01 | 예약 리마인드는 시작 2시간 전과 15분 전에 한 번씩 보낸다. 리마인드 때가 지난 뒤 확정된 예약에는 그 리마인드를 보내지 않는다 | C-602 | ✅ | `tests/docs/rule-docs.test.ts` 홀딩·게시·리마인드 시각<br>`src/server/notifications/reminder-store.db.test.ts` 15분 전 구간에 들면 2시간 전 리마인드는 고르지 않는다<br>`src/server/notifications/reminder-store.db.test.ts` 리마인드 때가 지난 뒤 확정된 예약과 이미 보낸 리마인드는 뺀다 |
 | NOTI-02 | 관심 동네·찜한 샵 새 매물 알림은 하루 한 번 오후 1시에 지난 24시간 매물을 모아 보내고, 밤 9시~아침 8시에는 보내지 않는다 | C-601·C-209 | ✅ | `src/server/notifications/digest.test.ts` 밤 시간에는 아무것도 읽지 않고 보내지 않는다<br>`src/server/notifications/digest.test.ts` 24시간 안에 게시된 매물을 모아 하루 한 번<br>`src/server/policy/values.test.ts` 관심 지역 알림 시각은 야간 금지 시간이 아니다 |
-| NOTI-03 | 그 알림은 따로 동의한 고객에게만 보낸다(이벤트·혜택 광고성 동의와 따로 받는다) | 11/8 | ✅ | `src/server/notifications/digest-store.db.test.ts` 동의·알림 기기·관심 동네나 찜이 있고 오늘 아직 받지 않은 고객만 고른다<br>`src/server/auth/account-store.test.ts` 관심 동네·찜한 샵 알림만 고르면 광고성(marketing) 기록은 남기지 않는다 |
+| NOTI-03 | 그 알림은 따로 동의한 고객에게만 보낸다(이벤트·혜택 광고성 동의와 따로 받는다) | 11/8 | ✅ | `src/server/notifications/digest-store.db.test.ts` 동의·관심 동네나 찜이 있고 오늘 아직 받지 않은 고객만 고른다<br>`src/server/auth/account-store.test.ts` 관심 동네·찜한 샵 알림만 고르면 광고성(marketing) 기록은 남기지 않는다 |
 | NOTI-04 | 한 기기에서 고객·원장님 알림을 모두 켤 수 있고, 지금 들어와 있는 계정과 상관없이 켜 둔 계정의 알림을 모두 받는다 | 11/1 | ✅ | `src/server/notifications/notify.test.ts` 켜 둔 기기마다 보내고 기록을 남긴다<br>`src/server/notifications/subscription-store.db.test.ts` 두 계정 모두 지운다 |
-| NOTI-05 | 푸시 알림을 켠 기기가 없어도 알림은 모두 기록되어 그 계정의 알림함(최근 90일)에 남는다. 켠 기기가 없으면 소리·배너 없이 쌓이기만 한다 | #371, 11/13 nnoinn | ⏳ | |
+| NOTI-05 | 푸시 알림을 켠 기기가 없어도 알림은 모두 기록되어 그 계정의 알림함(최근 90일)에 남는다. 켠 기기가 없으면 소리·배너 없이 쌓이기만 한다. 90일이 지난 알림은 매일 지운다 | #371, 11/13 nnoinn | ✅ | `src/server/notifications/notify.test.ts` 켜 둔 기기가 없어도 알림함에 남게 no_device로 기록<br>`src/server/notifications/notify.db.test.ts` 켠 기기가 없어도 알림함에 남는다<br>`src/server/notifications/digest-store.db.test.ts` 푸시 알림 기기가 없어도 고른다<br>`src/server/notifications/digest.test.ts` 보내기가 끝나면 알림함 기간(최근 90일)이 지난 알림을 지운다<br>`src/server/notifications/inbox-store.db.test.ts` 알림함 기간(90일)이 지난 알림만 지운다 |
 | NOTI-06 | 알림이 생기면 투리를 보고 있는 화면에 기본으로 화면 위 가운데 안내(5초)가 뜬다(푸시 알림을 켰는지와 상관없이, 켜지 않은 기기도 1분 안에). 크롬 계열은 그때 기기 알림을 띄우지 않는다 | #371, 11/13 nnoinn | ⏳ | |
-| NOTI-07 | 알림함과 안 읽은 수에는 지금 계정(고객/원장님)의 알림만 보인다 | #371, X-102 | ⏳ | |
+| NOTI-07 | 알림함과 안 읽은 수에는 지금 계정(고객/원장님)의 알림만 보인다 | #371, X-102 | ✅ | `src/server/notifications/inbox-store.db.test.ts` 알림함은 그 계정(고객/원장님)의 최근 90일 알림만<br>`src/server/notifications/inbox-store.db.test.ts` 안 읽은 수와 읽음은 그 계정의 최근 90일 알림만<br>`src/server/notifications/inbox.test.ts` 지금 계정이 다르면(원장님 모드에서 고객 알림함) 알림을 주지 않는다 |
 
 ## 14. 계정·권한·개인정보
 
@@ -202,6 +202,7 @@ PR 검사가 자동으로 막는 것:
 | AUTH-12 | 고객 계정을 만들 때 이름이 필수다(앞뒤 공백 빼고 1~30자). 예약한 샵에는 예약자 이름과 휴대폰 번호만 보인다(닉네임은 주지 않는다) | #375, 11/13 nnoinn | ✅ | `src/server/auth/customer-account.test.ts` 이름을 보내지 않은 요청도 NAME_REQUIRED<br>`src/server/auth/customer-account.test.ts` 이름을 비우면<br>`src/app/owner/(console)/reservations/reservation-detail-store.db.test.ts` 그 샵 예약을 매물·예약자 정보(이름·휴대폰, 닉네임은 빼고)와 같이 읽는다 |
 | AUTH-13 | 원장님은 자기 계정 이력만 보고, 운영자는 원장님·고객 계정 이력을 모두 본다. 운영자가 이력을 보면 열람 기록에 남는다 | #374, 11/13 nnoinn | ✅ | `src/server/accounts/history.test.ts` 지금 들어온 원장님 계정의 샵 이력만 읽는다<br>`src/server/accounts/history.test.ts` 원장님 이력: 그 원장님의 샵 이력을 읽고, 열람 기록을 남긴다<br>`src/server/accounts/history.test.ts` 운영자가 아니면 읽지도 기록하지도 않는다<br>`src/server/accounts/history-store.db.test.ts` 다른 샵과 시간대 안 손님 칸은 빼고 |
 | AUTH-14 | 운영자는 화면 위 오른쪽 프로필 메뉴의 [이름 바꾸기]로 자기 운영자 이름만 정하고 바꿀 수 있다(앞뒤 공백 빼고 1~20자). '운영자'와 다른 운영자가 쓰는 이름(앞뒤 공백·영문 대소문자 무시)은 쓸 수 없다. 운영자 기록에는 그 이름으로 보인다 | 11/16 nnoinn | ✅ | `src/server/admin/admin-profile.test.ts` 운영자가 아니면 FORBIDDEN을 그대로 돌려주고 DB를 열지 않는다<br>`src/server/admin/admin-profile.test.ts` 로그인한 운영자 자기 id로<br>`src/server/admin/admin-profile.db.test.ts` 다른 운영자가 쓰는 이름은<br>`src/server/admin/admin-name.test.ts` 이름을 정하지 않은 운영자에게 보이는 |
+| AUTH-15 | 간편 로그인을 끝까지 마치면 그 방식을 이 기기(브라우저)에 1년 동안 기억하고(로그아웃해도 남는다), 첫 화면·로그인 화면·운영자 입구에서 그 버튼에 "최근 로그인" 표시를 한다. 로그인을 마치지 못하면(취소·세션 실패·이메일 없음·운영자 아님) 바꾸지 않는다 | 11/16 nnoinn | ✅ | `src/app/api/auth/callback/route.test.ts` 로그인을 마치면 누른 간편 로그인을 이 기기의 최근 로그인으로 1년 동안 기억한다<br>`src/app/api/auth/callback/route.test.ts` 로그인을 마치지 못하면<br>`src/server/auth/recent-provider.test.ts` 버튼에 없는 값 |
 
 ## 15. 시간대 매물 (#308, 진행 중)
 
@@ -229,3 +230,16 @@ PR 검사가 자동으로 막는 것:
 | FLOW-05 | 이의제기 → 정산 보류 → 운영자 결론 → 보류 해제 → 목요일 정산에 들어간다 | A-104·X-206 | ⏳ | |
 | FLOW-06 | 실제 포트원 테스트 결제창으로 결제하고 환불까지 확인한다(결제사 화면이라 로봇이 누르지 않는다) | W11·W14 | 🖐 | |
 | FLOW-07 | 웹 푸시가 실제 기기(PC·폰)에 뜨고, 누르면 맞는 화면이 열린다 | W16 | 🖐 | |
+
+## 17. 운영자 문제 대처 (#373, 진행 중)
+
+운영자가 문제를 직접 고치는 기능이다(11/13 nnoinn 결정, 순서 ① → ③ → ⑥ → ② → ④ → ⑤). 항목이 들어올 때마다 줄을 더한다.
+
+| ID | 시나리오와 기대 | 근거 | 상태 | 테스트 |
+| --- | --- | --- | --- | --- |
+| OPS-01 | 운영자 처리는 사유가 필수다(앞뒤 공백을 빼고 1~1,000자). 빈칸이면 아무것도 하지 않는다 | #373 공통 | ✅ | `src/server/admin/reason.test.ts` 빈칸·공백만·글자가 아닌 값은 REASON_REQUIRED<br>`src/server/admin/payment-issues.test.ts` 사유가 빈칸이면 REASON_REQUIRED |
+| OPS-02 | 결제·환불 확인 화면에 정리 작업이 고치지 못한 건을 모은다: 60분이 지난 결제 대기·결제 확인(예약 안 됨) 주문, 30분이 지난 진행 중 고객 취소·합의 후 취소, 금액 확인이 필요하고 [확인함]이 없는 환불 | #373 ① | ✅ | `src/app/admin/payment-issues/queries.db.test.ts` 정리되지 않은 주문: 60분이 지난<br>`src/app/admin/payment-issues/queries.db.test.ts` 끝나지 않은 환불: 30분이 지난<br>`src/app/admin/payment-issues/queries.db.test.ts` 금액 확인이 필요한 환불: 확인할 이유가 있고 |
+| OPS-03 | [다시 시도]는 정리 작업과 같은 함수로 그 건 하나만 다시 정리하고(금액은 그 함수가 계산), 결과와 사유를 운영자 처리 기록에 남긴다. 정리 대상이 되기 전(주문 30분, 취소 5분)이면 TOO_SOON, 이미 정리된 주문이면 ALREADY_RESOLVED, 정리 중 오류는 던지지 않고 "이번에도 정하지 못함"으로 남긴다 | #373 ① | ✅ | `src/server/admin/payment-issues.test.ts` 정리 작업과 같은 기준(30분 전에 만든 주문)으로<br>`src/server/admin/payment-issues.test.ts` 정리 작업과 같은 기준(5분 전에 요청한 취소)으로<br>`src/server/admin/payment-issues.test.ts` 정리 중 오류가 나면 던지지 않고 left로 기록한다<br>`src/server/payments/order-store.db.test.ts` 주문 하나를 주면 그 주문만<br>`src/server/refunds/refund-store.db.test.ts` 예약 하나를 주면 그 예약의 오래된 진행 중 기록만 |
+| OPS-04 | 금액 확인이 필요한 환불의 [확인함]은 환불 줄을 잠근 트랜잭션에서 확인 기록만 남기고 금액·환불은 바꾸지 않는다. 다시 누르면 ALREADY_CHECKED | #373 ① | ✅ | `src/server/admin/payment-issues.test.ts` 환불 줄을 잠근 같은 트랜잭션에서<br>`src/server/admin/payment-issues-store.db.test.ts` 그 환불의 [확인함] 기록만 확인한 것으로 본다 |
+| OPS-05 | 원장님이 못 하면 운영자가 사유를 남기고 방문 완료·노쇼로 대신 처리한다. 원장님 함수를 그대로 써서 결과·금액·막는 조건(시작 전, 취소 진행 중, 이미 처리함)이 원장님이 한 것과 같고, 처리 기록(visit.record)은 같은 트랜잭션에서 성공했을 때만 남는다. 노쇼면 손님에게 같은 노쇼 알림, 원장님에게 "운영자가 처리했어요" 알림이 간다 | #373 ③, 11/16 | ✅ | `src/server/visits/admin-visit.test.ts` 그 예약의 샵으로 원장님 함수를 같은 트랜잭션에서 부르고<br>`src/server/visits/admin-visit.test.ts` 원장님 함수가 막으면<br>`src/server/visits/admin-visit.test.ts` 노쇼면 손님에게 원장님이 했을 때와 같은 노쇼 알림<br>`src/server/notifications/alerts.test.ts` 운영자가 대신 방문·노쇼로 처리하면 원장님에게만 |
+| OPS-06 | 운영자는 원장님이 잘못 누른 노쇼를 방문으로 되돌린다(정산은 판매가 그대로). 확인 중인 이의제기가 있으면 이의제기 결론으로 하게 막고, 정산에 묶인 뒤에는 막는다(11/16). 처리 기록은 이의제기 결론과 같은 visit.override로 같은 트랜잭션에 남고, 손님·원장님에게 바로잡혔다는 알림이 간다 | #373 ③, 11/16 | ✅ | `src/server/visits/admin-visit-store.db.test.ts` 노쇼를 방문으로 바꾸고, 같은 트랜잭션에서 visit.override 기록<br>`src/server/visits/admin-visit-store.db.test.ts` 확인 중인 이의제기·정산에 묶인 예약은 막고<br>`src/server/notifications/alerts.test.ts` 노쇼를 되돌리면 손님과 원장님에게 각자의 문구로<br>`src/app/admin/reservations/[reservationId]/visit-panel.test.ts` 노쇼는 되돌릴 수 있고 |

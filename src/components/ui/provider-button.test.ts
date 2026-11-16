@@ -31,12 +31,23 @@ describe('간편 로그인 버튼', () => {
     expect(css).toContain('--kakao: #fee500;');
     expect(css).toContain('--kakao-symbol: #000000;');
     expect(css).toContain('--kakao-foreground: rgb(0 0 0 / 0.85);');
-    expect(css).toContain('--google: #ffffff;');
+    // 구글 Neutral(테두리 없음, 11/16 nnoinn)
+    expect(css).toContain('--google: #f2f2f2;');
     expect(css).toContain('--google-foreground: #1f1f1f;');
-    expect(css).toContain('--google-border: #747775;');
+    expect(css).not.toContain('--google-border');
     // 네이버 지정 컬러(변경 불가)
     expect(css).toContain('--naver: #03a94d;');
     expect(css).toContain('--naver-foreground: #ffffff;');
+  });
+
+  it('구글 버튼은 테두리 없는 연회색이라 버튼이 있는 화면은 모두 흰 바탕이다(11/16 nnoinn)', () => {
+    const read = (file: string) => readFileSync(join(process.cwd(), file), 'utf8');
+    expect(read('src/components/ui/provider-button.tsx')).not.toMatch(/border-google/);
+    // 폰: 첫 화면·로그인 화면은 로그인 폼 자체가 흰 바탕, PC: 가운데 흰 카드
+    expect(read('src/app/(customer)/(focus)/login/login-form.tsx')).toContain('max-md:bg-card');
+    expect(read('src/app/(customer)/(focus)/layout.tsx')).toContain('md:bg-card');
+    // 운영자 입구: 폰·PC 모두 흰 카드
+    expect(read('src/app/admin/login/page.tsx')).toContain('rounded-xl bg-card');
   });
 
   it('글꼴: 카카오는 기기 기본 서체, 구글은 Google Sans가 맨 앞', () => {

@@ -1,6 +1,6 @@
 // 예약 취소의 DB 읽기·저장 (연결 #9, W14, 합의 후 취소 X-208 #320). 서버에서만 부른다.
 // 고객 취소(customer_cancel)와 합의 후 취소(agreed_cancel)는 같은 방식이다: 포트원을 부르기 전에 진행 중(requested) 기록을 남기고,
-// 환불이 끝나면 예약·매물을 '취소'로 바꾸며 기록을 끝낸다. 한 예약에 취소 환불 기록은 하나다(refunds_cancel_unique).
+// 환불이 끝나면 예약·매물을 '취소'로 바꾸며 기록을 끝낸다. 한 예약에 취소 환불 기록은 하나다(refunds_cancel_unique, 원장님 귀책 취소 포함).
 
 import 'server-only';
 
@@ -20,10 +20,10 @@ type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 type DbWriter = Pick<ReturnType<typeof getDb>, 'insert' | 'update'>;
 
 /**
- * 한 예약에 하나뿐인 취소 환불 기록(고객 취소·합의 후 취소). unique 인덱스 refunds_cancel_unique의 조건과 글자까지 같아야
- * ON CONFLICT가 그 인덱스를 찾는다(#320)
+ * 한 예약에 하나뿐인 취소 환불 기록(고객 취소·합의 후 취소·원장님 귀책 취소). unique 인덱스 refunds_cancel_unique의 조건과
+ * 글자까지 같아야 ON CONFLICT가 그 인덱스를 찾는다(#320, #419). 원장님 귀책 취소 환불이 먼저 있으면 고객 취소·합의 후 취소는 넣지 않는다
  */
-const CANCEL_REFUND = sql`reason in ('customer_cancel', 'agreed_cancel')`;
+const CANCEL_REFUND = sql`reason in ('customer_cancel', 'agreed_cancel', 'owner_fault')`;
 
 /** 진행 중 기록을 남기는 취소 환불 이유: 고객 취소 / 합의 후 취소 */
 export const CANCEL_REFUND_REASONS = ['customer_cancel', 'agreed_cancel'] as const;
@@ -323,7 +323,12 @@ export async function finishAdminCancel(
 /** 정리 작업이 볼 오래된 진행 중 취소(고객 취소·합의 후 취소). 오래된 것부터 */
 export async function readStaleCancels(
   db: DbReader,
-  input: { requestedBefore: Date; limit: number },
+  input: {
+    requestedBefore: Date;
+    limit: number;
+    /** 이 예약의 취소만 본다(운영자 [다시 시도], #373 ①) */
+    reservationId?: string;
+  },
 ): Promise<CancelRequest[]> {
   const rows = await db
     .select({
@@ -349,6 +354,7 @@ export async function readStaleCancels(
         inArray(refunds.reason, CANCEL_REFUND_REASONS),
         eq(refunds.status, 'requested'),
         lt(refunds.createdAt, input.requestedBefore),
+        input.reservationId ? eq(reservations.id, input.reservationId) : undefined,
       ),
     )
     .orderBy(asc(refunds.createdAt))
