@@ -234,7 +234,8 @@ export function LoginForm({
   ) : null;
 
   return (
-    <section className="flex flex-1 flex-col gap-8 px-4 pt-2 pb-12">
+    // 폰은 화면 바탕(연회색) 대신 흰 바탕이다. 구글 버튼(연회색, 테두리 없음)이 바탕에 묻히지 않게(11/16 nnoinn). PC는 흰 카드 안이다
+    <section className="flex flex-1 flex-col gap-8 px-4 pt-2 pb-12 max-md:bg-card">
       {isFirst ? (
         <div className="h-4" aria-hidden />
       ) : (

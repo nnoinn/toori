@@ -46,7 +46,7 @@ async function LoginContent({ searchParams }: { searchParams: SearchParams }) {
 
 function LoginSkeleton() {
   return (
-    <div className="flex flex-col gap-6 px-4 py-12">
+    <div className="flex flex-1 flex-col gap-6 px-4 py-12 max-md:bg-card">
       <Skeleton className="mx-auto h-8 w-40" />
       <Skeleton className="h-12 w-full" />
       <Skeleton className="h-24 w-full" />

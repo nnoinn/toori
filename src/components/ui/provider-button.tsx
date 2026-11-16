@@ -13,7 +13,8 @@ export { PROVIDER_ORDER };
 // 버튼 순서는 PROVIDER_ORDER(카카오·네이버·구글) 하나만 쓴다.
 // - 카카오: 배경 #FEE500, 말풍선 심볼(모양·비율·색 변경 불가, 심볼 없이 쓰지 않음), 문구 "카카오 로그인", 글자 85%, 모서리 12px
 //   https://developers.kakao.com/docs/latest/ko/kakaologin/design-guide
-// - 구글(Light): 흰 배경, 테두리 #747775, 글자 #1F1F1F, 표준 색 "G" 로고(색·크기 변경 불가), 현지화한 "Sign in with Google"
+// - 구글(Neutral): 연회색 배경 #F2F2F2, 테두리 없음, 글자 #1F1F1F, 표준 색 "G" 로고(색·크기 변경 불가), 현지화한 "Sign in with Google".
+//   테두리 없는 버튼을 쓰려고 Neutral을 골랐다(11/16 nnoinn). 바탕과 거의 같은 색이라 흰 바탕 위에만 둔다(첫 화면·로그인 화면·운영자 입구 모두 흰 바탕)
 //   https://developers.google.com/identity/branding-guidelines
 // - 네이버(Light, 가운데 정렬형): 배경 #03A94D(지정 컬러, 변경 불가), 흰 N 로고 16px, 흰 글자 "네이버 로그인"
 //   https://developers.naver.com/docs/login/bi/bi.md
@@ -55,28 +56,18 @@ type ProviderButtonProps = {
   onClick: () => void;
 };
 
-/** 최근 로그인 표시(11/16 nnoinn 시안 C): 검정 테두리와 검정 라벨. 테두리 바깥 틈은 버튼 바탕(폰: 화면 바탕, PC: 흰 카드) 색이다 */
-const RECENT_RING =
-  'ring-2 ring-foreground ring-offset-2 ring-offset-background md:ring-offset-card';
+/** 최근 로그인 표시(11/16 nnoinn 시안 C): 검정 테두리와 검정 라벨. 버튼은 늘 흰 바탕 위에 있어서 테두리 바깥 틈도 흰색(card)이다 */
+const RECENT_RING = 'ring-2 ring-foreground ring-offset-2 ring-offset-card';
 const RECENT_BADGE = 'bg-foreground text-background';
 /** 최근 로그인 표시 문구(11/16 nnoinn) */
 export const RECENT_LOGIN_LABEL = '최근 로그인';
-
-// 구글 버튼 시안 고르기용(임시): light 지금(흰 바탕·회색 테두리), neutral(연회색 바탕·테두리 없음), dark(검정 바탕)
-const GOOGLE_THEME = 'light' as 'light' | 'neutral' | 'dark';
-const GOOGLE_THEME_STYLES = {
-  light: 'border border-google-border bg-google text-google-foreground hover:bg-muted',
-  neutral: 'bg-[#f2f2f2] text-[#1f1f1f] hover:opacity-90',
-  dark: 'border border-[#8e918f] bg-[#131314] text-[#e3e3e3] hover:opacity-90',
-}[GOOGLE_THEME];
 
 /** 제공자마다 다른 모양(배경·글자·글꼴). 둥근 모서리와 높이는 같다 */
 const PROVIDER_STYLES: Record<ProviderKey, string> = {
   kakao: 'bg-kakao font-kakao text-[15px] font-semibold text-kakao-foreground hover:opacity-90',
   google: cn(
     googleSans.variable,
-    'font-google text-[14px] leading-5 font-medium',
-    GOOGLE_THEME_STYLES,
+    'bg-google font-google text-[14px] leading-5 font-medium text-google-foreground hover:opacity-90',
   ),
   // 네이버 가이드에 글꼴 지정이 없어서 카카오처럼 기기 기본 서체를 쓴다
   naver: 'bg-naver font-kakao text-[15px] font-semibold text-naver-foreground hover:opacity-90',
