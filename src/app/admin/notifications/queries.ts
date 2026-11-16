@@ -1,16 +1,17 @@
-// 운영자 알림 확인 화면(#373 ⑤)의 조회. 이 화면에서만 쓴다. 다시 보내기는 '@/server/admin/notification-resend'가 한다.
+// 운영자 알림 확인 화면(#373 ⑤)의 조회. 다시 보내기는 '@/server/admin/notification-resend'가 한다.
 // 알림함 기간(최근 NOTIFICATION_INBOX_DAYS일) 안의 보내지 못함·기기 없음 알림만 본다. 받는 사람은 이름만 읽는다(연락처는 읽지 않는다).
+// 종류마다 건수는 화면 위 알림 종과 같이 써서 '@/server/admin/notification-issues-store'에 있다.
 
 import 'server-only';
 
-import { and, count, desc, eq, gte, inArray, type SQL, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, type SQL, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { customers, notifications, owners, pushSubscriptions, shops } from '@/db/schema';
 import { inboxStart, readNotificationPayload } from '@/server/notifications/inbox-store';
 
 import { ADMIN_PAGE_SIZE, type PageResult, toPage } from '../lookup';
-import { NOTIFICATION_ISSUE_TABS, type NotificationIssueTab } from './format';
+import type { NotificationIssueTab } from './format';
 
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 
@@ -34,22 +35,8 @@ function inWindow(now: Date): SQL | undefined {
   return gte(notifications.createdAt, inboxStart(now));
 }
 
-/** 종류마다 건수(알림함 기간 안) */
-export async function countNotificationIssues(
-  db: DbReader,
-  now: Date,
-): Promise<Record<NotificationIssueTab, number>> {
-  const rows = await db
-    .select({ status: notifications.status, total: count() })
-    .from(notifications)
-    .where(and(inArray(notifications.status, [...NOTIFICATION_ISSUE_TABS]), inWindow(now)))
-    .groupBy(notifications.status);
-  const counts: Record<NotificationIssueTab, number> = { failed: 0, no_device: 0 };
-  for (const row of rows) {
-    if (row.status === 'failed' || row.status === 'no_device') counts[row.status] = row.total;
-  }
-  return counts;
-}
+/** 종류마다 건수(알림함 기간 안). 화면 위 알림 종과 같이 쓴다 */
+export { countNotificationIssues } from '@/server/admin/notification-issues-store';
 
 /** 한 종류의 알림을 최신 순으로 한 쪽(20줄)씩 */
 export async function selectNotificationIssues(
