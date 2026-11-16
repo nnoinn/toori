@@ -17,6 +17,7 @@ import {
   type ReservationStatus,
   reservations,
   shops,
+  settlementItems,
   type SlotStatus,
   slots,
   type VisitResult,
@@ -208,6 +209,8 @@ export type ReservationDetail = {
   refunds: RefundRow[];
   /** 이 예약의 이의제기(한 예약에 하나). 없으면 null. 있으면 [이의제기 등록] 대신 그 상세로 보낸다 */
   dispute: { disputeId: string; status: DisputeStatus; outcome: DisputeOutcome | null } | null;
+  /** 정산에 묶였는지(정산 줄이 있다). 묶인 뒤에는 노쇼를 되돌리지 않는다(#373 ③, 11/16) */
+  settlementBundled: boolean;
 };
 
 /** 예약 상세. 없으면 null */
@@ -240,6 +243,7 @@ export async function selectReservationDetail(
       salePrice: orders.salePrice,
       couponAmount: orders.couponAmount,
       amount: orders.amount,
+      orderId: orders.id,
     })
     .from(reservations)
     .innerJoin(slots, eq(slots.id, reservations.slotId))
@@ -271,6 +275,12 @@ export async function selectReservationDetail(
     .from(disputes)
     .where(eq(disputes.reservationId, reservationId));
 
+  const [bundled] = await db
+    .select({ id: settlementItems.id })
+    .from(settlementItems)
+    .where(eq(settlementItems.orderId, row.orderId))
+    .limit(1);
+
   return {
     ...row,
     // DB의 check 제약이 정해 둔 값만 허용한다
@@ -284,5 +294,6 @@ export async function selectReservationDetail(
           outcome: dispute.outcome as DisputeOutcome | null,
         }
       : null,
+    settlementBundled: Boolean(bundled),
   };
 }
