@@ -13,6 +13,15 @@ nnoinn이 팀원에게 알릴 내용을 PR과 함께 이 파일에 추가한다.
 
 ---
 
+## 2026-11-17 · 전원 (예약 무효 서버, 진행 중 환불은 예약당 하나)
+- 들어옴: 예약 무효 서버 함수 `previewVoidReservation`·`voidReservation`(`@/server/refunds/void-reservation`, A-108, #423). 운영자만 부르고 원장님이 요청한 내용이 필수다. 남은 결제액 환불, 쓴 쿠폰 돌려주기, 정산 기준 금액 0, 손님과 원장님 알림까지 한다. 운영자 화면과 이의제기 결론 "무효" 연결은 다음 PR
+- DB(마이그레이션 0019, 머지 뒤 nnoinn이 개발 DB에 바로 적용): `reservations.voided_at`(무효 시각, 비어 있으면 무효 아님), 환불 이유 `void`. 진행 중(`requested`) 환불은 이유와 상관없이 예약 하나에 하나만 둔다(`refunds_requested_unique`)
+- 바뀜: 무효가 진행 중이면 고객 취소·원장님 귀책 취소는 `CANCEL_FINISHING`, 합의 후 취소 동의는 `RESERVATION_CHANGED`, 방문·노쇼 처리는 `CANCEL_IN_PROGRESS`로 기다린다. 원장님 정산 내역과 목요일 묶기는 무효 예약을 빼고, 정산 내역에는 `void`(무효, 기준 금액 0원) 줄로 보인다
+- 바뀜(테스트 고정값): `RefundTarget`에 `voidInProgress`, `SettleTarget`에 `voidedAt`이 더해졌다. 테스트에서 이 모양을 직접 만들면 `voidInProgress: false`, `voidedAt: null`을 넣는다
+- 할 일: 강규민은 #448·#450·#467의 마이그레이션이 0019와 번호가 겹치니 main을 합친 뒤 0020으로 다시 만든다(#448 댓글). 정찬형·정민석은 지금 할 일 없음("무효" 이름표는 연결 Issue로 따로 알린다)
+
+---
+
 ## 2026-11-16 · 정찬형·정민석 (신규 고객 전용 배지, 원장님 귀책 취소 함수)
 - 결정: 고객 화면(매물 목록 카드, 매물 상세, 시간대 상세)에서 '신규 고객 전용' 배지를 보여 주지 않는다(11/16 nnoinn, #459). 서버에서 기존 손님에게 그 매물을 빼는 것과 원장님 화면의 표시는 그대로다
 - 들어옴: 원장님 귀책 취소 함수 `previewOwnerFaultCancel`·`cancelByOwnerFault`(`@/server/refunds/owner-fault-cancel`, #464). 전액 환불, 쓴 쿠폰 돌려주기, 보상 쿠폰 3,000원, 패널티 5,000원, 손님 알림까지 한다

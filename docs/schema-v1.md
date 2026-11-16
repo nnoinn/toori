@@ -381,6 +381,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | cancel_actor | text, null | `customer`(고객 취소) / `owner_fault`(원장님 귀책) / `system`(자동) / `admin`(운영자) / `agreed`(합의 후 취소, X-208) |
 | cancel_reason | text, null | |
 | hours_before_start_at_cancel | numeric, null | 취소할 때 시작까지 남은 시간. 원장님 귀책 취소 제재 기준을 정할 데이터 |
+| voided_at | timestamptz, null | 운영자가 예약을 무효로 한 시각(A-108, #423). 비어 있으면 무효 아님. 화면은 "무효"로 보여 주고 정산은 기준 금액 0으로 뺀다. 돌려줄 돈이 없어도(이미 다 돌려줬거나 쿠폰으로 0원 결제) 무효 기록은 이 칸으로 남는다. 예정 예약을 무효로 하면 `status`는 `cancelled`, `cancel_actor`는 `admin`이고, 이용 완료 예약은 상태와 방문 기록을 그대로 둔다 |
 | created_at | timestamptz | |
 
 신규 고객 판별(X-104): 고객이 그 샵 매물에 `confirmed` 또는 `completed` 예약이 있으면 "이력 있음"이다. 취소된 예약(위약금만 낸 건 포함)은 이력이 아니다.
@@ -419,7 +420,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | id | uuid PK | |
 | order_id | uuid → orders | |
 | reservation_id | uuid, null → reservations | 예약을 만들기 전에 결제를 취소하는 자동 취소(`auto_cancel`, C-406)에서는 비어 있다. 어떤 결제의 환불인지는 `order_id`로 안다(#64) |
-| reason | text | `customer_cancel` / `owner_fault` / `auto_cancel` / `admin_exception` / `agreed_cancel`(합의 후 취소: 실제 결제액 × 50%, `band`는 비우고 `penalty_rate` 50) |
+| reason | text | `customer_cancel` / `owner_fault` / `auto_cancel` / `admin_exception` / `agreed_cancel`(합의 후 취소: 실제 결제액 × 50%, `band`는 비우고 `penalty_rate` 50) / `void`(예약 무효 A-108: 실제 결제액 중 아직 돌려주지 않은 금액, `band`는 비우고 `penalty_rate` 0, `processed_by`는 처리한 운영자) |
 | status | text, 기본값 `done` | `requested`(포트원을 부르기 전에 저장한 취소 진행 중) / `done`(끝남) |
 | band | text, null | 적용 구간: `over_24h`(30%) / `6h_to_24h`(50%) / `under_6h`(100%) |
 | penalty_rate | integer | 적용한 위약금 비율(당시 값) |
@@ -432,6 +433,8 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | created_at | timestamptz | 정리 작업이 오래된 진행 중 기록을 찾을 때 쓴다 |
 
 한 예약에 취소 환불 기록(고객 취소·합의 후 취소·원장님 귀책 취소)은 하나만 둔다(unique `refunds_cancel_unique`, #320, #419). 손님이 직접 취소하는 순간 합의 후 취소 동의나 원장님 귀책 취소가 같이 들어와도 환불은 한 번만 나간다.
+
+무효 환불(`void`)은 예약 하나에 하나다(unique `refunds_void_unique`). 고객 취소로 일부 돌려준 예약에도 남은 금액을 한 번 더 돌려줄 수 있어서 취소 환불과 따로 둔다. 진행 중(`requested`) 환불은 이유와 상관없이 예약 하나에 하나만 둔다(unique `refunds_requested_unique`, A-108): 무효와 취소가 동시에 포트원을 부르지 않는다. 진행 중 기록을 넣는 쪽은 어느 unique에 걸려도 넣지 않고 "다른 처리가 진행 중"으로 답한다.
 
 ### agreed_cancel_requests — 합의 후 취소 요청 (S-410·C-506·X-208, #320)
 
@@ -741,3 +744,4 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | 2026-11-15 | `admin_profiles`(운영자 프로필: 이름·맡은 일)를 더하고, `admin_actions`(운영자 작업 기록)도 열람 기록처럼 DB 트리거로 고치기·지우기·비우기를 막는다. 프로필은 지우지 않는다(#372 4·5장, 11/13 nnoinn). 마이그레이션 0016 |
 | 2026-11-16 | `notifications`에 `read_at`(알림함 읽은 시각)과 알림함 인덱스를 더하고, `status`에 `no_device`(푸시 알림을 켠 기기 없음)를 더한다. 받는 계정마다 알림을 늘 남겨 알림함에 보여 준다(#371, 11/13 nnoinn). 마이그레이션 0017 |
 | 2026-11-16 | 원장님 귀책 취소(X-207, #419, 11/15 nnoinn 승인): 취소 환불 하나 조건(`refunds_cancel_unique`)에 `owner_fault`를 넣고, 보상 쿠폰은 원인 예약 하나에 한 장(`coupons_compensation_unique`)으로 막는다. 칸은 더하지 않는다. 마이그레이션 0018 |
+| 2026-11-17 | 예약 무효(A-108, #423, 11/15 nnoinn 승인): `refunds.reason`에 `void`, 무효 환불은 예약 하나에 하나(`refunds_void_unique`), `reservations.voided_at`(무효 시각)을 더한다. 진행 중 환불은 이유와 상관없이 예약 하나에 하나(`refunds_requested_unique`)로 막는다. 마이그레이션 0019 |
