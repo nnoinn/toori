@@ -10,6 +10,9 @@ export const CUSTOMER_CANCEL_REASON = '고객 예약 취소';
 /** 합의 후 취소(X-208) 때 포트원에 보내는 사유. 웹훅은 진행 중 기록이 있으면 정리 작업에 맡긴다(sync-cancel.ts) */
 export const AGREED_CANCEL_REASON = '합의 후 취소';
 
+/** 원장님 귀책 취소(X-207, #419) 때 포트원에 보내는 사유. 웹훅은 진행 중 기록이 있으면 정리 작업에 맡긴다(sync-cancel.ts) */
+export const OWNER_FAULT_CANCEL_REASON = '원장님 사정 취소';
+
 /**
  * 시드·시나리오가 만든 주문의 결제 번호 앞부분(scripts/dev-db.mjs). 포트원에 결제가 없어서 부를 수 없다.
  * 진짜 주문은 toori-로 시작해서(newPaymentId) 여기에 걸리지 않고, 모르는 번호는 포트원에 물어 실패하게 둔다

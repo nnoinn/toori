@@ -17,6 +17,9 @@ const state = vi.hoisted(() => ({
   /** 지우기·되돌리기가 받은 DB(트랜잭션이면 'tx') */
   writers: [] as unknown[],
   reopenError: null as Error | null,
+  ownerFaultExtras: [] as unknown[],
+  couponReturned: false,
+  ownerFaultAlerts: [] as unknown[],
 }));
 
 vi.mock('@/server/notifications/alerts', () => ({
@@ -29,6 +32,16 @@ vi.mock('@/server/notifications/alerts', () => ({
   },
   notifyAgreedCancelResult: (_db: unknown, input: unknown) => {
     state.agreedAlerts.push(input);
+  },
+  notifyOwnerFaultCancelled: (_db: unknown, reservationId: string, options: unknown) => {
+    state.ownerFaultAlerts.push({ reservationId, options });
+  },
+}));
+// 원장님 귀책 취소의 쿠폰·패널티 저장은 owner-fault-store.db.test.ts가 실제 DB로 본다
+vi.mock('./owner-fault-store', () => ({
+  recordOwnerFaultExtras: async (tx: unknown, input: unknown) => {
+    state.ownerFaultExtras.push({ tx, input });
+    return { couponReturned: state.couponReturned };
   },
 }));
 vi.mock('./agreed-cancel-store', () => ({
@@ -96,6 +109,9 @@ beforeEach(() => {
   state.reopened = [];
   state.writers = [];
   state.reopenError = null;
+  state.ownerFaultExtras = [];
+  state.couponReturned = false;
+  state.ownerFaultAlerts = [];
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -302,5 +318,56 @@ describe('합의 후 취소(#320)', () => {
     expect(await settleRequestedCancel(db, request, NOW)).toBe('cleared');
     expect(state.reopened).toEqual([]);
     expect(state.writers).toEqual([['clear', 'tx']]);
+  });
+});
+
+describe('원장님 귀책 취소(#419)', () => {
+  const ownerFault: CancelRequest = {
+    ...request,
+    reason: 'owner_fault',
+    band: null,
+    penaltyRate: 0,
+    refundAmount: 45_000,
+    penaltyAmount: 0,
+  };
+
+  it('끝내면 같은 트랜잭션에서 쿠폰·패널티 기록을 남기고, 손님에게 원장님 사정 알림(재등록 안내 없음)', async () => {
+    state.couponReturned = true;
+    expect(
+      await finishCancel(db, ownerFault, { cancellationId: 'c-1', amount: 45_000 }, NOW),
+    ).toEqual({ refundAmount: 45_000 });
+    expect(state.finishes).toMatchObject([
+      { reason: 'owner_fault', band: null, refundAmount: 45_000, penaltyAmount: 0 },
+    ]);
+    expect(state.ownerFaultExtras).toEqual([
+      { tx: 'tx', input: { reservationId: 'reservation-1', orderId: 'order-1', now: NOW } },
+    ]);
+    expect(state.ownerFaultAlerts).toEqual([
+      { reservationId: 'reservation-1', options: { couponReturned: true } },
+    ]);
+    expect(state.cancelAlerts).toEqual([]);
+    expect(state.agreedAlerts).toEqual([]);
+  });
+
+  it('먼저 기록한 요청이 있으면(false) 쿠폰·패널티 기록과 알림을 다시 하지 않는다', async () => {
+    state.finished = false;
+    expect(
+      await finishCancel(db, ownerFault, { cancellationId: 'c-1', amount: 45_000 }, NOW),
+    ).toBeNull();
+    expect(state.ownerFaultExtras).toEqual([]);
+    expect(state.ownerFaultAlerts).toEqual([]);
+  });
+
+  it('고객 취소는 원장님 귀책 기록을 부르지 않는다', async () => {
+    await finishCancel(db, request, { cancellationId: 'c-1', amount: 31_500 }, NOW);
+    expect(state.ownerFaultExtras).toEqual([]);
+    expect(state.ownerFaultAlerts).toEqual([]);
+  });
+
+  it('정리 작업도 같은 길로 끝낸다(진행 중으로 남은 원장님 귀책 취소)', async () => {
+    state.lookup = payment([{ id: 'c-9', amount: 45_000, reason: '원장님 사정 취소' }]);
+    expect(await settleRequestedCancel(db, ownerFault, NOW)).toBe('finished');
+    expect(state.ownerFaultExtras).toHaveLength(1);
+    expect(state.ownerFaultAlerts).toHaveLength(1);
   });
 });

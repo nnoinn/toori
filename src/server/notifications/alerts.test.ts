@@ -38,6 +38,7 @@ const {
   notifyAgreedCancelResult,
   notifyKeptWindowSlotsReleased,
   notifyNoShow,
+  notifyOwnerFaultCancelled,
   notifyPaymentAutoCancelled,
   notifyPayoutAccountChanged,
   notifyReservationCancelled,
@@ -393,5 +394,36 @@ describe('notifyKeptWindowSlotsReleased', () => {
     expect(state.notified).toEqual([]);
     notifyKeptWindowSlotsReleased(db, []);
     expect(state.afterTasks).toHaveLength(1);
+  });
+});
+
+describe('원장님 귀책 취소 (#419, 11/15 nnoinn 문구)', () => {
+  it('손님에게만 그 예약 상세로. 쓴 쿠폰을 돌려줬으면 그것도 알린다', async () => {
+    notifyOwnerFaultCancelled(db, 'r-1', { couponReturned: false });
+    notifyOwnerFaultCancelled(db, 'r-2', { couponReturned: true });
+    await runAfterTasks();
+    expect(state.notified).toEqual([
+      {
+        userId: 'customer-user',
+        accountType: 'customer',
+        event: 'reservation.owner_fault_cancelled',
+        dedupeKey: 'reservation.owner_fault_cancelled:customer:r-1',
+        title: '원장님 사정으로 예약이 취소됐어요',
+        body: '결제한 금액을 모두 돌려드리고 3,000원 쿠폰을 드렸어요',
+        url: '/reservations/r-1',
+      },
+      expect.objectContaining({
+        userId: 'customer-user',
+        body: '결제한 금액을 모두 돌려드리고 3,000원 쿠폰을 드렸어요. 쓰신 쿠폰도 돌려드렸어요',
+        url: '/reservations/r-2',
+      }),
+    ]);
+  });
+
+  it('예약이 없으면 보내지 않는다', async () => {
+    state.row = null;
+    notifyOwnerFaultCancelled(db, 'r-x', { couponReturned: true });
+    await runAfterTasks();
+    expect(state.notified).toEqual([]);
   });
 });
