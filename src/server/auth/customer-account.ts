@@ -50,15 +50,15 @@ const createSchema = z.object({
     interest_alert: z.boolean().optional(),
   }),
   phone: z.string().optional(),
-  // 가입 화면(정찬형)이 이름 칸을 붙이기 전에는 보내지 않는다(#375)
+  // 예약자 이름(#375). 빠지면 아래에서 NAME_REQUIRED로 막는다(입력 모양 오류와 구별하려고 여기서는 선택으로 둔다)
   name: z.string().optional(),
   next: z.string().optional(),
 });
 
 /**
  * 고객 계정을 만들고 약관 동의, 이름, 휴대폰 번호를 저장한다(첫 로그인 뒤 /join, C-104). 닉네임은 카카오·구글 프로필 이름으로 시작한다.
- * 이름은 예약자 이름이라 가입 화면에서 직접 받는다(앞뒤 공백 빼고 1~30자, #375). 가입 화면에 이름 칸이 붙기 전에
- * 이름을 보내지 않으면 지금처럼 닉네임으로 채운다. 빈칸을 보내면 막는다.
+ * 이름은 예약자 이름이라 가입 화면에서 직접 받고 꼭 있어야 한다(앞뒤 공백 빼고 1~30자, #375, AUTH-12).
+ * 보내지 않거나 빈칸이면 NAME_REQUIRED로 막는다. 닉네임으로 대신 채우지 않는다.
  * 번호는 인증 없이 모양만 보고 하이픈 넣은 모양으로 맞춰 저장한다. 다른 고객과 같은 번호여도 막지 않는다(#183).
  * 성공하면 돌아오지 않고 next(안전한 주소만, 없으면 홈)로 보낸다. 실패했을 때만 결과를 돌려준다
  */
@@ -72,8 +72,8 @@ export async function createCustomerAccount(input: {
     interest_alert?: boolean;
   };
   phone: string;
-  /** 예약자 이름(#375). 가입 화면에 이름 칸이 붙으면 꼭 보낸다 */
-  name?: string;
+  /** 예약자 이름(#375, 필수) */
+  name: string;
   next?: string;
 }): Promise<Result<never>> {
   const parsed = createSchema.safeParse(input);
@@ -88,16 +88,15 @@ export async function createCustomerAccount(input: {
   }
   const phone = normalizePhone(parsed.data.phone, 'mobile');
   if (!phone) return fail('INVALID_INPUT', PHONE_FORMAT_MESSAGE);
-  let name: string | null = null;
-  if (parsed.data.name !== undefined) {
-    const checked = customerNameSchema.safeParse(parsed.data.name);
-    if (!checked.success) {
-      return parsed.data.name.trim() === ''
-        ? fail('NAME_REQUIRED', CUSTOMER_NAME_MESSAGES.REQUIRED)
-        : fail('INVALID_INPUT', CUSTOMER_NAME_MESSAGES.TOO_LONG);
-    }
-    name = checked.data;
+  // 화면을 거치지 않은 요청이 이름을 보내지 않아도 빈칸과 같은 실패로 막는다
+  const rawName = parsed.data.name ?? '';
+  const checkedName = customerNameSchema.safeParse(rawName);
+  if (!checkedName.success) {
+    return rawName.trim() === ''
+      ? fail('NAME_REQUIRED', CUSTOMER_NAME_MESSAGES.REQUIRED)
+      : fail('INVALID_INPUT', CUSTOMER_NAME_MESSAGES.TOO_LONG);
   }
+  const name = checkedName.data;
   const user = await getSessionUser();
   if (!user) return fail('UNAUTHENTICATED', AUTH_ERRORS.UNAUTHENTICATED);
 
@@ -105,8 +104,7 @@ export async function createCustomerAccount(input: {
   const saved = await getDb().transaction((tx) =>
     saveCustomerAccount(tx, {
       userId: user.userId,
-      // 가입 화면에 이름 칸이 붙기 전에는 이름을 보내지 않아서 닉네임으로 채운다(0015 전 계정과 같다)
-      name: name ?? nickname,
+      name,
       nickname,
       phone,
       optionalTerms: OPTIONAL_CUSTOMER_TERMS.filter((type) => agreements[type] === true),

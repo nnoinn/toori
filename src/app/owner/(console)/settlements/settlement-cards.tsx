@@ -137,7 +137,7 @@ function PeriodSummaryCard({ list, from, to }: { list: SettlementList; from: str
 }
 
 /** 남은 패널티(원장님 사정 취소, S-409). 0원이면 이 카드를 두지 않는다(11/14 정민석) */
-function OutstandingPenaltyCard({ amount }: { amount: number }) {
+export function OutstandingPenaltyCard({ amount }: { amount: number }) {
   return (
     <Card>
       <CardHeader>

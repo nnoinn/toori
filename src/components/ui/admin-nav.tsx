@@ -5,6 +5,7 @@ import {
   CircleAlert,
   ClipboardList,
   MessageSquareWarning,
+  ScrollText,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -25,6 +26,7 @@ export function AdminNav() {
         { href: '/admin/disputes', label: '이의제기', icon: MessageSquareWarning },
         { href: '/admin/payment-issues', label: '결제·환불 확인', icon: CircleAlert },
         { href: '/admin/settlements', label: '정산', icon: Wallet },
+        { href: '/admin/logs', label: '운영자 기록', icon: ScrollText },
       ]}
     />
   );

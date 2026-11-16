@@ -5,10 +5,12 @@
 
 import 'server-only';
 
-import { and, asc, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, or, type SQL, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 import type { getDb } from '@/db';
 import {
+  adminProfiles,
   customers,
   type DisputeChannel,
   type DisputeOutcome,
@@ -23,7 +25,7 @@ import {
 } from '@/db/schema';
 
 import { ADMIN_LIST_LIMIT, containsPattern, type ListResult, toListResult } from '../lookup';
-import type { DisputeFilter } from './format';
+import { defaultDisputeSort, type DisputeFilter, type DisputeSort } from './format';
 
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 
@@ -44,17 +46,17 @@ export type DisputeRow = {
   customerName: string;
 };
 
-const ORDER: Record<DisputeFilter, SQL[]> = {
-  // 확인 중은 오래 기다린 것부터(정산 보류가 길어지지 않게)
-  open: [asc(disputes.receivedAt), asc(disputes.id)],
-  resolved: [desc(disputes.handledAt), desc(disputes.id)],
-  all: [desc(disputes.receivedAt), desc(disputes.id)],
+/** 정렬마다 순서. 결론 순은 아직 결론이 없는 것(확인 중)을 뒤로 둔다. 탭마다 기본 정렬은 defaultDisputeSort */
+const ORDER: Record<DisputeSort, SQL[]> = {
+  received_old: [asc(disputes.receivedAt), asc(disputes.id)],
+  received_new: [desc(disputes.receivedAt), desc(disputes.id)],
+  handled_new: [sql`${disputes.handledAt} desc nulls last`, desc(disputes.id)],
 };
 
 /** 이의제기 목록. 검색어는 예약번호·샵 이름·손님 이름·닉네임 */
 export async function selectDisputes(
   db: DbReader,
-  input: { filter: DisputeFilter; query: string },
+  input: { filter: DisputeFilter; query: string; sort?: DisputeSort },
 ): Promise<ListResult<DisputeRow>> {
   const pattern = containsPattern(input.query);
   const rows = await db
@@ -90,7 +92,7 @@ export async function selectDisputes(
           : undefined,
       ),
     )
-    .orderBy(...ORDER[input.filter])
+    .orderBy(...ORDER[input.sort ?? defaultDisputeSort(input.filter)])
     .limit(ADMIN_LIST_LIMIT + 1);
   // DB의 check 제약이 정해 둔 값만 허용한다
   return toListResult(
@@ -116,7 +118,14 @@ export type DisputeDetail = DisputeRow & {
   startAt: Date;
   menuName: string;
   shopId: string;
+  /** 카카오톡 채널 건을 등록한 운영자 이름(#372). 앱 접수거나 프로필이 없으면 null */
+  registeredByName: string | null;
+  /** 결론을 기록한 운영자 이름(#372). 확인 중이거나 프로필이 없으면 null */
+  handledByName: string | null;
 };
+
+const registeredByProfile = alias(adminProfiles, 'registered_by_profile');
+const handledByProfile = alias(adminProfiles, 'handled_by_profile');
 
 /** 이의제기 상세와 그 예약. 없으면 null */
 export async function selectDisputeDetail(
@@ -147,12 +156,16 @@ export async function selectDisputeDetail(
       shopName: shops.name,
       customerId: customers.id,
       customerName: customers.name,
+      registeredByName: registeredByProfile.name,
+      handledByName: handledByProfile.name,
     })
     .from(disputes)
     .innerJoin(reservations, eq(reservations.id, disputes.reservationId))
     .innerJoin(slots, eq(slots.id, reservations.slotId))
     .innerJoin(shops, eq(shops.id, slots.shopId))
     .innerJoin(customers, eq(customers.id, reservations.customerId))
+    .leftJoin(registeredByProfile, eq(registeredByProfile.userId, disputes.registeredBy))
+    .leftJoin(handledByProfile, eq(handledByProfile.userId, disputes.handledBy))
     .where(eq(disputes.id, disputeId));
   if (!row) return null;
   // DB의 check 제약이 정해 둔 값만 허용한다

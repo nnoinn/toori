@@ -53,12 +53,12 @@ PR 검사가 자동으로 막는 것:
 | --- | --- | --- | --- | --- |
 | SLOT-01 | 시작이 48시간보다 멀면 게시예정으로 저장하고 시작 48시간 전에 게시한다. 딱 48시간이거나 더 가까우면 바로 게시중이다 | S-204·S-205 | ✅ | `src/app/owner/(console)/slots/slot-time.test.ts` 시작 48시간 전이 아직 오지 않았으면<br>`src/app/owner/(console)/slots/slot-time.test.ts` 딱 48시간 남았거나 그보다 가까우면 지금 게시중<br>`src/app/owner/(console)/slots/slot-create-store.db.test.ts` 미리 올리기 |
 | SLOT-02 | 시작 시각은 지금 뒤, 14일 안, 30분 단위만 받는다 | S-205·#108 | ✅ | `src/app/owner/(console)/slots/slot-time.test.ts` 14일 정각까지 받고, 넘으면 막는다<br>`src/app/owner/(console)/slots/slot-draft-store.db.test.ts` 지난 시각, 14일 밖, 단위가 안 맞는 시각 |
-| SLOT-03 | 같은 샵의 게시예정·게시중·예약됨 매물과 시간이 겹치면 등록할 수 없다. 마감·취소·완료와는 겹쳐도 되고, 끝 시각에 바로 이어지면 겹치지 않는다 | S-209 | ✅ | `src/app/owner/(console)/slots/slot-draft-store.db.test.ts` 예약대기·게시중·예약됨과 겹치면 막고<br>`src/app/owner/(console)/slots/slot-time.test.ts` 끝 시각에 바로 이어지면 겹치지 않는다<br>`src/db/slot-windows.db.test.ts` 한 시술 매물은 게시예정·게시중 시간대와 겹치면 |
+| SLOT-03 | 같은 샵의 게시예정·게시중·예약됨 매물과 시간이 겹치면 등록할 수 없다. 마감·취소·완료와는 겹쳐도 되고, 끝 시각에 바로 이어지면 겹치지 않는다 | S-209 | ✅ | `src/app/owner/(console)/slots/slot-draft-store.db.test.ts` 게시예정·게시중·예약됨과 겹치면 막고<br>`src/app/owner/(console)/slots/slot-time.test.ts` 끝 시각에 바로 이어지면 겹치지 않는다<br>`src/db/slot-windows.db.test.ts` 한 시술 매물은 게시예정·게시중 시간대와 겹치면 |
 | SLOT-04 | 매물은 영업시간 안에서 끝나야 한다. 쉬는 날은 막고, 영업시간을 입력하지 않은 요일은 막지 않는다. 새벽 영업(18:00~02:00), 자정 마감(닫는 시각 00:00), 24시간(여는 시각 = 닫는 시각)을 받는다 | #332 | ✅ | `src/app/owner/(console)/slots/slot-draft-store.db.test.ts` 영업시간을 입력한 요일은 영업시간 안에 끝나야 하고<br>`src/app/owner/(console)/slots/slot-time.test.ts` 다음 날 새벽까지<br>`src/app/owner/(console)/slots/slot-time.test.ts` 자정 마감: 닫는 시각 00:00은 그 날 밤 12시<br>`src/app/owner/(console)/slots/slot-time.test.ts` 24시간: 여는 시각부터 다음 날 같은 시각까지 |
 | SLOT-05 | 입점 승인된 샵만 매물을 등록한다. 고객에게는 승인 샵의 매물만 보이고 홀딩된다 | S-102·A-101 | ✅ | `src/server/shops/review-store.test.ts` assertShopApproved는 승인된 샵만 통과시킨다<br>`src/features/map/slot-list/queries.db.test.ts` 승인 샵의 게시중 매물만<br>`src/server/payments/hold-store.db.test.ts` 승인되지 않은 샵의 매물 |
 | SLOT-06 | 게시예정·게시중 매물만 수정·마감할 수 있다. 예약됨, 다른 고객이 결제 중, 시작이 지난 매물은 막는다 | S-206 | ✅ | `src/features/slot-status/slot-status.test.ts` 게시중이어도 다른 고객이 홀딩 중이면<br>`src/app/owner/(console)/slots/slot-edit-store.db.test.ts` 예약됨·결제 중·이미 마감·시작 지남 |
-| SLOT-07 | 마감은 사유(다른 곳 예약·잘못 올림·기타)와 시각을 남기고, 지우기는 없다. 마감한 시간에는 새 매물을 올릴 수 있다 | S-206 | ✅ | `src/app/owner/(console)/slots/slot-edit-store.db.test.ts` 게시중·예약대기 매물을 사유·시각과 함께 마감하고 |
-| SLOT-08 | 게시중 매물은 48시간 밖으로 옮기지 못한다. 게시예정 매물을 옮기면 게시 시각을 새 시작 48시간 전으로 다시 정한다 | S-205 | ✅ | `src/app/owner/(console)/slots/slot-edit-store.db.test.ts` 게시중 매물은 48시간 밖으로 옮기지 못한다<br>`src/app/owner/(console)/slots/slot-edit-store.db.test.ts` 예약대기 매물은 14일 안의 먼 시각으로 옮기면 |
+| SLOT-07 | 마감은 사유(다른 곳 예약·잘못 올림·기타)와 시각을 남기고, 지우기는 없다. 마감한 시간에는 새 매물을 올릴 수 있다 | S-206 | ✅ | `src/app/owner/(console)/slots/slot-edit-store.db.test.ts` 게시중·게시예정 매물을 사유·시각과 함께 마감하고 |
+| SLOT-08 | 게시중 매물은 48시간 밖으로 옮기지 못한다. 게시예정 매물을 옮기면 게시 시각을 새 시작 48시간 전으로 다시 정한다 | S-205 | ✅ | `src/app/owner/(console)/slots/slot-edit-store.db.test.ts` 게시중 매물은 48시간 밖으로 옮기지 못한다<br>`src/app/owner/(console)/slots/slot-edit-store.db.test.ts` 게시예정 매물은 14일 안의 먼 시각으로 옮기면 |
 
 ## 3. 매물 상태
 
@@ -77,6 +77,7 @@ PR 검사가 자동으로 막는 것:
 | SHOW-02 | 시작까지 6시간 미만이면 임박·환불 불가로 표시하고, 딱 6시간이면 표시하지 않는다 | C-203·C-308 | ✅ | `src/features/map/slot-list/badges.test.ts` 6시간 미만이면 환불 불가·임박, 딱 6시간이면 없음<br>`src/server/policy/slot-time.test.ts` 딱 6시간 남았으면 임박·환불 불가가 아니다 |
 | SHOW-03 | 다른 고객이 홀딩 중인 매물은 목록에 그대로 두고 "결제 중"으로 표시한다. 내 홀딩과 끝난 홀딩은 표시하지 않고, 서버 시각으로 판단한다 | C-404 | ✅ | `src/features/map/slot-list/badges.test.ts` 다른 고객이 홀딩 중이면 결제 중 배지<br>`src/features/map/slot-list/queries.db.test.ts` 배지는 서버 시각으로 |
 | SHOW-04 | 매물 상세에는 접힌 "환불 규정" 한 줄만 두고, 규정 문구는 결제 동의 문구와 글자까지 같다 | C-305·C-402 | ✅ | `src/app/(customer)/(tabs)/slots/[slotId]/detail-format.test.ts` 결제 동의 문구(consent-texts.md 3장)와 글자까지 같다 |
+| SHOW-05 | 샵 영업시간은 일~토 순서로 보여 준다(고객 매물 상세, 원장님 매장 설정의 표와 요일별 칸) | 11/15 nnoinn, #431, #437 | ⏳ | |
 
 ## 5. 홀딩·결제
 
@@ -198,8 +199,9 @@ PR 검사가 자동으로 막는 것:
 | AUTH-09 | 운영자 화면은 운영자 입구(/admin/login)에서 운영자로 로그인해야 열린다. 고객·원장님으로 로그인해 있어도 열리지 않고, 운영자 권한이 없으면 운영자 로그인을 거절한다. 운영자 함수도 운영자 모드에서만 통과한다(AUTH-03의 "관리자"가 이렇게 바뀐다) | #372, 11/13 nnoinn | ✅ | `src/server/auth/proxy-rules.test.ts` 운영자 모드면 통과하고<br>`src/app/api/auth/callback/route.test.ts` 운영자 입구로 들어왔는데 관리자가 아니면 바로 로그아웃시키고<br>`src/server/auth/session.test.ts` 운영자 모드로는 바꿀 수 없고 |
 | AUTH-10 | 운영자가 데이터를 바꾸면 같은 트랜잭션에서 처리 기록(누가·언제·무엇을·사유)이 남고, 처리 기록과 열람 기록은 앱에서 고치거나 지울 수 없다 | #372·#373 | ⏳ | |
 | AUTH-11 | 운영자 회원 상세에서도 휴대폰 번호·이메일은 가려서 보여주고, [번호 보기]를 누를 때만 서버에서 받아 보여준다. 누른 것도 열람 기록에 남는다 | 11/12 점검 8-2, 11/13 nnoinn | ⏳ | |
-| AUTH-12 | 고객 계정을 만들 때 이름이 필수다(앞뒤 공백 빼고 1~30자). 예약한 샵에는 예약자 이름과 휴대폰 번호만 보인다(닉네임은 주지 않는다) | #375, 11/13 nnoinn | ⏳ | |
-| AUTH-13 | 원장님은 자기 계정 이력만 보고, 운영자는 원장님·고객 계정 이력을 모두 본다. 운영자가 이력을 보면 열람 기록에 남는다 | #374, 11/13 nnoinn | ⏳ | |
+| AUTH-12 | 고객 계정을 만들 때 이름이 필수다(앞뒤 공백 빼고 1~30자). 예약한 샵에는 예약자 이름과 휴대폰 번호만 보인다(닉네임은 주지 않는다) | #375, 11/13 nnoinn | ✅ | `src/server/auth/customer-account.test.ts` 이름을 보내지 않은 요청도 NAME_REQUIRED<br>`src/server/auth/customer-account.test.ts` 이름을 비우면<br>`src/app/owner/(console)/reservations/reservation-detail-store.db.test.ts` 그 샵 예약을 매물·예약자 정보(이름·휴대폰, 닉네임은 빼고)와 같이 읽는다 |
+| AUTH-13 | 원장님은 자기 계정 이력만 보고, 운영자는 원장님·고객 계정 이력을 모두 본다. 운영자가 이력을 보면 열람 기록에 남는다 | #374, 11/13 nnoinn | ✅ | `src/server/accounts/history.test.ts` 지금 들어온 원장님 계정의 샵 이력만 읽는다<br>`src/server/accounts/history.test.ts` 원장님 이력: 그 원장님의 샵 이력을 읽고, 열람 기록을 남긴다<br>`src/server/accounts/history.test.ts` 운영자가 아니면 읽지도 기록하지도 않는다<br>`src/server/accounts/history-store.db.test.ts` 다른 샵과 시간대 안 손님 칸은 빼고 |
+| AUTH-14 | 운영자는 화면 위 오른쪽 프로필 메뉴의 [이름 바꾸기]로 자기 운영자 이름만 정하고 바꿀 수 있다(앞뒤 공백 빼고 1~20자). '운영자'와 다른 운영자가 쓰는 이름(앞뒤 공백·영문 대소문자 무시)은 쓸 수 없다. 운영자 기록에는 그 이름으로 보인다 | 11/16 nnoinn | ✅ | `src/server/admin/admin-profile.test.ts` 운영자가 아니면 FORBIDDEN을 그대로 돌려주고 DB를 열지 않는다<br>`src/server/admin/admin-profile.test.ts` 로그인한 운영자 자기 id로<br>`src/server/admin/admin-profile.db.test.ts` 다른 운영자가 쓰는 이름은<br>`src/server/admin/admin-name.test.ts` 이름을 정하지 않은 운영자에게 보이는 |
 
 ## 15. 시간대 매물 (#308, 진행 중)
 

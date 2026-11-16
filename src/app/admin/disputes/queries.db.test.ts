@@ -3,7 +3,7 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
-import { customers, disputes, shops } from '@/db/schema';
+import { adminProfiles, customers, disputes, shops } from '@/db/schema';
 
 import {
   createTestCustomer,
@@ -91,6 +91,16 @@ describeDb('운영자 이의제기 조회 (실제 DB)', () => {
         older.disputeId,
       ]);
       expect(await ids('all', newer.reservation.code)).toEqual([newer.disputeId]);
+      // 정렬을 고르면 그 순서: 전체를 최근 결론 순으로 보면 결론 없는 확인 중은 뒤로
+      const sorted = async (filter: 'open' | 'all', sort: 'received_new' | 'handled_new') =>
+        (await selectDisputes(tx, { filter, query: shopName, sort })).rows.map(
+          (row) => row.disputeId,
+        );
+      expect(await sorted('open', 'received_new')).toEqual([newer.disputeId, older.disputeId]);
+      expect((await sorted('all', 'handled_new')).slice(0, 2)).toEqual([
+        doneLate.disputeId,
+        doneEarly.disputeId,
+      ]);
       expect(await ids('all', unique('없는샵'))).toEqual([]);
       // 신청한 손님(그 예약의 손님)의 예약자 이름(#375)으로 찾고, 닉네임으로도 찾는다
       const name = unique('이의이름');
@@ -122,10 +132,11 @@ describeDb('운영자 이의제기 조회 (실제 DB)', () => {
     });
   });
 
-  it('상세는 이의제기 내용·결론과 그 예약(상태·방문 결과·처리·시작 시각·메뉴)·샵·신청한 손님을 읽고, 없는 이의제기는 null', async () => {
+  it('상세는 이의제기 내용·결론과 그 예약(상태·방문 결과·처리·시작 시각·메뉴)·샵·신청한 손님·결론 기록한 운영자를 읽고, 없는 이의제기는 null', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved', name: '상세 이의샵' });
       const adminId = await createTestUser(tx);
+      await tx.insert(adminProfiles).values({ userId: adminId, name: '결론 운영자' });
       const { disputeId, reservation, customerId } = await addDispute(tx, shop, '09:00', '10:00', {
         receivedAt: at(2, '09:00'),
         status: 'resolved',
@@ -157,6 +168,9 @@ describeDb('운영자 이의제기 조회 (실제 DB)', () => {
         shopName: '상세 이의샵',
         customerId,
         customerName: '테스트 고객',
+        // 앱 접수라 등록한 운영자는 없다(#372)
+        registeredByName: null,
+        handledByName: '결론 운영자',
       });
       expect(await selectDisputeDetail(tx, crypto.randomUUID())).toBeNull();
     });

@@ -22,7 +22,7 @@ export type SlotFormData = {
   businessHours: BusinessHours;
   /** 고를 수 있는 메뉴: 숨기지 않았고 지금 업종의 서비스 종류. 비어 있으면 화면이 메뉴 등록을 안내한다 */
   menus: SlotMenuOption[];
-  /** 같은 샵의 예약대기·게시중·예약됨 매물 시간. 수정이면 고치는 매물은 뺀다(excludeSlotId) */
+  /** 같은 샵의 게시예정·게시중·예약됨 매물 시간. 수정이면 고치는 매물은 뺀다(excludeSlotId) */
   busy: { start: string; end: string }[];
 };
 

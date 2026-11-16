@@ -122,7 +122,7 @@ describe('startCandidates', () => {
 describe('publishPlan (S-204·S-205)', () => {
   const now = at('2026-10-31T09:00:00');
 
-  it('시작 48시간 전이 아직 오지 않았으면 그 시각에 게시하는 예약대기', () => {
+  it('시작 48시간 전이 아직 오지 않았으면 그 시각에 게시하는 게시예정', () => {
     expect(publishPlan(at('2026-11-05T14:00:00'), now)).toEqual({
       status: 'scheduled',
       publishAt: at('2026-11-03T14:00:00'),
