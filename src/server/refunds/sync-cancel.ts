@@ -13,7 +13,7 @@ import type { FinishedCancellation } from '@/server/payments/portone';
 
 import { calcRefund } from './calc-refund';
 import { finishCancel } from './finish-cancel';
-import { CUSTOMER_CANCEL_REASON } from './refund-payment';
+import { CUSTOMER_CANCEL_REASON, VOID_REFUND_REASON } from './refund-payment';
 import { finishAdminCancel, readRefundTargetByOrder, type RefundTarget } from './refund-store';
 
 type Db = ReturnType<typeof getDb>;
@@ -47,7 +47,8 @@ export async function syncUnrecordedCancel(
   // 진행 중인 취소나 예약 무효(A-108)가 끝낸다
   if (target.requested || target.voidInProgress) return 'retry';
   if (target.status !== 'confirmed') {
-    if (target.status === 'completed') {
+    // 이용 완료한 예약을 무효로 하면(A-108) 포트원 취소가 생긴다
+    if (target.status === 'completed' && !refund.reasons.includes(VOID_REFUND_REASON)) {
       console.error('[cancel] 이용 완료한 예약에 포트원 취소가 있어요:', target.reservationId);
     }
     return 'cancel_known';

@@ -367,6 +367,13 @@ describe('cancelReservation', () => {
     expect(state.requests).toEqual([]);
   });
 
+  it('예약 무효(A-108)가 진행 중이면 포트원을 부르지 않고 CANCEL_FINISHING', async () => {
+    state.target = target({ voidInProgress: true });
+    expect(codeOf(await cancel())).toBe('CANCEL_FINISHING');
+    expect(state.pgCalls).toEqual([]);
+    expect(state.requests).toEqual([]);
+  });
+
   describe('진행 중인 취소를 다시 누를 때', () => {
     it('새로 계산하지 않고 저장해 둔 금액으로 처리한다(그 사이 구간이 바뀌어도)', async () => {
       state.now = before(10); // 지금 계산하면 50% 구간이다

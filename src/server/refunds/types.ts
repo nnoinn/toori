@@ -47,3 +47,29 @@ export type OwnerFaultCancelPreview = {
   startAt: string;
   serverNow: string;
 };
+
+/** 예약 무효 확인 창의 값(A-108, #423). 금액은 화면에서 계산하지 않고 이 값을 보여준다 */
+export type VoidPreview = {
+  reservationId: string;
+  /** 지금 무효로 할 수 있는지 */
+  voidable: boolean;
+  /** 무효로 할 수 없는 이유. 할 수 있으면 null */
+  blockReason: 'ALREADY_VOIDED' | 'SETTLEMENT_BUNDLED' | 'CANCEL_IN_PROGRESS' | null;
+  /** 손님이 실제 결제한 금액 */
+  paidAmount: number;
+  /** 이미 돌려준 금액(고객 취소 등) */
+  refundedAmount: number;
+  /** 이번에 돌려줄 금액 = 결제액 − 이미 돌려준 금액 */
+  refundAmount: number;
+  /** 돌려줄 쿠폰 금액(이미 돌려줬으면 0) */
+  usedCouponAmount: number;
+};
+
+/** 무효를 끝낸 결과 */
+export type VoidedReservation = {
+  reservationId: string;
+  /** 이번에 돌려준 금액 */
+  refundAmount: number;
+  /** ISO */
+  voidedAt: string;
+};

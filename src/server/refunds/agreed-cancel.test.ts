@@ -26,6 +26,7 @@ const state = vi.hoisted(() => ({
   alerts: [] as unknown[],
   marked: true,
   refundStarted: true,
+  voidInProgress: false,
   pgResult: null as unknown,
   lookup: null as unknown,
   finished: { refundAmount: 10_225 } as { refundAmount: number } | null | Error,
@@ -87,6 +88,7 @@ vi.mock('./refund-store', () => ({
       startAt: state.target.startAt,
       status: state.target.status,
       requested: null,
+      voidInProgress: state.voidInProgress,
     },
   requestCancelRefund: async (tx: unknown, input: unknown) => {
     state.steps.push(['requestRefund', tx, input]);
@@ -154,6 +156,7 @@ beforeEach(() => {
   state.alerts = [];
   state.marked = true;
   state.refundStarted = true;
+  state.voidInProgress = false;
   state.pgResult = { ok: true, cancellationId: 'c-1', amount: 10_225 };
   state.lookup = { state: 'none' };
   state.finished = { refundAmount: 10_225 };
@@ -405,6 +408,16 @@ describe('respondAgreedCancel (고객)', () => {
       error: { code: 'RESERVATION_CHANGED' },
     });
     expect(state.steps.map((step) => (step as unknown[])[0])).not.toContain('pg');
+  });
+
+  it('운영자가 예약 무효(A-108)를 진행 중이면 동의해도 RESERVATION_CHANGED(포트원을 부르지 않는다)', async () => {
+    state.voidInProgress = true;
+    expect(await respondAgreedCancel({ requestId: REQUEST, agree: true })).toMatchObject({
+      ok: false,
+      error: { code: 'RESERVATION_CHANGED' },
+    });
+    expect(state.steps.map((step) => (step as unknown[])[0])).not.toContain('pg');
+    expect(state.steps.map((step) => (step as unknown[])[0])).not.toContain('requestRefund');
   });
 
   it('결제사가 거절했고 돌아간 돈이 없으면 진행 중 표시를 지우고 요청을 다시 답 기다림으로, REFUND_FAILED', async () => {

@@ -168,6 +168,20 @@ describe('syncUnrecordedCancel', () => {
     expect(console.error).toHaveBeenCalled();
   });
 
+  it('예약 무효(A-108)가 진행 중이면 retry(무효 흐름이 끝낸다)', async () => {
+    state.target = target({ voidInProgress: true });
+    expect(await syncUnrecordedCancel(db, 'order-1', CONSOLE, NOW)).toBe('retry');
+    expect(state.finishes).toEqual([]);
+  });
+
+  it('무효로 처리한 이용 완료 예약의 포트원 취소는 로그를 남기지 않는다', async () => {
+    state.target = target({ status: 'completed' });
+    const voided = { cancellationId: 'c-2', amount: 45_000, reasons: ['예약 무효'] };
+    expect(await syncUnrecordedCancel(db, 'order-1', voided, NOW)).toBe('cancel_known');
+    expect(state.finishes).toEqual([]);
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
   it('예약이 없으면 바꾸지 않고 로그를 남긴다', async () => {
     state.target = null;
     expect(await syncUnrecordedCancel(db, 'order-1', REFUND, NOW)).toBe('cancel_known');

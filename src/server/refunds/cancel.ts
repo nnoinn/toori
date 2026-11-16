@@ -111,7 +111,10 @@ export async function cancelReservation(input: {
 
   // 다른 취소 환불이 진행 중이다(손님이 같은 순간 합의 후 취소에 동의함, 원장님 귀책 취소). 한 예약에 취소 환불은 하나라 그쪽이 끝낸다
   // 예약 무효(A-108)가 진행 중이어도 그쪽이 끝낸다
-  if ((target.requested && target.requested.reason !== 'customer_cancel') || target.voidInProgress) {
+  if (
+    (target.requested && target.requested.reason !== 'customer_cancel') ||
+    target.voidInProgress
+  ) {
     return refundFail('CANCEL_FINISHING');
   }
   const requested = target.requested ?? {

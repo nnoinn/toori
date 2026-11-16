@@ -4,6 +4,7 @@
 // - 목요일에 묶인 거래(settlement_items)는 저장한 금액과 정산 묶음 상태를 그대로 쓴다
 // - 결제 수수료율이 정해지기 전(null)에는 가격 미리보기(S-203)처럼 결제 수수료와 정산액을 비운다
 // - 원장님 사정 취소는 정산 줄이 없어도 기준 금액 0원과 패널티로 남긴다(정산할 금액 없음, #129 nnoinn 요청)
+// - 무효(A-108, #423)도 정산 줄 없이 "무효, 기준 금액 0원"으로 남긴다. 무효 전에 묶인 줄이 있으면(정산 묶기와 겹친 경우) 그 줄을 그대로 보여준다
 
 import { z } from 'zod';
 
@@ -52,7 +53,7 @@ export type SettlementRow = SettleTarget & {
 type Options = { now: Date; paymentFeeRate: number | null };
 
 /**
- * 예약 하나의 정산 내역 줄. 예정 예약과, 원장님 사정 취소가 아닌데 정산할 거래가 아닌 것
+ * 예약 하나의 정산 내역 줄. 예정 예약과, 원장님 사정 취소·무효가 아닌데 정산할 거래가 아닌 것
  * (운영자 취소, 자동 취소, 환불이 끝나지 않은 취소)은 null
  */
 export function toSettlementItemView(
@@ -120,6 +121,27 @@ export function toSettlementItemView(
       // 줄은 묶음과 한 트랜잭션에서 만든다. 묶음이 없으면 지급 전으로 본다
       status: item.settlement?.status ?? 'pending',
       payoutDate: item.settlement?.payoutDate ?? null,
+    };
+  }
+
+  if (row.voidedAt) {
+    return {
+      ...common,
+      kind: 'void',
+      penaltyRate: null,
+      hoursBeforeStart: null,
+      baseAmount: 0,
+      platformFeeRate: 0,
+      platformFee: 0,
+      platformFeeVat: 0,
+      paymentFeeRate: null,
+      paymentFee: 0,
+      paymentFeeVat: 0,
+      payoutAmount: 0,
+      ownerPenalty: null,
+      hold: null,
+      status: 'no_payout',
+      payoutDate: null,
     };
   }
 

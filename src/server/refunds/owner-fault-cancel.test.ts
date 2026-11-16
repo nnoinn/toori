@@ -179,6 +179,14 @@ describe('cancelByOwnerFault', () => {
     expect(state.flows).toEqual([]);
   });
 
+  it('예약 무효(A-108)가 진행 중이면 CANCEL_FINISHING', async () => {
+    state.target = { ...TARGET, voidInProgress: true };
+    expect(await cancelByOwnerFault({ reservationId: RESERVATION })).toMatchObject({
+      error: { code: 'CANCEL_FINISHING' },
+    });
+    expect(state.flows).toEqual([]);
+  });
+
   it('진행 중인 원장님 귀책 취소를 다시 누르면 저장해 둔 값으로 이어서 한다(그 사이 시작 시각이 지났어도)', async () => {
     const requested = {
       reason: 'owner_fault' as const,

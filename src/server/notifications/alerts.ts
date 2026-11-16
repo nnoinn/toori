@@ -6,6 +6,7 @@ import 'server-only';
 import { eq, sql } from 'drizzle-orm';
 import { after } from 'next/server';
 
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { getDb } from '@/db';
 import { customers, orders, owners, reservations, shops, slots, slotWindows } from '@/db/schema';
 import { formatEndTime, formatKst } from '@/lib/time';
@@ -32,6 +33,7 @@ async function readReservationAlert(db: Db, reservationId: string) {
     .select({
       customerUserId: customers.userId,
       ownerUserId: owners.userId,
+      code: reservations.code,
       shopName: shops.name,
       menuName: slots.menuName,
       startAt: slots.startAt,
@@ -188,6 +190,51 @@ export function notifyOwnerFaultCancelled(
         : `결제한 금액을 모두 돌려드리고 ${coupon}을 드렸어요`,
       url: `/reservations/${reservationId}`,
     });
+  });
+}
+
+/** 예약 무효 손님 알림의 본문(A-108, #423 승인 문구). 돌려준 돈이 없으면(이미 다 돌려줬거나 쿠폰으로 0원 결제) 금액은 말하지 않는다 */
+export function voidedCustomerBody(refundAmount: number, couponReturned: boolean): string {
+  if (refundAmount > 0) {
+    const refunded = `${refundAmount.toLocaleString('ko-KR')}원을 돌려드렸어요`;
+    return couponReturned ? `${refunded}. 쓰신 쿠폰도 돌려드렸어요` : refunded;
+  }
+  return couponReturned ? '쓰신 쿠폰을 돌려드렸어요' : '자세한 내용은 예약 상세에서 확인해 주세요';
+}
+
+/**
+ * 운영자가 예약을 무효로 처리했을 때 손님과 원장님에게(A-108, #423, 11/15 nnoinn 문구). 무효는 원장님 요청으로만 하므로 원장님에게는
+ * 요청을 처리했다고 알리고, 재등록 안내(S-400)는 보내지 않는다. 무효를 끝낸 쪽만 부르므로 한 번만 간다
+ */
+export function notifyReservationVoided(
+  db: Db,
+  reservationId: string,
+  { refundAmount, couponReturned }: { refundAmount: number; couponReturned: boolean },
+) {
+  const event = 'reservation.voided';
+  sendAfterResponse(event, async () => {
+    const alert = await readReservationAlert(db, reservationId);
+    if (!alert) return;
+    await Promise.all([
+      notify(db, {
+        userId: alert.customerUserId,
+        accountType: 'customer',
+        event,
+        dedupeKey: `${event}:customer:${reservationId}`,
+        title: '예약이 무효 처리됐어요',
+        body: voidedCustomerBody(refundAmount, couponReturned),
+        url: `/reservations/${reservationId}`,
+      }),
+      notify(db, {
+        userId: alert.ownerUserId,
+        accountType: 'owner',
+        event,
+        dedupeKey: `${event}:owner:${reservationId}`,
+        title: '요청하신 예약 무효를 처리했어요',
+        body: `예약번호 ${formatReservationCode(alert.code)} · 정산에서 빠져요`,
+        url: `/owner/reservations/${reservationId}`,
+      }),
+    ]);
   });
 }
 
