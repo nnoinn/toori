@@ -11,6 +11,9 @@ import { PRICE_FILTER_RANGES, TIME_FILTER_RANGES } from './filters';
 import {
   INTEREST_DIGEST_HOUR,
   MARKETING_CONSENT_RECHECK_MONTHS,
+  NOTIFICATION_CHECK_SECONDS,
+  NOTIFICATION_INBOX_DAYS,
+  NOTIFICATION_TOAST_SECONDS,
   PUSH_QUIET_HOURS,
   REMINDER_MINUTES_BEFORE,
 } from './notifications';
@@ -109,6 +112,12 @@ describe('알림·동의 (#48 6장)', () => {
   it('관심 지역 알림 시각은 야간 금지 시간이 아니다', () => {
     expect(INTEREST_DIGEST_HOUR).toBeGreaterThanOrEqual(PUSH_QUIET_HOURS.end);
     expect(INTEREST_DIGEST_HOUR).toBeLessThan(PUSH_QUIET_HOURS.start);
+  });
+
+  it('알림함은 최근 90일, 화면 안내는 위 가운데 5초, 보고 있으면 1분마다 새 알림 확인(#371, 11/13 nnoinn)', () => {
+    expect(NOTIFICATION_INBOX_DAYS).toBe(90);
+    expect(NOTIFICATION_TOAST_SECONDS).toBe(5);
+    expect(NOTIFICATION_CHECK_SECONDS).toBe(60);
   });
 
   it('약관 버전은 DB의 약관 종류마다 하나씩 있다', () => {

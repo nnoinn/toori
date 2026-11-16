@@ -1,4 +1,5 @@
 // 관심 동네·찜한 샵 새 매물 알림 보내기 (C-601·C-209, W17 ②, #270). 예약 작업(/api/cron/slot-digest)이 매일 오후 1시에 부른다.
+// 보내기가 끝나면 알림함 기간(최근 90일)이 지난 알림을 지운다(#371).
 // 광고성 정보라 제목 앞에 (광고)와 보내는 곳, 내용에 수신 거부 방법을 넣고, 밤 9시~아침 8시에는 보내지 않는다(동의 문구 6장).
 // 받는 고객은 '관심 동네·찜한 샵 새 매물 알림' 동의(interest_alert)만 본다. 이벤트·혜택 동의(marketing)와 상관없다(11/8).
 
@@ -17,6 +18,7 @@ import {
   readDigestCustomers,
   readDigestSlots,
 } from './digest-store';
+import { deleteExpiredNotifications, inboxStart } from './inbox-store';
 import { notify } from './notify';
 
 type Db = ReturnType<typeof getDb>;
@@ -37,6 +39,8 @@ export type DigestSummary = {
   failed: number;
   /** 밤 시간이라 보내지 않았으면 'quiet_hours' */
   skipped: 'quiet_hours' | null;
+  /** 알림함 기간(최근 NOTIFICATION_INBOX_DAYS일)이 지나서 지운 알림 수(#371). 하루 한 번 도는 이 작업이 맡는다 */
+  expired: number;
 };
 
 /** 광고성 알림을 보내지 않는 시간(밤 9시~아침 8시, 한국 시간)인지 */
@@ -94,7 +98,10 @@ export function digestMessage(
  * 같은 날 다시 불러도 이미 받은 고객에게는 보내지 않는다. 한 고객이 실패해도 나머지는 보낸다
  */
 export async function sendSlotDigest(db: Db, now: Date): Promise<DigestSummary> {
-  if (isQuietHour(now)) return { customers: 0, sent: 0, failed: 0, skipped: 'quiet_hours' };
+  if (isQuietHour(now)) {
+    const expired = await deleteExpiredNotifications(db, inboxStart(now));
+    return { customers: 0, sent: 0, failed: 0, skipped: 'quiet_hours', expired };
+  }
   const dateKey = kstDateKey(now);
   const since = addHours(now, -DIGEST_WINDOW_HOURS);
   const targets = await readDigestCustomers(db, { dateKey, limit: DIGEST_CUSTOMER_LIMIT });
@@ -102,7 +109,13 @@ export async function sendSlotDigest(db: Db, now: Date): Promise<DigestSummary> 
     console.error('[notify] 새 매물 알림 대상이 한 번에 볼 수를 넘었어요:', DIGEST_CUSTOMER_LIMIT);
   }
 
-  const summary: DigestSummary = { customers: targets.length, sent: 0, failed: 0, skipped: null };
+  const summary: DigestSummary = {
+    customers: targets.length,
+    sent: 0,
+    failed: 0,
+    skipped: null,
+    expired: 0,
+  };
   for (let start = 0; start < targets.length; start += SEND_CONCURRENCY) {
     const results = await Promise.allSettled(
       targets.slice(start, start + SEND_CONCURRENCY).map(async (target) => {
@@ -131,5 +144,7 @@ export async function sendSlotDigest(db: Db, now: Date): Promise<DigestSummary> 
       );
     }
   }
+  // 알림함 기간이 지난 알림을 지운다(#371, 개인정보를 오래 두지 않게). 보내기가 끝난 뒤라 지우다 실패해도 알림은 이미 갔다
+  summary.expired = await deleteExpiredNotifications(db, inboxStart(now));
   return summary;
 }

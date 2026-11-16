@@ -8,6 +8,7 @@ import {
   keptSlotsNotice,
   mergeEntries,
   onHold,
+  rowDetailHref,
   splitByDay,
   viewStatus,
 } from './dashboard';
@@ -275,5 +276,14 @@ describe('시간대 마감 때 손님이 결제 중이라 남긴 칸 안내 (WIN
     ).toBe(
       '손님이 결제 중인 14:00~15:00(커트), 23:30~00:30(익일)(펌)은 결제가 끝날 때까지 남아 있어요. 결제하면 예약으로 남고, 결제하지 않으면 자동으로 닫혀요.',
     );
+  });
+});
+
+describe('줄을 두 번 누르면 여는 곳 (11/16 정민석)', () => {
+  it('예약이 있는 줄(예약됨·완료·취소, 처리 필요)은 그 예약 상세, 없는 줄은 고르기만(null)', () => {
+    expect(rowDetailHref(slot('2026-10-31T15:00:00', { reservationId: 'r1' }))).toBe(
+      '/owner/reservations/r1',
+    );
+    expect(rowDetailHref(slot('2026-10-31T15:00:00', { reservationId: null }))).toBeNull();
   });
 });
