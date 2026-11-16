@@ -168,7 +168,7 @@ async function Overview({ searchParams }: { searchParams: SearchParams }) {
         />
       ) : (
         <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
-          <table className="w-full min-w-[72rem] text-sm">
+          <table className="w-full text-sm">
             <thead className="text-left text-muted-foreground">
               <tr className="border-b">
                 <th className={HEAD_CELL}>지급일</th>
@@ -192,8 +192,9 @@ async function Overview({ searchParams }: { searchParams: SearchParams }) {
                   <SelectableRow key={row.settlementId} id={row.settlementId} href={href}>
                     <td className={cn(CELL, 'whitespace-nowrap')}>{row.payoutDate}</td>
                     <td className={cn(CELL, 'font-medium')}>{row.shopName}</td>
-                    <td className={cn(CELL, 'whitespace-nowrap text-muted-foreground')}>
-                      {row.periodStart} ~ {row.payoutDate}
+                    <td className={cn(CELL, 'text-muted-foreground')}>
+                      <span className="whitespace-nowrap">{row.periodStart} ~</span>{' '}
+                      <span className="whitespace-nowrap">{row.payoutDate}</span>
                     </td>
                     <td className={cn(CELL, 'text-right')}>{row.itemCount}</td>
                     <td className={cn(CELL, 'text-right whitespace-nowrap')}>

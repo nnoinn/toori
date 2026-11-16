@@ -33,6 +33,7 @@ describe('주소 값', () => {
       target: null,
       from: null,
       to: null,
+      page: 1,
     });
     expect(
       toLogParams({
@@ -43,6 +44,7 @@ describe('주소 값', () => {
         target: 'shop',
         from: '2026-11-01',
         to: '2026-11-15',
+        page: '3',
       }),
     ).toEqual({
       tab: 'access',
@@ -52,17 +54,25 @@ describe('주소 값', () => {
       target: 'shop',
       from: '2026-11-01',
       to: '2026-11-15',
+      page: 3,
     });
     expect(
       toLogParams({ tab: 'x', admin: 'not-uuid', kind: 'DROP TABLE', target: "'", from: '11/1' }),
     ).toMatchObject({ tab: 'actions', admin: null, kind: null, target: null, from: null });
   });
 
-  it('기본값(처리 기록, 최근 순, 빈 거르기)은 주소에 넣지 않는다', () => {
+  it.each(['0', '-2', '1.5', 'abc', ''])('쪽이 1 이상의 정수가 아니면(%j) 1쪽', (page) => {
+    expect(toLogParams({ page }).page).toBe(1);
+  });
+
+  it('기본값(처리 기록, 최근 순, 빈 거르기, 1쪽)은 주소에 넣지 않는다', () => {
     expect(logsHref({ tab: 'actions' })).toBe('/admin/logs');
-    expect(logsHref({ tab: 'actions', sort: 'new', admin: null })).toBe('/admin/logs');
+    expect(logsHref({ tab: 'actions', sort: 'new', admin: null, page: 1 })).toBe('/admin/logs');
     expect(logsHref({ tab: 'access', sort: 'old', kind: 'view', from: '2026-11-01' })).toBe(
       '/admin/logs?tab=access&sort=old&kind=view&from=2026-11-01',
+    );
+    expect(logsHref({ tab: 'actions', kind: 'shop.approve', page: 2 })).toBe(
+      '/admin/logs?kind=shop.approve&page=2',
     );
   });
 
