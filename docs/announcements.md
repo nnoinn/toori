@@ -17,6 +17,7 @@ nnoinn이 팀원에게 알릴 내용을 PR과 함께 이 파일에 추가한다.
 - 들어옴: 알림은 푸시 알림을 켠 기기가 없어도 받는 계정마다 늘 기록된다(`notify()`, 켠 기기가 없으면 `no_device`, NOTI-05). 관심 동네·찜한 샵 새 매물 알림도 동의한 고객이면 기기와 상관없이 만든다(알림함에 남는다)
 - 들어옴: 알림함 함수 4개 `listMyNotifications`·`countMyUnreadNotifications`·`markNotificationsRead`·`listMyNotificationsSince`(`@/server/notifications/inbox`, 모양은 `inbox-types`, #371). 지금 계정 모드 기준이고(NOTI-07), 원장님 화면은 마지막 값으로 `'owner'`를 넘긴다. 90일이 지난 알림은 매일 오후 1시 새 매물 알림 작업이 끝날 때 지운다
 - 바뀜: 고객 알림함(`/notifications`)과 종이 가짜 결과 대신 진짜 함수를 부른다. 가짜 결과 파일과 `DEV_FAKE_NOTIFICATIONS` 스위치는 없어졌다(.env.local에 있으면 지워도 된다)
+- 들어옴: 운영자 알림 확인(#373 ⑤, `/admin/notifications`, 운영자 메뉴 "알림 확인"). 최근 90일 동안 푸시 알림이 가지 않은 알림(보내지 못함·기기 없음)을 보고, 지금 그 계정에 기기가 있으면 사유를 남겨 다시 보낸다(처리 기록 `notification.resend`). 보내기는 `notify`와 같은 `sendToDevices`를 쓴다
 - 할 일: 강규민은 개발 DB에 0017 적용(#445, 적용 전에는 알림 저장이 실패한다). 정민석은 원장님 알림함·종을 이 함수에 `'owner'`를 넘겨 만든다(#371). 정찬형은 0017이 적용되면 알림함을 진짜 알림으로 확인
 
 ---
