@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { getCurrentAccount, toSwitchableMode } from '@/server/auth';
+import { readRecentProvider } from '@/server/auth/recent-provider';
 
 import { LoginForm } from './login/login-form';
 
@@ -18,7 +19,7 @@ export default function FirstPage() {
 }
 
 async function FirstContent() {
-  const account = await getCurrentAccount();
+  const [account, recentProvider] = await Promise.all([getCurrentAccount(), readRecentProvider()]);
   return (
     <LoginForm
       variant="first"
@@ -31,6 +32,7 @@ async function FirstContent() {
           ? { customer: Boolean(account.customerId), owner: Boolean(account.ownerId) }
           : undefined
       }
+      recentProvider={recentProvider}
     />
   );
 }

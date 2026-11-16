@@ -12,7 +12,16 @@ import { ADMIN_LOGIN_START_FAILED_MESSAGE } from './admin-login-texts';
  * 운영자 입구의 간편 로그인 버튼 (#372 1장). 고객·원장님과 같은 카카오·네이버·구글 로그인이고(같은 순서), 운영자 모드로 들어온다.
  * 운영자 전용 아이디·비밀번호는 만들지 않는다("간편 로그인만" 규칙)
  */
-export function AdminLoginForm({ next, error }: { next: string; error: string | null }) {
+export function AdminLoginForm({
+  next,
+  error,
+  recentProvider = null,
+}: {
+  next: string;
+  error: string | null;
+  /** 이 기기에서 가장 최근에 로그인한 방식. 그 버튼에 "최근 로그인" 표시를 한다(AUTH-14) */
+  recentProvider?: ProviderKey | null;
+}) {
   const [message, setMessage] = useState<string | null>(error);
   const [pendingProvider, setPendingProvider] = useState<ProviderKey | null>(null);
   const [, startTransition] = useTransition();
@@ -44,6 +53,7 @@ export function AdminLoginForm({ next, error }: { next: string; error: string | 
           provider={provider}
           disabled={pendingProvider !== null}
           pending={pendingProvider === provider}
+          recent={recentProvider === provider}
           onClick={() => start(provider)}
         />
       ))}

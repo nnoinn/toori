@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { getCurrentAccount } from '@/server/auth';
+import { readRecentProvider } from '@/server/auth/recent-provider';
 
 import { LoginForm } from './login-form';
 import { parseLoginError, parseLoginMode, readNextParam } from './login-params';
@@ -23,7 +24,11 @@ export default function LoginPage({ searchParams }: { searchParams: SearchParams
 }
 
 async function LoginContent({ searchParams }: { searchParams: SearchParams }) {
-  const [params, account] = await Promise.all([searchParams, getCurrentAccount()]);
+  const [params, account, recentProvider] = await Promise.all([
+    searchParams,
+    getCurrentAccount(),
+    readRecentProvider(),
+  ]);
   const mode = parseLoginMode(params.mode);
   const error = parseLoginError(params.error);
   return (
@@ -34,6 +39,7 @@ async function LoginContent({ searchParams }: { searchParams: SearchParams }) {
       nextParam={readNextParam(params.next)}
       error={error}
       signedInEmail={account?.email ?? null}
+      recentProvider={recentProvider}
     />
   );
 }

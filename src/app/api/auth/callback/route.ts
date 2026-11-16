@@ -1,6 +1,7 @@
 // 카카오·구글·네이버 로그인을 마치고 돌아오는 곳 (X-101, C-101, #47 3장).
 // 1) 받은 code를 로그인 세션으로 바꾸고 2) 첫 로그인이면 profiles를 만들고 3) 고른 모드를 account_mode 쿠키에 저장한 뒤
 // 4) 그 모드의 계정이 없으면 가입 화면(고객 /join, 원장님 /owner/join)으로, 있으면 보던 화면(next)으로 보낸다.
+// 로그인을 마치면 누른 간편 로그인(provider)을 이 기기의 "최근 로그인" 방식으로 기억한다(AUTH-14, recent-provider.ts).
 
 import { cookies } from 'next/headers';
 import { type NextRequest, NextResponse } from 'next/server';
@@ -13,6 +14,11 @@ import {
   parseAccountMode,
 } from '@/server/auth/account-mode';
 import { ensureProfile, loadAccount } from '@/server/auth/current-account';
+import {
+  parseRecentProvider,
+  RECENT_PROVIDER_COOKIE,
+  RECENT_PROVIDER_COOKIE_OPTIONS,
+} from '@/server/auth/recent-provider';
 import { afterLoginPath, DEFAULT_NEXT, loginPath } from '@/server/auth/paths';
 import { createSupabaseServerClient } from '@/server/supabase/server';
 
@@ -47,6 +53,11 @@ export async function GET(request: NextRequest) {
     await supabase.auth.signOut({ scope: 'local' });
     (await cookies()).delete(ACCOUNT_MODE_COOKIE);
     return go(loginPath('admin', next, 'not_admin'));
+  }
+  // 로그인을 마친 방식만 기억한다(취소·실패·이메일 없음·운영자 아님은 위에서 끝난다)
+  const provider = parseRecentProvider(params.get('provider'));
+  if (provider) {
+    (await cookies()).set(RECENT_PROVIDER_COOKIE, provider, RECENT_PROVIDER_COOKIE_OPTIONS);
   }
   return go(afterLoginPath(account, mode, next));
 }

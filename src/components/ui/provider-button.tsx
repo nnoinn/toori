@@ -50,8 +50,25 @@ type ProviderButtonProps = {
   disabled?: boolean;
   /** 누른 버튼이면 문구 대신 이동 중 안내 */
   pending?: boolean;
+  /** 이 기기에서 가장 최근에 로그인한 방식이면 테두리와 "최근 로그인" 표시(11/16 nnoinn, AUTH-14) */
+  recent?: boolean;
   onClick: () => void;
 };
+
+// 시안 고르기용(임시): a 초록 테두리·초록 라벨, b 초록 테두리·연한 초록 라벨(긴 문구), c 검정 테두리·검정 라벨
+const RECENT_VARIANT = 'a' as 'a' | 'b' | 'c';
+const RECENT_RING = {
+  a: 'ring-2 ring-primary ring-offset-2 ring-offset-card',
+  b: 'ring-2 ring-primary ring-offset-2 ring-offset-card',
+  c: 'ring-2 ring-foreground ring-offset-2 ring-offset-card',
+}[RECENT_VARIANT];
+const RECENT_BADGE = {
+  a: 'bg-primary text-primary-foreground',
+  b: 'border border-primary bg-accent text-accent-foreground',
+  c: 'bg-foreground text-background',
+}[RECENT_VARIANT];
+/** 최근 로그인 표시 문구 */
+export const RECENT_LOGIN_LABEL = RECENT_VARIANT === 'b' ? '최근에 로그인한 방식' : '최근 로그인';
 
 /** 제공자마다 다른 모양(배경·글자·글꼴). 둥근 모서리와 높이는 같다 */
 const PROVIDER_STYLES: Record<ProviderKey, string> = {
@@ -64,7 +81,13 @@ const PROVIDER_STYLES: Record<ProviderKey, string> = {
   naver: 'bg-naver font-kakao text-[15px] font-semibold text-naver-foreground hover:opacity-90',
 };
 
-export function ProviderButton({ provider, disabled, pending, onClick }: ProviderButtonProps) {
+export function ProviderButton({
+  provider,
+  disabled,
+  pending,
+  recent,
+  onClick,
+}: ProviderButtonProps) {
   return (
     <button
       type="button"
@@ -74,6 +97,7 @@ export function ProviderButton({ provider, disabled, pending, onClick }: Provide
       className={cn(
         'relative flex h-12 w-full items-center justify-center gap-2.5 rounded-[12px] px-4 transition-opacity outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60',
         PROVIDER_STYLES[provider],
+        recent && RECENT_RING,
       )}
     >
       {provider === 'kakao' ? (
@@ -85,6 +109,17 @@ export function ProviderButton({ provider, disabled, pending, onClick }: Provide
         <Image src={naverLogo} alt="" width={16} height={16} className="size-4 shrink-0" />
       )}
       <span>{pending ? '로그인 화면으로 이동 중…' : PROVIDER_LABELS[provider]}</span>
+      {recent ? (
+        // 버튼 오른쪽 위 테두리에 걸친 라벨. 버튼 이름에 같이 읽힌다("카카오 로그인 최근 로그인")
+        <span
+          className={cn(
+            'absolute -top-2.5 right-3 rounded-full px-2 py-0.5 font-sans text-xs leading-4 font-semibold shadow-sm',
+            RECENT_BADGE,
+          )}
+        >
+          {RECENT_LOGIN_LABEL}
+        </span>
+      ) : null}
     </button>
   );
 }
