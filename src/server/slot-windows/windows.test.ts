@@ -6,9 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { fail, ok } from '@/lib/result';
 import { kstToUtc } from '@/lib/time';
+import { PUBLISH_PAUSED_MESSAGE } from '@/server/shops/publish-pause-message';
 
 import type { ShopMenu } from './rules';
 import type { Range } from './starts';
+import { SLOT_WINDOW_ERRORS } from './errors';
 import type { WindowHoldOutcome } from './hold-store';
 
 const SHOP = '5d6e7f80-9a1b-4c2d-8e3f-405162738495';
@@ -43,6 +45,7 @@ const state = vi.hoisted(() => ({
   owner: null as unknown,
   customer: null as unknown,
   approved: null as unknown,
+  publishable: null as unknown,
   now: new Date(),
   menus: [] as ShopMenu[],
   busy: [] as Range[],
@@ -61,7 +64,10 @@ vi.mock('@/server/auth', () => ({
   requireShopOwner: async () => state.owner,
   requireCustomer: async () => state.customer,
 }));
-vi.mock('@/server/shops', () => ({ assertShopApproved: async () => state.approved }));
+vi.mock('@/server/shops', () => ({
+  assertShopApproved: async () => state.approved,
+  assertShopCanPublish: async () => state.publishable,
+}));
 vi.mock('@/db', () => ({
   getDb: () => ({ transaction: (run: (tx: string) => unknown) => run('tx') }),
 }));
@@ -109,6 +115,7 @@ beforeEach(() => {
   state.owner = ok({ userId: 'owner-user', ownerId: 'owner-1', shopId: SHOP });
   state.customer = ok({ userId: 'customer-user', customerId: 'customer-1' });
   state.approved = ok(null);
+  state.publishable = ok(null);
   state.inserted = [];
   state.insertError = null;
   state.closed = [];
@@ -222,6 +229,15 @@ describe('createSlotWindows (원장님)', () => {
     expect(await createSlotWindows(SHOP, input)).toEqual(
       fail('SHOP_NOT_APPROVED', '입점 승인 뒤에 올릴 수 있어요'),
     );
+  });
+
+  it('운영자가 새 매물 게시를 멈춘 샵이면(#373 ④) 그 실패이고 저장하지 않는다', async () => {
+    state.publishable = fail('PUBLISH_PAUSED', PUBLISH_PAUSED_MESSAGE);
+    expect(await createSlotWindows(SHOP, input)).toEqual(
+      fail('PUBLISH_PAUSED', PUBLISH_PAUSED_MESSAGE),
+    );
+    expect(state.inserted).toEqual([]);
+    expect(SLOT_WINDOW_ERRORS.PUBLISH_PAUSED).toBe(PUBLISH_PAUSED_MESSAGE);
   });
 
   it('실패 흉내 스위치', async () => {

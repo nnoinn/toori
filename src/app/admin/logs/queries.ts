@@ -19,6 +19,8 @@ import {
   reservations,
   settlements,
   shops,
+  slots,
+  slotWindows,
 } from '@/db/schema';
 
 import { ADMIN_PAGE_SIZE, type PageResult, toPage } from '../lookup';
@@ -28,6 +30,8 @@ type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 
 const disputeReservations = alias(reservations, 'dispute_reservation');
 const settlementShops = alias(shops, 'settlement_shop');
+const slotShops = alias(shops, 'slot_shop');
+const windowShops = alias(shops, 'window_shop');
 
 /** 처리 기록 한 줄 */
 export type ActionLogRow = {
@@ -95,6 +99,12 @@ export async function selectActionLogs(
       ownerName: owners.name,
       settlementShopName: settlementShops.name,
       settlementPayoutDate: settlements.periodEnd,
+      // 운영자 마감한 매물·시간대 매물(#373 ④)
+      slotShopName: slotShops.name,
+      slotMenuName: slots.menuName,
+      slotStartAt: slots.startAt,
+      windowShopName: windowShops.name,
+      windowStartAt: slotWindows.startAt,
     })
     .from(t)
     .leftJoin(adminProfiles, eq(adminProfiles.userId, t.adminId))
@@ -106,6 +116,10 @@ export async function selectActionLogs(
     .leftJoin(owners, and(eq(t.targetType, 'owner'), eq(owners.id, t.targetId)))
     .leftJoin(settlements, and(eq(t.targetType, 'settlement'), eq(settlements.id, t.targetId)))
     .leftJoin(settlementShops, eq(settlementShops.id, settlements.shopId))
+    .leftJoin(slots, and(eq(t.targetType, 'slot'), eq(slots.id, t.targetId)))
+    .leftJoin(slotShops, eq(slotShops.id, slots.shopId))
+    .leftJoin(slotWindows, and(eq(t.targetType, 'slot_window'), eq(slotWindows.id, t.targetId)))
+    .leftJoin(windowShops, eq(windowShops.id, slotWindows.shopId))
     .where(condition)
     .orderBy(
       ...(filters.sort === 'old' ? [asc(t.createdAt), asc(t.id)] : [desc(t.createdAt), desc(t.id)]),
