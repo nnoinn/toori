@@ -20,23 +20,23 @@ const valid = (overrides: Partial<ShopProfileInput> = {}): ShopProfileInput => (
   ...overrides,
 });
 
-/** 월요일(0번 줄)만 바꾼 영업시간 */
-const withMonday = (row: Partial<HoursRow>): HoursRow[] => {
-  const hours = emptyHours();
-  hours[0] = { ...hours[0], ...row };
-  return hours;
-};
+/** 월요일 줄이 화면에서 몇 번째인지. 오류는 줄 번호(`hours.{번호}`)에 붙는다 */
+const MONDAY_ROW = emptyHours().findIndex((row) => row.weekday === 1);
+
+/** 월요일만 바꾼 영업시간 */
+const withMonday = (row: Partial<HoursRow>): HoursRow[] =>
+  emptyHours().map((item) => (item.weekday === 1 ? { ...item, ...row } : item));
 
 describe('toHoursRows', () => {
-  it('저장된 영업시간을 월~일 7줄로 바꾸고, 없는 요일은 빈 줄로 둔다', () => {
+  it('저장된 영업시간을 일~토 7줄로 바꾸고(캘린더·영업시간 표와 같은 순서), 없는 요일은 빈 줄로 둔다', () => {
     const rows = toHoursRows([
       { weekday: 1, open: '10:00', close: '20:00' },
       { weekday: 0, closed: true },
     ]);
-    expect(rows.map((row) => row.weekday)).toEqual([1, 2, 3, 4, 5, 6, 0]);
-    expect(rows[0]).toEqual({ weekday: 1, closed: false, open: '10:00', close: '20:00' });
-    expect(rows[1]).toEqual({ weekday: 2, closed: false, open: '', close: '' });
-    expect(rows[6]).toEqual({ weekday: 0, closed: true, open: '', close: '' });
+    expect(rows.map((row) => row.weekday)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(rows[0]).toEqual({ weekday: 0, closed: true, open: '', close: '' });
+    expect(rows[1]).toEqual({ weekday: 1, closed: false, open: '10:00', close: '20:00' });
+    expect(rows[2]).toEqual({ weekday: 2, closed: false, open: '', close: '' });
   });
 });
 
@@ -58,9 +58,14 @@ describe('validateShopProfile', () => {
   });
 
   it('영업시간은 빈 요일을 빼고 일~토 순서로 저장한다', () => {
-    const hours = emptyHours();
-    hours[0] = { weekday: 1, closed: false, open: '10:00', close: '20:00' };
-    hours[6] = { weekday: 0, closed: true, open: '', close: '' };
+    // 줄이 어떤 순서로 와도(여기서는 토~일) 저장은 일~토
+    const hours = emptyHours()
+      .reverse()
+      .map((row) => {
+        if (row.weekday === 1) return { ...row, open: '10:00', close: '20:00' };
+        if (row.weekday === 0) return { ...row, closed: true };
+        return row;
+      });
     const result = validateShopProfile(valid({ hours }));
     expect(result.ok && result.data.businessHours).toEqual([
       { weekday: 0, closed: true },
@@ -84,7 +89,7 @@ describe('validateShopProfile', () => {
     ],
   ])('영업시간 오류: %s', (_name, row, message) => {
     const result = validateShopProfile(valid({ hours: withMonday(row) }));
-    expect(result).toEqual({ ok: false, fieldErrors: { 'hours.0': message } });
+    expect(result).toEqual({ ok: false, fieldErrors: { [`hours.${MONDAY_ROW}`]: message } });
   });
 
   it.each([

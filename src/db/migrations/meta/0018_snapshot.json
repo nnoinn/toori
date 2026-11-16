@@ -1,5 +1,5 @@
 {
-  "id": "88374b9d-9c34-4a9f-a034-f6d4828754b5",
+  "id": "a8bbf9c4-acb7-4e55-b578-8f903548f11e",
   "prevId": "47e12ffe-3f42-4e2f-a6ae-d5712b25017b",
   "version": "7",
   "dialect": "postgresql",
@@ -708,93 +708,6 @@
         "disputes_outcome_status_check": {
           "name": "disputes_outcome_status_check",
           "value": "(\"disputes\".\"status\" = 'resolved') = (\"disputes\".\"outcome\" is not null)"
-        }
-      },
-      "isRLSEnabled": true
-    },
-    "public.cron_runs": {
-      "name": "cron_runs",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "job": {
-          "name": "job",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "started_at": {
-          "name": "started_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "finished_at": {
-          "name": "finished_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "ok": {
-          "name": "ok",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "summary": {
-          "name": "summary",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "error": {
-          "name": "error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "cron_runs_job_started_at_idx": {
-          "name": "cron_runs_job_started_at_idx",
-          "columns": [
-            {
-              "expression": "job",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "started_at",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "cron_runs_job_check": {
-          "name": "cron_runs_job_check",
-          "value": "\"cron_runs\".\"job\" in ('payments-sweep', 'reminders', 'settlement-batch', 'slot-digest')"
-        },
-        "cron_runs_finished_check": {
-          "name": "cron_runs_finished_check",
-          "value": "(\"cron_runs\".\"finished_at\" is null) = (\"cron_runs\".\"ok\" is null)"
         }
       },
       "isRLSEnabled": true
@@ -1999,6 +1912,22 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "coupons_compensation_unique": {
+          "name": "coupons_compensation_unique",
+          "columns": [
+            {
+              "expression": "source_reservation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"coupons\".\"reason\" = 'owner_fault_compensation'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -2322,7 +2251,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"refunds\".\"reason\" in ('customer_cancel', 'agreed_cancel')",
+          "where": "\"refunds\".\"reason\" in ('customer_cancel', 'agreed_cancel', 'owner_fault')",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -2404,176 +2333,6 @@
         "refunds_band_check": {
           "name": "refunds_band_check",
           "value": "\"refunds\".\"band\" is null or \"refunds\".\"band\" in ('over_24h', '6h_to_24h', 'under_6h')"
-        }
-      },
-      "isRLSEnabled": true
-    },
-    "public.settlement_holds": {
-      "name": "settlement_holds",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "reservation_id": {
-          "name": "reservation_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "shop_id": {
-          "name": "shop_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reason": {
-          "name": "reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "held_by": {
-          "name": "held_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "held_at": {
-          "name": "held_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "released_by": {
-          "name": "released_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "released_at": {
-          "name": "released_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "release_memo": {
-          "name": "release_memo",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "settlement_holds_reservation_active_unique": {
-          "name": "settlement_holds_reservation_active_unique",
-          "columns": [
-            {
-              "expression": "reservation_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"settlement_holds\".\"released_at\" is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "settlement_holds_shop_active_unique": {
-          "name": "settlement_holds_shop_active_unique",
-          "columns": [
-            {
-              "expression": "shop_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"settlement_holds\".\"released_at\" is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "settlement_holds_reservation_id_reservations_id_fk": {
-          "name": "settlement_holds_reservation_id_reservations_id_fk",
-          "tableFrom": "settlement_holds",
-          "tableTo": "reservations",
-          "columnsFrom": [
-            "reservation_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "settlement_holds_shop_id_shops_id_fk": {
-          "name": "settlement_holds_shop_id_shops_id_fk",
-          "tableFrom": "settlement_holds",
-          "tableTo": "shops",
-          "columnsFrom": [
-            "shop_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "settlement_holds_held_by_profiles_id_fk": {
-          "name": "settlement_holds_held_by_profiles_id_fk",
-          "tableFrom": "settlement_holds",
-          "tableTo": "profiles",
-          "columnsFrom": [
-            "held_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "settlement_holds_released_by_profiles_id_fk": {
-          "name": "settlement_holds_released_by_profiles_id_fk",
-          "tableFrom": "settlement_holds",
-          "tableTo": "profiles",
-          "columnsFrom": [
-            "released_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "settlement_holds_target_check": {
-          "name": "settlement_holds_target_check",
-          "value": "(\"settlement_holds\".\"reservation_id\" is null) <> (\"settlement_holds\".\"shop_id\" is null)"
-        },
-        "settlement_holds_release_check": {
-          "name": "settlement_holds_release_check",
-          "value": "(\"settlement_holds\".\"released_at\" is null) = (\"settlement_holds\".\"released_by\" is null) and (\"settlement_holds\".\"released_at\" is null) = (\"settlement_holds\".\"release_memo\" is null)"
         }
       },
       "isRLSEnabled": true
@@ -3462,18 +3221,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "publish_paused_at": {
-          "name": "publish_paused_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "publish_paused_reason": {
-          "name": "publish_paused_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -3583,10 +3330,6 @@
         "shops_status_check": {
           "name": "shops_status_check",
           "value": "\"shops\".\"status\" in ('pending', 'approved', 'rejected')"
-        },
-        "shops_publish_pause_check": {
-          "name": "shops_publish_pause_check",
-          "value": "(\"shops\".\"publish_paused_at\" is null) = (\"shops\".\"publish_paused_reason\" is null)"
         }
       },
       "isRLSEnabled": true
@@ -3903,7 +3646,7 @@
         },
         "slot_windows_close_reason_check": {
           "name": "slot_windows_close_reason_check",
-          "value": "\"slot_windows\".\"close_reason\" is null or \"slot_windows\".\"close_reason\" in ('other_channel', 'mistake', 'other', 'hold_released', 'admin')"
+          "value": "\"slot_windows\".\"close_reason\" is null or \"slot_windows\".\"close_reason\" in ('other_channel', 'mistake', 'other', 'hold_released')"
         }
       },
       "isRLSEnabled": true
@@ -4237,7 +3980,7 @@
         },
         "slots_close_reason_check": {
           "name": "slots_close_reason_check",
-          "value": "\"slots\".\"close_reason\" is null or \"slots\".\"close_reason\" in ('other_channel', 'mistake', 'other', 'hold_released', 'admin')"
+          "value": "\"slots\".\"close_reason\" is null or \"slots\".\"close_reason\" in ('other_channel', 'mistake', 'other', 'hold_released')"
         }
       },
       "isRLSEnabled": true
