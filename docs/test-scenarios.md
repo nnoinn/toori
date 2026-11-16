@@ -77,7 +77,7 @@ PR 검사가 자동으로 막는 것:
 | SHOW-02 | 시작까지 6시간 미만이면 임박·환불 불가로 표시하고, 딱 6시간이면 표시하지 않는다 | C-203·C-308 | ✅ | `src/features/map/slot-list/badges.test.ts` 6시간 미만이면 환불 불가·임박, 딱 6시간이면 없음<br>`src/server/policy/slot-time.test.ts` 딱 6시간 남았으면 임박·환불 불가가 아니다 |
 | SHOW-03 | 다른 고객이 홀딩 중인 매물은 목록에 그대로 두고 "결제 중"으로 표시한다. 내 홀딩과 끝난 홀딩은 표시하지 않고, 서버 시각으로 판단한다 | C-404 | ✅ | `src/features/map/slot-list/badges.test.ts` 다른 고객이 홀딩 중이면 결제 중 배지<br>`src/features/map/slot-list/queries.db.test.ts` 배지는 서버 시각으로 |
 | SHOW-04 | 매물 상세에는 접힌 "환불 규정" 한 줄만 두고, 규정 문구는 결제 동의 문구와 글자까지 같다 | C-305·C-402 | ✅ | `src/app/(customer)/(tabs)/slots/[slotId]/detail-format.test.ts` 결제 동의 문구(consent-texts.md 3장)와 글자까지 같다 |
-| SHOW-05 | 샵 영업시간은 일~토 순서로 보여 준다(고객 매물 상세, 원장님 매장 설정의 표와 요일별 칸) | 11/15 nnoinn, #431, #437 | ⏳ | `src/app/owner/(console)/settings/shop/shop-profile.test.ts` 저장된 영업시간을 일~토 7줄로 바꾸고 |
+| SHOW-05 | 샵 영업시간은 일~토 순서로 보여 준다(고객 매물 상세, 원장님 매장 설정의 표와 요일별 칸) | 11/15 nnoinn, #431, #437 | ⏳ | |
 
 ## 5. 홀딩·결제
 
@@ -116,12 +116,15 @@ PR 검사가 자동으로 막는 것:
 | AGREED-07 | 결제액이 홀수라 50%에 원 미만이 생기면 고객 취소처럼 손님 쪽으로 맞춘다(위약금 쪽에서 버림). 23,457원 → 위약금 11,728원, 손님 환불 11,729원 | 11/12 nnoinn·정산 예시 3장 | ✅ | `tests/docs/rule-docs.test.ts` 합의 후 취소 원 미만은 고객 취소처럼 손님 쪽으로<br>`src/server/refunds/agreed-cancel-rules.test.ts` 원 미만은 고객 취소처럼 손님 쪽으로 맞춘다 |
 | AGREED-06 | 정산 줄을 만들 때 합의 후 취소의 기준 금액은 판매가 × 50%다(판매가 45,000원 → 22,500원, 원장님 정산 21,758원) | X-208·W20·정산 예시 3장 | ✅ | `src/server/settlements/calc-settlement.test.ts` 합의 후 취소는 판매가 × 50% |
 
-## 8. 원장님 귀책 취소 (P1, 준비 중)
+## 8. 원장님 귀책 취소 (P1)
 
 | ID | 시나리오와 기대 | 근거 | 상태 | 테스트 |
 | --- | --- | --- | --- | --- |
 | OWNER-01 | 남은 시간과 상관없이 결제액 100%를 환불하고, 원장님 기준 금액은 0이다 | X-207 | ✅ | `src/server/refunds/calc-refund.test.ts` 남은 시간과 상관없이 결제액 전액 환불, 원장님 기준 금액 0 |
-| OWNER-02 | 고객에게 3,000원 쿠폰(90일)을 주고 쓴 쿠폰은 돌려준다. 원장님 패널티 5,000원은 아직 지급하지 않은 정산금에서 먼저 빼고, 모자라면 다음 정산에서 뺀다 | X-207 | ⏳ | `tests/docs/rule-docs.test.ts` 원장님 귀책 취소의 쿠폰·패널티와 쿠폰 유효기간<br>`src/server/settlements/calc-settlement.test.ts` 모자라면 오래된 것부터 떼고 |
+| OWNER-02 | 고객에게 3,000원 쿠폰(90일)을 주고 쓴 쿠폰은 돌려준다(기한은 원래 그대로, 11/15). 원장님 패널티 5,000원은 아직 지급하지 않은 정산금에서 먼저 빼고, 모자라면 다음 정산에서 뺀다. 다시 처리해도 보상 쿠폰·패널티는 하나다 | X-207·#419 | ✅ | `tests/docs/rule-docs.test.ts` 원장님 귀책 취소의 쿠폰·패널티와 쿠폰 유효기간<br>`src/server/settlements/calc-settlement.test.ts` 모자라면 오래된 것부터 떼고<br>`src/server/refunds/owner-fault-store.db.test.ts` 쓴 쿠폰을 기한 그대로 돌려주고, 보상 쿠폰 3,000원(90일)·패널티 5,000원을 남기고<br>`src/server/refunds/owner-fault-store.db.test.ts` 다시 돌아도 보상 쿠폰·패널티는 하나이고 |
+| OWNER-03 | 원장님은 자기 샵의 예정 예약을 서비스 시작 전(딱 시작 시각부터는 막는다)까지만 원장님 사정으로 취소한다. 시작 뒤 문제는 손님이 이의제기한다. 고객 취소처럼 진행 중으로 먼저 저장하고 포트원에서 전액 돌려준 뒤 한 트랜잭션으로 끝내며, 중간에 멈추면 정리 작업이 같은 방식으로 끝낸다 | S-409·#419 | ✅ | `src/server/refunds/owner-fault-cancel.test.ts` 서비스 시작 시각부터(딱 그 시각 포함)<br>`src/server/refunds/owner-fault-cancel.test.ts` 결제액 전부를 원장님 사정 사유로 환불 진행에 넘기고<br>`src/server/refunds/owner-fault-store.db.test.ts` 내 샵 예약만 읽고, 진행 중인 원장님 귀책 취소가 보이며, 정리 작업 대상이다<br>`src/server/refunds/finish-cancel.test.ts` 정리 작업도 같은 길로 끝낸다 |
+| OWNER-04 | 한 예약에 취소 환불(고객 취소·합의 후 취소·원장님 귀책 취소)은 하나다. 다른 취소가 진행 중이면 CANCEL_FINISHING, 답을 기다리는 합의 후 취소 요청은 원장님 귀책 취소 때 닫는다(11/15) | X-207·#419 | ✅ | `src/db/owner-fault-unique.db.test.ts` 한 예약에 고객 취소·합의 후 취소·원장님 귀책 취소 환불은 합쳐서 하나만<br>`src/server/refunds/owner-fault-cancel.test.ts` 고객 취소·합의 후 취소가 진행 중이면 CANCEL_FINISHING<br>`src/server/refunds/owner-fault-store.db.test.ts` 합의 후 요청을 닫는다 |
+| OWNER-05 | 원장님 귀책 취소가 끝나면 손님에게 "원장님 사정으로 예약이 취소됐어요 / 결제한 금액을 모두 돌려드리고 3,000원 쿠폰을 드렸어요"(쓴 쿠폰을 돌려줬으면 "쓰신 쿠폰도 돌려드렸어요")를 보내고, 원장님에게 재등록 안내는 보내지 않는다(11/15) | #419 | ✅ | `src/server/notifications/alerts.test.ts` 손님에게만 그 예약 상세로. 쓴 쿠폰을 돌려줬으면<br>`src/server/refunds/finish-cancel.test.ts` 손님에게 원장님 사정 알림(재등록 안내 없음) |
 
 ## 9. 방문·노쇼
 
@@ -181,8 +184,9 @@ PR 검사가 자동으로 막는 것:
 | NOTI-03 | 그 알림은 따로 동의한 고객에게만 보낸다(이벤트·혜택 광고성 동의와 따로 받는다) | 11/8 | ✅ | `src/server/notifications/digest-store.db.test.ts` 동의·관심 동네나 찜이 있고 오늘 아직 받지 않은 고객만 고른다<br>`src/server/auth/account-store.test.ts` 관심 동네·찜한 샵 알림만 고르면 광고성(marketing) 기록은 남기지 않는다 |
 | NOTI-04 | 한 기기에서 고객·원장님 알림을 모두 켤 수 있고, 지금 들어와 있는 계정과 상관없이 켜 둔 계정의 알림을 모두 받는다 | 11/1 | ✅ | `src/server/notifications/notify.test.ts` 켜 둔 기기마다 보내고 기록을 남긴다<br>`src/server/notifications/subscription-store.db.test.ts` 두 계정 모두 지운다 |
 | NOTI-05 | 푸시 알림을 켠 기기가 없어도 알림은 모두 기록되어 그 계정의 알림함(최근 90일)에 남는다. 켠 기기가 없으면 소리·배너 없이 쌓이기만 한다. 90일이 지난 알림은 매일 지운다 | #371, 11/13 nnoinn | ✅ | `src/server/notifications/notify.test.ts` 켜 둔 기기가 없어도 알림함에 남게 no_device로 기록<br>`src/server/notifications/notify.db.test.ts` 켠 기기가 없어도 알림함에 남는다<br>`src/server/notifications/digest-store.db.test.ts` 푸시 알림 기기가 없어도 고른다<br>`src/server/notifications/digest.test.ts` 보내기가 끝나면 알림함 기간(최근 90일)이 지난 알림을 지운다<br>`src/server/notifications/inbox-store.db.test.ts` 알림함 기간(90일)이 지난 알림만 지운다 |
-| NOTI-06 | 알림이 생기면 투리를 보고 있는 화면에 기본으로 화면 위 가운데 안내(5초)가 뜬다(푸시 알림을 켰는지와 상관없이, 켜지 않은 기기도 1분 안에). 크롬 계열은 그때 기기 알림을 띄우지 않는다 | #371, 11/13 nnoinn | ⏳ | |
+| NOTI-06 | 알림이 생기면 투리를 보고 있는 화면에 기본으로 화면 위 가운데 안내(5초)가 뜬다(푸시 알림을 켰는지와 상관없이, 켜지 않은 기기도 1분 안에). 크롬 계열은 그때 기기 알림을 띄우지 않는다 | #371, 11/13 nnoinn | ⏳ | `src/components/ui/notification-toast-rules.test.ts` 처음 보는 안 읽은 알림 중 서버 시각 기준 2분 안에 생긴 것만<br>`src/server/policy/values.test.ts` 화면 안내는 위 가운데 5초, 보고 있으면 1분마다 새 알림 확인 |
 | NOTI-07 | 알림함과 안 읽은 수에는 지금 계정(고객/원장님)의 알림만 보인다 | #371, X-102 | ✅ | `src/server/notifications/inbox-store.db.test.ts` 알림함은 그 계정(고객/원장님)의 최근 90일 알림만<br>`src/server/notifications/inbox-store.db.test.ts` 안 읽은 수와 읽음은 그 계정의 최근 90일 알림만<br>`src/server/notifications/inbox.test.ts` 지금 계정이 다르면(원장님 모드에서 고객 알림함) 알림을 주지 않는다 |
+| NOTI-08 | 운영자는 화면 위 알림 종(숫자는 보내지 못한 알림 수, 상자에 최근 5개)과 알림 확인 화면에서 최근 90일 동안 푸시 알림이 가지 않은 알림(보내지 못함·기기 없음)을 보고, 지금 그 계정에 푸시 알림 기기가 있으면 사유를 남겨 다시 보낸다. 두 운영자가 동시에 눌러도 한 번만 가고, 한 기기도 받지 못하면 보내지 못함으로 남는다 | #373 ⑤ | ✅ | `src/server/admin/notification-resend.test.ts` 지금 그 계정의 푸시 알림 기기로 같은 내용을 보내고<br>`src/server/admin/notification-resend.test.ts` 받는 계정에 푸시 알림 기기가 아직 없으면 NO_DEVICE<br>`src/server/admin/notification-resend.test.ts` 한 기기도 받지 못하면 failed<br>`src/server/admin/notification-resend-store.db.test.ts` 보내지 못함·기기 없음인 알림만 한 번 자리를 잡고<br>`src/app/admin/notifications/queries.db.test.ts` 알림함 기간 안의 보내지 못함·기기 없음만<br>`src/server/admin/notification-issues.test.ts` 종 숫자는 보내지 못한 알림 수이고<br>`src/server/admin/notification-issues-store.db.test.ts` 알림함 기간 안의 보내지 못함·기기 없음을 합쳐 최신 순으로 |
 
 ## 14. 계정·권한·개인정보
 

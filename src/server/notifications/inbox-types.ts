@@ -21,8 +21,17 @@ export type MyNotification = {
   readAt: string | null;
 };
 
+/**
+ * 알림함이 바뀌었을 때(읽음으로 바꿈, 새 알림이 옴) 알리는 브라우저 이벤트. 종이 듣고 안 읽은 수를 다시 묻는다.
+ * 고객 알림함(#443)이 쓰던 이름 그대로다
+ */
+export const NOTIFICATIONS_CHANGED_EVENT = 'toori:notifications-read';
+
 /** 알림함에서 한 번에 불러오는 수(기본) */
 export const NOTIFICATIONS_PAGE_SIZE = 20;
+
+/** 알림 종을 누르면 상자에 보여 주는 최근 알림 수(11/16 nnoinn "5~6개") */
+export const NOTIFICATIONS_BELL_COUNT = 5;
 
 /** 알림함에서 한 번에 불러올 수 있는 가장 큰 수 */
 export const NOTIFICATIONS_PAGE_MAX = 50;

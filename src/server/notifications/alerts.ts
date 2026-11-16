@@ -9,6 +9,7 @@ import { after } from 'next/server';
 import type { getDb } from '@/db';
 import { customers, orders, owners, reservations, shops, slots, slotWindows } from '@/db/schema';
 import { formatEndTime, formatKst } from '@/lib/time';
+import { OWNER_FAULT_COUPON_AMOUNT } from '@/server/policy/owner-fault';
 import { readReleasedKeptSlots } from '@/server/slot-windows/store';
 
 import { notify } from './notify';
@@ -159,6 +160,34 @@ export function notifyReservationCancelled(
           })
         : null,
     ]);
+  });
+}
+
+/**
+ * 원장님 귀책 취소가 끝났을 때 손님에게(X-207, S-409, #419, 11/15 nnoinn 문구). 결제한 금액 전부와 보상 쿠폰, 쓴 쿠폰을 돌려줬으면 그것도 알린다.
+ * 원장님 사정이라 원장님에게 재등록 안내(S-400)는 보내지 않는다. 취소를 끝낸 쪽만 부르므로 한 번만 간다
+ */
+export function notifyOwnerFaultCancelled(
+  db: Db,
+  reservationId: string,
+  { couponReturned }: { couponReturned: boolean },
+) {
+  const event = 'reservation.owner_fault_cancelled';
+  sendAfterResponse(event, async () => {
+    const alert = await readReservationAlert(db, reservationId);
+    if (!alert) return;
+    const coupon = `${OWNER_FAULT_COUPON_AMOUNT.toLocaleString('ko-KR')}원 쿠폰`;
+    await notify(db, {
+      userId: alert.customerUserId,
+      accountType: 'customer',
+      event,
+      dedupeKey: `${event}:customer:${reservationId}`,
+      title: '원장님 사정으로 예약이 취소됐어요',
+      body: couponReturned
+        ? `결제한 금액을 모두 돌려드리고 ${coupon}을 드렸어요. 쓰신 쿠폰도 돌려드렸어요`
+        : `결제한 금액을 모두 돌려드리고 ${coupon}을 드렸어요`,
+      url: `/reservations/${reservationId}`,
+    });
   });
 }
 

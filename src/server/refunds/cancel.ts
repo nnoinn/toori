@@ -5,8 +5,7 @@
 //
 // - previewRefund: 진짜(읽기만 한다). 금액은 calcRefund(#125)와 같은 계산이다
 // - cancelReservation: 진행 중(requested)으로 먼저 저장하고, 포트원에서 환불액만 돌려준 뒤, 예약·매물을 '취소'로 바꾸고 기록을 끝낸다(W14, #222).
-//   포트원을 부르는 동안 DB를 잠그지 않는다. 중간에 멈추면 정리 작업(sweep-cancels.ts)이 마무리한다.
-//   다시 누르면 저장해 둔 금액을 쓰고, 포트원이 앞선 환불을 알려줘서 두 번 환불되지 않는다
+//   진행 순서는 원장님 귀책 취소와 같이 쓴다(cancel-flow.ts). 중간에 멈추면 정리 작업(sweep-cancels.ts)이 마무리한다
 
 import { z } from 'zod';
 
@@ -16,15 +15,10 @@ import { ok } from '@/lib/result';
 import { requireCustomer } from '@/server/auth';
 
 import { calcRefund } from './calc-refund';
+import { runCancelRefund } from './cancel-flow';
 import { refundFail, type RefundResult } from './errors';
-import { finishCancel, lookUpRefund, type RefundLookup } from './finish-cancel';
-import { refundPayment } from './refund-payment';
-import {
-  clearRequestedCancel,
-  readRefundTarget,
-  type RefundTarget,
-  requestCancelRefund,
-} from './refund-store';
+import { CUSTOMER_CANCEL_REASON } from './refund-payment';
+import { readRefundTarget, type RefundTarget } from './refund-store';
 import type { CancelledReservation, RefundPreview } from './types';
 
 const reservationIdSchema = z.uuid();
@@ -115,11 +109,10 @@ export async function cancelReservation(input: {
     return refundFail('REFUND_CHANGED', { preview });
   }
 
-  // 합의 후 취소 환불이 진행 중이다(손님이 같은 순간 동의함). 한 예약에 취소 환불은 하나라 그쪽이 끝낸다
+  // 다른 취소 환불이 진행 중이다(손님이 같은 순간 합의 후 취소에 동의함, 원장님 귀책 취소). 한 예약에 취소 환불은 하나라 그쪽이 끝낸다
   if (target.requested && target.requested.reason !== 'customer_cancel') {
     return refundFail('CANCEL_FINISHING');
   }
-  const db = getDb();
   const requested = target.requested ?? {
     reason: 'customer_cancel' as const,
     band: preview.band,
@@ -128,56 +121,10 @@ export async function cancelReservation(input: {
     penaltyAmount: preview.penaltyAmount,
     requestedAt: now,
   };
-  if (!target.requested) {
-    try {
-      const started = await requestCancelRefund(db, {
-        reservationId,
-        orderId: target.orderId,
-        ...requested,
-      });
-      // 다른 요청이 같은 취소를 처리하고 있다(두 번 누름)
-      if (!started) return refundFail('CANCEL_FINISHING');
-    } catch (error) {
-      logCancelError('취소 시작 저장 실패:', reservationId, error);
-      return refundFail('REFUND_FAILED');
-    }
-  }
-
-  const refund = await refundPayment({
-    paymentId: target.paymentId,
-    paidAmount: target.paidAmount,
-    refundAmount: requested.refundAmount,
+  return runCancelRefund(getDb(), {
+    target,
+    requested,
+    now,
+    pgReason: CUSTOMER_CANCEL_REASON,
   });
-  // 결과를 기다리거나 모르면 진행 중으로 두고 정리 작업이 포트원에 물어 정한다
-  if (!refund.ok && refund.reason !== 'rejected') return refundFail('CANCEL_FINISHING');
-  // 거절 답이 와도 돈이 돌아갔거나 돌아가는 중일 수 있다(결제사 통신 오류, 앞선 요청의 환불). 지우기 전에 취소 내역을 본다
-  const found: RefundLookup = refund.ok
-    ? { state: 'refunded', refund }
-    : await lookUpRefund(target.paymentId);
-  if (found.state === 'pending') return refundFail('CANCEL_FINISHING');
-  if (found.state === 'none') {
-    // 돌려준 돈이 없다. 못 지워도 정리 작업이 지운다
-    await clearRequestedCancel(db, reservationId).catch((error: unknown) => {
-      logCancelError('진행 중 표시 지우기 실패:', reservationId, error);
-    });
-    return refundFail('REFUND_FAILED');
-  }
-
-  try {
-    const finished = await finishCancel(db, { ...target, ...requested }, found.refund, now);
-    if (!finished) return refundFail('ALREADY_CANCELLED');
-    return ok({
-      reservationId,
-      refundAmount: finished.refundAmount,
-      cancelledAt: requested.requestedAt.toISOString(),
-    });
-  } catch (error) {
-    // 환불은 끝났다. 정리 작업이 마무리하고, 다시 눌러도 앞선 환불을 읽어 기록한다
-    logCancelError('환불 뒤 저장 실패:', reservationId, error);
-    return refundFail('CANCEL_FINISHING');
-  }
-}
-
-function logCancelError(message: string, reservationId: string, error: unknown) {
-  console.error(`[cancel] ${message}`, reservationId, error instanceof Error ? error.name : error);
 }
