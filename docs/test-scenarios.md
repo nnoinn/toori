@@ -201,6 +201,7 @@ PR 검사가 자동으로 막는 것:
 | AUTH-11 | 운영자 회원 상세에서도 휴대폰 번호·이메일은 가려서 보여주고, [번호 보기]를 누를 때만 서버에서 받아 보여준다. 누른 것도 열람 기록에 남는다 | 11/12 점검 8-2, 11/13 nnoinn | ⏳ | |
 | AUTH-12 | 고객 계정을 만들 때 이름이 필수다(앞뒤 공백 빼고 1~30자). 예약한 샵에는 예약자 이름과 휴대폰 번호만 보인다(닉네임은 주지 않는다) | #375, 11/13 nnoinn | ✅ | `src/server/auth/customer-account.test.ts` 이름을 보내지 않은 요청도 NAME_REQUIRED<br>`src/server/auth/customer-account.test.ts` 이름을 비우면<br>`src/app/owner/(console)/reservations/reservation-detail-store.db.test.ts` 그 샵 예약을 매물·예약자 정보(이름·휴대폰, 닉네임은 빼고)와 같이 읽는다 |
 | AUTH-13 | 원장님은 자기 계정 이력만 보고, 운영자는 원장님·고객 계정 이력을 모두 본다. 운영자가 이력을 보면 열람 기록에 남는다 | #374, 11/13 nnoinn | ✅ | `src/server/accounts/history.test.ts` 지금 들어온 원장님 계정의 샵 이력만 읽는다<br>`src/server/accounts/history.test.ts` 원장님 이력: 그 원장님의 샵 이력을 읽고, 열람 기록을 남긴다<br>`src/server/accounts/history.test.ts` 운영자가 아니면 읽지도 기록하지도 않는다<br>`src/server/accounts/history-store.db.test.ts` 다른 샵과 시간대 안 손님 칸은 빼고 |
+| AUTH-14 | 운영자는 화면 위 오른쪽 프로필 메뉴의 [이름 바꾸기]로 자기 운영자 이름만 정하고 바꿀 수 있다(앞뒤 공백 빼고 1~20자). '운영자'와 다른 운영자가 쓰는 이름(앞뒤 공백·영문 대소문자 무시)은 쓸 수 없다. 운영자 기록에는 그 이름으로 보인다 | 11/16 nnoinn | ✅ | `src/server/admin/admin-profile.test.ts` 운영자가 아니면 FORBIDDEN을 그대로 돌려주고 DB를 열지 않는다<br>`src/server/admin/admin-profile.test.ts` 로그인한 운영자 자기 id로<br>`src/server/admin/admin-profile.db.test.ts` 다른 운영자가 쓰는 이름은<br>`src/server/admin/admin-name.test.ts` 이름을 정하지 않은 운영자에게 보이는 |
 
 ## 15. 시간대 매물 (#308, 진행 중)
 
