@@ -32,7 +32,7 @@ const FRESH = { publishAt: new Date('2026-11-01T09:00:00+09:00') };
 type Tx = Parameters<Parameters<typeof withRollback>[0]>[0];
 type Reader = Parameters<typeof readDigestCustomers>[0];
 
-/** 동의·고객 알림 기기·관심 동네(단원구, 테스트 샵 동네)를 다 갖춘 고객 */
+/** 동의·고객 푸시 알림 기기·관심 동네(단원구, 테스트 샵 동네)를 다 갖춘 고객 */
 async function readyCustomer(tx: Tx, options: { area?: boolean } = {}) {
   const customer = await createTestCustomer(tx);
   await tx.insert(termsAgreements).values({
@@ -59,7 +59,7 @@ async function readyCustomer(tx: Tx, options: { area?: boolean } = {}) {
 describeDb('새 매물 알림 고르기 (실제 DB)', () => {
   afterAll(closeTestDb);
 
-  it('동의·알림 기기·관심 동네나 찜이 있고 오늘 아직 받지 않은 고객만 고른다', async () => {
+  it('동의·관심 동네나 찜이 있고 오늘 아직 받지 않은 고객만 고른다. 푸시 알림 기기가 없어도 고른다(알림함에 남는다, #371)', async () => {
     await withRollback(async (tx) => {
       const db = tx as unknown as Reader;
       const ready = await readyCustomer(tx);
@@ -84,11 +84,14 @@ describeDb('새 매물 알림 고르기 (실제 DB)', () => {
       await tx
         .insert(interestAreas)
         .values({ customerId: marketingOnly.customerId, sigunguCode: '41273' });
+      // 고객 푸시 알림을 켠 기기가 없는 고객(원장님 알림만 켰거나 하나도 안 켰음)도 고른다(#371)
       const ownerDeviceOnly = await readyCustomer(tx);
       await tx
         .update(pushSubscriptions)
         .set({ accountType: 'owner' })
         .where(eq(pushSubscriptions.userId, ownerDeviceOnly.userId));
+      const noDevice = await readyCustomer(tx);
+      await tx.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, noDevice.userId));
       const sentToday = await readyCustomer(tx);
       await tx.insert(notifications).values({
         userId: sentToday.userId,
@@ -103,8 +106,15 @@ describeDb('새 매물 알림 고르기 (실제 DB)', () => {
       const picked = (await readDigestCustomers(db, { dateKey: DATE_KEY, limit: 50 })).map(
         (c) => c.customerId,
       );
-      expect(picked).toEqual(expect.arrayContaining([ready.customerId, favoriteOnly.customerId]));
-      for (const left of [nothing, withdrawn, marketingOnly, ownerDeviceOnly, sentToday]) {
+      expect(picked).toEqual(
+        expect.arrayContaining([
+          ready.customerId,
+          favoriteOnly.customerId,
+          ownerDeviceOnly.customerId,
+          noDevice.customerId,
+        ]),
+      );
+      for (const left of [nothing, withdrawn, marketingOnly, sentToday]) {
         expect(picked).not.toContain(left.customerId);
       }
     });

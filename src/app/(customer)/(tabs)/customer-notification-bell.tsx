@@ -4,9 +4,8 @@ import { Suspense, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
 import { NotificationBell } from '@/components/ui/notification-bell';
+import { countMyUnreadNotifications } from '@/server/notifications/inbox';
 
-// 지금은 가짜 결과 버전(#371). 진짜 함수가 들어오면 이 import만 바꾼다
-import { countMyUnreadNotifications } from './notifications/fake-actions';
 import { NOTIFICATIONS_PATH, NOTIFICATIONS_READ_EVENT } from './notifications/notification-rules';
 
 /**

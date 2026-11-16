@@ -32,7 +32,7 @@ export function BusinessHoursEditor({
   onChange,
   onChangeAll,
 }: {
-  /** 7줄(화면 순서는 월요일부터, 요일은 weekday로 안다) */
+  /** 7줄(화면 순서는 표와 같은 일~토 HOURS_WEEKDAYS, 요일은 weekday로 안다) */
   hours: HoursRow[];
   /** 샵 정보 칸 오류 전체. 이 중 `hours.{줄 번호}`만 쓴다 */
   errors: ShopProfileFieldErrors;

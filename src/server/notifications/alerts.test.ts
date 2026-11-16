@@ -38,12 +38,14 @@ const {
   notifyAgreedCancelResult,
   notifyKeptWindowSlotsReleased,
   notifyNoShow,
+  notifyNoShowReversed,
   notifyOwnerFaultCancelled,
   notifyPaymentAutoCancelled,
   notifyPayoutAccountChanged,
   notifyReservationCancelled,
   notifyReservationConfirmed,
   notifyShopReviewed,
+  notifyVisitRecordedByAdmin,
   sendAgreedCancelResult,
 } = await import('./alerts');
 
@@ -394,6 +396,63 @@ describe('notifyKeptWindowSlotsReleased', () => {
     expect(state.notified).toEqual([]);
     notifyKeptWindowSlotsReleased(db, []);
     expect(state.afterTasks).toHaveLength(1);
+  });
+});
+
+describe('운영자 대신 처리·노쇼 되돌리기 (#373 ③, 11/16)', () => {
+  it('운영자가 대신 방문·노쇼로 처리하면 원장님에게만, 결과마다 다른 제목으로 그 예약 상세로', async () => {
+    notifyVisitRecordedByAdmin(db, 'r-1', 'no_show');
+    notifyVisitRecordedByAdmin(db, 'r-2', 'visited');
+    await runAfterTasks();
+    expect(state.notified).toEqual([
+      {
+        userId: 'owner-user',
+        accountType: 'owner',
+        event: 'reservation.visit_recorded_by_admin',
+        dedupeKey: 'reservation.visit_recorded_by_admin:owner:r-1',
+        title: '운영자가 예약을 노쇼로 처리했어요',
+        body: '커트 · 11/5(목) 15:00',
+        url: '/owner/reservations/r-1',
+      },
+      expect.objectContaining({
+        userId: 'owner-user',
+        title: '운영자가 예약을 방문으로 처리했어요',
+        url: '/owner/reservations/r-2',
+      }),
+    ]);
+  });
+
+  it('노쇼를 되돌리면 손님과 원장님에게 각자의 문구로', async () => {
+    notifyNoShowReversed(db, 'r-1');
+    await runAfterTasks();
+    expect(state.notified).toEqual([
+      {
+        userId: 'customer-user',
+        accountType: 'customer',
+        event: 'reservation.no_show_reversed',
+        dedupeKey: 'reservation.no_show_reversed:customer:r-1',
+        title: '노쇼 처리가 취소됐어요',
+        body: '샘플 헤어 · 11/5(목) 15:00 예약이 방문으로 바뀌었어요',
+        url: '/reservations/r-1',
+      },
+      {
+        userId: 'owner-user',
+        accountType: 'owner',
+        event: 'reservation.no_show_reversed',
+        dedupeKey: 'reservation.no_show_reversed:owner:r-1',
+        title: '운영자가 노쇼를 방문으로 바꿨어요',
+        body: '커트 · 11/5(목) 15:00',
+        url: '/owner/reservations/r-1',
+      },
+    ]);
+  });
+
+  it('예약이 없으면 보내지 않는다', async () => {
+    state.row = null;
+    notifyVisitRecordedByAdmin(db, 'r-x', 'no_show');
+    notifyNoShowReversed(db, 'r-x');
+    await runAfterTasks();
+    expect(state.notified).toEqual([]);
   });
 });
 

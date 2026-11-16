@@ -9,13 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState, ErrorState } from '@/components/ui/state';
 import { CUSTOMER_HOME } from '@/server/auth/paths';
-
-// 지금은 가짜 결과 버전(#371). 진짜 함수가 들어오면 이 import만 바꾼다
 import {
   countMyUnreadNotifications,
   listMyNotifications,
   markNotificationsRead,
-} from './fake-actions';
+} from '@/server/notifications/inbox';
+
 import {
   type MyNotification,
   NOTIFICATION_TEXTS,

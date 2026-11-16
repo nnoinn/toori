@@ -11,7 +11,6 @@ import {
   favorites,
   interestAreas,
   notifications,
-  pushSubscriptions,
   shops,
   slots,
   termsAgreements,
@@ -46,8 +45,8 @@ export function digestDedupeKey(customerId: string, dateKey: string): string {
 
 /**
  * 오늘 알림을 받을 수 있는 고객. 고객 id 순서.
- * '관심 동네·찜한 샵 새 매물 알림' 동의(interest_alert)가 켜져 있고, 고객 알림을 켠 기기가 있고,
- * 관심 동네나 찜한 샵이 있고, 오늘 아직 이 알림을 받지 않은 고객
+ * '관심 동네·찜한 샵 새 매물 알림' 동의(interest_alert)가 켜져 있고, 관심 동네나 찜한 샵이 있고, 오늘 아직 이 알림을 받지 않은 고객.
+ * 푸시 알림을 켠 기기는 보지 않는다. 기기가 없어도 알림함에 남는다(#371, NOTI-05)
  */
 export async function readDigestCustomers(
   db: DbReader,
@@ -63,15 +62,6 @@ export async function readDigestCustomers(
         eq(termsAgreements.accountType, 'customer'),
         eq(termsAgreements.termsType, 'interest_alert'),
         isNull(termsAgreements.withdrawnAt),
-      ),
-    );
-  const subscribed = db
-    .select(one)
-    .from(pushSubscriptions)
-    .where(
-      and(
-        eq(pushSubscriptions.userId, customers.userId),
-        eq(pushSubscriptions.accountType, 'customer'),
       ),
     );
   const hasArea = db
@@ -91,14 +81,7 @@ export async function readDigestCustomers(
   return db
     .select({ customerId: customers.id, userId: customers.userId })
     .from(customers)
-    .where(
-      and(
-        exists(consented),
-        exists(subscribed),
-        or(exists(hasArea), exists(hasFavorite)),
-        notExists(sentToday),
-      ),
-    )
+    .where(and(exists(consented), or(exists(hasArea), exists(hasFavorite)), notExists(sentToday)))
     .orderBy(asc(customers.id))
     .limit(input.limit);
 }
