@@ -51,10 +51,7 @@ export function toMyNotification(row: InboxRow): MyNotification {
 
 /** 이 계정의 최근 기간 알림 */
 function mine(owner: InboxOwner): SQL | undefined {
-  return and(
-    eq(notifications.userId, owner.userId),
-    gte(notifications.createdAt, owner.from),
-  );
+  return and(eq(notifications.userId, owner.userId), gte(notifications.createdAt, owner.from));
 }
 
 /**
