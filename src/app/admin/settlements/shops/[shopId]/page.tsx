@@ -172,7 +172,8 @@ function StatementTable({
               <SelectableRow key={statement.payoutDate} id={statement.payoutDate} href={href}>
                 <td className={cn(CELL, 'whitespace-nowrap')}>{statement.payoutDate}</td>
                 <td className={cn(CELL, 'text-muted-foreground')}>
-                  {statement.periodStart} ~ {statement.periodEnd}
+                  <span className="whitespace-nowrap">{statement.periodStart} ~</span>{' '}
+                  <span className="whitespace-nowrap">{statement.periodEnd}</span>
                 </td>
                 <td className={cn(CELL, 'text-right')}>{count}</td>
                 <td className={cn(CELL, 'text-right whitespace-nowrap')}>

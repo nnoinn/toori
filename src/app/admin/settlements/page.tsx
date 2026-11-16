@@ -193,7 +193,8 @@ async function Overview({ searchParams }: { searchParams: SearchParams }) {
                     <td className={cn(CELL, 'whitespace-nowrap')}>{row.payoutDate}</td>
                     <td className={cn(CELL, 'font-medium')}>{row.shopName}</td>
                     <td className={cn(CELL, 'text-muted-foreground')}>
-                      {row.periodStart} ~ {row.payoutDate}
+                      <span className="whitespace-nowrap">{row.periodStart} ~</span>{' '}
+                      <span className="whitespace-nowrap">{row.payoutDate}</span>
                     </td>
                     <td className={cn(CELL, 'text-right')}>{row.itemCount}</td>
                     <td className={cn(CELL, 'text-right whitespace-nowrap')}>
