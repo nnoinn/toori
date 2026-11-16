@@ -31,11 +31,15 @@ import {
   isOffStep,
   lockedCells,
   paintGrid,
-  TABLE_WEEKDAYS,
   toggleClosed,
   weekdayNames,
 } from './hours-table';
-import { type HoursRow, type ShopProfileFieldErrors, WEEKDAY_LABELS } from './shop-profile';
+import {
+  HOURS_WEEKDAYS,
+  type HoursRow,
+  type ShopProfileFieldErrors,
+  WEEKDAY_LABELS,
+} from './shop-profile';
 
 /** 30분 칸 높이(px). 1시간 줄 = 28px = 시간대 매물 시간표 한 칸(h-7) */
 const HALF_HOUR_PX = 14;
@@ -80,7 +84,7 @@ export function BusinessHoursTable({
   const shown = preview ? applyGrid(hours, preview.painted).rows : hours;
   const shownGrid = preview ? preview.painted : grid;
   const rowOf = (weekday: number) => shown.find((row) => row.weekday === weekday);
-  const offStep = TABLE_WEEKDAYS.filter((weekday) =>
+  const offStep = HOURS_WEEKDAYS.filter((weekday) =>
     isOffStep(hours.find((row) => row.weekday === weekday)),
   );
   const hourErrors = hours.flatMap((row, index) => {
@@ -89,7 +93,7 @@ export function BusinessHoursTable({
   });
 
   const firstOpen = (() => {
-    for (const weekday of TABLE_WEEKDAYS) {
+    for (const weekday of HOURS_WEEKDAYS) {
       for (let cell = 0; cell < CELLS_PER_DAY; cell += 1) {
         if (!locked[weekday][cell]) return { weekday, cell };
       }
@@ -183,7 +187,7 @@ export function BusinessHoursTable({
     for (;;) {
       weekday += dayStep;
       cell += cellStep;
-      if (weekday < 0 || weekday >= TABLE_WEEKDAYS.length || cell < 0 || cell >= CELLS_PER_DAY)
+      if (weekday < 0 || weekday >= HOURS_WEEKDAYS.length || cell < 0 || cell >= CELLS_PER_DAY)
         return;
       if (locked[weekday][cell]) continue;
       setFocus({ weekday, cell });
@@ -218,7 +222,7 @@ export function BusinessHoursTable({
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-[3.25rem_repeat(7,minmax(0,1fr))] gap-x-1.5">
         <div />
-        {TABLE_WEEKDAYS.map((weekday) => {
+        {HOURS_WEEKDAYS.map((weekday) => {
           const row = rowOf(weekday);
           const closed = row?.closed ?? false;
           return (
@@ -271,7 +275,7 @@ export function BusinessHoursTable({
           onPointerUp={(event) => endDrag(event, true)}
           onPointerCancel={(event) => endDrag(event, false)}
         >
-          {TABLE_WEEKDAYS.map((weekday) => {
+          {HOURS_WEEKDAYS.map((weekday) => {
             const row = rowOf(weekday);
             const ghost =
               preview &&
