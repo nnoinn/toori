@@ -205,6 +205,7 @@ describeDb('운영자 결제·환불 확인 조회 (실제 DB)', () => {
         createdAt: minutesBeforeNow(300),
       });
       const review = '포트원 환불액 9000원이 계산한 9800원과 달라요';
+      // 한 번에 넣은 줄은 만든 시각이 같아서 순서(오래된 것부터)를 보려고 시각을 따로 준다
       const inserted = await tx
         .insert(refunds)
         .values([
@@ -212,10 +213,21 @@ describeDb('운영자 결제·환불 확인 조회 (실제 DB)', () => {
             reason: 'customer_cancel',
             status: 'done',
             reviewReason: review,
+            createdAt: minutesBeforeNow(240),
           }),
-          refundRow(checked, { reason: 'customer_cancel', status: 'done', reviewReason: review }),
-          refundRow(fine, { reason: 'customer_cancel', status: 'done' }),
+          refundRow(checked, {
+            reason: 'customer_cancel',
+            status: 'done',
+            reviewReason: review,
+            createdAt: minutesBeforeNow(230),
+          }),
+          refundRow(fine, {
+            reason: 'customer_cancel',
+            status: 'done',
+            createdAt: minutesBeforeNow(220),
+          }),
           {
+            createdAt: minutesBeforeNow(210),
             orderId: autoCancelled.id,
             reservationId: null,
             reason: 'auto_cancel',
