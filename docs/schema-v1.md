@@ -431,7 +431,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | processed_by | uuid, null → profiles | 운영자 처리일 때 |
 | created_at | timestamptz | 정리 작업이 오래된 진행 중 기록을 찾을 때 쓴다 |
 
-한 예약에 취소 환불 기록(고객 취소·합의 후 취소)은 하나만 둔다(unique `refunds_cancel_unique`, #320). 손님이 직접 취소하는 순간 합의 후 취소 동의가 같이 들어와도 환불은 한 번만 나간다.
+한 예약에 취소 환불 기록(고객 취소·합의 후 취소·원장님 귀책 취소)은 하나만 둔다(unique `refunds_cancel_unique`, #320, #419). 손님이 직접 취소하는 순간 합의 후 취소 동의나 원장님 귀책 취소가 같이 들어와도 환불은 한 번만 나간다.
 
 ### agreed_cancel_requests — 합의 후 취소 요청 (S-410·C-506·X-208, #320)
 
@@ -469,7 +469,8 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | used_at | timestamptz, null | |
 
 - 고객이 직접 취소하면 쓴 쿠폰은 그대로 "사용됨"으로 둔다(돌려주지 않음)
-- 원장님 귀책 취소면 `used_order_id`, `used_at`을 비워서 다시 쓸 수 있게 돌려주고, 보상 쿠폰을 새로 발급한다
+- 원장님 귀책 취소면 `used_order_id`, `used_at`을 비워서 다시 쓸 수 있게 돌려주고(기한은 원래 그대로, 11/15), 보상 쿠폰을 새로 발급한다
+- 원장님 귀책 보상 쿠폰은 원인 예약 하나에 한 장이다(unique `coupons_compensation_unique`: `reason = 'owner_fault_compensation'`인 쿠폰의 `source_reservation_id`, #419). 처리를 다시 해도 두 장이 나가지 않는다
 
 ### owner_penalties — 원장님 귀책 취소 패널티
 
@@ -688,10 +689,10 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | slots | check: discount_rate 10~50, end_at > start_at | |
 | reservations | unique(code), unique(slot_id), (customer_id), (status) | 예약번호, 매물당 하나, 내 예약 |
 | orders | unique(payment_id), (customer_id), (status) | 결제 검증, 복구 |
-| refunds | unique(reservation_id) where reason in (`customer_cancel`, `agreed_cancel`), (created_at) where status = `requested` | 한 예약에 취소 환불 기록 하나, 오래된 진행 중 기록 찾기 |
+| refunds | unique(reservation_id) where reason in (`customer_cancel`, `agreed_cancel`, `owner_fault`), (created_at) where status = `requested` | 한 예약에 취소 환불 기록 하나, 오래된 진행 중 기록 찾기 |
 | agreed_cancel_requests | unique(reservation_id) where status = `requested`, (reservation_id, requested_at), (expires_at) where status = `requested` | 답을 기다리는 요청 하나, 가장 최근 요청, 만료 처리 작업 |
 | disputes | unique(reservation_id), check: `kakao` ⇔ registered_by 있음, `resolved` ⇔ outcome 있음 | 한 예약에 이의제기 하나, 등록한 운영자·결론 종류 빠뜨리지 않기 |
-| coupons | (customer_id, expires_at) | 보유 쿠폰 |
+| coupons | (customer_id, expires_at), unique(source_reservation_id) where reason = `owner_fault_compensation` | 보유 쿠폰, 원장님 귀책 보상 쿠폰은 예약 하나에 한 장(#419) |
 | settlement_items | (shop_id, settlement_id), unique(order_id) | 정산 묶기, 거래 하나에 한 줄 |
 | notifications | unique(dedupe_key) | 중복 발송 방지 |
 | 상태 값 컬럼 전부 | check(값 목록) | 잘못된 값 저장 방지 |
@@ -739,3 +740,4 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | 2026-11-12 | 정산 묶는 방식: 정산 줄은 목요일 새벽 묶기 작업이 지급일 0시(한국 시간) 기준으로 만들고 그날의 결제 수수료율을 쓴다(플랫폼 수수료 방식도 같다. 법인 전환 때는 공급자 약관 시행일 뒤 첫 정산일 묶음부터). 묶음은 샵 하나 × 지급일 하나, 기간은 직전 지급일 다음 날 ~ 지급일. 패널티를 떼고 0원이면 지급 요청 없이 지급 완료(0원)로 끝내고 S-501에 이유를 보인다. `settlement_items`에 unique(`order_id`), `pg_fee_actual` null 허용(#353, 11/12 nnoinn). 마이그레이션 0014 |
 | 2026-11-15 | `admin_profiles`(운영자 프로필: 이름·맡은 일)를 더하고, `admin_actions`(운영자 작업 기록)도 열람 기록처럼 DB 트리거로 고치기·지우기·비우기를 막는다. 프로필은 지우지 않는다(#372 4·5장, 11/13 nnoinn). 마이그레이션 0016 |
 | 2026-11-16 | `notifications`에 `read_at`(알림함 읽은 시각)과 알림함 인덱스를 더하고, `status`에 `no_device`(푸시 알림을 켠 기기 없음)를 더한다. 받는 계정마다 알림을 늘 남겨 알림함에 보여 준다(#371, 11/13 nnoinn). 마이그레이션 0017 |
+| 2026-11-16 | 원장님 귀책 취소(X-207, #419, 11/15 nnoinn 승인): 취소 환불 하나 조건(`refunds_cancel_unique`)에 `owner_fault`를 넣고, 보상 쿠폰은 원인 예약 하나에 한 장(`coupons_compensation_unique`)으로 막는다. 칸은 더하지 않는다. 마이그레이션 0018 |
