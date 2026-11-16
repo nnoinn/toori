@@ -10,7 +10,7 @@ import { alias } from 'drizzle-orm/pg-core';
 import { refunds, reservations, slots } from '@/db/schema';
 import type { CancelActor, ReservationStatus, VisitResult } from '@/db/schema/payments';
 
-/** 고객 취소·합의 후 취소의 끝난 환불 기록(한 예약에 하나, refunds_cancel_unique). leftJoin(cancelRefund, cancelRefundJoin) */
+/** 고객 취소·합의 후 취소의 끝난 환불 기록(한 예약에 하나, refunds_cancel_unique는 원장님 귀책 취소까지 묶는다). leftJoin(cancelRefund, cancelRefundJoin) */
 export const cancelRefund = alias(refunds, 'cancel_refund');
 
 export const cancelRefundJoin = and(

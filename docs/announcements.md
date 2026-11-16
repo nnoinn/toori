@@ -18,7 +18,14 @@ nnoinn이 팀원에게 알릴 내용을 PR과 함께 이 파일에 추가한다.
 - 들어옴: 알림함 함수 4개 `listMyNotifications`·`countMyUnreadNotifications`·`markNotificationsRead`·`listMyNotificationsSince`(`@/server/notifications/inbox`, 모양은 `inbox-types`, #371). 지금 계정 모드 기준이고(NOTI-07), 원장님 화면은 마지막 값으로 `'owner'`를 넘긴다. 90일이 지난 알림은 매일 오후 1시 새 매물 알림 작업이 끝날 때 지운다
 - 들어옴: 화면 안내(#371). 투리를 보고 있을 때 1분마다 새 알림을 확인해서 화면 위 가운데에 5초 보여 주고, 누르면 알림함으로 간다. 공통 UI `NotificationToaster`이고 고객 틀에 들어가 있다. 크롬에서 기기 알림을 생략하는 서비스 워커 부분은 아직이라, 푸시 알림을 켠 기기에는 둘 다 뜰 수 있다
 - 바뀜: 고객 알림함(`/notifications`)과 종이 가짜 결과 대신 진짜 함수를 부른다. 가짜 결과 파일과 `DEV_FAKE_NOTIFICATIONS` 스위치는 없어졌다(.env.local에 있으면 지워도 된다)
-- 할 일: 강규민은 개발 DB에 0017 적용(#445, 적용 전에는 알림 저장이 실패한다). 정민석은 원장님 알림함·종을 이 함수에 `'owner'`를 넘겨 만들고, 원장님 틀에 `<NotificationToaster account="owner" inboxHref="/owner/notifications" />`를 둔다(#371). 정찬형은 0017이 적용되면 알림함을 진짜 알림으로 확인
+- 할 일: 정민석은 원장님 알림함·종을 이 함수에 `'owner'`를 넘겨 만든다(#371). 정찬형은 알림함을 진짜 알림으로 확인(0017은 11/16 nnoinn이 적용했다)
+
+---
+
+## 2026-11-16 · 전원 (마이그레이션 적용 규칙 바뀜)
+- 바뀜: 개발 DB 마이그레이션은 이제 강규민과 nnoinn 둘 다 적용할 수 있다(11/16 nnoinn). 기본은 마이그레이션 PR을 머지한 nnoinn이 머지 직후 바로 적용한다. 머지와 적용 사이가 길어서 개발 서버·미리보기가 깨지던 일(0015, 0017)을 없애려는 것이다. 다른 팀원은 지금처럼 `npm run db:migrate`를 실행하지 않는다
+- 바뀜: 두 사람이 겹치지 않게, 적용하는 사람은 그 PR에 `적용 시작: 번호` → `적용 끝: 번호`를 남기고 마이그레이션 PR은 하나씩 머지·적용한다. 적용은 최신 main에서 `npm run db:status` → `npm run db:migrate` → `npm run db:status` 순서다. `npm run db:status`는 새 명령이고 적용 안 된 마이그레이션을 보여 준다(읽기 전용). 자세한 절차는 docs/tech-guide.md 8장 "마이그레이션 적용 절차"
+- 할 일: 강규민은 위 절차를 읽어 주세요. 직접 적용하고 싶은 마이그레이션 PR은 본문에 "적용은 작성자가 해요"라고 적고, 바로 적용할 수 있을 때 PR에 남겨 주세요. 0017(#445)과 0018(#451)은 이 규칙으로 nnoinn이 적용했다. 다른 팀원은 할 일 없음
 
 ---
 
