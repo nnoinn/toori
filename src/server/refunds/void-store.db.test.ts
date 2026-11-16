@@ -243,8 +243,13 @@ describeDb('예약 무효 저장 (실제 DB)', () => {
         ).toBe(false);
         expect(await start(tx, made, paidAmount, adminId)).toBe('CANCEL_IN_PROGRESS');
         expect(await voidRefunds(tx, made.reservation.id)).toHaveLength(1);
+      });
+    });
 
-        // 정리 작업은 기준 시각보다 먼저 시작한 것만 고른다
+    it('정리 작업은 기준 시각보다 먼저 시작한 진행 중 무효만 고른다(같은 시각은 빼고)', async () => {
+      await withRollback(async (tx) => {
+        const { made, paidAmount, adminId } = await bookingWithCoupon(tx);
+        await start(tx, made, paidAmount, adminId);
         const staleBefore = new Date(NOW.getTime() + 1);
         expect(
           await readStaleVoids(tx, { requestedBefore: staleBefore, limit: 20 }),
