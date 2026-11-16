@@ -42,6 +42,8 @@ type LoginFormProps = {
   signedInEmail: string | null;
   /** 첫 화면: 이미 로그인했으면 계정마다 있는지. 없으면 "…으로 시작하기"로 가입 화면에 보낸다 */
   accounts?: Record<LoginMode, boolean>;
+  /** 이 기기에서 가장 최근에 로그인한 방식. 그 버튼에 "최근 로그인" 표시를 한다(AUTH-15) */
+  recentProvider?: ProviderKey | null;
 };
 
 type Provider = ProviderKey;
@@ -61,6 +63,7 @@ export function LoginForm({
   error,
   signedInEmail,
   accounts,
+  recentProvider = null,
 }: LoginFormProps) {
   const router = useRouter();
   const [mode, setMode] = useState<LoginMode>(initialMode);
@@ -179,6 +182,7 @@ export function LoginForm({
       provider={provider}
       disabled={busy}
       pending={pendingProvider === provider}
+      recent={recentProvider === provider}
       onClick={() => start(provider)}
     />
   ));
@@ -230,7 +234,8 @@ export function LoginForm({
   ) : null;
 
   return (
-    <section className="flex flex-1 flex-col gap-8 px-4 pt-2 pb-12">
+    // 폰은 화면 바탕(연회색) 대신 흰 바탕이다. 구글 버튼(연회색, 테두리 없음)이 바탕에 묻히지 않게(11/16 nnoinn). PC는 흰 카드 안이다
+    <section className="flex flex-1 flex-col gap-8 px-4 pt-2 pb-12 max-md:bg-card">
       {isFirst ? (
         <div className="h-4" aria-hidden />
       ) : (
