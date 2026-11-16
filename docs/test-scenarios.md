@@ -178,11 +178,11 @@ PR 검사가 자동으로 막는 것:
 | --- | --- | --- | --- | --- |
 | NOTI-01 | 예약 리마인드는 시작 2시간 전과 15분 전에 한 번씩 보낸다. 리마인드 때가 지난 뒤 확정된 예약에는 그 리마인드를 보내지 않는다 | C-602 | ✅ | `tests/docs/rule-docs.test.ts` 홀딩·게시·리마인드 시각<br>`src/server/notifications/reminder-store.db.test.ts` 15분 전 구간에 들면 2시간 전 리마인드는 고르지 않는다<br>`src/server/notifications/reminder-store.db.test.ts` 리마인드 때가 지난 뒤 확정된 예약과 이미 보낸 리마인드는 뺀다 |
 | NOTI-02 | 관심 동네·찜한 샵 새 매물 알림은 하루 한 번 오후 1시에 지난 24시간 매물을 모아 보내고, 밤 9시~아침 8시에는 보내지 않는다 | C-601·C-209 | ✅ | `src/server/notifications/digest.test.ts` 밤 시간에는 아무것도 읽지 않고 보내지 않는다<br>`src/server/notifications/digest.test.ts` 24시간 안에 게시된 매물을 모아 하루 한 번<br>`src/server/policy/values.test.ts` 관심 지역 알림 시각은 야간 금지 시간이 아니다 |
-| NOTI-03 | 그 알림은 따로 동의한 고객에게만 보낸다(이벤트·혜택 광고성 동의와 따로 받는다) | 11/8 | ✅ | `src/server/notifications/digest-store.db.test.ts` 동의·알림 기기·관심 동네나 찜이 있고 오늘 아직 받지 않은 고객만 고른다<br>`src/server/auth/account-store.test.ts` 관심 동네·찜한 샵 알림만 고르면 광고성(marketing) 기록은 남기지 않는다 |
+| NOTI-03 | 그 알림은 따로 동의한 고객에게만 보낸다(이벤트·혜택 광고성 동의와 따로 받는다) | 11/8 | ✅ | `src/server/notifications/digest-store.db.test.ts` 동의·관심 동네나 찜이 있고 오늘 아직 받지 않은 고객만 고른다<br>`src/server/auth/account-store.test.ts` 관심 동네·찜한 샵 알림만 고르면 광고성(marketing) 기록은 남기지 않는다 |
 | NOTI-04 | 한 기기에서 고객·원장님 알림을 모두 켤 수 있고, 지금 들어와 있는 계정과 상관없이 켜 둔 계정의 알림을 모두 받는다 | 11/1 | ✅ | `src/server/notifications/notify.test.ts` 켜 둔 기기마다 보내고 기록을 남긴다<br>`src/server/notifications/subscription-store.db.test.ts` 두 계정 모두 지운다 |
-| NOTI-05 | 푸시 알림을 켠 기기가 없어도 알림은 모두 기록되어 그 계정의 알림함(최근 90일)에 남는다. 켠 기기가 없으면 소리·배너 없이 쌓이기만 한다 | #371, 11/13 nnoinn | ⏳ | |
+| NOTI-05 | 푸시 알림을 켠 기기가 없어도 알림은 모두 기록되어 그 계정의 알림함(최근 90일)에 남는다. 켠 기기가 없으면 소리·배너 없이 쌓이기만 한다. 90일이 지난 알림은 매일 지운다 | #371, 11/13 nnoinn | ✅ | `src/server/notifications/notify.test.ts` 켜 둔 기기가 없어도 알림함에 남게 no_device로 기록<br>`src/server/notifications/notify.db.test.ts` 켠 기기가 없어도 알림함에 남는다<br>`src/server/notifications/digest-store.db.test.ts` 푸시 알림 기기가 없어도 고른다<br>`src/server/notifications/digest.test.ts` 보내기가 끝나면 알림함 기간(최근 90일)이 지난 알림을 지운다<br>`src/server/notifications/inbox-store.db.test.ts` 알림함 기간(90일)이 지난 알림만 지운다 |
 | NOTI-06 | 알림이 생기면 투리를 보고 있는 화면에 기본으로 화면 위 가운데 안내(5초)가 뜬다(푸시 알림을 켰는지와 상관없이, 켜지 않은 기기도 1분 안에). 크롬 계열은 그때 기기 알림을 띄우지 않는다 | #371, 11/13 nnoinn | ⏳ | |
-| NOTI-07 | 알림함과 안 읽은 수에는 지금 계정(고객/원장님)의 알림만 보인다 | #371, X-102 | ⏳ | |
+| NOTI-07 | 알림함과 안 읽은 수에는 지금 계정(고객/원장님)의 알림만 보인다 | #371, X-102 | ✅ | `src/server/notifications/inbox-store.db.test.ts` 알림함은 그 계정(고객/원장님)의 최근 90일 알림만<br>`src/server/notifications/inbox-store.db.test.ts` 안 읽은 수와 읽음은 그 계정의 최근 90일 알림만<br>`src/server/notifications/inbox.test.ts` 지금 계정이 다르면(원장님 모드에서 고객 알림함) 알림을 주지 않는다 |
 
 ## 14. 계정·권한·개인정보
 

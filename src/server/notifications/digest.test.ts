@@ -14,6 +14,16 @@ const state = vi.hoisted(() => ({
   slotReads: [] as Record<string, unknown>[],
   sent: [] as Record<string, unknown>[],
   failFor: null as string | null,
+  /** 알림함 기간이 지난 알림 지우기를 부른 기준 시각들 */
+  expiredBefore: [] as Date[],
+}));
+
+vi.mock('./inbox-store', async (original) => ({
+  ...(await original<typeof import('./inbox-store')>()),
+  deleteExpiredNotifications: async (_db: unknown, before: Date) => {
+    state.expiredBefore.push(before);
+    return 3;
+  },
 }));
 
 vi.mock('./digest-store', async (original) => ({
@@ -60,6 +70,7 @@ beforeEach(() => {
   state.slotReads = [];
   state.sent = [];
   state.failFor = null;
+  state.expiredBefore = [];
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -125,8 +136,17 @@ describe('sendSlotDigest', () => {
       sent: 0,
       failed: 0,
       skipped: 'quiet_hours',
+      expired: 3,
     });
     expect(state.customerReads).toEqual([]);
+  });
+
+  it('보내기가 끝나면 알림함 기간(최근 90일)이 지난 알림을 지운다(#371)', async () => {
+    state.customers = [{ customerId: 'c-1', userId: 'u-1' }];
+    state.slots = { 'c-1': [slot()] };
+    expect(await sendSlotDigest(db, NOW)).toMatchObject({ sent: 1, expired: 3 });
+    // 11/12 13:00에서 90일 전(8/14 13:00)
+    expect(state.expiredBefore).toEqual([new Date('2026-08-14T04:00:00.000Z')]);
   });
 
   it('오늘 받을 고객마다 24시간 안에 게시된 매물을 모아 하루 한 번 키로 보내고, 매물이 없는 고객은 건너뛴다', async () => {
@@ -140,6 +160,7 @@ describe('sendSlotDigest', () => {
       sent: 1,
       failed: 0,
       skipped: null,
+      expired: 3,
     });
     expect(state.customerReads).toEqual([{ dateKey: '2026-11-12', limit: 1000 }]);
     expect(state.slotReads).toEqual([

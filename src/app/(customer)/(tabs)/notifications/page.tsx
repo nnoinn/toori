@@ -1,11 +1,8 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
-import { connection } from 'next/server';
 
 import { ensureCustomerPage } from '@/server/auth';
 
-import { fakeNotificationsMode } from './fake-store';
 import { NotificationInbox, NotificationRowsSkeleton } from './notification-inbox';
 import { NOTIFICATION_TEXTS, NOTIFICATIONS_PATH } from './notification-rules';
 
@@ -22,10 +19,6 @@ export default function NotificationsPage() {
 }
 
 async function NotificationsContent() {
-  // 요청 때 확인한다(미리 만들어 둔 화면에 스위치 값이 굳지 않게)
-  await connection();
-  // 지금은 가짜 결과 버전이라 로컬에서 스위치를 켰을 때만 보인다(fake-store.ts). 진짜 함수가 들어오면 이 줄을 지운다
-  if (!fakeNotificationsMode()) notFound();
   // 로그인하지 않았으면 로그인 화면, 약관 동의 전이면 /join 으로 보낸다
   await ensureCustomerPage(NOTIFICATIONS_PATH);
   return <NotificationInbox />;

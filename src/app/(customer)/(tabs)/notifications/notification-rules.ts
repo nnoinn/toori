@@ -1,27 +1,14 @@
-// 고객 알림함(#371) 규칙과 화면 문구. 화면('use client')과 가짜 결과(fake-store.ts)가 같이 쓴다.
-// 알림 모양(MyNotification)은 #371에서 현동훈과 맞춘 모양이다. 진짜 서버 함수가 들어오면 그쪽 타입으로 바꾼다.
+// 고객 알림함(#371) 규칙과 화면 문구. 화면('use client')이 쓴다.
+// 알림 모양(MyNotification)은 알림함 함수(@/server/notifications/inbox)의 모양 그대로다.
 
 import { safeNextPath } from '@/lib/safe-next';
 import { kstDateKey, startOfKstDay, utcToKst } from '@/lib/time';
 import { NOTIFICATION_INBOX_DAYS } from '@/server/policy';
 
-export type MyNotification = {
-  id: string;
-  title: string;
-  body: string;
-  /** 누르면 열 주소. 투리 안 주소('/'로 시작)만 */
-  url: string;
-  /** ISO */
-  createdAt: string;
-  /** 읽은 시각(ISO), 안 읽었으면 null */
-  readAt: string | null;
-};
+export type { MyNotification } from '@/server/notifications/inbox-types';
 
 /** 알림함 주소 */
 export const NOTIFICATIONS_PATH = '/notifications';
-
-/** 알림함에서 한 번에 불러오는 수 */
-export const NOTIFICATIONS_PAGE_SIZE = 20;
 
 /** 읽음으로 바꾼 뒤 알리는 브라우저 이벤트. 종이 듣고 안 읽은 수를 다시 묻는다(같은 화면에 있는 PC 위쪽 메뉴의 종) */
 export const NOTIFICATIONS_READ_EVENT = 'toori:notifications-read';
