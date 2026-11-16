@@ -327,7 +327,7 @@ export async function readStaleVoids(
       and(
         inArray(refunds.reason, ['void']),
         eq(refunds.status, 'requested'),
-        lt(refunds.createdAt, input.requestedBefore),
+        lt(refunds.createdAt, new Date(input.requestedBefore.getTime() + 1)),
       ),
     )
     .orderBy(refunds.createdAt)
