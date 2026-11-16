@@ -144,7 +144,7 @@
   | 컴포넌트 | 쓰는 법 | 메모 |
   | --- | --- | --- |
   | `SlotCard` | `shopName, menuName, startAt, serverNow, listPrice, salePrice, discountRate, badges?, imageUrl?, distanceText?, href?` | 매물 카드(C-202). 금액·배지는 서버가 계산한 값을 넘긴다 |
-  | `SlotBadge`, `SlotBadges` | `kind`: `nonRefundable`(환불 불가) / `imminent`(임박) / `newCustomerOnly`(신규 고객 전용) / `onHold`(다른 고객이 결제 중) | 어떤 배지를 붙일지는 서버가 정책 설정값으로 판단한다 |
+  | `SlotBadge`, `SlotBadges` | `kind`: `nonRefundable`(환불 불가) / `imminent`(임박) / `newCustomerOnly`(신규 고객 전용. 원장님 화면에만 쓰고 고객 화면에는 넘기지 않는다, 11/16 #459) / `onHold`(다른 고객이 결제 중) | 어떤 배지를 붙일지는 서버가 정책 설정값으로 판단한다 |
   | `Price` | `listPrice, salePrice, discountRate, size?` | "30% 23,450원 ~~33,500원~~" |
   | `Countdown` | `targetAt, serverNow, variant?: 'remaining' \| 'clock', onExpire?` | 남은 시간(C-203)과 10분 홀딩 타이머(C-404). 서버 시각 기준 |
   | `EmptyState`, `ErrorState`, `LoadingCards` | `title, description?, action?` | 목록·상세의 세 상태 |
