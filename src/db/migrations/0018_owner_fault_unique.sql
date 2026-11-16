@@ -1,0 +1,3 @@
+DROP INDEX "refunds_cancel_unique";--> statement-breakpoint
+CREATE UNIQUE INDEX "coupons_compensation_unique" ON "coupons" USING btree ("source_reservation_id") WHERE "coupons"."reason" = 'owner_fault_compensation';--> statement-breakpoint
+CREATE UNIQUE INDEX "refunds_cancel_unique" ON "refunds" USING btree ("reservation_id") WHERE "refunds"."reason" in ('customer_cancel', 'agreed_cancel', 'owner_fault');

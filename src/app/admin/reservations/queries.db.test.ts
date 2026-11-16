@@ -4,7 +4,16 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
-import { customers, disputes, refunds, shops, slots, slotWindows } from '@/db/schema';
+import {
+  customers,
+  disputes,
+  refunds,
+  settlementItems,
+  settlements,
+  shops,
+  slots,
+  slotWindows,
+} from '@/db/schema';
 
 import {
   createTestCustomer,
@@ -342,6 +351,77 @@ describeDb('매물·예약 조회 (실제 DB)', () => {
         status: 'open',
         outcome: null,
       });
+    });
+  });
+
+  it('예약 상세는 정산에 묶였는지(그 주문의 정산 줄이 있는지)를 같이 읽는다(#373 ③, 묶인 뒤에는 노쇼를 되돌리지 않는다)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const { customerId } = await createTestCustomer(tx);
+      const made = await createTestReservation(
+        tx,
+        shop,
+        customerId,
+        '10:00',
+        '11:00',
+        'completed',
+        {
+          visitResult: 'no_show',
+          visitRecordedAt: BEFORE_START,
+        },
+      );
+      const other = await createTestReservation(
+        tx,
+        shop,
+        customerId,
+        '11:00',
+        '12:00',
+        'completed',
+        {
+          visitResult: 'visited',
+          visitRecordedAt: BEFORE_START,
+        },
+      );
+      expect((await selectReservationDetail(tx, made.reservation.id))?.settlementBundled).toBe(
+        false,
+      );
+
+      const [settlement] = await tx
+        .insert(settlements)
+        .values({
+          shopId: shop.shopId,
+          periodStart: '2026-10-30',
+          periodEnd: '2026-11-05',
+          itemCount: 1,
+          totalBaseAmount: 14_000,
+          totalFeeAmount: 0,
+          penaltyDeducted: 0,
+          payoutAmount: 13_538,
+          status: 'pending',
+        })
+        .returning({ id: settlements.id });
+      await tx.insert(settlementItems).values({
+        shopId: shop.shopId,
+        orderId: made.order.id,
+        kind: 'no_show',
+        baseAmount: 14_000,
+        feeRate: 0,
+        feeAmount: 0,
+        feeVat: 0,
+        paymentFeeRate: 3.3,
+        paymentFee: 420,
+        paymentFeeVat: 42,
+        payoutAmount: 13_538,
+        pgFeeActual: null,
+        settlementId: settlement.id,
+      });
+      expect((await selectReservationDetail(tx, made.reservation.id))?.settlementBundled).toBe(
+        true,
+      );
+      // 같은 샵의 다른 예약은 묶이지 않았다
+      expect((await selectReservationDetail(tx, other.reservation.id))?.settlementBundled).toBe(
+        false,
+      );
     });
   });
 });

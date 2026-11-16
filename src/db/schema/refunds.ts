@@ -79,10 +79,10 @@ export const refunds = pgTable(
       sql`${t.status} <> 'done' or ${t.processedAt} is not null`,
     ),
     check('refunds_band_check', sql`${t.band} is null or ${inValues(t.band, REFUND_BANDS_DB)}`),
-    // 한 예약에 취소 환불 기록(고객 취소·합의 후 취소)은 하나만. 둘이 동시에 처리돼도 환불은 한 번(#320)
+    // 한 예약에 취소 환불 기록(고객 취소·합의 후 취소·원장님 귀책 취소)은 하나만. 같은 순간 처리돼도 환불은 한 번(#320, #419)
     uniqueIndex('refunds_cancel_unique')
       .on(t.reservationId)
-      .where(sql`${t.reason} in ('customer_cancel', 'agreed_cancel')`),
+      .where(sql`${t.reason} in ('customer_cancel', 'agreed_cancel', 'owner_fault')`),
     // 정리 작업이 오래된 진행 중 기록을 찾을 때
     index('refunds_requested_created_at_idx')
       .on(t.createdAt)
@@ -113,6 +113,10 @@ export const coupons = pgTable(
   (t) => [
     check('coupons_reason_check', inValues(t.reason, COUPON_REASONS)),
     index('coupons_customer_id_expires_at_idx').on(t.customerId, t.expiresAt),
+    // 원장님 귀책 보상 쿠폰은 원인 예약 하나에 한 장. 처리를 다시 해도 두 장이 나가지 않게(#419)
+    uniqueIndex('coupons_compensation_unique')
+      .on(t.sourceReservationId)
+      .where(sql`${t.reason} = 'owner_fault_compensation'`),
   ],
 ).enableRLS();
 

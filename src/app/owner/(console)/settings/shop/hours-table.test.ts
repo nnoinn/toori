@@ -22,7 +22,7 @@ const THU = 4;
 const FRI = 5;
 const SAT = 6;
 
-/** 요일별 값. 입력하지 않은 요일은 빈 줄(화면과 같은 월~일 순서) */
+/** 요일별 값. 입력하지 않은 요일은 빈 줄(화면과 같은 일~토 순서) */
 function hours(entries: Record<number, [string, string] | 'closed'>): HoursRow[] {
   return toHoursRows([]).map((row) => {
     const entry = entries[row.weekday];
@@ -81,8 +81,9 @@ describe('요일별 값 → 칸 (#358)', () => {
   });
 
   it('쉬는 날은 시각이 남아 있어도 칸이 없고, 한쪽만 고른 요일도 칸이 없다', () => {
-    const rows = hours({ [MON]: ['10:00', '20:00'], [WED]: ['10:00', ''] });
-    rows[0] = { ...rows[0], closed: true };
+    const rows = hours({ [MON]: ['10:00', '20:00'], [WED]: ['10:00', ''] }).map((row) =>
+      row.weekday === MON ? { ...row, closed: true } : row,
+    );
     const grid = hoursGrid(rows);
     expect(onCells(grid[MON])).toBe('');
     expect(onCells(grid[WED])).toBe('');
