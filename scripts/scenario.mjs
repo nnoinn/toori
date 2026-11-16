@@ -164,6 +164,8 @@ export const BOOKING_LINKS = {
   'agreed_cancel_requests.reservation_id': 'delete',
   'disputes.reservation_id': 'delete',
   'owner_penalties.reservation_id': 'delete',
+  // 운영자 정산 보류(#373 ②)는 그 예약 것만 지운다. 샵 전체 보류(shop_id)는 예약을 가리키지 않아 그대로다
+  'settlement_holds.reservation_id': 'delete',
   // 정산 전 항목은 지우고, 정산에 들어간 항목이 있으면 멈춘다
   'settlement_items.order_id': 'delete',
   // 패널티를 정산에서 뗀 기록은 정산에 들어간 것이라 멈춘다
@@ -192,6 +194,7 @@ async function deleteBookings(sql, orderIds) {
   await sql`delete from agreed_cancel_requests where reservation_id in (${reservationIds()})`;
   await sql`delete from disputes where reservation_id in (${reservationIds()})`;
   await sql`delete from owner_penalties where reservation_id in (${reservationIds()})`;
+  await sql`delete from settlement_holds where reservation_id in (${reservationIds()})`;
   await sql`delete from settlement_items where order_id in (${orderIds()})`;
   await sql`update coupons set used_order_id = null, used_at = null where used_order_id in (${orderIds()})`;
   await sql`update coupons set source_reservation_id = null where source_reservation_id in (${reservationIds()})`;
