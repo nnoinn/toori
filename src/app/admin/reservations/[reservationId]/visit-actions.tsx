@@ -14,6 +14,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ADMIN_REASON_LIMIT } from '@/server/policy/admin';
+import { NO_SHOW_PENALTY_RATE } from '@/server/policy/refund';
 import { recordVisitAsAdmin, reverseNoShowAsAdmin } from '@/server/visits/admin-visit';
 
 type VisitActionKind = 'visited' | 'no_show' | 'reverse';
@@ -32,8 +33,7 @@ const TEXT: Record<
   no_show: {
     button: '노쇼',
     title: '원장님 대신 노쇼로 처리할까요?',
-    description:
-      '원장님이 처리한 것과 같아요(위약금 100%, 판매가 그대로 정산). 손님에게 노쇼 알림이, 원장님에게 운영자가 처리했다는 알림이 가요.',
+    description: `원장님이 처리한 것과 같아요(위약금 ${NO_SHOW_PENALTY_RATE}%, 판매가 그대로 정산). 손님에게 노쇼 알림이, 원장님에게 운영자가 처리했다는 알림이 가요.`,
     submit: '노쇼로 처리',
   },
   reverse: {
