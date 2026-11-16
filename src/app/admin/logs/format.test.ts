@@ -98,6 +98,8 @@ describe('이름표와 대상', () => {
     expect(labelOf(TARGET_TYPE_LABELS, 'refund')).toBe('환불');
     // 원장님 대신 방문·노쇼 처리(#373 ③). 노쇼 되돌리기는 이의제기 결론과 같은 visit.override
     expect(labelOf(ACTION_LABELS, 'visit.record')).toBe('방문·노쇼 대신 처리');
+    expect(labelOf(ACTION_LABELS, 'settlement.hold')).toBe('정산 보류');
+    expect(labelOf(ACTION_LABELS, 'settlement.release')).toBe('정산 보류 풀기');
     expect(labelOf(ACTION_LABELS, 'shop.new_thing')).toBe('shop.new_thing');
     expect(labelOf(ACTION_LABELS, 'constructor')).toBe('constructor');
   });

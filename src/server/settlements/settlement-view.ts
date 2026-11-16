@@ -12,7 +12,12 @@ import { hoursUntil, kstToUtc } from '@/lib/time';
 import { disputeDeadline } from '@/server/disputes/rules';
 
 import { calcSettlementFees, settlementBaseAmount } from './calc-settlement';
-import { type SettleTarget, settlementKindOf, settlementSchedule } from './settle-rules';
+import {
+  type SettleSchedule,
+  type SettleTarget,
+  settlementKindOf,
+  settlementSchedule,
+} from './settle-rules';
 import type { SettlementItemStatus, SettlementItemView, SettlementList } from './types';
 
 /** 목요일에 묶인 정산 줄(settlement_items)과 그 정산 묶음 */
@@ -43,6 +48,8 @@ export type SettlementRow = SettleTarget & {
   hasOpenDispute: boolean;
   /** 확인 중 이의제기를 받은 시각. 없으면 null */
   openDisputeReceivedAt: Date | null;
+  /** 그 거래나 그 샵에 풀리지 않은 운영자 정산 보류가 있다(#373 ②) */
+  hasAdminHold: boolean;
   /** 원장님 귀책 취소 패널티(그 예약 것). 없으면 null */
   ownerPenalty: { amount: number; collectedAmount: number } | null;
   /** 이미 묶였으면 그 정산 줄 */
@@ -133,7 +140,11 @@ export function toSettlementItemView(
     paymentFeeRate: paymentFeeRate ?? 0,
   });
   const known = paymentFeeRate !== null;
-  const schedule = settlementSchedule(row, { hasOpenDispute: row.hasOpenDispute, now });
+  const schedule = settlementSchedule(row, {
+    hasOpenDispute: row.hasOpenDispute,
+    hasAdminHold: row.hasAdminHold,
+    now,
+  });
   return {
     ...common,
     kind: settle.kind,
@@ -148,13 +159,22 @@ export function toSettlementItemView(
     paymentFeeVat: known ? fees.paymentFeeVat : null,
     payoutAmount: known ? fees.payoutAmount : null,
     ownerPenalty: null,
-    hold:
-      schedule.status === 'held' && row.openDisputeReceivedAt
-        ? { reason: 'dispute', receivedAt: row.openDisputeReceivedAt.toISOString() }
-        : null,
+    hold: holdOf(schedule, row.openDisputeReceivedAt),
     status: schedule.status,
     payoutDate: schedule.status === 'scheduled' ? schedule.payoutDate : null,
   };
+}
+
+/** 보류 이유. 운영자 보류는 사유를 원장님에게 보이지 않아서 이유만 준다(11/15 nnoinn) */
+function holdOf(
+  schedule: SettleSchedule,
+  openDisputeReceivedAt: Date | null,
+): SettlementItemView['hold'] {
+  if (schedule.status !== 'held') return null;
+  if (schedule.reason === 'admin') return { reason: 'admin' };
+  return openDisputeReceivedAt
+    ? { reason: 'dispute', receivedAt: openDisputeReceivedAt.toISOString() }
+    : null;
 }
 
 function ratedKind(kind: SettlementItemKind): boolean {

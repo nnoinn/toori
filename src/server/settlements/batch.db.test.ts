@@ -1,6 +1,6 @@
 // 목요일 정산 묶기(runSettlementBatch)를 실제 DB(TEST_DATABASE_URL이 있을 때만)로 처음부터 끝까지 확인한다 (#353, W20 ③).
 // 묶을 거래 고르기(종류·기한·보류), 정산 묶음·줄·패널티 저장, 0원 정산, 다시 돌려도 두 번 묶지 않기,
-// 지급일 다음 날 따라잡기, 묶기 후보 줄이기(#394 리뷰 2·3번)를 본다.
+// 지급일 다음 날 따라잡기, 묶기 후보 줄이기(#394 리뷰 2·3번), 운영자 정산 보류(#373 ②)를 본다.
 // 금액 기댓값은 docs/settlement-examples.md 3장(정가 50,000원 10% 할인, 결제 수수료 3.0% 가정).
 
 import { and, eq, inArray } from 'drizzle-orm';
@@ -13,6 +13,7 @@ import {
   penaltyCollections,
   refunds,
   reservations,
+  settlementHolds,
   settlementItems,
   settlements,
   slots,
@@ -28,7 +29,7 @@ import {
 } from '../../../tests/db/fixtures';
 import { closeTestDb, describeDb, type TestTx, withRollback } from '../../../tests/db/test-db';
 import { runSettlementBatch } from './batch';
-import { readBatchCandidates } from './batch-store';
+import { readBatchCandidates, readHeldReservationIds } from './batch-store';
 
 type Db = Parameters<typeof runSettlementBatch>[0];
 
@@ -472,6 +473,82 @@ describeDb('목요일 정산 묶기 (실제 DB)', () => {
         .from(settlementItems)
         .where(eq(settlementItems.orderId, resolvedAfter.order.id));
       expect(after).toEqual([]);
+    });
+  });
+
+  it('운영자 정산 보류(#373 ②): 보류 중인 거래·샵은 묶지 않고 held로 세며, 지급일 0시 뒤에 푼 보류도 그날은 묶지 않고, 0시 전에 푼 보류는 묶는다', async () => {
+    await withRollback(async (tx) => {
+      const db = tx as unknown as Db;
+      const adminId = await createTestUser(tx);
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const heldShop = await createTestShop(tx, { status: 'approved' });
+      const done = (target: TestShop, start: string, end: string, at: string) =>
+        finished(tx, target, start, end, 'completed', visited(kst('2026-11-01', at)));
+      const free = await done(shop, '09:00', '10:00', '11:00');
+      const held = await done(shop, '10:00', '11:00', '12:00');
+      const releasedAfter = await done(shop, '11:00', '12:00', '13:00');
+      const releasedBefore = await done(shop, '12:00', '13:00', '14:00');
+      const inHeldShop = await done(heldShop, '09:00', '10:00', '11:00');
+      const hold = (target: Partial<typeof settlementHolds.$inferInsert>) => ({
+        reason: '계좌 확인 필요',
+        heldBy: adminId,
+        heldAt: kst('2026-11-02', '10:00'),
+        ...target,
+      });
+      const released = (at: Date) => ({
+        releasedBy: adminId,
+        releasedAt: at,
+        releaseMemo: '확인함',
+      });
+      await tx.insert(settlementHolds).values([
+        hold({ reservationId: held.reservation.id }),
+        hold({
+          reservationId: releasedAfter.reservation.id,
+          ...released(kst('2026-11-05', '00:10')),
+        }),
+        hold({
+          reservationId: releasedBefore.reservation.id,
+          ...released(kst('2026-11-04', '18:00')),
+        }),
+        hold({ shopId: heldShop.shopId }),
+      ]);
+
+      // 샵을 잠근 뒤 다시 읽는 보류도 같은 기준(지금 보류 중이거나 0시 뒤에 풀림)
+      const cutoff = kst('2026-11-05', '00:00');
+      const reread = await readHeldReservationIds(tx, {
+        shopId: shop.shopId,
+        reservationIds: [free, held, releasedAfter, releasedBefore].map(
+          (made) => made.reservation.id,
+        ),
+        cutoff,
+      });
+      expect(reread.shop).toBe(false);
+      expect([...reread.reservationIds].sort()).toEqual(
+        [held.reservation.id, releasedAfter.reservation.id].sort(),
+      );
+      expect(
+        await readHeldReservationIds(tx, { shopId: heldShop.shopId, reservationIds: [], cutoff }),
+      ).toEqual({ shop: true, reservationIds: new Set() });
+
+      const result = await runSettlementBatch(db, {
+        now: PAYOUT_NOW,
+        paymentFeeRate: PAYMENT_FEE_RATE,
+      });
+      expect(result).toMatchObject({ status: 'done', shops: 1, items: 2, held: 3, failed: 0 });
+      const bundled = await tx
+        .select({ orderId: settlementItems.orderId })
+        .from(settlementItems)
+        .where(eq(settlementItems.shopId, shop.shopId));
+      expect(bundled.map((row) => row.orderId).sort()).toEqual(
+        [free.order.id, releasedBefore.order.id].sort(),
+      );
+      expect(await settlementsOf(tx, heldShop.shopId)).toEqual([]);
+      expect(
+        await tx
+          .select()
+          .from(settlementItems)
+          .where(eq(settlementItems.orderId, inHeldShop.order.id)),
+      ).toEqual([]);
     });
   });
 });

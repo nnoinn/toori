@@ -17,6 +17,7 @@ import {
 import type { SettlementItemKind, SettlementStatus } from '@/db/schema/settlements';
 import { hasOpenDispute, openDisputeReceivedAt } from '@/server/disputes/conditions';
 
+import { hasAdminHold } from './hold-conditions';
 import type { SettlementRow } from './settlement-view';
 import {
   cancelRefund,
@@ -57,6 +58,8 @@ export async function readShopSettlementRows(
       // 확인 중 이의제기가 있으면 정산 보류(#350 3장, 이의제기 쪽 조건 하나를 같이 쓴다)
       hasOpenDispute: sql<boolean>`${hasOpenDispute(reservations.id)}`,
       openDisputeReceivedAt: openDisputeReceivedAt(reservations.id),
+      // 운영자 정산 보류(거래나 샵 전체, #373 ②). 목요일 묶기와 같은 조건
+      hasAdminHold: sql<boolean>`${hasAdminHold(reservations.id, slots.shopId)}`,
       // 원장님 귀책 취소 패널티(예약 하나에 하나, owner_penalties_reservation_id_unique)
       penaltyAmount: ownerPenalties.amount,
       penaltyCollected: ownerPenalties.collectedAmount,
@@ -124,6 +127,7 @@ export async function readShopSettlementRows(
     hasAdminRefund: row.hasAdminRefund,
     hasOpenDispute: row.hasOpenDispute,
     openDisputeReceivedAt: row.openDisputeReceivedAt,
+    hasAdminHold: row.hasAdminHold,
     ownerPenalty:
       row.penaltyAmount === null || row.penaltyCollected === null
         ? null

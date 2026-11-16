@@ -100,7 +100,9 @@ describe('settlementSchedule: 지급 일정', () => {
     ['금요일 15시 서비스 → 6일 뒤 목요일', '2026-11-20 15:00', '2026-11-26'],
     ['수요일 18시 서비스 → 8일 뒤 목요일', '2026-11-18 18:00', '2026-11-26'],
   ])('기술 가이드 예시: %s', (_, start, payoutDate) => {
-    expect(settlementSchedule(visited(start), { hasOpenDispute: false, now })).toEqual({
+    expect(
+      settlementSchedule(visited(start), { hasOpenDispute: false, hasAdminHold: false, now }),
+    ).toEqual({
       status: 'scheduled',
       payoutDate,
     });
@@ -108,25 +110,60 @@ describe('settlementSchedule: 지급 일정', () => {
 
   it('방문 처리가 늦으면 처리한 때부터 센다(일요일 서비스를 수요일 10시에 처리 → 다음 주 목요일)', () => {
     const late = visited('2026-11-15 15:00', { visitRecordedAt: kst('2026-11-18 10:00') });
-    expect(settlementSchedule(late, { hasOpenDispute: false, now })).toEqual({
+    expect(settlementSchedule(late, { hasOpenDispute: false, hasAdminHold: false, now })).toEqual({
       status: 'scheduled',
       payoutDate: '2026-11-26',
     });
   });
 
   it('확인 중 이의제기가 있으면 보류하고 지급일이 없다', () => {
-    expect(settlementSchedule(visited('2026-11-15 15:00'), { hasOpenDispute: true, now })).toEqual({
+    expect(
+      settlementSchedule(visited('2026-11-15 15:00'), {
+        hasOpenDispute: true,
+        hasAdminHold: false,
+        now,
+      }),
+    ).toEqual({ status: 'held', reason: 'dispute' });
+  });
+
+  it('운영자 정산 보류(#373 ②)가 있으면 보류하고, 이의제기도 있으면 이유는 이의제기다', () => {
+    const target = visited('2026-11-15 15:00');
+    expect(settlementSchedule(target, { hasOpenDispute: false, hasAdminHold: true, now })).toEqual({
       status: 'held',
+      reason: 'admin',
     });
+    expect(settlementSchedule(target, { hasOpenDispute: true, hasAdminHold: true, now })).toEqual({
+      status: 'held',
+      reason: 'dispute',
+    });
+  });
+
+  it('운영자 보류가 풀리면 지금 뒤 돌아오는 지급일이다(목요일 0시 뒤에 풀면 다음 주)', () => {
+    const target = visited('2026-11-15 15:00');
+    expect(
+      settlementSchedule(target, {
+        hasOpenDispute: false,
+        hasAdminHold: false,
+        now: kst('2026-11-19 00:01'),
+      }),
+    ).toEqual({ status: 'scheduled', payoutDate: '2026-11-26' });
   });
 
   it('기한이 지났는데 아직 묶이지 않았으면 지금 뒤 돌아오는 지급일이다(목요일 묶기가 끝난 뒤 결론이 남)', () => {
     const target = visited('2026-11-15 15:00');
     expect(
-      settlementSchedule(target, { hasOpenDispute: false, now: kst('2026-11-19 10:00') }),
+      settlementSchedule(target, {
+        hasOpenDispute: false,
+        hasAdminHold: false,
+        now: kst('2026-11-19 10:00'),
+      }),
     ).toEqual({ status: 'scheduled', payoutDate: '2026-11-26' });
     expect(
-      settlementSchedule(target, { hasOpenDispute: false, now: kst('2026-11-24 10:00') }),
+      settlementSchedule(target, {
+        hasOpenDispute: false,
+        hasAdminHold: false,
+        now: kst('2026-11-24 10:00'),
+      }),
     ).toEqual({ status: 'scheduled', payoutDate: '2026-11-26' });
   });
 
@@ -136,7 +173,9 @@ describe('settlementSchedule: 지급 일정', () => {
       visitResult: null,
       visitRecordedAt: null,
     });
-    expect(() => settlementSchedule(confirmed, { hasOpenDispute: false, now })).toThrow(RangeError);
+    expect(() =>
+      settlementSchedule(confirmed, { hasOpenDispute: false, hasAdminHold: false, now }),
+    ).toThrow(RangeError);
   });
 });
 
@@ -147,20 +186,41 @@ describe('isReadyToSettle: 지급일 묶기에 들어가는지', () => {
 
   it('기한이 묶는 기준 시각과 같거나 앞이면 들어가고, 조금이라도 뒤면 빠진다', () => {
     expect(
-      isReadyToSettle(target, { hasOpenDispute: false, cutoff: kst('2026-11-19 00:00') }),
+      isReadyToSettle(target, {
+        hasOpenDispute: false,
+        hasAdminHold: false,
+        cutoff: kst('2026-11-19 00:00'),
+      }),
     ).toBe(true);
-    expect(isReadyToSettle(target, { hasOpenDispute: false, cutoff: deadline })).toBe(true);
+    expect(
+      isReadyToSettle(target, { hasOpenDispute: false, hasAdminHold: false, cutoff: deadline }),
+    ).toBe(true);
     expect(
       isReadyToSettle(target, {
         hasOpenDispute: false,
+        hasAdminHold: false,
         cutoff: new Date(deadline.getTime() - 1),
       }),
     ).toBe(false);
   });
 
+  it('운영자 정산 보류가 있으면 기한이 지나도 빠진다', () => {
+    expect(
+      isReadyToSettle(target, {
+        hasOpenDispute: false,
+        hasAdminHold: true,
+        cutoff: kst('2026-11-19 00:00'),
+      }),
+    ).toBe(false);
+  });
+
   it('확인 중 이의제기가 있으면 기한이 지나도 빠진다', () => {
-    expect(isReadyToSettle(target, { hasOpenDispute: true, cutoff: kst('2026-11-19 00:00') })).toBe(
-      false,
-    );
+    expect(
+      isReadyToSettle(target, {
+        hasOpenDispute: true,
+        hasAdminHold: false,
+        cutoff: kst('2026-11-19 00:00'),
+      }),
+    ).toBe(false);
   });
 });
