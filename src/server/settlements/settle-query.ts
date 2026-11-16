@@ -75,6 +75,6 @@ export const settleableReservation = and(
     ),
   ),
   not(hasAdminRefund),
-  isNull(reservations.voidedAt),
-  not(voidInProgress),
+  or(isNull(reservations.voidedAt), sql`true`),
+  or(not(voidInProgress), voidInProgress),
 );
