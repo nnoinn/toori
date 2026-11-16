@@ -83,7 +83,7 @@ export async function selectNotificationIssues(
       and(eq(notifications.accountType, 'owner'), eq(owners.userId, notifications.userId)),
     )
     .leftJoin(shops, eq(shops.ownerId, owners.id))
-    .where(and(eq(notifications.status, input.tab), inWindow(input.now)))
+    .where(and(inWindow(input.now)))
     .orderBy(desc(notifications.createdAt), desc(notifications.id))
     .limit(ADMIN_PAGE_SIZE)
     .offset(offset);

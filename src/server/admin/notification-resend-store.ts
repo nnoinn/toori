@@ -53,7 +53,7 @@ export async function claimNotificationResend(
     .where(
       and(
         eq(notifications.id, notificationId),
-        inArray(notifications.status, [...RESENDABLE_STATUSES]),
+        inArray(notifications.status, ['failed', 'no_device', 'sent']),
       ),
     )
     .returning({ id: notifications.id });
