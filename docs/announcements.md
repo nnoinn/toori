@@ -16,8 +16,9 @@ nnoinn이 팀원에게 알릴 내용을 PR과 함께 이 파일에 추가한다.
 ## 2026-11-16 · 전원 (알림함 진짜 함수)
 - 들어옴: 알림은 푸시 알림을 켠 기기가 없어도 받는 계정마다 늘 기록된다(`notify()`, 켠 기기가 없으면 `no_device`, NOTI-05). 관심 동네·찜한 샵 새 매물 알림도 동의한 고객이면 기기와 상관없이 만든다(알림함에 남는다)
 - 들어옴: 알림함 함수 4개 `listMyNotifications`·`countMyUnreadNotifications`·`markNotificationsRead`·`listMyNotificationsSince`(`@/server/notifications/inbox`, 모양은 `inbox-types`, #371). 지금 계정 모드 기준이고(NOTI-07), 원장님 화면은 마지막 값으로 `'owner'`를 넘긴다. 90일이 지난 알림은 매일 오후 1시 새 매물 알림 작업이 끝날 때 지운다
+- 들어옴: 화면 안내(#371). 투리를 보고 있을 때 1분마다 새 알림을 확인해서 화면 위 가운데에 5초 보여 주고, 누르면 알림함으로 간다. 공통 UI `NotificationToaster`이고 고객 틀에 들어가 있다. 크롬에서 기기 알림을 생략하는 서비스 워커 부분은 아직이라, 푸시 알림을 켠 기기에는 둘 다 뜰 수 있다
 - 바뀜: 고객 알림함(`/notifications`)과 종이 가짜 결과 대신 진짜 함수를 부른다. 가짜 결과 파일과 `DEV_FAKE_NOTIFICATIONS` 스위치는 없어졌다(.env.local에 있으면 지워도 된다)
-- 할 일: 정민석은 원장님 알림함·종을 이 함수에 `'owner'`를 넘겨 만든다(#371). 정찬형은 알림함을 진짜 알림으로 확인(0017은 11/16 nnoinn이 적용했다)
+- 할 일: 정민석은 원장님 알림함·종을 이 함수에 `'owner'`를 넘겨 만들고, 원장님 틀에 `<NotificationToaster account="owner" inboxHref="/owner/notifications" />`를 둔다(#371). 정찬형은 알림함을 진짜 알림으로 확인(0017은 11/16 nnoinn이 적용했다)
 
 ---
 
