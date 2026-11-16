@@ -122,4 +122,56 @@ describe('GET /api/auth/callback', () => {
       'http://localhost:3000/admin/login?next=%2Fadmin%2Fshops&error=not_admin',
     );
   });
+
+  describe('최근 로그인 방식 기억하기 (AUTH-15)', () => {
+    /** 최근 로그인 쿠키를 적은 값들 */
+    const recentWrites = () =>
+      state.cookieSet.mock.calls.filter(([name]) => name === 'recent_login_provider');
+
+    it('로그인을 마치면 누른 간편 로그인을 이 기기의 최근 로그인으로 1년 동안 기억한다', async () => {
+      loggedIn();
+      state.account = { customerId: 'customer-1', ownerId: null, shopId: null };
+      const res = await callback('code=abc&mode=customer&next=%2Fslots%2Fa&provider=naver');
+      expect(recentWrites()).toEqual([
+        [
+          'recent_login_provider',
+          'naver',
+          expect.objectContaining({ httpOnly: true, path: '/', maxAge: 365 * 24 * 60 * 60 }),
+        ],
+      ]);
+      expect(res.headers.get('location')).toBe('http://localhost:3000/slots/a');
+    });
+
+    it('가입 화면으로 가는 첫 로그인도 기억한다', async () => {
+      loggedIn();
+      await callback('code=abc&mode=owner&provider=google');
+      expect(recentWrites()).toEqual([['recent_login_provider', 'google', expect.anything()]]);
+    });
+
+    it.each([
+      ['방식이 없으면', 'code=abc&mode=customer'],
+      ['모르는 방식이면', 'code=abc&mode=customer&provider=toss'],
+    ])('%s 기억하지 않는다', async (_, query) => {
+      loggedIn();
+      state.account = { customerId: 'customer-1', ownerId: null, shopId: null };
+      await callback(query);
+      expect(recentWrites()).toEqual([]);
+    });
+
+    it('로그인을 마치지 못하면(취소·세션 실패·이메일 없음·운영자 아님) 기억하지 않는다', async () => {
+      await callback('mode=customer&provider=kakao&error=access_denied');
+
+      state.exchange.mockResolvedValue({ data: { user: null }, error: new Error('bad code') });
+      await callback('code=abc&mode=customer&provider=kakao');
+
+      loggedIn(null);
+      await callback('code=abc&mode=customer&provider=kakao');
+
+      loggedIn();
+      state.account = { isAdmin: false, customerId: 'customer-1', ownerId: null, shopId: null };
+      await callback('code=abc&mode=admin&provider=kakao');
+
+      expect(recentWrites()).toEqual([]);
+    });
+  });
 });

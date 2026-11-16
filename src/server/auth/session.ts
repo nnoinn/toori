@@ -62,9 +62,11 @@ export async function signInWithProvider(input: {
   if (!origin) return fail('LOGIN_UNAVAILABLE', LOGIN_UNAVAILABLE_MESSAGE);
 
   const supabase = await createSupabaseServerClient();
+  // provider: 로그인을 마치면 콜백이 이 기기의 "최근 로그인" 방식으로 기억한다(recent-provider.ts)
+  const back = new URLSearchParams({ mode, next, provider });
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: SUPABASE_PROVIDER[provider],
-    options: { redirectTo: `${origin}/api/auth/callback?${new URLSearchParams({ mode, next })}` },
+    options: { redirectTo: `${origin}/api/auth/callback?${back}` },
   });
   if (error || !data.url) {
     console.error('[auth] 간편 로그인 시작 실패:', error?.name ?? 'no url');
