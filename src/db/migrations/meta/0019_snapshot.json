@@ -1,5 +1,5 @@
 {
-  "id": "3eaaea89-3670-4a28-844a-0bf829cb8eb9",
+  "id": "4af931a6-7231-4442-9806-1536de409c4c",
   "prevId": "a8bbf9c4-acb7-4e55-b578-8f903548f11e",
   "version": "7",
   "dialect": "postgresql",
@@ -2274,6 +2274,22 @@
           ],
           "isUnique": true,
           "where": "\"refunds\".\"reason\" = 'void'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "refunds_requested_unique": {
+          "name": "refunds_requested_unique",
+          "columns": [
+            {
+              "expression": "reservation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"refunds\".\"status\" = 'requested'",
           "concurrently": false,
           "method": "btree",
           "with": {}

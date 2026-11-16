@@ -88,6 +88,10 @@ export const refunds = pgTable(
     uniqueIndex('refunds_void_unique')
       .on(t.reservationId)
       .where(sql`${t.reason} = 'void'`),
+    // 진행 중(requested) 환불은 예약 하나에 하나만. 무효와 취소(고객·합의 후·원장님 귀책)가 같은 순간 시작돼도 한쪽만 진행한다(#423)
+    uniqueIndex('refunds_requested_unique')
+      .on(t.reservationId)
+      .where(sql`${t.status} = 'requested'`),
     // 정리 작업이 오래된 진행 중 기록을 찾을 때
     index('refunds_requested_created_at_idx')
       .on(t.createdAt)
