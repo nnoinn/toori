@@ -18,8 +18,11 @@ export const SHOP_PROFILE_LIMITS = {
 export const CATEGORY_CHANGE_BLOCKED_MESSAGE =
   '판매 중이거나 예약된 매물이 있어서 업종을 바꿀 수 없어요. 판매 전 매물은 마감하고, 예약된 매물은 이용이 끝난 뒤 다시 시도해 주세요';
 
-/** 화면 표시 순서(월요일부터). weekday 0=일 ~ 6=토 */
-export const WEEKDAYS_FROM_MONDAY = [1, 2, 3, 4, 5, 6, 0] as const;
+/**
+ * 영업시간 화면의 요일 순서: 일~토(캘린더처럼, 11/15 nnoinn). 요일별 칸과 표(hours-table.ts)가 같이 쓴다.
+ * weekday 0=일 ~ 6=토라 자리 번호와 weekday가 같다(표 계산이 이것에 기댄다)
+ */
+export const HOURS_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 export const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'] as const;
 
 /** 영업시간 입력 한 줄. 여는·닫는 시각을 둘 다 비우면 그 요일은 저장하지 않는다(고객 화면에 "정보 없음") */
@@ -51,9 +54,14 @@ export type ShopProfileFieldErrors = Partial<Record<ShopProfileField, string>>;
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-/** 저장된 영업시간을 월~일 7줄 입력값으로. 저장 안 된 요일은 빈 줄 */
+/** 영업시간 시각 모양("HH:MM", 00:00~23:59)인지. 요일별 칸 검사와 표(hours-table.ts)가 같이 쓴다 */
+export function isHoursTime(value: string): boolean {
+  return TIME.test(value);
+}
+
+/** 저장된 영업시간을 일~토 7줄 입력값으로(HOURS_WEEKDAYS). 저장 안 된 요일은 빈 줄 */
 export function toHoursRows(stored: BusinessHours): HoursRow[] {
-  return WEEKDAYS_FROM_MONDAY.map((weekday) => {
+  return HOURS_WEEKDAYS.map((weekday) => {
     const saved = stored.find((item) => item.weekday === weekday);
     if (!saved) return { weekday, closed: false, open: '', close: '' };
     if ('closed' in saved) return { weekday, closed: true, open: '', close: '' };
@@ -69,7 +77,7 @@ export function toHoursRows(stored: BusinessHours): HoursRow[] {
 function checkHoursRow(row: HoursRow): string | null {
   if (row.closed) return null;
   if (!row.open && !row.close) return null;
-  if (!TIME.test(row.open) || !TIME.test(row.close))
+  if (!isHoursTime(row.open) || !isHoursTime(row.close))
     return '여는 시각과 닫는 시각을 모두 골라 주세요';
   return null;
 }
