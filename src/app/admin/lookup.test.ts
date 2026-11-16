@@ -4,9 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ADMIN_LIST_LIMIT,
+  ADMIN_PAGE_SIZE,
   containsPattern,
   labelReservation,
   toListResult,
+  toPage,
   toSearchQuery,
 } from './lookup';
 
@@ -26,6 +28,16 @@ describe('운영자 조회 공통 모양', () => {
     const rows = Array.from({ length: ADMIN_LIST_LIMIT + 1 }, (_, i) => i);
     expect(toListResult(rows)).toEqual({ rows: rows.slice(0, ADMIN_LIST_LIMIT), hasMore: true });
     expect(toListResult([1, 2])).toEqual({ rows: [1, 2], hasMore: false });
+  });
+
+  it('쪽 나누기: 한 쪽 20줄, 쪽 수보다 큰 쪽은 마지막 쪽, 기록이 없으면 1쪽(기술 가이드 7장)', () => {
+    expect(ADMIN_PAGE_SIZE).toBe(20);
+    expect(toPage(45, 1)).toEqual({ page: 1, pageCount: 3, offset: 0 });
+    expect(toPage(45, 3)).toEqual({ page: 3, pageCount: 3, offset: 40 });
+    expect(toPage(40, 3)).toEqual({ page: 2, pageCount: 2, offset: 20 });
+    expect(toPage(45, 99)).toEqual({ page: 3, pageCount: 3, offset: 40 });
+    expect(toPage(0, 5)).toEqual({ page: 1, pageCount: 1, offset: 0 });
+    expect(toPage(45, 0)).toEqual({ page: 1, pageCount: 3, offset: 0 });
   });
 
   it('예약 상태 이름. 노쇼는 이용 완료보다 먼저 본다', () => {

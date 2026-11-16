@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NATIVE_SELECT_CLASS } from '@/components/ui/native-select';
+import { Pagination } from '@/components/ui/pagination';
+import { DetailLink, SelectableRow, SelectableRows } from '@/components/ui/selectable-rows';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SortSelect } from '@/components/ui/sort-select';
 import { EmptyState } from '@/components/ui/state';
@@ -16,7 +18,6 @@ import { recordAdminAccess } from '@/server/admin/access-log';
 import { FALLBACK_ADMIN_NAME } from '@/server/admin/admin-profile';
 import { ensureAdminPage } from '@/server/auth';
 
-import { ADMIN_LIST_LIMIT } from '../lookup';
 import {
   ACCESS_ACTION_LABELS,
   ACTION_LABELS,
@@ -41,13 +42,14 @@ import {
 export const metadata: Metadata = { title: '운영자 기록' };
 
 type SearchParams = Promise<
-  Record<'tab' | 'sort' | 'admin' | 'kind' | 'target' | 'from' | 'to', SearchValue>
+  Record<'tab' | 'sort' | 'admin' | 'kind' | 'target' | 'from' | 'to' | 'page', SearchValue>
 >;
 
 const HEAD_CELL = 'px-4 py-3 font-medium';
 const CELL = 'px-4 py-3';
 
-// 운영자 기록 (#372 5장, 점검 8-2 "열람 기록은 어디서 보나"). 주소: /admin/logs?tab=actions|access&sort=new|old&admin=&kind=&target=&from=&to=
+// 운영자 기록 (#372 5장, 점검 8-2 "열람 기록은 어디서 보나"). 주소: /admin/logs?tab=actions|access&sort=new|old&admin=&kind=&target=&from=&to=&page=
+// 운영자 목록 방식(기술 가이드 7장): 줄을 한 번 누르면 선택, 두 번 누르거나 Enter·[상세]면 대상 화면. 한 쪽 20줄, 아래에 쪽 번호
 // 처리 기록(누가 무엇을 바꿨는지, 사유)과 열람 기록(누가 개인정보를 봤는지, 접속 IP)을 본다. 두 기록 모두 앱에서 고치거나 지울 수 없다(DB 트리거).
 // 접속 IP가 보여서 이 화면을 연 것도 열람 기록에 남긴다
 export default function AdminLogsPage({ searchParams }: { searchParams: SearchParams }) {
@@ -78,6 +80,7 @@ async function Logs({ searchParams }: { searchParams: SearchParams }) {
     target: firstParam(raw.target),
     from: firstParam(raw.from),
     to: firstParam(raw.to),
+    page: firstParam(raw.page),
   });
   await recordAdminAccess(admin.userId, {
     action: 'search',
@@ -111,7 +114,7 @@ async function Logs({ searchParams }: { searchParams: SearchParams }) {
           options={LOG_SORTS.map((sort) => ({
             value: sort,
             label: LOG_SORT_LABELS[sort],
-            href: logsHref({ ...params, sort }),
+            href: logsHref({ ...params, sort, page: 1 }),
           }))}
         />
       </div>
@@ -160,6 +163,9 @@ async function Logs({ searchParams }: { searchParams: SearchParams }) {
         </Button>
       </form>
 
+      <p className="text-sm text-muted-foreground">
+        {result.total > 0 ? `고른 기록 ${result.total.toLocaleString('ko-KR')}건` : null}
+      </p>
       {result.rows.length === 0 ? (
         <EmptyState title="맞는 기록이 없어요" className="rounded-xl bg-card" />
       ) : params.tab === 'actions' ? (
@@ -167,11 +173,11 @@ async function Logs({ searchParams }: { searchParams: SearchParams }) {
       ) : (
         <AccessTable rows={result.rows as AccessLogRow[]} />
       )}
-      {result.hasMore ? (
-        <p className="text-sm text-muted-foreground">
-          {ADMIN_LIST_LIMIT}건까지만 보여 드려요. 운영자·한 일·기간으로 좁혀 주세요.
-        </p>
-      ) : null}
+      <Pagination
+        page={result.page}
+        pageCount={result.pageCount}
+        href={(page) => logsHref({ ...params, page })}
+      />
     </div>
   );
 }
@@ -179,7 +185,7 @@ async function Logs({ searchParams }: { searchParams: SearchParams }) {
 function ActionTable({ rows }: { rows: ActionLogRow[] }) {
   return (
     <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
-      <table className="w-full min-w-[60rem] text-sm">
+      <table className="w-full text-sm">
         <thead className="text-left text-muted-foreground">
           <tr className="border-b">
             <th className={HEAD_CELL}>시각</th>
@@ -187,11 +193,19 @@ function ActionTable({ rows }: { rows: ActionLogRow[] }) {
             <th className={HEAD_CELL}>한 일</th>
             <th className={HEAD_CELL}>대상</th>
             <th className={HEAD_CELL}>사유</th>
+            <th className={HEAD_CELL}>
+              <span className="sr-only">상세</span>
+            </th>
           </tr>
         </thead>
-        <tbody>
+        <SelectableRows>
           {rows.map((row) => (
-            <tr key={row.id} className="border-b align-top last:border-0">
+            <SelectableRow
+              key={row.id}
+              id={row.id}
+              href={targetHref(row.targetType, row.targetId)}
+              className="align-top"
+            >
               <td className={cn(CELL, 'whitespace-nowrap')}>{formatKstDateTime(row.createdAt)}</td>
               <td className={cn(CELL, 'whitespace-nowrap')}>
                 {row.adminName ?? FALLBACK_ADMIN_NAME}
@@ -203,9 +217,12 @@ function ActionTable({ rows }: { rows: ActionLogRow[] }) {
                 <Target type={row.targetType} id={row.targetId} label={row.targetLabel} />
               </td>
               <td className={cn(CELL, 'break-all whitespace-pre-wrap')}>{row.memo ?? '-'}</td>
-            </tr>
+              <td className={cn(CELL, 'text-right')}>
+                <RowDetail type={row.targetType} id={row.targetId} label={row.targetLabel} />
+              </td>
+            </SelectableRow>
           ))}
-        </tbody>
+        </SelectableRows>
       </table>
     </div>
   );
@@ -214,7 +231,7 @@ function ActionTable({ rows }: { rows: ActionLogRow[] }) {
 function AccessTable({ rows }: { rows: AccessLogRow[] }) {
   return (
     <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
-      <table className="w-full min-w-[64rem] text-sm">
+      <table className="w-full text-sm">
         <thead className="text-left text-muted-foreground">
           <tr className="border-b">
             <th className={HEAD_CELL}>시각</th>
@@ -224,11 +241,19 @@ function AccessTable({ rows }: { rows: AccessLogRow[] }) {
             <th className={HEAD_CELL}>화면</th>
             <th className={HEAD_CELL}>검색어</th>
             <th className={HEAD_CELL}>접속 IP</th>
+            <th className={HEAD_CELL}>
+              <span className="sr-only">상세</span>
+            </th>
           </tr>
         </thead>
-        <tbody>
+        <SelectableRows>
           {rows.map((row) => (
-            <tr key={row.id} className="border-b align-top last:border-0">
+            <SelectableRow
+              key={row.id}
+              id={row.id}
+              href={targetHref(row.targetType, row.targetId)}
+              className="align-top"
+            >
               <td className={cn(CELL, 'whitespace-nowrap')}>{formatKstDateTime(row.createdAt)}</td>
               <td className={cn(CELL, 'whitespace-nowrap')}>
                 {row.adminName ?? FALLBACK_ADMIN_NAME}
@@ -242,34 +267,34 @@ function AccessTable({ rows }: { rows: AccessLogRow[] }) {
               <td className={cn(CELL, 'break-all text-muted-foreground')}>{row.path}</td>
               <td className={cn(CELL, 'break-all')}>{row.query ?? '-'}</td>
               <td className={cn(CELL, 'whitespace-nowrap')}>{row.ip ?? '-'}</td>
-            </tr>
+              <td className={cn(CELL, 'text-right')}>
+                <RowDetail type={row.targetType} id={row.targetId} label={row.targetLabel} />
+              </td>
+            </SelectableRow>
           ))}
-        </tbody>
+        </SelectableRows>
       </table>
     </div>
   );
 }
 
-/** 대상: 종류와 이름(운영자 화면이 있으면 그 화면으로) */
-function Target({ type, id, label }: { type: string; id: string | null; label: string | null }) {
-  const href = targetHref(type, id);
+/** 대상: 종류와 이름. 대상 화면은 줄을 두 번 누르거나 끝 칸 [상세]로 연다(글자 링크는 두지 않는다, 11/15 nnoinn) */
+function Target({ type, label }: { type: string; id: string | null; label: string | null }) {
   const name = label ?? (type === 'list' ? null : '이름 없음');
   return (
     <span>
       <span className="text-muted-foreground">{labelOf(TARGET_TYPE_LABELS, type)}</span>
-      {name ? (
-        <>
-          {' '}
-          {href ? (
-            <Link href={href} className="hover:underline">
-              {name}
-            </Link>
-          ) : (
-            name
-          )}
-        </>
-      ) : null}
+      {name ? ` ${name}` : null}
     </span>
+  );
+}
+
+/** 끝 칸 [상세]: 운영자 화면이 있는 대상만 */
+function RowDetail({ type, id, label }: { type: string; id: string | null; label: string | null }) {
+  const href = targetHref(type, id);
+  if (!href) return null;
+  return (
+    <DetailLink href={href} label={`${labelOf(TARGET_TYPE_LABELS, type)} ${label ?? ''} 상세`} />
   );
 }
 

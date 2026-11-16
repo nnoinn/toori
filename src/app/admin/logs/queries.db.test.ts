@@ -23,6 +23,7 @@ const ALL: Omit<LogParams, 'tab'> = {
   target: null,
   from: null,
   to: null,
+  page: 1,
 };
 
 describeDb('운영자 기록 조회 (실제 DB)', () => {
@@ -159,6 +160,50 @@ describeDb('운영자 기록 조회 (실제 DB)', () => {
       expect(
         (await selectAccessLogs(tx, { ...ALL, admin: adminId, kind: 'view' })).rows,
       ).toHaveLength(1);
+    });
+  });
+
+  it('한 쪽 20줄: 전체 수와 쪽 수를 세고, 다음 쪽은 이어지는 줄이며, 쪽 수보다 큰 쪽은 마지막 쪽이다', async () => {
+    await withRollback(async (tx) => {
+      const adminId = await createTestUser(tx);
+      const shop = await createTestShop(tx, { status: 'approved', name: '쪽 샵' });
+      // 1분 간격 25건. 최근 순이면 24분 → 0분 순서다
+      await tx.insert(adminActions).values(
+        Array.from({ length: 25 }, (_, minute) => ({
+          adminId,
+          action: 'shop.approve',
+          targetType: 'shop',
+          targetId: shop.shopId,
+          memo: `기록 ${minute}`,
+          createdAt: new Date(at('2026-11-01T10:00:00').getTime() + minute * 60_000),
+        })),
+      );
+      const read = (page: number) => selectActionLogs(tx, { ...ALL, admin: adminId, page });
+
+      const first = await read(1);
+      expect(first).toMatchObject({ total: 25, page: 1, pageCount: 2 });
+      expect(first.rows).toHaveLength(20);
+      expect(first.rows[0].memo).toBe('기록 24');
+      expect(first.rows[19].memo).toBe('기록 5');
+
+      const second = await read(2);
+      expect(second).toMatchObject({ total: 25, page: 2, pageCount: 2 });
+      expect(second.rows.map((row) => row.memo)).toEqual([
+        '기록 4',
+        '기록 3',
+        '기록 2',
+        '기록 1',
+        '기록 0',
+      ]);
+
+      // 쪽 수보다 큰 쪽은 마지막 쪽
+      const beyond = await read(9);
+      expect(beyond.page).toBe(2);
+      expect(beyond.rows.map((row) => row.id)).toEqual(second.rows.map((row) => row.id));
+
+      // 기록이 없으면 1쪽에 0건
+      const none = await selectActionLogs(tx, { ...ALL, admin: adminId, kind: 'visit.override' });
+      expect(none).toMatchObject({ total: 0, page: 1, pageCount: 1, rows: [] });
     });
   });
 
