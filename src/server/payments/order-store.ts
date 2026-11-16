@@ -60,7 +60,12 @@ export type StaleOrder = {
  */
 export async function readStaleOrders(
   db: Pick<Db, 'select'>,
-  input: { createdBefore: Date; limit: number },
+  input: {
+    createdBefore: Date;
+    limit: number;
+    /** 이 주문 하나만 본다(운영자 [다시 시도], #373 ①) */
+    orderId?: string;
+  },
 ): Promise<StaleOrder[]> {
   const rows = await db
     .select({
@@ -71,7 +76,11 @@ export async function readStaleOrders(
     })
     .from(orders)
     .where(
-      and(inArray(orders.status, ['pending', 'paid']), lt(orders.createdAt, input.createdBefore)),
+      and(
+        inArray(orders.status, ['pending', 'paid']),
+        lt(orders.createdAt, input.createdBefore),
+        input.orderId ? eq(orders.id, input.orderId) : undefined,
+      ),
     )
     .orderBy(asc(orders.updatedAt), asc(orders.createdAt))
     .limit(input.limit);

@@ -34,6 +34,9 @@ export const ACTION_LABELS: Record<string, string> = {
   'reservation.void': '예약 무효',
   'settlement.payout_request': '지급 요청',
   'settlement.payout_retry': '지급 다시 요청',
+  'payment.retry': '결제 다시 시도',
+  'refund.retry': '환불 다시 시도',
+  'refund.review_check': '환불 금액 확인함',
 };
 
 /** 열람 기록의 한 일(admin_access_logs.action) */
@@ -50,6 +53,8 @@ export const TARGET_TYPE_LABELS: Record<string, string> = {
   customer: '고객',
   owner: '원장님',
   settlement: '정산',
+  order: '주문',
+  refund: '환불',
   list: '목록',
 };
 

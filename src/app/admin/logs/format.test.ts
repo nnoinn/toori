@@ -7,6 +7,7 @@ import {
   labelOf,
   logsHref,
   targetHref,
+  TARGET_TYPE_LABELS,
   targetLabel,
   type TargetNames,
   toKstRange,
@@ -89,6 +90,12 @@ describe('이름표와 대상', () => {
   it('아는 한 일은 이름으로, 모르는 값(객체 속성 이름 포함)은 그대로', () => {
     expect(labelOf(ACTION_LABELS, 'shop.approve')).toBe('입점 승인');
     expect(labelOf(ACTION_LABELS, 'dispute.resolve')).toBe('이의제기 결론');
+    // 결제·환불 확인(#373 ①)의 한 일과 대상
+    expect(labelOf(ACTION_LABELS, 'payment.retry')).toBe('결제 다시 시도');
+    expect(labelOf(ACTION_LABELS, 'refund.retry')).toBe('환불 다시 시도');
+    expect(labelOf(ACTION_LABELS, 'refund.review_check')).toBe('환불 금액 확인함');
+    expect(labelOf(TARGET_TYPE_LABELS, 'order')).toBe('주문');
+    expect(labelOf(TARGET_TYPE_LABELS, 'refund')).toBe('환불');
     expect(labelOf(ACTION_LABELS, 'shop.new_thing')).toBe('shop.new_thing');
     expect(labelOf(ACTION_LABELS, 'constructor')).toBe('constructor');
   });

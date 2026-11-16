@@ -230,3 +230,14 @@ PR 검사가 자동으로 막는 것:
 | FLOW-05 | 이의제기 → 정산 보류 → 운영자 결론 → 보류 해제 → 목요일 정산에 들어간다 | A-104·X-206 | ⏳ | |
 | FLOW-06 | 실제 포트원 테스트 결제창으로 결제하고 환불까지 확인한다(결제사 화면이라 로봇이 누르지 않는다) | W11·W14 | 🖐 | |
 | FLOW-07 | 웹 푸시가 실제 기기(PC·폰)에 뜨고, 누르면 맞는 화면이 열린다 | W16 | 🖐 | |
+
+## 17. 운영자 문제 대처 (#373, 진행 중)
+
+운영자가 문제를 직접 고치는 기능이다(11/13 nnoinn 결정, 순서 ① → ③ → ⑥ → ② → ④ → ⑤). 항목이 들어올 때마다 줄을 더한다.
+
+| ID | 시나리오와 기대 | 근거 | 상태 | 테스트 |
+| --- | --- | --- | --- | --- |
+| OPS-01 | 운영자 처리는 사유가 필수다(앞뒤 공백을 빼고 1~1,000자). 빈칸이면 아무것도 하지 않는다 | #373 공통 | ✅ | `src/server/admin/reason.test.ts` 빈칸·공백만·글자가 아닌 값은 REASON_REQUIRED<br>`src/server/admin/payment-issues.test.ts` 사유가 빈칸이면 REASON_REQUIRED |
+| OPS-02 | 결제·환불 확인 화면에 정리 작업이 고치지 못한 건을 모은다: 60분이 지난 결제 대기·결제 확인(예약 안 됨) 주문, 30분이 지난 진행 중 고객 취소·합의 후 취소, 금액 확인이 필요하고 [확인함]이 없는 환불 | #373 ① | ✅ | `src/app/admin/payment-issues/queries.db.test.ts` 정리되지 않은 주문: 60분이 지난<br>`src/app/admin/payment-issues/queries.db.test.ts` 끝나지 않은 환불: 30분이 지난<br>`src/app/admin/payment-issues/queries.db.test.ts` 금액 확인이 필요한 환불: 확인할 이유가 있고 |
+| OPS-03 | [다시 시도]는 정리 작업과 같은 함수로 그 건 하나만 다시 정리하고(금액은 그 함수가 계산), 결과와 사유를 운영자 처리 기록에 남긴다. 정리 대상이 되기 전(주문 30분, 취소 5분)이면 TOO_SOON, 이미 정리된 주문이면 ALREADY_RESOLVED, 정리 중 오류는 던지지 않고 "이번에도 정하지 못함"으로 남긴다 | #373 ① | ✅ | `src/server/admin/payment-issues.test.ts` 정리 작업과 같은 기준(30분 전에 만든 주문)으로<br>`src/server/admin/payment-issues.test.ts` 정리 작업과 같은 기준(5분 전에 요청한 취소)으로<br>`src/server/admin/payment-issues.test.ts` 정리 중 오류가 나면 던지지 않고 left로 기록한다<br>`src/server/payments/order-store.db.test.ts` 주문 하나를 주면 그 주문만<br>`src/server/refunds/refund-store.db.test.ts` 예약 하나를 주면 그 예약의 오래된 진행 중 기록만 |
+| OPS-04 | 금액 확인이 필요한 환불의 [확인함]은 환불 줄을 잠근 트랜잭션에서 확인 기록만 남기고 금액·환불은 바꾸지 않는다. 다시 누르면 ALREADY_CHECKED | #373 ① | ✅ | `src/server/admin/payment-issues.test.ts` 환불 줄을 잠근 같은 트랜잭션에서<br>`src/server/admin/payment-issues-store.db.test.ts` 그 환불의 [확인함] 기록만 확인한 것으로 본다 |
