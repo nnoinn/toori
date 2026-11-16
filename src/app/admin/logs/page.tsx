@@ -240,7 +240,7 @@ function AccessTable({ rows }: { rows: AccessLogRow[] }) {
             <th className={HEAD_CELL}>대상</th>
             <th className={HEAD_CELL}>화면</th>
             <th className={HEAD_CELL}>검색어</th>
-            <th className={HEAD_CELL}>접속 IP</th>
+            <th className={cn(HEAD_CELL, 'whitespace-nowrap')}>접속 IP</th>
             <th className={HEAD_CELL}>
               <span className="sr-only">상세</span>
             </th>
