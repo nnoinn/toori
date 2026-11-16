@@ -131,7 +131,9 @@ export function NotificationToaster({
         <Bell className="mt-0.5 size-4 shrink-0" aria-hidden />
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className="font-semibold">{shown.item.title}</span>
-          {shown.item.body ? <span className="line-clamp-2 opacity-80">{shown.item.body}</span> : null}
+          {shown.item.body ? (
+            <span className="line-clamp-2 opacity-80">{shown.item.body}</span>
+          ) : null}
           {shown.more > 0 ? (
             <span className="text-xs opacity-70">새 알림이 {shown.more}개 더 있어요</span>
           ) : null}

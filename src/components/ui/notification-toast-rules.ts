@@ -27,7 +27,8 @@ export function pickToastItems(
     )
     .sort(
       (a, b) =>
-        Date.parse(b.createdAt) - Date.parse(a.createdAt) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0),
+        Date.parse(b.createdAt) - Date.parse(a.createdAt) ||
+        (a.id < b.id ? 1 : a.id > b.id ? -1 : 0),
     );
 }
 
