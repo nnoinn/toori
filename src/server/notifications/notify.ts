@@ -45,7 +45,7 @@ export async function notify(db: Db, input: NewNotification): Promise<void> {
       dedupeKey,
       channel: 'web_push',
       payload: { title, body, url },
-      status: 'sent',
+      status: targets.length === 0 ? 'no_device' : 'sent',
     })
     .onConflictDoNothing({ target: notifications.dedupeKey })
     .returning({ id: notifications.id });
