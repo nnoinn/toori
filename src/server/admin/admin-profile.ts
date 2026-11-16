@@ -1,5 +1,5 @@
 // 운영자 프로필 읽기·이름 정하기 (#372 4장, 11/16 nnoinn). 서버에서만 부른다.
-// 운영자 화면 위 이름과 [이름 정하기·바꾸기](admin-name-edit.tsx), 운영자 기록 화면이 쓴다.
+// 운영자 화면 위 프로필 메뉴와 [이름 바꾸기] 창(admin-profile-menu.tsx, admin-name-edit.tsx), 운영자 기록 화면이 쓴다.
 
 import 'server-only';
 
@@ -17,7 +17,7 @@ export { FALLBACK_ADMIN_NAME } from './admin-name';
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 type DbWriter = Pick<ReturnType<typeof getDb>, 'select' | 'insert'>;
 
-/** 운영자 이름. 아직 정하지 않았으면(프로필 전) null이라 화면 위에 [이름 정하기]를 보여 준다 */
+/** 운영자 이름. 아직 정하지 않았으면(프로필 전) null이라 화면 위에 '운영자'와 메뉴의 [이름 정하기]를 보여 준다 */
 export async function readAdminProfileName(db: DbReader, userId: string): Promise<string | null> {
   const [row] = await db
     .select({ name: adminProfiles.name })
@@ -27,7 +27,7 @@ export async function readAdminProfileName(db: DbReader, userId: string): Promis
 }
 
 /**
- * 운영자 이름을 정하거나 바꾼다(AUTH-13). 프로필이 없으면 만들고, 있으면 이름만 바꾼다(맡은 일은 그대로).
+ * 운영자 이름을 정하거나 바꾼다(AUTH-14). 프로필이 없으면 만들고, 있으면 이름만 바꾼다(맡은 일은 그대로).
  * 다른 운영자가 쓰는 이름(앞뒤 공백·영문 대소문자 무시)이면 NAME_TAKEN. 기록은 운영자 id로 남아서,
  * 이름을 바꾸면 지난 기록에도 새 이름으로 보인다
  */

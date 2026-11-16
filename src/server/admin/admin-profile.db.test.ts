@@ -1,4 +1,4 @@
-// 운영자 이름 정하기·바꾸기 저장 (11/16 nnoinn, AUTH-13). 실제 DB(TEST_DATABASE_URL이 있을 때만)로 확인한다.
+// 운영자 이름 정하기·바꾸기 저장 (11/16 nnoinn, AUTH-14). 실제 DB(TEST_DATABASE_URL이 있을 때만)로 확인한다.
 // 권한 확인은 admin-profile.test.ts가 가짜 로그인으로 본다.
 
 import { eq } from 'drizzle-orm';

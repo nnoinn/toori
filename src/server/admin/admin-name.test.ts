@@ -1,4 +1,4 @@
-// 운영자 이름 규칙 (11/16 nnoinn, AUTH-13). 다른 운영자와 겹치는지는 admin-profile.db.test.ts가 실제 DB로 본다.
+// 운영자 이름 규칙 (11/16 nnoinn, AUTH-14). 다른 운영자와 겹치는지는 admin-profile.db.test.ts가 실제 DB로 본다.
 
 import { describe, expect, it } from 'vitest';
 

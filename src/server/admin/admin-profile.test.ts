@@ -1,4 +1,4 @@
-// 내 운영자 이름 정하기 (11/16 nnoinn, AUTH-13). 권한 확인과 누구 이름으로 저장하는지만 본다.
+// 내 운영자 이름 정하기 (11/16 nnoinn, AUTH-14). 권한 확인과 누구 이름으로 저장하는지만 본다.
 // 로그인·DB는 가짜로 바꿔서 DB 없이 돈다. 겹치는 이름·실제 저장 모양은 admin-profile.db.test.ts가 실제 DB로 본다.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -39,12 +39,17 @@ beforeEach(() => {
 });
 
 describe('updateMyAdminName', () => {
-  it.each([
-    ['운영자가 아니면', fail('FORBIDDEN', '접근 권한이 없어요')],
-    ['로그인하지 않았으면', fail('UNAUTHENTICATED', '로그인이 필요해요')],
-  ])('%s 그 결과를 그대로 돌려주고 DB를 열지 않는다', async (_, auth) => {
-    state.adminAuth = auth;
-    expect(await updateMyAdminName('김투리')).toEqual(auth);
+  it('운영자가 아니면 FORBIDDEN을 그대로 돌려주고 DB를 열지 않는다', async () => {
+    const forbidden = fail('FORBIDDEN', '접근 권한이 없어요');
+    state.adminAuth = forbidden;
+    expect(await updateMyAdminName('김투리')).toEqual(forbidden);
+    expect(state.getDb).not.toHaveBeenCalled();
+  });
+
+  it('로그인하지 않았으면 UNAUTHENTICATED를 그대로 돌려주고 DB를 열지 않는다', async () => {
+    const unauthenticated = fail('UNAUTHENTICATED', '로그인이 필요해요');
+    state.adminAuth = unauthenticated;
+    expect(await updateMyAdminName('김투리')).toEqual(unauthenticated);
     expect(state.getDb).not.toHaveBeenCalled();
   });
 
