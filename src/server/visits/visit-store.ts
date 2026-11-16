@@ -15,6 +15,7 @@ import {
   type VisitResult,
 } from '@/db/schema';
 import { ok, type Result } from '@/lib/result';
+import { CANCEL_REFUND_REASONS } from '@/server/refunds/refund-store';
 
 import { visitFail } from './errors';
 import { visitBlockReason } from './rules';
@@ -26,7 +27,7 @@ type Db = Pick<ReturnType<typeof getDb>, 'select' | 'update'>;
  * 이 샵의 예약을 방문 완료·노쇼로 처리한다. 트랜잭션 안에서 부른다.
  * 예약·매물 줄을 잠그고(FOR UPDATE) 상태를 본 뒤 바꿔서, 동시에 두 번 눌러도 한 번만 처리되고 두 번째는 ALREADY_RECORDED다.
  * 처리하면 예약은 이용 완료 + 방문 결과·처리 시각·처리한 사람, 매물은 '완료'.
- * 손님 취소·합의 후 취소의 환불이 진행 중이면 막는다(CANCEL_IN_PROGRESS). 합의 후 취소는 시작 뒤에도 할 수 있어서,
+ * 손님 취소·합의 후 취소·원장님 귀책 취소의 환불이 진행 중이면 막는다(CANCEL_IN_PROGRESS). 합의 후 취소는 시작 뒤에도 할 수 있어서,
  * 환불이 도는 사이 방문 처리가 끼면 돈은 돌아갔는데 예약이 '완료'로 남을 수 있다(#320)
  * 정산 내역(settlement_items)은 결제 수수료율이 정해진 뒤(W15·W20) 처리된 예약에서 만든다
  */
@@ -73,7 +74,7 @@ export async function recordVisitInTx(
     .where(
       and(
         eq(refunds.reservationId, input.reservationId),
-        inArray(refunds.reason, ['customer_cancel', 'agreed_cancel']),
+        inArray(refunds.reason, CANCEL_REFUND_REASONS),
         eq(refunds.status, 'requested'),
       ),
     )

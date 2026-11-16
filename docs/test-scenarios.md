@@ -116,12 +116,15 @@ PR 검사가 자동으로 막는 것:
 | AGREED-07 | 결제액이 홀수라 50%에 원 미만이 생기면 고객 취소처럼 손님 쪽으로 맞춘다(위약금 쪽에서 버림). 23,457원 → 위약금 11,728원, 손님 환불 11,729원 | 11/12 nnoinn·정산 예시 3장 | ✅ | `tests/docs/rule-docs.test.ts` 합의 후 취소 원 미만은 고객 취소처럼 손님 쪽으로<br>`src/server/refunds/agreed-cancel-rules.test.ts` 원 미만은 고객 취소처럼 손님 쪽으로 맞춘다 |
 | AGREED-06 | 정산 줄을 만들 때 합의 후 취소의 기준 금액은 판매가 × 50%다(판매가 45,000원 → 22,500원, 원장님 정산 21,758원) | X-208·W20·정산 예시 3장 | ✅ | `src/server/settlements/calc-settlement.test.ts` 합의 후 취소는 판매가 × 50% |
 
-## 8. 원장님 귀책 취소 (P1, 준비 중)
+## 8. 원장님 귀책 취소 (P1)
 
 | ID | 시나리오와 기대 | 근거 | 상태 | 테스트 |
 | --- | --- | --- | --- | --- |
 | OWNER-01 | 남은 시간과 상관없이 결제액 100%를 환불하고, 원장님 기준 금액은 0이다 | X-207 | ✅ | `src/server/refunds/calc-refund.test.ts` 남은 시간과 상관없이 결제액 전액 환불, 원장님 기준 금액 0 |
-| OWNER-02 | 고객에게 3,000원 쿠폰(90일)을 주고 쓴 쿠폰은 돌려준다. 원장님 패널티 5,000원은 아직 지급하지 않은 정산금에서 먼저 빼고, 모자라면 다음 정산에서 뺀다 | X-207 | ⏳ | `tests/docs/rule-docs.test.ts` 원장님 귀책 취소의 쿠폰·패널티와 쿠폰 유효기간<br>`src/server/settlements/calc-settlement.test.ts` 모자라면 오래된 것부터 떼고 |
+| OWNER-02 | 고객에게 3,000원 쿠폰(90일)을 주고 쓴 쿠폰은 돌려준다(기한은 원래 그대로, 11/15). 원장님 패널티 5,000원은 아직 지급하지 않은 정산금에서 먼저 빼고, 모자라면 다음 정산에서 뺀다. 다시 처리해도 보상 쿠폰·패널티는 하나다 | X-207·#419 | ✅ | `tests/docs/rule-docs.test.ts` 원장님 귀책 취소의 쿠폰·패널티와 쿠폰 유효기간<br>`src/server/settlements/calc-settlement.test.ts` 모자라면 오래된 것부터 떼고<br>`src/server/refunds/owner-fault-store.db.test.ts` 쓴 쿠폰을 기한 그대로 돌려주고, 보상 쿠폰 3,000원(90일)·패널티 5,000원을 남기고<br>`src/server/refunds/owner-fault-store.db.test.ts` 다시 돌아도 보상 쿠폰·패널티는 하나이고 |
+| OWNER-03 | 원장님은 자기 샵의 예정 예약을 서비스 시작 전(딱 시작 시각부터는 막는다)까지만 원장님 사정으로 취소한다. 시작 뒤 문제는 손님이 이의제기한다. 고객 취소처럼 진행 중으로 먼저 저장하고 포트원에서 전액 돌려준 뒤 한 트랜잭션으로 끝내며, 중간에 멈추면 정리 작업이 같은 방식으로 끝낸다 | S-409·#419 | ✅ | `src/server/refunds/owner-fault-cancel.test.ts` 서비스 시작 시각부터(딱 그 시각 포함)<br>`src/server/refunds/owner-fault-cancel.test.ts` 결제액 전부를 원장님 사정 사유로 환불 진행에 넘기고<br>`src/server/refunds/owner-fault-store.db.test.ts` 내 샵 예약만 읽고, 진행 중인 원장님 귀책 취소가 보이며, 정리 작업 대상이다<br>`src/server/refunds/finish-cancel.test.ts` 정리 작업도 같은 길로 끝낸다 |
+| OWNER-04 | 한 예약에 취소 환불(고객 취소·합의 후 취소·원장님 귀책 취소)은 하나다. 다른 취소가 진행 중이면 CANCEL_FINISHING, 답을 기다리는 합의 후 취소 요청은 원장님 귀책 취소 때 닫는다(11/15) | X-207·#419 | ✅ | `src/db/owner-fault-unique.db.test.ts` 한 예약에 고객 취소·합의 후 취소·원장님 귀책 취소 환불은 합쳐서 하나만<br>`src/server/refunds/owner-fault-cancel.test.ts` 고객 취소·합의 후 취소가 진행 중이면 CANCEL_FINISHING<br>`src/server/refunds/owner-fault-store.db.test.ts` 합의 후 요청을 닫는다 |
+| OWNER-05 | 원장님 귀책 취소가 끝나면 손님에게 "원장님 사정으로 예약이 취소됐어요 / 결제한 금액을 모두 돌려드리고 3,000원 쿠폰을 드렸어요"(쓴 쿠폰을 돌려줬으면 "쓰신 쿠폰도 돌려드렸어요")를 보내고, 원장님에게 재등록 안내는 보내지 않는다(11/15) | #419 | ✅ | `src/server/notifications/alerts.test.ts` 손님에게만 그 예약 상세로. 쓴 쿠폰을 돌려줬으면<br>`src/server/refunds/finish-cancel.test.ts` 손님에게 원장님 사정 알림(재등록 안내 없음) |
 
 ## 9. 방문·노쇼
 

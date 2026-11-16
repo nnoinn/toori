@@ -1,5 +1,5 @@
-// 예약 취소의 DB 읽기·저장 (연결 #9, W14, 합의 후 취소 X-208 #320). 서버에서만 부른다.
-// 고객 취소(customer_cancel)와 합의 후 취소(agreed_cancel)는 같은 방식이다: 포트원을 부르기 전에 진행 중(requested) 기록을 남기고,
+// 예약 취소의 DB 읽기·저장 (연결 #9, W14, 합의 후 취소 X-208 #320, 원장님 귀책 취소 X-207 #419). 서버에서만 부른다.
+// 고객 취소(customer_cancel)·합의 후 취소(agreed_cancel)·원장님 귀책 취소(owner_fault)는 같은 방식이다: 포트원을 부르기 전에 진행 중(requested) 기록을 남기고,
 // 환불이 끝나면 예약·매물을 '취소'로 바꾸며 기록을 끝낸다. 한 예약에 취소 환불 기록은 하나다(refunds_cancel_unique, 원장님 귀책 취소 포함).
 
 import 'server-only';
@@ -8,6 +8,7 @@ import { and, asc, eq, inArray, lt, type SQL, sql } from 'drizzle-orm';
 
 import { getDb } from '@/db';
 import {
+  type CancelActor,
   orders,
   refunds,
   type RefundBand,
@@ -25,9 +26,16 @@ type DbWriter = Pick<ReturnType<typeof getDb>, 'insert' | 'update'>;
  */
 const CANCEL_REFUND = sql`reason in ('customer_cancel', 'agreed_cancel', 'owner_fault')`;
 
-/** 진행 중 기록을 남기는 취소 환불 이유: 고객 취소 / 합의 후 취소 */
-export const CANCEL_REFUND_REASONS = ['customer_cancel', 'agreed_cancel'] as const;
+/** 진행 중 기록을 남기는 취소 환불 이유: 고객 취소 / 합의 후 취소 / 원장님 귀책 취소(#419) */
+export const CANCEL_REFUND_REASONS = ['customer_cancel', 'agreed_cancel', 'owner_fault'] as const;
 export type CancelRefundReason = (typeof CANCEL_REFUND_REASONS)[number];
+
+/** 취소 환불 이유별로 예약에 남기는 취소한 쪽 */
+const CANCEL_ACTOR_OF: Record<CancelRefundReason, CancelActor> = {
+  customer_cancel: 'customer',
+  agreed_cancel: 'agreed',
+  owner_fault: 'owner_fault',
+};
 
 export type CancelTarget = {
   reservationId: string;
@@ -73,6 +81,15 @@ export async function readRefundTarget(
     db,
     and(eq(reservations.id, reservationId), eq(reservations.customerId, customerId)),
   );
+}
+
+/** 이 샵의 예약만(원장님 귀책 취소, #419). 없거나 남의 샵 예약이면 null */
+export async function readRefundTargetForShop(
+  reservationId: string,
+  shopId: string,
+  db: DbReader = getDb(),
+): Promise<RefundTarget | null> {
+  return readTargetWhere(db, and(eq(reservations.id, reservationId), eq(slots.shopId, shopId)));
 }
 
 /** 주문의 예약. 웹훅처럼 고객 없이 볼 때 쓴다. 예약이 없으면 null */
@@ -136,7 +153,7 @@ async function readTargetWhere(db: DbReader, where: SQL | undefined): Promise<Re
       requestedRefund !== null &&
       requestedPenalty !== null
         ? {
-            // 조인 조건이 두 이유만 고른다
+            // 조인 조건이 취소 환불 이유만 고른다
             reason: requestedReason as CancelRefundReason,
             band: requestedBand as RefundBand | null,
             penaltyRate: requestedRate,
@@ -191,7 +208,8 @@ export async function clearRequestedCancel(
 }
 
 /**
- * 환불이 끝난 취소(고객 취소·합의 후 취소)를 기록한다. 트랜잭션 안에서 부른다. 취소한 쪽은 고객 취소 customer, 합의 후 취소 agreed.
+ * 환불이 끝난 취소(고객 취소·합의 후 취소·원장님 귀책 취소)를 기록한다. 트랜잭션 안에서 부른다. 취소한 쪽은 고객 취소 customer,
+ * 합의 후 취소 agreed, 원장님 귀책 취소 owner_fault. 원장님 귀책 취소의 쿠폰·패널티는 owner-fault-store가 같은 트랜잭션에서 남긴다.
  * 예약이 아직 '예정'일 때만 바꿔서, 동시에 두 번 불러도 환불 기록은 한 줄이다. 먼저 기록한 요청이 있으면 false.
  * 진행 중 기록이 그 사이 지워졌어도 돈은 이미 돌아갔으므로 새로 넣는다.
  * 쓴 쿠폰은 돌려주지 않는다(C-407). 원장님 알림(W16)과 정산 내역(W15)은 여기서 만들지 않는다
@@ -223,7 +241,7 @@ export async function finishCancelRecord(
     .set({
       status: 'cancelled',
       cancelledAt: input.requestedAt,
-      cancelActor: input.reason === 'agreed_cancel' ? 'agreed' : 'customer',
+      cancelActor: CANCEL_ACTOR_OF[input.reason],
       hoursBeforeStartAtCancel: input.hoursBeforeStart,
     })
     .where(and(eq(reservations.id, input.reservationId), eq(reservations.status, 'confirmed')))
@@ -254,7 +272,7 @@ export async function finishCancelRecord(
       target: refunds.reservationId,
       targetWhere: CANCEL_REFUND,
       set: done,
-      // 같은 이유의 기록만 끝낸다(고객 취소와 합의 후 취소 기록을 서로의 값으로 덮지 않는다)
+      // 같은 이유의 기록만 끝낸다(다른 이유의 취소 환불 기록을 서로의 값으로 덮지 않는다)
       setWhere: sql`${refunds.reason} = ${input.reason}`,
     });
   if (input.pgCancellationId) {
@@ -359,7 +377,7 @@ export async function readStaleCancels(
     )
     .orderBy(asc(refunds.createdAt))
     .limit(input.limit);
-  // 조건이 두 이유만 고른다
+  // 조건이 취소 환불 이유만 고른다
   return rows.map((row) => ({
     ...row,
     reason: row.reason as CancelRefundReason,
