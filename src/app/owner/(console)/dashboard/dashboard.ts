@@ -54,8 +54,8 @@ export type DashboardWindow = {
   /** 원장님이 마감했으면 사유 */
   closeReason: SlotCloseReason | null;
   newCustomerOnly: boolean;
-  /** 올린 서비스(메뉴 순서)와 할인율 */
-  menus: { name: string; discountRate: number }[];
+  /** 올린 서비스(메뉴 순서)와 할인율. 정가·메뉴 id는 할인율 수정 창이 쓴다 */
+  menus: { menuId: string; name: string; listPrice: number; discountRate: number }[];
   /** 원장님이 마감했을 때 손님이 결제 중이라 남긴 칸(시작 순). 결제가 끝나거나 칸이 닫히면 빠진다. 없으면 [] */
   keptSlots: KeptSlotSummary[];
 };

@@ -120,7 +120,7 @@ export function ServicesStep({
 }
 
 /** 할인율 칩(10~50%) 한 줄. 고른 값이 없으면 아무것도 골라지지 않은 모양 */
-function RateChips({
+export function RateChips({
   label,
   value,
   size,

@@ -175,7 +175,12 @@ export async function selectDashboardWindows(
       }),
       closeReason: row.closeReason as SlotCloseReason | null,
       newCustomerOnly: row.newCustomerOnly,
-      menus: menus.map((menu) => ({ name: menu.name, discountRate: menu.discountRate })),
+      menus: menus.map((menu) => ({
+        menuId: menu.menuId,
+        name: menu.name,
+        listPrice: menu.listPrice,
+        discountRate: menu.discountRate,
+      })),
       keptSlots: keptByWindow.get(row.id) ?? [],
     };
   });

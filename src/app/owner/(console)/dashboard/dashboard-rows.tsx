@@ -4,7 +4,7 @@
 // 탭·필터·마감 확인 창은 owner-dashboard.tsx가 갖고, 여기는 받은 매물을 그리기만 한다.
 // 줄마다 지금 상태로 버튼을 고른다: 판매 전은 [수정]·[마감](O10), 시작 전 취소 매물은 [재등록](O13),
 // 예약이 있는 매물은 [상세](O11). 결제 중(홀딩)이면 [수정]·[마감]을 잠근다.
-// 시간대 매물(#308)은 WindowRow가 그린다: 시간·서비스·최대 할인율·상태와 [마감]. 시간대 안에서 손님이 만든 매물(windowId)은
+// 시간대 매물(#308)은 WindowRow가 그린다: 시간·서비스·최대 할인율·상태와 [수정]·[마감]. [수정]은 서비스마다 할인율만 바꾼다(11/16 정민석). 시간대 안에서 손님이 만든 매물(windowId)은
 // "시간대 예약"으로 표시하고, 원장님이 올린 매물이 아니라서 [수정]·[마감]·[재등록]을 두지 않는다(취소되면 그 시간은 시간대에 저절로 다시 열린다).
 // 손님이 아직 결제 중인 시간대 칸은 매물 줄로 나오지 않는다(ownerListedSlot). 마감한 시간대에 그런 칸이 남아 있으면
 // 시간대 줄에 마감 창과 같은 안내(keptSlotsNotice)를 붙인다(WINDOW-06).
@@ -177,9 +177,12 @@ function windowMenuSummary(menus: DashboardWindow['menus']): string {
  */
 export function WindowRow({
   window,
+  onEdit,
   onClose,
 }: {
   window: DashboardWindow;
+  /** [수정]: 서비스마다 할인율 바꾸기 창(edit-window-dialog.tsx) */
+  onEdit: (window: DashboardWindow) => void;
   onClose: (window: DashboardWindow) => void;
 }) {
   const status = WINDOW_VIEW_STATUS[window.state];
@@ -227,9 +230,14 @@ export function WindowRow({
       </div>
       <div className="flex w-36 shrink-0 justify-end gap-1">
         {window.state === 'closed' ? null : (
-          <Button type="button" variant="outline" onClick={() => onClose(window)}>
-            마감
-          </Button>
+          <>
+            <Button type="button" variant="outline" onClick={() => onEdit(window)}>
+              수정
+            </Button>
+            <Button type="button" variant="outline" onClick={() => onClose(window)}>
+              마감
+            </Button>
+          </>
         )}
       </div>
     </li>
