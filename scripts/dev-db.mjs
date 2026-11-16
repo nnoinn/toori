@@ -127,7 +127,7 @@ export async function openDevDb(commandName) {
   const [{ ready }] = await sql`select to_regclass('public.reservations') is not null as ready`;
   if (!ready) {
     await sql.end();
-    throw new Error('개발 DB에 결제·예약 테이블(W1b)이 아직 없어요. 강규민이 npm run db:migrate로 적용한 뒤에 다시 실행해 주세요.');
+    throw new Error('개발 DB에 결제·예약 테이블(W1b)이 아직 없어요. 강규민이나 nnoinn이 마이그레이션을 적용한 뒤에 다시 실행해 주세요(docs/tech-guide.md "마이그레이션 적용 절차").');
   }
   return { sql, supabaseUrl, secretKey };
 }

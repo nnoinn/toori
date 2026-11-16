@@ -17,6 +17,7 @@
     "format:check": "prettier --check .",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:status": "node scripts/db-status.mjs",
     "db:seed": "node scripts/seed.mjs",
     "scenario": "node scripts/scenario.mjs",
     "screenshot": "node scripts/pr-screenshot.mjs",

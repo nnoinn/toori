@@ -19,7 +19,7 @@
 import { withNextDayMark } from '@/lib/time';
 import { SLOT_START_STEP_MINUTES } from '@/server/policy';
 
-import { type HoursRow, WEEKDAY_LABELS } from './shop-profile';
+import { HOURS_WEEKDAYS, type HoursRow, isHoursTime, WEEKDAY_LABELS } from './shop-profile';
 
 const DAY_MINUTES = 24 * 60;
 const STEP = SLOT_START_STEP_MINUTES;
@@ -27,9 +27,6 @@ const WEEK_DAYS = 7;
 
 /** 하루 칸 수. 30분 칸 48개 */
 export const CELLS_PER_DAY = DAY_MINUTES / STEP;
-
-/** 표의 열 순서. 일(0)부터 토(6)까지(#358) */
-export const TABLE_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 
 /** 켜진 칸. [요일 0=일 ~ 6=토][칸 0=00:00~00:30 … 47=23:30~24:00] */
 export type HoursGrid = boolean[][];
@@ -39,8 +36,6 @@ export type CellPosition = { weekday: number; cell: number };
 
 /** 한 요일 영업 구간(그 날 자정부터 지난 분). end가 1440보다 크면 다음 날 새벽까지 이어진다 */
 type Span = { start: number; end: number };
-
-const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const minutesOf = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
 const pad2 = (value: number) => String(value).padStart(2, '0');
@@ -54,7 +49,7 @@ const emptyGrid = (): HoursGrid =>
 
 /** 영업 구간. 쉬는 날이거나 두 시각을 다 고르지 않았으면 null. 두 시각이 같으면 24시간 */
 function rowSpan(row: HoursRow | undefined): Span | null {
-  if (!row || row.closed || !TIME.test(row.open) || !TIME.test(row.close)) return null;
+  if (!row || row.closed || !isHoursTime(row.open) || !isHoursTime(row.close)) return null;
   const open = minutesOf(row.open);
   const close = minutesOf(row.close);
   return { start: open, end: close > open ? close : close + DAY_MINUTES };
@@ -127,11 +122,11 @@ type DayReading = { kind: 'open'; span: Span } | { kind: 'none' } | { kind: 'spl
  * 전날에서 이어진 새벽 칸 수(carry)를 먼저 정하고, 그 아래 칸에서 그 요일 영업을 찾는다
  */
 function readGrid(grid: HoursGrid, rows: readonly HoursRow[]): DayReading[] {
-  const spans = TABLE_WEEKDAYS.map((weekday) => rowSpan(rowOf(rows, weekday)));
-  const fixed = TABLE_WEEKDAYS.map((weekday) => isOffStep(rowOf(rows, weekday)));
+  const spans = HOURS_WEEKDAYS.map((weekday) => rowSpan(rowOf(rows, weekday)));
+  const fixed = HOURS_WEEKDAYS.map((weekday) => isOffStep(rowOf(rows, weekday)));
   const locked = lockedCells(rows);
   const usable = (weekday: number, cell: number) => grid[weekday][cell] && !locked[weekday][cell];
-  const full = TABLE_WEEKDAYS.map(
+  const full = HOURS_WEEKDAYS.map(
     (weekday) => !fixed[weekday] && grid[weekday].every((_, cell) => usable(weekday, cell)),
   );
 
@@ -167,9 +162,9 @@ function readGrid(grid: HoursGrid, rows: readonly HoursRow[]): DayReading[] {
     return length <= start ? length : 0;
   }
 
-  const carry = TABLE_WEEKDAYS.map(carryInto);
+  const carry = HOURS_WEEKDAYS.map(carryInto);
 
-  return TABLE_WEEKDAYS.map((weekday): DayReading => {
+  return HOURS_WEEKDAYS.map((weekday): DayReading => {
     if (full[weekday]) return { kind: 'open', span: { start: 0, end: DAY_MINUTES } };
     const runs: [number, number][] = [];
     for (let cell = carry[weekday]; cell < CELLS_PER_DAY; cell += 1) {
@@ -212,7 +207,7 @@ export function applyGrid(rows: readonly HoursRow[], painted: HoursGrid): GridRe
   const grid = painted.map((column) => [...column]);
 
   // 전날 영업이 이제 24:00까지 오지 않거나 24시간이 되면, 전날에서 이어진 새벽 칸은 주인이 없어 지운다
-  for (const weekday of TABLE_WEEKDAYS) {
+  for (const weekday of HOURS_WEEKDAYS) {
     const previous = previousWeekday(weekday);
     const previousRow = rowOf(rows, previous);
     const span = rowSpan(previousRow);

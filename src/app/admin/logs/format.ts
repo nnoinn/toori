@@ -30,6 +30,7 @@ export const ACTION_LABELS: Record<string, string> = {
   'dispute.register': '이의제기 등록(카카오톡 채널)',
   'dispute.resolve': '이의제기 결론',
   'visit.override': '방문으로 바꿈(노쇼 취소)',
+  'visit.record': '방문·노쇼 대신 처리',
   'refund.exception': '환불 예외',
   'reservation.void': '예약 무효',
   'settlement.payout_request': '지급 요청',
