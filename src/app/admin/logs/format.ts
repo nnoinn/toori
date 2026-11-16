@@ -122,6 +122,8 @@ export type LogParams = {
   /** 기간(한국 날짜, 둘 다 포함). 없으면 거르지 않는다 */
   from: string | null;
   to: string | null;
+  /** 쪽(1부터, 한 쪽 20줄) */
+  page: number;
 };
 
 const dateSchema = z.iso.date();
@@ -134,7 +136,10 @@ const parseOr = <T>(schema: z.ZodType<T>, value: string | undefined): T | null =
   return parsed.success ? parsed.data : null;
 };
 
-/** 주소 값 읽기. 모르는 탭은 처리 기록, 모르는 정렬은 최근 순, 모양이 틀린 값은 거르지 않는다 */
+/** 쪽 번호 모양(1 이상의 정수) */
+const pageSchema = z.coerce.number().int().min(1);
+
+/** 주소 값 읽기. 모르는 탭은 처리 기록, 모르는 정렬은 최근 순, 모양이 틀린 값은 거르지 않고, 틀린 쪽은 1쪽 */
 export function toLogParams(input: {
   tab?: string;
   sort?: string;
@@ -143,6 +148,7 @@ export function toLogParams(input: {
   target?: string;
   from?: string;
   to?: string;
+  page?: string;
 }): LogParams {
   return {
     tab: LOG_TABS.find((tab) => tab === input.tab) ?? 'actions',
@@ -152,10 +158,11 @@ export function toLogParams(input: {
     target: parseOr(codeSchema, input.target),
     from: parseOr(dateSchema, input.from),
     to: parseOr(dateSchema, input.to),
+    page: parseOr(pageSchema, input.page) ?? 1,
   };
 }
 
-/** 기록 화면 주소. 기본값(처리 기록, 최근 순, 빈 거르기)은 주소에 넣지 않는다 */
+/** 기록 화면 주소. 기본값(처리 기록, 최근 순, 빈 거르기, 1쪽)은 주소에 넣지 않는다 */
 export function logsHref(params: Partial<LogParams> & { tab: LogTab }): string {
   const search = new URLSearchParams();
   if (params.tab !== 'actions') search.set('tab', params.tab);
@@ -164,6 +171,7 @@ export function logsHref(params: Partial<LogParams> & { tab: LogTab }): string {
     const value = params[key];
     if (value) search.set(key, value);
   }
+  if (params.page && params.page > 1) search.set('page', String(params.page));
   const text = search.toString();
   return text ? `/admin/logs?${text}` : '/admin/logs';
 }

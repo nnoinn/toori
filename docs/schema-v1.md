@@ -555,7 +555,9 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | user_agent | text, null | 기기 정보 |
 | created_at | timestamptz | |
 
-### notifications — 알림 발송 기록
+### notifications — 알림 기록·알림함
+
+받는 계정마다 알림을 늘 한 줄 남기고(푸시 알림을 켠 기기가 없어도), 알림함(오른쪽 위 종)에 최근 90일(정책 값 `NOTIFICATION_INBOX_DAYS`)을 보여 준다. 90일이 지난 알림은 매일 정리 작업으로 지운다(개인정보를 오래 두지 않게). 화면 안내(투리를 보고 있을 때 위 가운데 5초)는 1분마다 새 알림을 확인해서 띄운다(#371, 11/13 nnoinn).
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
@@ -565,10 +567,13 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | event | text | 예: `reservation.confirmed`, `reservation.reminder`, `shop.approved` |
 | channel | text | `web_push`(앱 단계에서 `app_push` 추가) |
 | dedupe_key | text, unique | 같은 알림을 두 번 보내지 않게. 예: `reminder:15m:예약ID` |
-| payload | jsonb | |
-| status | text | `sent` / `failed` |
+| payload | jsonb | 알림함에 보이는 `{ title, body, url }`(url은 누르면 열 투리 안 주소) |
+| status | text | 푸시 알림 보낸 결과. `sent` / `failed` / `no_device`(푸시 알림을 켠 기기가 없어서 보내지 않음. 알림함에는 남는다) |
 | error | text, null | |
+| read_at | timestamptz, null | 알림함에서 읽은 시각. 비어 있으면 안 읽음(종의 숫자) |
 | created_at | timestamptz | |
+
+인덱스 `notifications_inbox_idx`(user_id, account_type, created_at, id): 알림함 목록(최근 순)과 안 읽은 수를 찾는다.
 
 ### interest_areas — 관심 동네
 
@@ -733,3 +738,4 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | 2026-11-12 | `disputes`에 `channel`(접수 경로)·`received_at`(접수 시각)·`registered_by`(카카오톡 채널 건을 등록한 운영자)·`outcome`(결론 종류 6개)을 더하고 unique(`reservation_id`)를 건다. 지금 있는 기록은 `app`, `created_at`으로 채운다. check는 양쪽으로: `kakao` ⇔ 등록한 운영자 있음, `resolved` ⇔ 결론 종류 있음. 돈이 오가는 결론 셋은 처리 기능이 생길 때까지 서버가 막는다. 정산 보류는 칸 없이 "`open` 이의제기가 있으면"으로 본다(#350, 11/12 nnoinn). 마이그레이션 0013 |
 | 2026-11-12 | 정산 묶는 방식: 정산 줄은 목요일 새벽 묶기 작업이 지급일 0시(한국 시간) 기준으로 만들고 그날의 결제 수수료율을 쓴다(플랫폼 수수료 방식도 같다. 법인 전환 때는 공급자 약관 시행일 뒤 첫 정산일 묶음부터). 묶음은 샵 하나 × 지급일 하나, 기간은 직전 지급일 다음 날 ~ 지급일. 패널티를 떼고 0원이면 지급 요청 없이 지급 완료(0원)로 끝내고 S-501에 이유를 보인다. `settlement_items`에 unique(`order_id`), `pg_fee_actual` null 허용(#353, 11/12 nnoinn). 마이그레이션 0014 |
 | 2026-11-15 | `admin_profiles`(운영자 프로필: 이름·맡은 일)를 더하고, `admin_actions`(운영자 작업 기록)도 열람 기록처럼 DB 트리거로 고치기·지우기·비우기를 막는다. 프로필은 지우지 않는다(#372 4·5장, 11/13 nnoinn). 마이그레이션 0016 |
+| 2026-11-16 | `notifications`에 `read_at`(알림함 읽은 시각)과 알림함 인덱스를 더하고, `status`에 `no_device`(푸시 알림을 켠 기기 없음)를 더한다. 받는 계정마다 알림을 늘 남겨 알림함에 보여 준다(#371, 11/13 nnoinn). 마이그레이션 0017 |
