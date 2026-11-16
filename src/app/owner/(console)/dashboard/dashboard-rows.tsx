@@ -2,8 +2,10 @@
 
 // 대시보드 목록의 줄들 (O9, S-401). 매물 한 줄(SlotRow)과 맨 위 "처리 필요" 카드(NeedsVisitCard).
 // 탭·필터·마감 확인 창은 owner-dashboard.tsx가 갖고, 여기는 받은 매물을 그리기만 한다.
-// 줄마다 지금 상태로 버튼을 고른다: 판매 전은 [수정]·[마감](O10), 시작 전 취소 매물은 [재등록](O13),
-// 예약이 있는 매물은 [상세](O11). 결제 중(홀딩)이면 [수정]·[마감]을 잠근다.
+// 줄마다 지금 상태로 버튼을 고른다: 판매 전은 [수정]·[마감](O10), 시작 전 취소 매물은 [재등록](O13).
+// 결제 중(홀딩)이면 [수정]·[마감]을 잠근다.
+// 예약이 있는 줄(예약됨·완료·취소, "처리 필요")은 [상세] 버튼 없이 줄을 두 번 누르거나 Enter로 예약 상세(O11)를 연다
+// (11/16 정민석, 공통 UI SelectableRow). 한 번 누르면 그 줄이 연한 초록으로 골라진다. 줄 안의 버튼을 두 번 눌러도 상세로 가지 않는다.
 // 시간대 매물(#308)은 WindowRow가 그린다: 시간·서비스·최대 할인율·상태와 [마감]. 시간대 안에서 손님이 만든 매물(windowId)은
 // "시간대 예약"으로 표시하고, 원장님이 올린 매물이 아니라서 [수정]·[마감]·[재등록]을 두지 않는다(취소되면 그 시간은 시간대에 저절로 다시 열린다).
 // 손님이 아직 결제 중인 시간대 칸은 매물 줄로 나오지 않는다(ownerListedSlot). 마감한 시간대에 그런 칸이 남아 있으면
@@ -17,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Price } from '@/components/ui/price';
 import { formatReservationCode } from '@/components/ui/reservation-code';
+import { SelectableRow, SelectableRows } from '@/components/ui/selectable-rows';
 import { SlotBadges, type SlotBadgeKind } from '@/components/ui/slot-badge';
 import type { SlotStatus } from '@/features/slot-status/slot-status';
 import { formatEndTime, formatKst } from '@/lib/time';
@@ -31,6 +34,8 @@ import {
   type DashboardWindow,
   keptSlotsNotice,
   onHold,
+  ROW_DETAIL_HINT,
+  rowDetailHref,
   SLOT_STATUS_LABELS,
   viewStatus,
   WINDOW_VIEW_STATUS,
@@ -55,9 +60,17 @@ export function SlotRow({
   const badges: SlotBadgeKind[] = [];
   if (slot.newCustomerOnly) badges.push('newCustomerOnly');
   if (held) badges.push('onHold');
+  const detailHref = rowDetailHref(slot);
 
   return (
-    <li className="flex items-center gap-4 px-4 py-3">
+    <SelectableRow
+      as="li"
+      id={slot.id}
+      href={detailHref}
+      title={detailHref ? ROW_DETAIL_HINT : undefined}
+      className="flex items-center gap-4 px-4 py-3"
+    >
+      <DetailHint href={detailHref} />
       <div className="w-36 shrink-0 text-sm">
         <p className="font-semibold">{formatKst(new Date(slot.startAt))}</p>
         <p className="text-muted-foreground">~ {formatEndTime(slot.startAt, slot.endAt)}</p>
@@ -95,7 +108,7 @@ export function SlotRow({
         ) : null}
         {inWindow ? <span className="text-xs text-muted-foreground">시간대 예약</span> : null}
       </div>
-      {/* 버튼이 없는 줄도 같은 폭을 비워 상태 배지 줄을 맞춘다. 취소 매물은 [재등록]·[상세] 두 개라 폭을 넉넉히 */}
+      {/* 버튼이 없는 줄도 같은 폭을 비워 상태 배지 줄을 맞춘다. 판매 전 매물은 [수정]·[마감] 두 개라 폭을 넉넉히 */}
       <div className="flex w-36 shrink-0 justify-end gap-1">
         <SlotActions
           slot={slot}
@@ -115,13 +128,13 @@ export function SlotRow({
           onClose={onClose}
         />
       </div>
-    </li>
+    </SelectableRow>
   );
 }
 
 /**
- * 매물 줄의 버튼. 판매 전이면 [수정]·[마감](결제 중이면 둘 다 잠금), 다시 올릴 수 있는 취소 매물이면 [재등록],
- * 예약이 있으면 [상세]. 잠긴 [수정]은 링크가 아니라 누를 수 없는 버튼으로 그린다(링크는 잠글 수 없다)
+ * 매물 줄의 버튼. 판매 전이면 [수정]·[마감](결제 중이면 둘 다 잠금), 다시 올릴 수 있는 취소 매물이면 [재등록].
+ * 예약 상세는 버튼 없이 줄을 두 번 눌러 연다. 잠긴 [수정]은 링크가 아니라 누를 수 없는 버튼으로 그린다(링크는 잠글 수 없다)
  */
 function SlotActions({
   slot,
@@ -159,7 +172,6 @@ function SlotActions({
           <Link href={`/owner/slots/${slot.id}/relist`}>재등록</Link>
         </Button>
       ) : null}
-      {slot.reservationId ? <DetailButton reservationId={slot.reservationId} /> : null}
     </>
   );
 }
@@ -185,8 +197,9 @@ export function WindowRow({
   const status = WINDOW_VIEW_STATUS[window.state];
   const maxRate = Math.max(0, ...window.menus.map((menu) => menu.discountRate));
   const keptNotice = keptSlotsNotice(window.keptSlots);
+  // 시간대 줄은 열 상세가 없어서 고르기만 된다(같은 목록의 매물 줄과 똑같이 골라진다)
   return (
-    <li className="flex items-center gap-4 px-4 py-3">
+    <SelectableRow as="li" id={window.id} className="flex items-center gap-4 px-4 py-3">
       <div className="w-36 shrink-0 text-sm">
         <p className="font-semibold">{formatKst(new Date(window.startAt))}</p>
         <p className="text-muted-foreground">~ {formatEndTime(window.startAt, window.endAt)}</p>
@@ -232,14 +245,14 @@ export function WindowRow({
           </Button>
         )}
       </div>
-    </li>
+    </SelectableRow>
   );
 }
 
 /**
  * 맨 위 "처리 필요"(#21 Q12). 자동으로 처리하지 않아서 처리할 때까지 계속 보인다.
  * 줄에서 바로 [방문 완료]·[노쇼]를 누를 수 있다(#23 B1). 누르면 대시보드의 확인 창(onVisit)이 열리고,
- * 거기서 한 번 더 눌러야 처리된다. [상세]는 예약 상세(O11)로 간다
+ * 거기서 한 번 더 눌러야 처리된다. 줄을 두 번 누르거나 Enter를 누르면 예약 상세(O11)로 간다(11/16 정민석)
  */
 export function NeedsVisitCard({
   slots,
@@ -261,9 +274,17 @@ export function NeedsVisitCard({
         </p>
       </CardHeader>
       <CardContent className="py-0">
-        <ul className="divide-y">
+        <SelectableRows as="ul" className="-mx-2 divide-y">
           {slots.map((slot) => (
-            <li key={slot.id} className="flex items-center gap-4 py-2 text-sm">
+            <SelectableRow
+              as="li"
+              key={slot.id}
+              id={slot.id}
+              href={rowDetailHref(slot)}
+              title={ROW_DETAIL_HINT}
+              className="flex items-center gap-4 px-2 py-2 text-sm"
+            >
+              <DetailHint href={rowDetailHref(slot)} />
               <span className="w-36 shrink-0 font-medium">{formatKst(new Date(slot.startAt))}</span>
               <span className="min-w-0 flex-1 truncate">{slot.menuName}</span>
               {slot.reservationCode ? (
@@ -283,24 +304,22 @@ export function NeedsVisitCard({
                   >
                     {VISIT_ACTIONS.no_show.button}
                   </Button>
-                  <DetailButton reservationId={slot.reservationId} />
                 </div>
               ) : null}
-            </li>
+            </SelectableRow>
           ))}
-        </ul>
+        </SelectableRows>
       </CardContent>
     </Card>
   );
 }
 
-/** 예약이 있는 매물(예약됨·완료·취소)과 "처리 필요" 줄에서 예약 상세(O11)로 간다 */
-function DetailButton({ reservationId }: { reservationId: string }) {
-  return (
-    <Button asChild variant="outline">
-      <Link href={`/owner/reservations/${reservationId}`}>상세</Link>
-    </Button>
-  );
+/**
+ * 화면 읽기 프로그램용 안내. [상세] 버튼이 없어서, 예약이 있는 줄에 가면 Enter로 예약 상세를 연다고 읽어 준다.
+ * 마우스로 쓰는 사람에게는 줄의 title(ROW_DETAIL_HINT)이 같은 일을 한다
+ */
+function DetailHint({ href }: { href: string | null }) {
+  return href ? <span className="sr-only">Enter를 누르면 예약 상세가 열려요.</span> : null;
 }
 
 /** 화면 상태(viewStatus) 배지. 같은 이름 6개(X-301)만 쓴다 */
