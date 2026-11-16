@@ -202,6 +202,7 @@ PR 검사가 자동으로 막는 것:
 | AUTH-12 | 고객 계정을 만들 때 이름이 필수다(앞뒤 공백 빼고 1~30자). 예약한 샵에는 예약자 이름과 휴대폰 번호만 보인다(닉네임은 주지 않는다) | #375, 11/13 nnoinn | ✅ | `src/server/auth/customer-account.test.ts` 이름을 보내지 않은 요청도 NAME_REQUIRED<br>`src/server/auth/customer-account.test.ts` 이름을 비우면<br>`src/app/owner/(console)/reservations/reservation-detail-store.db.test.ts` 그 샵 예약을 매물·예약자 정보(이름·휴대폰, 닉네임은 빼고)와 같이 읽는다 |
 | AUTH-13 | 원장님은 자기 계정 이력만 보고, 운영자는 원장님·고객 계정 이력을 모두 본다. 운영자가 이력을 보면 열람 기록에 남는다 | #374, 11/13 nnoinn | ✅ | `src/server/accounts/history.test.ts` 지금 들어온 원장님 계정의 샵 이력만 읽는다<br>`src/server/accounts/history.test.ts` 원장님 이력: 그 원장님의 샵 이력을 읽고, 열람 기록을 남긴다<br>`src/server/accounts/history.test.ts` 운영자가 아니면 읽지도 기록하지도 않는다<br>`src/server/accounts/history-store.db.test.ts` 다른 샵과 시간대 안 손님 칸은 빼고 |
 | AUTH-14 | 운영자는 화면 위 오른쪽 프로필 메뉴의 [이름 바꾸기]로 자기 운영자 이름만 정하고 바꿀 수 있다(앞뒤 공백 빼고 1~20자). '운영자'와 다른 운영자가 쓰는 이름(앞뒤 공백·영문 대소문자 무시)은 쓸 수 없다. 운영자 기록에는 그 이름으로 보인다 | 11/16 nnoinn | ✅ | `src/server/admin/admin-profile.test.ts` 운영자가 아니면 FORBIDDEN을 그대로 돌려주고 DB를 열지 않는다<br>`src/server/admin/admin-profile.test.ts` 로그인한 운영자 자기 id로<br>`src/server/admin/admin-profile.db.test.ts` 다른 운영자가 쓰는 이름은<br>`src/server/admin/admin-name.test.ts` 이름을 정하지 않은 운영자에게 보이는 |
+| AUTH-15 | 간편 로그인을 끝까지 마치면 그 방식을 이 기기(브라우저)에 1년 동안 기억하고(로그아웃해도 남는다), 첫 화면·로그인 화면·운영자 입구에서 그 버튼에 "최근 로그인" 표시를 한다. 로그인을 마치지 못하면(취소·세션 실패·이메일 없음·운영자 아님) 바꾸지 않는다 | 11/16 nnoinn | ✅ | `src/app/api/auth/callback/route.test.ts` 로그인을 마치면 누른 간편 로그인을 이 기기의 최근 로그인으로 1년 동안 기억한다<br>`src/app/api/auth/callback/route.test.ts` 로그인을 마치지 못하면<br>`src/server/auth/recent-provider.test.ts` 버튼에 없는 값 |
 
 ## 15. 시간대 매물 (#308, 진행 중)
 
@@ -229,3 +230,15 @@ PR 검사가 자동으로 막는 것:
 | FLOW-05 | 이의제기 → 정산 보류 → 운영자 결론 → 보류 해제 → 목요일 정산에 들어간다 | A-104·X-206 | ⏳ | |
 | FLOW-06 | 실제 포트원 테스트 결제창으로 결제하고 환불까지 확인한다(결제사 화면이라 로봇이 누르지 않는다) | W11·W14 | 🖐 | |
 | FLOW-07 | 웹 푸시가 실제 기기(PC·폰)에 뜨고, 누르면 맞는 화면이 열린다 | W16 | 🖐 | |
+
+## 17. 운영자 문제 대처 (#373, 진행 중)
+
+운영자가 문제를 직접 고치는 기능이다(11/13 nnoinn 결정, 순서 ① → ③ → ⑥ → ② → ④ → ⑤). 항목이 들어올 때마다 줄을 더한다.
+
+| ID | 시나리오와 기대 | 근거 | 상태 | 테스트 |
+| --- | --- | --- | --- | --- |
+| OPS-01 | 운영자 처리는 사유가 필수다(앞뒤 공백을 빼고 1~1,000자). 빈칸이면 아무것도 하지 않는다 | #373 공통 | ✅ | `src/server/admin/reason.test.ts` 빈칸·공백만·글자가 아닌 값은 REASON_REQUIRED<br>`src/server/admin/payment-issues.test.ts` 사유가 빈칸이면 REASON_REQUIRED |
+| OPS-02 | 결제·환불 확인 화면에 정리 작업이 고치지 못한 건을 모은다: 60분이 지난 결제 대기·결제 확인(예약 안 됨) 주문, 30분이 지난 진행 중 고객 취소·합의 후 취소, 금액 확인이 필요하고 [확인함]이 없는 환불 | #373 ① | ✅ | `src/app/admin/payment-issues/queries.db.test.ts` 정리되지 않은 주문: 60분이 지난<br>`src/app/admin/payment-issues/queries.db.test.ts` 끝나지 않은 환불: 30분이 지난<br>`src/app/admin/payment-issues/queries.db.test.ts` 금액 확인이 필요한 환불: 확인할 이유가 있고 |
+| OPS-03 | [다시 시도]는 정리 작업과 같은 함수로 그 건 하나만 다시 정리하고(금액은 그 함수가 계산), 결과와 사유를 운영자 처리 기록에 남긴다. 정리 대상이 되기 전(주문 30분, 취소 5분)이면 TOO_SOON, 이미 정리된 주문이면 ALREADY_RESOLVED, 정리 중 오류는 던지지 않고 "이번에도 정하지 못함"으로 남긴다 | #373 ① | ✅ | `src/server/admin/payment-issues.test.ts` 정리 작업과 같은 기준(30분 전에 만든 주문)으로<br>`src/server/admin/payment-issues.test.ts` 정리 작업과 같은 기준(5분 전에 요청한 취소)으로<br>`src/server/admin/payment-issues.test.ts` 정리 중 오류가 나면 던지지 않고 left로 기록한다<br>`src/server/payments/order-store.db.test.ts` 주문 하나를 주면 그 주문만<br>`src/server/refunds/refund-store.db.test.ts` 예약 하나를 주면 그 예약의 오래된 진행 중 기록만 |
+| OPS-04 | 금액 확인이 필요한 환불의 [확인함]은 환불 줄을 잠근 트랜잭션에서 확인 기록만 남기고 금액·환불은 바꾸지 않는다. 다시 누르면 ALREADY_CHECKED | #373 ① | ✅ | `src/server/admin/payment-issues.test.ts` 환불 줄을 잠근 같은 트랜잭션에서<br>`src/server/admin/payment-issues-store.db.test.ts` 그 환불의 [확인함] 기록만 확인한 것으로 본다 |
+| OPS-07 | 예약 작업 4개는 돌 때마다 시작·끝·성공 여부·처리 개수·실패 이유(오류 이름과 메시지 첫 줄, DB 오류의 값은 남기지 않음)를 남기고, 실패하면 기록한 뒤 오류를 그대로 낸다. 30일 지난 기록은 그 작업이 끝날 때 지운다. 마지막 성공이 결제 정리 30분·리마인드 15분·하루 작업 26시간보다 오래되거나, 3번 이어서 실패하거나(10분 넘게 안 끝난 실행 포함), 기록이 없으면 운영자 화면 위에 경고한다 | #373 ⑥, 11/16 | ✅ | `src/app/admin/jobs/status.test.ts` 마지막 성공이 결제 정리 30분<br>`src/app/admin/jobs/status.test.ts` 최근부터 3번 이어서 실패<br>`src/app/admin/jobs/status.test.ts` 기록이 하나도 없으면 기록 없음<br>`src/server/cron/run-log.test.ts` Drizzle이 감싼 DB 오류는 원래 오류를 쓰고<br>`src/server/cron/run-log.db.test.ts` 실패하면 실패와 오류 이름·메시지를 남기고<br>`src/server/cron/run-log.db.test.ts` 끝날 때 그 작업의 30일 지난 기록만 지운다<br>`src/app/api/cron/reminders/route.test.ts` 작업을 "reminders" 이름과 서버 시각으로 감싸고 |

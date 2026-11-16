@@ -323,7 +323,12 @@ export async function finishAdminCancel(
 /** 정리 작업이 볼 오래된 진행 중 취소(고객 취소·합의 후 취소). 오래된 것부터 */
 export async function readStaleCancels(
   db: DbReader,
-  input: { requestedBefore: Date; limit: number },
+  input: {
+    requestedBefore: Date;
+    limit: number;
+    /** 이 예약의 취소만 본다(운영자 [다시 시도], #373 ①) */
+    reservationId?: string;
+  },
 ): Promise<CancelRequest[]> {
   const rows = await db
     .select({
@@ -349,6 +354,7 @@ export async function readStaleCancels(
         inArray(refunds.reason, CANCEL_REFUND_REASONS),
         eq(refunds.status, 'requested'),
         lt(refunds.createdAt, input.requestedBefore),
+        input.reservationId ? eq(reservations.id, input.reservationId) : undefined,
       ),
     )
     .orderBy(asc(refunds.createdAt))
