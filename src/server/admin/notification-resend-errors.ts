@@ -19,9 +19,7 @@ export const NOTIFICATION_RESEND_ERRORS = {
 
 export type NotificationResendErrorCode = keyof typeof NOTIFICATION_RESEND_ERRORS;
 
-export type NotificationResendResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: ResultError };
+export type NotificationResendResult<T> = { ok: true; data: T } | { ok: false; error: ResultError };
 
 export function notificationResendFail(code: NotificationResendErrorCode): {
   ok: false;

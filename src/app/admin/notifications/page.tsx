@@ -138,7 +138,7 @@ function IssuesTable({ tab, rows }: { tab: NotificationIssueTab; rows: Notificat
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.notificationId} className="border-b last:border-b-0 align-top">
+            <tr key={row.notificationId} className="border-b align-top last:border-b-0">
               <td className={cn(CELL, 'whitespace-nowrap')}>{formatKstDateTime(row.createdAt)}</td>
               <td className={cn(CELL, 'whitespace-nowrap')}>
                 <span className="text-muted-foreground">
@@ -153,9 +153,7 @@ function IssuesTable({ tab, rows }: { tab: NotificationIssueTab; rows: Notificat
               {tab === 'failed' ? (
                 <td className={cn(CELL, 'whitespace-nowrap')}>{labelPushErrors(row.error)}</td>
               ) : null}
-              <td className={cn(CELL, 'whitespace-nowrap')}>
-                {row.readAt ? '읽음' : '안 읽음'}
-              </td>
+              <td className={cn(CELL, 'whitespace-nowrap')}>{row.readAt ? '읽음' : '안 읽음'}</td>
               <td className={cn(CELL, 'whitespace-nowrap')}>
                 {row.devices > 0 ? `${row.devices}대` : '없음'}
               </td>
@@ -163,7 +161,9 @@ function IssuesTable({ tab, rows }: { tab: NotificationIssueTab; rows: Notificat
                 {row.devices > 0 ? (
                   <ResendAction notificationId={row.notificationId} title={row.title} />
                 ) : (
-                  <span className="text-xs text-muted-foreground">기기가 생기면 보낼 수 있어요</span>
+                  <span className="text-xs text-muted-foreground">
+                    기기가 생기면 보낼 수 있어요
+                  </span>
                 )}
               </td>
             </tr>

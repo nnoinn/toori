@@ -18,7 +18,10 @@ export function toNotificationIssueTab(value: string | undefined): NotificationI
 }
 
 /** 목록 주소. 첫 쪽이면 page를 넣지 않는다 */
-export function notificationIssuesHref(input: { tab: NotificationIssueTab; page?: number }): string {
+export function notificationIssuesHref(input: {
+  tab: NotificationIssueTab;
+  page?: number;
+}): string {
   const params = new URLSearchParams({ tab: input.tab });
   if (input.page && input.page > 1) params.set('page', String(input.page));
   return `${NOTIFICATION_ISSUES_PATH}?${params}`;

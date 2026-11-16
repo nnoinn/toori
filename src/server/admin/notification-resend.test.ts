@@ -64,7 +64,11 @@ beforeEach(() => {
     userId: USER_ID,
     accountType: 'customer',
     status: 'no_device',
-    payload: { title: '예약이 확정됐어요', body: '샘플 헤어 · 11/17(월) 14:00', url: '/reservations/r-1' },
+    payload: {
+      title: '예약이 확정됐어요',
+      body: '샘플 헤어 · 11/17(월) 14:00',
+      url: '/reservations/r-1',
+    },
   };
   state.targets = [{ endpoint: 'a' }, { endpoint: 'b' }];
   state.claimed = true;
