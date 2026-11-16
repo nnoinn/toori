@@ -163,6 +163,7 @@ describeDb('원장님 정산 내역 읽기 (실제 DB)', () => {
         hasAdminRefund: false,
         hasOpenDispute: false,
         openDisputeReceivedAt: null,
+        hasAdminHold: false,
         ownerPenalty: null,
         item: null,
       });
