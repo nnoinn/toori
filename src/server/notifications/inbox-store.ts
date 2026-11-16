@@ -53,7 +53,6 @@ export function toMyNotification(row: InboxRow): MyNotification {
 function mine(owner: InboxOwner): SQL | undefined {
   return and(
     eq(notifications.userId, owner.userId),
-    eq(notifications.accountType, owner.accountType),
     gte(notifications.createdAt, owner.from),
   );
 }
@@ -72,7 +71,7 @@ export async function selectInboxPage(
   const after =
     input.afterId === null
       ? undefined
-      : sql`(${notifications.createdAt}, ${notifications.id}) < (
+      : sql`(${notifications.createdAt}, ${notifications.id}) <= (
           select c.created_at, c.id from ${notifications} c
           where c.id = ${input.afterId} and c.user_id = ${owner.userId} and c.account_type = ${owner.accountType}
         )`;
