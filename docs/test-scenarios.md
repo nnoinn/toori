@@ -77,7 +77,7 @@ PR 검사가 자동으로 막는 것:
 | SHOW-02 | 시작까지 6시간 미만이면 임박·환불 불가로 표시하고, 딱 6시간이면 표시하지 않는다 | C-203·C-308 | ✅ | `src/features/map/slot-list/badges.test.ts` 6시간 미만이면 환불 불가·임박, 딱 6시간이면 없음<br>`src/server/policy/slot-time.test.ts` 딱 6시간 남았으면 임박·환불 불가가 아니다 |
 | SHOW-03 | 다른 고객이 홀딩 중인 매물은 목록에 그대로 두고 "결제 중"으로 표시한다. 내 홀딩과 끝난 홀딩은 표시하지 않고, 서버 시각으로 판단한다 | C-404 | ✅ | `src/features/map/slot-list/badges.test.ts` 다른 고객이 홀딩 중이면 결제 중 배지<br>`src/features/map/slot-list/queries.db.test.ts` 배지는 서버 시각으로 |
 | SHOW-04 | 매물 상세에는 접힌 "환불 규정" 한 줄만 두고, 규정 문구는 결제 동의 문구와 글자까지 같다 | C-305·C-402 | ✅ | `src/app/(customer)/(tabs)/slots/[slotId]/detail-format.test.ts` 결제 동의 문구(consent-texts.md 3장)와 글자까지 같다 |
-| SHOW-05 | 샵 영업시간은 일~토 순서로 보여 준다(고객 매물 상세, 원장님 매장 설정의 표와 요일별 칸) | 11/15 nnoinn, #431, #437 | ⏳ | |
+| SHOW-05 | 샵 영업시간은 일~토 순서로 보여 준다(고객 매물 상세, 원장님 매장 설정의 표와 요일별 칸) | 11/15 nnoinn, #431, #437 | ⏳ | `src/app/owner/(console)/settings/shop/shop-profile.test.ts` 저장된 영업시간을 일~토 7줄로 바꾸고 |
 
 ## 5. 홀딩·결제
 
