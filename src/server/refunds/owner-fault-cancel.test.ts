@@ -41,6 +41,7 @@ vi.mock('./cancel-flow', () => ({
 const { cancelByOwnerFault, previewOwnerFaultCancel } = await import('./owner-fault-cancel');
 
 const TARGET: RefundTarget = {
+  voidInProgress: false,
   reservationId: RESERVATION,
   orderId: 'order-1',
   slotId: 'slot-1',

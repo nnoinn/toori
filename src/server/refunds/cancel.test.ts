@@ -75,6 +75,7 @@ const { cancelReservation, previewRefund } = await import('./cancel');
 
 function target(extra: Partial<RefundTarget> = {}): RefundTarget {
   return {
+    voidInProgress: false,
     reservationId: RESERVATION,
     orderId: 'order-1',
     slotId: 'slot-1',

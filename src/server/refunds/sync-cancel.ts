@@ -44,7 +44,8 @@ export async function syncUnrecordedCancel(
     console.error('[cancel] 확정된 주문에 예약이 없어요:', orderId);
     return 'cancel_known';
   }
-  if (target.requested) return 'retry';
+  // 진행 중인 취소나 예약 무효(A-108)가 끝낸다
+  if (target.requested || target.voidInProgress) return 'retry';
   if (target.status !== 'confirmed') {
     if (target.status === 'completed') {
       console.error('[cancel] 이용 완료한 예약에 포트원 취소가 있어요:', target.reservationId);

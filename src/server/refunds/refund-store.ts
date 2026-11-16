@@ -66,6 +66,8 @@ export type RefundTarget = CancelTarget & {
   couponAmount: number;
   /** 진행 중인 취소(고객 취소 또는 합의 후 취소). 없으면 null */
   requested: RequestedCancel | null;
+  /** 예약 무효(A-108)가 진행 중이다. 그동안 취소·웹훅은 시작하지 않고 무효 흐름이 끝내기를 기다린다 */
+  voidInProgress: boolean;
 };
 
 /** 진행 중으로 남은 취소 하나 */
@@ -118,6 +120,7 @@ async function readTargetWhere(db: DbReader, where: SQL | undefined): Promise<Re
       requestedRefund: refunds.refundAmount,
       requestedPenalty: refunds.penaltyAmount,
       requestedAt: refunds.createdAt,
+      voidInProgress: sql<boolean>`exists (select 1 from ${refunds} v where v.reservation_id = ${reservations.id} and v.reason = 'void' and v.status = 'requested')`,
     })
     .from(reservations)
     .innerJoin(orders, eq(orders.id, reservations.orderId))

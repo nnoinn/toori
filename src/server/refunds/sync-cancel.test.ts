@@ -52,6 +52,7 @@ const CONSOLE = { cancellationId: 'c-9', amount: 17_500, reasons: ['콘솔에서
 
 function target(extra: Partial<RefundTarget> = {}): RefundTarget {
   return {
+    voidInProgress: false,
     reservationId: 'reservation-1',
     orderId: 'order-1',
     slotId: 'slot-1',
