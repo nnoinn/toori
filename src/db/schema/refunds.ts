@@ -21,13 +21,14 @@ import { settlements } from './settlements';
 import { shops } from './shops';
 import { createdAt, inValues, timestamptz } from './types';
 
-/** 환불 사유: 고객 취소 / 원장님 귀책 / 자동 취소 / 운영자 예외 / 합의 후 취소(X-208, #320) */
+/** 환불 사유: 고객 취소 / 원장님 귀책 / 자동 취소 / 운영자 예외 / 합의 후 취소(X-208, #320) / 예약 무효(A-108, #423) */
 export const REFUND_REASONS = [
   'customer_cancel',
   'owner_fault',
   'auto_cancel',
   'admin_exception',
   'agreed_cancel',
+  'void',
 ] as const;
 export type RefundReason = (typeof REFUND_REASONS)[number];
 
@@ -83,6 +84,10 @@ export const refunds = pgTable(
     uniqueIndex('refunds_cancel_unique')
       .on(t.reservationId)
       .where(sql`${t.reason} in ('customer_cancel', 'agreed_cancel', 'owner_fault')`),
+    // 무효 환불(A-108)은 예약 하나에 하나만. 고객 취소로 일부 돌려준 예약에도 남은 금액을 한 번 더 돌려줄 수 있어서 취소 환불과 따로 둔다(#423)
+    uniqueIndex('refunds_void_unique')
+      .on(t.reservationId)
+      .where(sql`${t.reason} = 'void'`),
     // 정리 작업이 오래된 진행 중 기록을 찾을 때
     index('refunds_requested_created_at_idx')
       .on(t.createdAt)
