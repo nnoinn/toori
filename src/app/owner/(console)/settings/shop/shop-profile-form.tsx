@@ -2,6 +2,8 @@
 
 // 샵 정보 입력 폼 (O2, S-103). 저장 전에 화면에서 한 번 검사하고, 서버 함수가 다시 검사한다.
 // 영업시간 칸은 business-hours-editor.tsx가 그리고, 값과 오류는 이 폼이 한 곳에서 갖는다.
+// 영업시간을 바꿔서 영업시간 밖이 되는 매물이 있으면 서버가 목록을 돌려주고, 확인 창(hours-change-dialog.tsx)에서
+// [네]를 누르면 그 목록을 담아 다시 저장한다(11/16 정민석).
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
@@ -29,6 +31,8 @@ import { getCategoryChangeImpact, saveShopProfile } from './actions';
 import { AddressSearchButton } from './address-search-button';
 import { BusinessHoursEditor } from './business-hours-editor';
 import type { CategoryChangeImpact } from './category-change-store';
+import type { HoursChangeImpact } from './hours-change';
+import { HoursChangeDialog } from './hours-change-dialog';
 import {
   CATEGORY_CHANGE_BLOCKED_MESSAGE,
   type HoursRow,
@@ -70,6 +74,11 @@ export function ShopProfileForm({
   // 마지막으로 저장된 업종. 이것과 다르면 업종 변경 확인(2단계)을 거친다
   const [savedCategory, setSavedCategory] = useState(initial.category);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
+  // 영업시간 밖이 되는 매물 확인 창. 다시 저장할 때 업종 변경 확인 여부도 그대로 넘긴다
+  const [hoursConfirm, setHoursConfirm] = useState<{
+    impact: HoursChangeImpact;
+    confirmCategoryChange: boolean;
+  } | null>(null);
 
   /**
    * 칸 하나를 바꾼다. "저장했어요" 문구는 지금 입력과 헷갈리지 않게 지운다.
@@ -107,12 +116,31 @@ export function ShopProfileForm({
 
   /**
    * 서버에 저장한다. confirmCategoryChange는 업종 변경 확인 창을 거쳤을 때만 true다.
-   * 서버는 이 값 없이 업종이 바뀐 저장을 거절해서, 확인 없이 메뉴가 초기화되는 일을 막는다
+   * 서버는 이 값 없이 업종이 바뀐 저장을 거절해서, 확인 없이 메뉴가 초기화되는 일을 막는다.
+   * confirmHoursClose는 영업시간 확인 창에서 [네]를 눌렀을 때 그 창에 있던 마감할 매물 id다
    */
-  function submit(next: ShopProfileInput, confirmCategoryChange: boolean) {
+  function submit(
+    next: ShopProfileInput,
+    confirmCategoryChange: boolean,
+    confirmHoursClose?: string[],
+  ) {
     startTransition(async () => {
-      const result = await saveShopProfile(shopId, next, { confirmCategoryChange });
+      const result = await saveShopProfile(shopId, next, {
+        confirmCategoryChange,
+        confirmHoursClose,
+      });
       setConfirm(null);
+      setHoursConfirm(null);
+      if (
+        !result.ok &&
+        result.error.code === 'HOURS_CHANGE_NOT_CONFIRMED' &&
+        result.error.hoursImpact
+      ) {
+        // 아직 저장하지 않았다. 확인 창을 띄우고 [네]를 기다린다
+        setHoursConfirm({ impact: result.error.hoursImpact, confirmCategoryChange });
+        setStatus({ kind: 'idle' });
+        return;
+      }
       if (result.ok) {
         setSavedCategory(next.category);
         // 저장한 모양(전화번호는 하이픈 넣은 모양 등)으로 칸을 맞춘다. 새로고침하지 않아도 저장된 값이 보인다
@@ -126,11 +154,13 @@ export function ShopProfileForm({
             description: saved.data.description ?? '',
           }));
         }
+        const base = confirmCategoryChange
+          ? `업종을 바꿨어요.${result.data.resetMenus > 0 ? ` 메뉴 ${result.data.resetMenus}개를 초기화했어요.` : ''} 새 업종에 맞는 메뉴를 등록해 주세요`
+          : '저장했어요';
+        const closed = hoursClosedMessage(result.data);
         setStatus({
           kind: 'saved',
-          message: confirmCategoryChange
-            ? `업종을 바꿨어요.${result.data.resetMenus > 0 ? ` 메뉴 ${result.data.resetMenus}개를 초기화했어요.` : ''} 새 업종에 맞는 메뉴를 등록해 주세요`
-            : '저장했어요',
+          message: closed ? `${base}.${closed}` : base,
           showMenuLink: confirmCategoryChange,
         });
         return;
@@ -342,8 +372,38 @@ export function ShopProfileForm({
         onConfirmStep1={confirmStep1}
         onConfirmStep2={() => submit(form, true)}
       />
+      <HoursChangeDialog
+        impact={hoursConfirm?.impact ?? null}
+        pending={pending}
+        onCancel={() => {
+          setHoursConfirm(null);
+          setStatus({ kind: 'error', message: '저장하지 않았어요' });
+        }}
+        onConfirm={() =>
+          hoursConfirm &&
+          submit(
+            form,
+            hoursConfirm.confirmCategoryChange,
+            hoursConfirm.impact.close.map((item) => item.id),
+          )
+        }
+      />
     </form>
   );
+}
+
+/** 저장 뒤 문구에 덧붙이는 마감 결과. 예: " 매물 2개와 시간대 매물 1개를 마감했어요(사유: 기타)" */
+function hoursClosedMessage(data: { closedSlots: number; closedWindows: number; skipped: number }) {
+  const parts = [
+    data.closedSlots > 0 ? `매물 ${data.closedSlots}개` : null,
+    data.closedWindows > 0 ? `시간대 매물 ${data.closedWindows}개` : null,
+  ].filter(Boolean);
+  const closed = parts.length > 0 ? ` ${parts.join('와 ')}를 마감했어요(사유: 기타).` : '';
+  const skipped =
+    data.skipped > 0
+      ? ` ${data.skipped}개는 그사이 손님이 결제를 시작해서 마감하지 못했어요. 대시보드에서 확인해 주세요.`
+      : '';
+  return closed + skipped;
 }
 
 /** 업종 변경 2단계 확인 창 (10/29 nnoinn 결정, 기술 가이드 7장) */
