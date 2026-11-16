@@ -9,6 +9,8 @@ import { withNextDayMark } from '@/lib/time';
 // 닫는 시각 칸(closing)은 다음 날에 닫는 시각에 "(익일)"을 붙인다(11/12 nnoinn, 점검 1-6. 예전 "00:00(자정)"을 바꿨다).
 // 짝인 여는 시각(openValue)을 알면 그보다 이르거나 같은 시각이 다음 날이다(18:00에 열면 02:00·18:00, 같으면 24시간 영업).
 // 여는 시각을 모르면 00:00에만 붙인다(닫는 시각 00:00은 그 날 밤 12시, 곧 다음 날 0시에 닫는다는 뜻).
+// 닫는 시각 칸의 목록은 그 날 시각을 먼저, "(익일)" 시각을 그 아래에 둔다(11/16 정민석). 18:00에 열면
+// 18:30 … 23:30, 00:00(익일) … 18:00(익일) 순서이고, 여는 시각을 모르면 00:00(익일)이 맨 아래다.
 // 분 단위(stepMinutes)에 맞지 않는 예전 값(예: 10:15)도 지우지 않고 목록에 넣어 그대로 보여준다.
 
 const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -26,11 +28,23 @@ export function timeOptions(stepMinutes: number, extra?: string): string[] {
     : options;
 }
 
+/** 닫는 시각이 다음 날인지. 여는 시각을 알면 그보다 이르거나 같은 시각, 모르면 00:00만 */
+function isNextDayClose(value: string, openValue?: string): boolean {
+  return openValue && TIME.test(openValue) ? value <= openValue : value === '00:00';
+}
+
 /** 목록에 보이는 이름. 닫는 시각 칸에서 다음 날에 닫는 시각이면 "02:00(익일)" */
 export function timeOptionLabel(value: string, closing = false, openValue?: string): string {
   if (!closing) return value;
-  const nextDay = openValue && TIME.test(openValue) ? value <= openValue : value === '00:00';
-  return nextDay ? withNextDayMark(value) : value;
+  return isNextDayClose(value, openValue) ? withNextDayMark(value) : value;
+}
+
+/** 닫는 시각 칸의 목록 순서. 그 날 시각을 먼저, 다음 날 시각("(익일)")을 그 아래에 둔다. 각각 안에서는 시각 순서 */
+export function closingTimeOptions(options: readonly string[], openValue?: string): string[] {
+  return [
+    ...options.filter((value) => !isNextDayClose(value, openValue)),
+    ...options.filter((value) => isNextDayClose(value, openValue)),
+  ];
 }
 
 const SELECT_CLASS =
@@ -65,6 +79,7 @@ export function TimeSelect({
   a11y,
   className,
 }: TimeSelectProps) {
+  const options = timeOptions(stepMinutes, value);
   return (
     <select
       aria-label={label}
@@ -75,7 +90,7 @@ export function TimeSelect({
       className={cn(SELECT_CLASS, className)}
     >
       <option value="">선택</option>
-      {timeOptions(stepMinutes, value).map((option) => (
+      {(closing ? closingTimeOptions(options, openValue) : options).map((option) => (
         <option key={option} value={option}>
           {timeOptionLabel(option, closing, openValue)}
         </option>
