@@ -2,8 +2,8 @@
 
 // 고를 수 있는 표 줄(#360 1번, 11/12 점검 8-1·11/13 nnoinn). 운영자 목록(예약·입점 심사·회원)이 같이 쓴다.
 // - 줄을 한 번 누르면 그 줄이 연한 투리 색으로 채워져 선택된 것처럼 보인다(한 표에 한 줄)
-// - 두 번 누르거나, 줄에서 Enter를 누르면 상세(href)로 간다
-// - 화면 읽기 프로그램과 마우스 없이 쓰는 사람을 위해 줄 끝 칸에 [상세] 링크(DetailLink)를 꼭 둔다
+// - 두 번 누르거나, 줄에서 Enter를 누르면 상세(href)로 간다. 열 화면이 없는 줄(href 없음, 예: 운영자 기록의 목록 검색)은 고르기만 된다
+// - 화면 읽기 프로그램과 마우스 없이 쓰는 사람을 위해 열 화면이 있는 줄은 끝 칸에 [상세] 링크(DetailLink)를 꼭 둔다
 // 쓰는 법:
 //   <table>…<SelectableRows>
 //     {rows.map((row) => (
@@ -41,7 +41,7 @@ export function SelectableRows({
   );
 }
 
-/** 표의 한 줄. 한 번 누르면 선택, 두 번 누르거나 Enter면 href로 간다 */
+/** 표의 한 줄. 한 번 누르면 선택, 두 번 누르거나 Enter면 href로 간다(href가 없으면 고르기만) */
 export function SelectableRow({
   id,
   href,
@@ -49,7 +49,8 @@ export function SelectableRow({
   className,
 }: {
   id: string;
-  href: string;
+  /** 두 번 누르거나 Enter를 누르면 여는 화면. 없으면 고르기만 된다 */
+  href?: string | null;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -71,10 +72,12 @@ export function SelectableRow({
       onMouseDown={(event) => {
         if (event.detail > 1) event.preventDefault();
       }}
-      onDoubleClick={() => router.push(href)}
+      onDoubleClick={() => {
+        if (href) router.push(href);
+      }}
       onKeyDown={(event) => {
         // 줄 안의 링크·버튼에서 누른 Enter는 그 링크·버튼이 처리한다
-        if (event.key !== 'Enter' || event.target !== event.currentTarget) return;
+        if (!href || event.key !== 'Enter' || event.target !== event.currentTarget) return;
         event.preventDefault();
         router.push(href);
       }}

@@ -18,7 +18,7 @@ import {
   type LoginMode,
   nextForMode,
 } from './login-params';
-import { ProviderButton, type ProviderKey } from '@/components/ui/provider-button';
+import { PROVIDER_ORDER, ProviderButton, type ProviderKey } from '@/components/ui/provider-button';
 
 const MODES: { mode: LoginMode; label: string }[] = [
   { mode: 'customer', label: '고객' },
@@ -26,9 +26,6 @@ const MODES: { mode: LoginMode; label: string }[] = [
 ];
 
 const MODE_LABEL: Record<LoginMode, string> = { customer: '고객', owner: '원장님' };
-
-// 카카오·구글을 먼저 만든다(C-101). 네이버는 강규민님 W21 뒤에 더한다
-const PROVIDERS: ProviderKey[] = ['kakao', 'google'];
 
 type LoginFormProps = {
   /**
@@ -45,6 +42,8 @@ type LoginFormProps = {
   signedInEmail: string | null;
   /** 첫 화면: 이미 로그인했으면 계정마다 있는지. 없으면 "…으로 시작하기"로 가입 화면에 보낸다 */
   accounts?: Record<LoginMode, boolean>;
+  /** 이 기기에서 가장 최근에 로그인한 방식. 그 버튼에 "최근 로그인" 표시를 한다(AUTH-15) */
+  recentProvider?: ProviderKey | null;
 };
 
 type Provider = ProviderKey;
@@ -54,7 +53,7 @@ const LOGIN_START_FAILED_MESSAGE = '로그인을 시작하지 못했어요. 잠�
 
 /**
  * 로그인 화면 (J8, C-101)과 첫 화면(#215). 고객/원장님 토글과 간편 로그인 버튼.
- * 버튼을 누르면 signInWithProvider(#47 3장)가 카카오·구글 로그인 화면으로 보낸다.
+ * 버튼을 누르면 signInWithProvider(#47 3장)가 카카오·구글·네이버 로그인 화면으로 보낸다.
  * 성공하면 이 화면으로 돌아오지 않고, 시작하지 못했을 때만 실패 문구를 보여준다
  */
 export function LoginForm({
@@ -64,6 +63,7 @@ export function LoginForm({
   error,
   signedInEmail,
   accounts,
+  recentProvider = null,
 }: LoginFormProps) {
   const router = useRouter();
   const [mode, setMode] = useState<LoginMode>(initialMode);
@@ -123,7 +123,7 @@ export function LoginForm({
     setPendingProvider(provider);
     startTransition(async () => {
       try {
-        // 성공하면 서버가 카카오·구글로 보내서 아래로 내려오지 않는다
+        // 성공하면 서버가 카카오·구글·네이버로 보내서 아래로 내려오지 않는다
         const result = await signInWithProvider({ provider, mode, next });
         if (!result.ok) {
           setMessage(result.error.message);
@@ -175,12 +175,14 @@ export function LoginForm({
     </p>
   ) : null;
 
-  const providers = PROVIDERS.map((provider) => (
+  // 카카오·네이버·구글(C-101, 11/15 순서). 네이버는 Supabase 커스텀 제공자 custom:naver로 들어간다(W21, session.ts)
+  const providers = PROVIDER_ORDER.map((provider) => (
     <ProviderButton
       key={provider}
       provider={provider}
       disabled={busy}
       pending={pendingProvider === provider}
+      recent={recentProvider === provider}
       onClick={() => start(provider)}
     />
   ));
@@ -232,7 +234,8 @@ export function LoginForm({
   ) : null;
 
   return (
-    <section className="flex flex-1 flex-col gap-8 px-4 pt-2 pb-12">
+    // 폰은 화면 바탕(연회색) 대신 흰 바탕이다. 구글 버튼(연회색, 테두리 없음)이 바탕에 묻히지 않게(11/16 nnoinn). PC는 흰 카드 안이다
+    <section className="flex flex-1 flex-col gap-8 px-4 pt-2 pb-12 max-md:bg-card">
       {isFirst ? (
         <div className="h-4" aria-hidden />
       ) : (

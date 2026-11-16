@@ -7,6 +7,7 @@ import {
   labelOf,
   logsHref,
   targetHref,
+  TARGET_TYPE_LABELS,
   targetLabel,
   type TargetNames,
   toKstRange,
@@ -33,6 +34,7 @@ describe('주소 값', () => {
       target: null,
       from: null,
       to: null,
+      page: 1,
     });
     expect(
       toLogParams({
@@ -43,6 +45,7 @@ describe('주소 값', () => {
         target: 'shop',
         from: '2026-11-01',
         to: '2026-11-15',
+        page: '3',
       }),
     ).toEqual({
       tab: 'access',
@@ -52,17 +55,25 @@ describe('주소 값', () => {
       target: 'shop',
       from: '2026-11-01',
       to: '2026-11-15',
+      page: 3,
     });
     expect(
       toLogParams({ tab: 'x', admin: 'not-uuid', kind: 'DROP TABLE', target: "'", from: '11/1' }),
     ).toMatchObject({ tab: 'actions', admin: null, kind: null, target: null, from: null });
   });
 
-  it('기본값(처리 기록, 최근 순, 빈 거르기)은 주소에 넣지 않는다', () => {
+  it.each(['0', '-2', '1.5', 'abc', ''])('쪽이 1 이상의 정수가 아니면(%j) 1쪽', (page) => {
+    expect(toLogParams({ page }).page).toBe(1);
+  });
+
+  it('기본값(처리 기록, 최근 순, 빈 거르기, 1쪽)은 주소에 넣지 않는다', () => {
     expect(logsHref({ tab: 'actions' })).toBe('/admin/logs');
-    expect(logsHref({ tab: 'actions', sort: 'new', admin: null })).toBe('/admin/logs');
+    expect(logsHref({ tab: 'actions', sort: 'new', admin: null, page: 1 })).toBe('/admin/logs');
     expect(logsHref({ tab: 'access', sort: 'old', kind: 'view', from: '2026-11-01' })).toBe(
       '/admin/logs?tab=access&sort=old&kind=view&from=2026-11-01',
+    );
+    expect(logsHref({ tab: 'actions', kind: 'shop.approve', page: 2 })).toBe(
+      '/admin/logs?kind=shop.approve&page=2',
     );
   });
 
@@ -79,6 +90,12 @@ describe('이름표와 대상', () => {
   it('아는 한 일은 이름으로, 모르는 값(객체 속성 이름 포함)은 그대로', () => {
     expect(labelOf(ACTION_LABELS, 'shop.approve')).toBe('입점 승인');
     expect(labelOf(ACTION_LABELS, 'dispute.resolve')).toBe('이의제기 결론');
+    // 결제·환불 확인(#373 ①)의 한 일과 대상
+    expect(labelOf(ACTION_LABELS, 'payment.retry')).toBe('결제 다시 시도');
+    expect(labelOf(ACTION_LABELS, 'refund.retry')).toBe('환불 다시 시도');
+    expect(labelOf(ACTION_LABELS, 'refund.review_check')).toBe('환불 금액 확인함');
+    expect(labelOf(TARGET_TYPE_LABELS, 'order')).toBe('주문');
+    expect(labelOf(TARGET_TYPE_LABELS, 'refund')).toBe('환불');
     expect(labelOf(ACTION_LABELS, 'shop.new_thing')).toBe('shop.new_thing');
     expect(labelOf(ACTION_LABELS, 'constructor')).toBe('constructor');
   });

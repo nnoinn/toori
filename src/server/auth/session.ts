@@ -1,7 +1,7 @@
 'use server';
 
 // 로그인 시작·로그아웃·계정 전환 (X-101, C-101, #47 3장). 로그인 화면(정찬형)과 내 정보 화면에서 부른다.
-// 카카오·구글 로그인을 마치고 돌아오는 처리는 src/app/api/auth/callback/route.ts가 한다.
+// 카카오·구글·네이버 로그인을 마치고 돌아오는 처리는 src/app/api/auth/callback/route.ts가 한다.
 
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -25,7 +25,17 @@ import { getSessionUserId, loadAccount } from './current-account';
 import { DEFAULT_NEXT } from './paths';
 import { AUTH_ERRORS } from './require';
 
-const PROVIDERS = ['kakao', 'google'] as const;
+const PROVIDERS = ['kakao', 'google', 'naver'] as const;
+
+/**
+ * Supabase에 넘기는 제공자 이름. 카카오·구글은 Supabase 기본 제공자이고, 네이버는 커스텀 OAuth 제공자다(W21, 기술 가이드 3-3).
+ * custom:naver는 nnoinn이 Supabase 대시보드에 만든다(UserInfo URL은 /api/auth/naver/userinfo)
+ */
+const SUPABASE_PROVIDER = {
+  kakao: 'kakao',
+  google: 'google',
+  naver: 'custom:naver',
+} as const satisfies Record<(typeof PROVIDERS)[number], string>;
 
 const signInSchema = z.object({
   provider: z.enum(PROVIDERS),
@@ -34,7 +44,7 @@ const signInSchema = z.object({
 });
 
 /**
- * 카카오·구글 로그인 화면으로 보낸다. 로그인을 마치면 /api/auth/callback으로 돌아와서 mode·next대로 처리한다.
+ * 카카오·구글·네이버 로그인 화면으로 보낸다. 로그인을 마치면 /api/auth/callback으로 돌아와서 mode·next대로 처리한다.
  * 성공하면 돌아오지 않고(redirect), 시작하지 못했을 때만 실패 결과를 돌려준다
  */
 export async function signInWithProvider(input: {
@@ -52,9 +62,11 @@ export async function signInWithProvider(input: {
   if (!origin) return fail('LOGIN_UNAVAILABLE', LOGIN_UNAVAILABLE_MESSAGE);
 
   const supabase = await createSupabaseServerClient();
+  // provider: 로그인을 마치면 콜백이 이 기기의 "최근 로그인" 방식으로 기억한다(recent-provider.ts)
+  const back = new URLSearchParams({ mode, next, provider });
   const { data, error } = await supabase.auth.signInWithOAuth({
-    provider,
-    options: { redirectTo: `${origin}/api/auth/callback?${new URLSearchParams({ mode, next })}` },
+    provider: SUPABASE_PROVIDER[provider],
+    options: { redirectTo: `${origin}/api/auth/callback?${back}` },
   });
   if (error || !data.url) {
     console.error('[auth] 간편 로그인 시작 실패:', error?.name ?? 'no url');

@@ -11,3 +11,6 @@ export const PUSH_QUIET_HOURS = { start: 21, end: 8 } as const;
 
 /** 광고성 정보 수신 동의를 다시 확인하는 주기(개월) */
 export const MARKETING_CONSENT_RECHECK_MONTHS = 24;
+
+/** 알림함에서 보여주는 기간(일). 지난 알림은 정리 작업으로 지운다(#371, 11/13 nnoinn) */
+export const NOTIFICATION_INBOX_DAYS = 90;

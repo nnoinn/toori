@@ -68,6 +68,7 @@ vi.mock('./account-store', async (importOriginal) => {
 
 const ALL_REQUIRED = { age14: true, service: true, privacy: true, location: true } as const;
 const PHONE = '010-1234-5678';
+const NAME = '강투리';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -85,12 +86,13 @@ describe('createCustomerAccount', () => {
       createCustomerAccount({
         agreements: { ...ALL_REQUIRED, marketing: true },
         phone: PHONE,
+        name: NAME,
         next: '/slots/a',
       }),
     ).rejects.toThrow('redirect:/slots/a');
     expect(state.saveCustomerAccount).toHaveBeenCalledWith('tx', {
       userId: 'user-1',
-      name: '김투리',
+      name: NAME,
       nickname: '김투리',
       phone: PHONE,
       optionalTerms: ['marketing'],
@@ -105,11 +107,15 @@ describe('createCustomerAccount', () => {
   it('프로필 이름이 없으면 기본 닉네임, 돌아갈 주소가 없거나 다른 사이트면 홈으로', async () => {
     state.user = { userId: 'user-1', name: null };
     await expect(
-      createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: false }, phone: PHONE }),
+      createCustomerAccount({
+        agreements: { ...ALL_REQUIRED, marketing: false },
+        phone: PHONE,
+        name: NAME,
+      }),
     ).rejects.toThrow('redirect:/');
     expect(state.saveCustomerAccount).toHaveBeenCalledWith('tx', {
       userId: 'user-1',
-      name: '고객',
+      name: NAME,
       nickname: '고객',
       phone: PHONE,
       optionalTerms: [],
@@ -119,6 +125,7 @@ describe('createCustomerAccount', () => {
       createCustomerAccount({
         agreements: { ...ALL_REQUIRED, marketing: false },
         phone: PHONE,
+        name: NAME,
         next: '//evil.example',
       }),
     ).rejects.toThrow('redirect:/');
@@ -139,7 +146,11 @@ describe('createCustomerAccount', () => {
     '번호(%s)를 저장 모양으로 맞춰 저장한다',
     async (phone) => {
       await expect(
-        createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: false }, phone }),
+        createCustomerAccount({
+          agreements: { ...ALL_REQUIRED, marketing: false },
+          phone,
+          name: NAME,
+        }),
       ).rejects.toThrow('redirect:/');
       expect(state.saveCustomerAccount).toHaveBeenCalledWith(
         'tx',
@@ -152,6 +163,7 @@ describe('createCustomerAccount', () => {
     const result = await createCustomerAccount({
       agreements: { ...ALL_REQUIRED, marketing: false },
       phone,
+      name: NAME,
     });
     expect(result).toEqual(fail('PHONE_REQUIRED', '휴대폰 번호를 입력해 주세요'));
     expect(state.saveCustomerAccount).not.toHaveBeenCalled();
@@ -163,6 +175,7 @@ describe('createCustomerAccount', () => {
       const result = await createCustomerAccount({
         agreements: { ...ALL_REQUIRED, marketing: false },
         phone,
+        name: NAME,
       });
       expect(result).toEqual(
         fail('INVALID_INPUT', '휴대폰 번호를 확인해 주세요. 예: 010-1234-5678'),
@@ -176,6 +189,15 @@ describe('createCustomerAccount', () => {
       agreements: { ...ALL_REQUIRED, marketing: false },
     } as never);
     expect(result.ok === false && result.error.code).toBe('PHONE_REQUIRED');
+    expect(state.saveCustomerAccount).not.toHaveBeenCalled();
+  });
+
+  it('이름을 보내지 않은 요청도 NAME_REQUIRED이고 저장하지 않는다(닉네임으로 채우지 않는다, AUTH-12)', async () => {
+    const result = await createCustomerAccount({
+      agreements: { ...ALL_REQUIRED, marketing: false },
+      phone: PHONE,
+    } as never);
+    expect(result).toEqual(fail('NAME_REQUIRED', '이름을 입력해 주세요'));
     expect(state.saveCustomerAccount).not.toHaveBeenCalled();
   });
 
@@ -239,6 +261,7 @@ describe('createCustomerAccount', () => {
     const result = await createCustomerAccount({
       agreements: { ...ALL_REQUIRED, marketing: false },
       phone: PHONE,
+      name: NAME,
     });
     expect(result.ok === false && result.error.code).toBe('UNAUTHENTICATED');
     expect(state.saveCustomerAccount).not.toHaveBeenCalled();
@@ -249,6 +272,7 @@ describe('createCustomerAccount', () => {
     const result = await createCustomerAccount({
       agreements: { ...ALL_REQUIRED, marketing: false },
       phone: PHONE,
+      name: NAME,
     });
     expect(result).toEqual(fail('ALREADY_EXISTS', '이미 가입한 계정이에요'));
     expect(state.cookieSet).not.toHaveBeenCalled();
@@ -259,6 +283,7 @@ describe('createCustomerAccount', () => {
       createCustomerAccount({
         agreements: { ...ALL_REQUIRED, marketing: true, interest_alert: true },
         phone: PHONE,
+        name: NAME,
       }),
     ).rejects.toThrow('redirect:/');
     expect(state.saveCustomerAccount).toHaveBeenLastCalledWith(
@@ -270,6 +295,7 @@ describe('createCustomerAccount', () => {
       createCustomerAccount({
         agreements: { ...ALL_REQUIRED, marketing: false, interest_alert: true },
         phone: PHONE,
+        name: NAME,
       }),
     ).rejects.toThrow('redirect:/');
     expect(state.saveCustomerAccount).toHaveBeenLastCalledWith(
@@ -295,6 +321,7 @@ describe('가입 직후 선택 동의 처리 결과 안내', () => {
       createCustomerAccount({
         agreements: { ...ALL_REQUIRED, marketing: true, interest_alert: true },
         phone: PHONE,
+        name: NAME,
       }),
     ).rejects.toThrow('redirect:/');
     expect(state.cookieSet).toHaveBeenCalledWith(
@@ -306,7 +333,11 @@ describe('가입 직후 선택 동의 처리 결과 안내', () => {
 
   it('선택 동의를 고르지 않았으면 남기지 않는다', async () => {
     await expect(
-      createCustomerAccount({ agreements: { ...ALL_REQUIRED, marketing: false }, phone: PHONE }),
+      createCustomerAccount({
+        agreements: { ...ALL_REQUIRED, marketing: false },
+        phone: PHONE,
+        name: NAME,
+      }),
     ).rejects.toThrow('redirect:/');
     expect(state.cookieSet).not.toHaveBeenCalledWith(
       'marketing_consent_notice',
