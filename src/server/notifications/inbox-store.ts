@@ -32,18 +32,23 @@ const INBOX_COLUMNS = {
 
 type InboxRow = { id: string; payload: unknown; createdAt: Date; readAt: Date | null };
 
-/** 알림 한 줄을 알림함 모양으로. payload({ title, body, url })에 없는 값은 빈 글자로 둔다 */
+/** 알림 내용(payload: { title, body, url })을 읽는다. 없는 값은 빈 글자로 둔다 */
+export function readNotificationPayload(payload: unknown): {
+  title: string;
+  body: string;
+  url: string;
+} {
+  const value =
+    typeof payload === 'object' && payload !== null ? (payload as Record<string, unknown>) : {};
+  const text = (item: unknown) => (typeof item === 'string' ? item : '');
+  return { title: text(value.title), body: text(value.body), url: text(value.url) };
+}
+
+/** 알림 한 줄을 알림함 모양으로 */
 export function toMyNotification(row: InboxRow): MyNotification {
-  const payload =
-    typeof row.payload === 'object' && row.payload !== null
-      ? (row.payload as Record<string, unknown>)
-      : {};
-  const text = (value: unknown) => (typeof value === 'string' ? value : '');
   return {
     id: row.id,
-    title: text(payload.title),
-    body: text(payload.body),
-    url: text(payload.url),
+    ...readNotificationPayload(row.payload),
     createdAt: row.createdAt.toISOString(),
     readAt: row.readAt ? row.readAt.toISOString() : null,
   };

@@ -10,8 +10,8 @@ export type { MyNotification } from '@/server/notifications/inbox-types';
 /** 알림함 주소 */
 export const NOTIFICATIONS_PATH = '/notifications';
 
-/** 읽음으로 바꾼 뒤 알리는 브라우저 이벤트. 종이 듣고 안 읽은 수를 다시 묻는다(같은 화면에 있는 PC 위쪽 메뉴의 종) */
-export const NOTIFICATIONS_READ_EVENT = 'toori:notifications-read';
+/** 읽음으로 바꾼 뒤·새 알림이 왔을 때 알리는 브라우저 이벤트(공통 값). 종이 듣고 안 읽은 수를 다시 묻는다(같은 화면에 있는 PC 위쪽 메뉴의 종) */
+export { NOTIFICATIONS_CHANGED_EVENT as NOTIFICATIONS_READ_EVENT } from '@/server/notifications/inbox-types';
 
 export const NOTIFICATION_TEXTS = {
   TITLE: '알림',
