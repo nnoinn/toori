@@ -180,6 +180,67 @@ export function notifyNoShow(db: Db, reservationId: string) {
   });
 }
 
+/**
+ * 운영자가 원장님 대신 방문·노쇼로 처리했을 때 원장님에게(#373 ③, 11/16). 원장님 예약을 운영자가 바꿨다는 것을 알린다.
+ * 손님에게 가는 노쇼 알림은 원장님이 처리했을 때와 같이 notifyNoShow가 보낸다(방문은 손님 알림 없음)
+ */
+export function notifyVisitRecordedByAdmin(
+  db: Db,
+  reservationId: string,
+  result: 'visited' | 'no_show',
+) {
+  const event = 'reservation.visit_recorded_by_admin';
+  sendAfterResponse(event, async () => {
+    const alert = await readReservationAlert(db, reservationId);
+    if (!alert) return;
+    await notify(db, {
+      userId: alert.ownerUserId,
+      accountType: 'owner',
+      event,
+      dedupeKey: `${event}:owner:${reservationId}`,
+      title:
+        result === 'no_show'
+          ? '운영자가 예약을 노쇼로 처리했어요'
+          : '운영자가 예약을 방문으로 처리했어요',
+      body: `${alert.menuName} · ${formatKst(alert.startAt)}`,
+      url: `/owner/reservations/${reservationId}`,
+    });
+  });
+}
+
+/**
+ * 운영자가 잘못 누른 노쇼를 방문으로 되돌렸을 때 손님과 원장님에게(#373 ③, 11/16). 손님은 노쇼 알림을 이미 받았으니 바로잡힌 것도 알린다.
+ * 이의제기 결론의 "노쇼 취소"는 이 알림을 보내지 않는다(11/12 결정, 결론 알림 없음)
+ */
+export function notifyNoShowReversed(db: Db, reservationId: string) {
+  const event = 'reservation.no_show_reversed';
+  sendAfterResponse(event, async () => {
+    const alert = await readReservationAlert(db, reservationId);
+    if (!alert) return;
+    const when = formatKst(alert.startAt);
+    await Promise.all([
+      notify(db, {
+        userId: alert.customerUserId,
+        accountType: 'customer',
+        event,
+        dedupeKey: `${event}:customer:${reservationId}`,
+        title: '노쇼 처리가 취소됐어요',
+        body: `${alert.shopName} · ${when} 예약이 방문으로 바뀌었어요`,
+        url: `/reservations/${reservationId}`,
+      }),
+      notify(db, {
+        userId: alert.ownerUserId,
+        accountType: 'owner',
+        event,
+        dedupeKey: `${event}:owner:${reservationId}`,
+        title: '운영자가 노쇼를 방문으로 바꿨어요',
+        body: `${alert.menuName} · ${when}`,
+        url: `/owner/reservations/${reservationId}`,
+      }),
+    ]);
+  });
+}
+
 /** 확정하지 못한 결제를 자동 취소했을 때 고객에게(C-406, W12). 예약이 없는 주문이라 내 예약 목록으로 간다 */
 export function notifyPaymentAutoCancelled(db: Db, orderId: string) {
   const event = 'payment.auto_cancelled';

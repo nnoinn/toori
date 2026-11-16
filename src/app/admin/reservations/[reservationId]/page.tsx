@@ -16,6 +16,7 @@ import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
 import { disputeDeadline, disputeOpensAt, disputeTypes } from '@/server/disputes/rules';
 import { DISPUTE_DEADLINE_BUSINESS_HOURS } from '@/server/policy/dispute';
+import { ADMIN_VISIT_ERRORS } from '@/server/visits/admin-errors';
 
 import {
   labelCancelActor,
@@ -29,6 +30,8 @@ import { DISPUTE_TYPE_LABELS, labelDisputeStatus, toKstInputValue } from '../../
 import { labelReservation } from '../../lookup';
 import { selectReservationDetail } from '../queries';
 import { RegisterDispute } from './register-dispute';
+import { VisitAction } from './visit-actions';
+import { type VisitPanel, visitPanel } from './visit-panel';
 
 export const metadata: Metadata = { title: '예약 정보' };
 
@@ -73,6 +76,17 @@ async function Detail({ params }: { params: Params }) {
     cancelledAt: detail.cancelledAt,
   };
   const disputeDue = disputeDeadline(disputeTarget);
+  const visit = visitPanel(
+    {
+      status: detail.status,
+      visitResult: detail.visitResult,
+      visitRecordedAt: detail.visitRecordedAt,
+      startAt: detail.startAt,
+      disputeOpen: detail.dispute?.status === 'open',
+      settlementBundled: detail.settlementBundled,
+    },
+    now,
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -160,6 +174,15 @@ async function Detail({ params }: { params: Params }) {
 
       <Card>
         <CardHeader>
+          <CardTitle>방문·노쇼</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 text-sm">
+          <VisitPanelView reservationId={detail.reservationId} panel={visit} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>이의제기</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 text-sm">
@@ -197,6 +220,47 @@ async function Detail({ params }: { params: Params }) {
       </Card>
     </div>
   );
+}
+
+/** 방문·노쇼 칸(#373 ③). 원장님이 못 하면 운영자가 사유를 남기고 대신 처리하고, 잘못 누른 노쇼는 정산에 묶이기 전까지 되돌린다 */
+function VisitPanelView({ reservationId, panel }: { reservationId: string; panel: VisitPanel }) {
+  switch (panel.kind) {
+    case 'cancelled':
+      return <p className="text-muted-foreground">취소된 예약이라 방문·노쇼를 처리하지 않아요.</p>;
+    case 'before_start':
+      return (
+        <p className="text-muted-foreground">
+          서비스 시작({formatKst(panel.startAt)})부터 원장님 대신 처리할 수 있어요.
+        </p>
+      );
+    case 'can_record':
+      return (
+        <>
+          <p className="text-muted-foreground">
+            아직 처리하지 않았어요. 원장님이 처리하지 못하면 운영자가 대신 처리해요.
+          </p>
+          <div className="flex gap-2">
+            <VisitAction reservationId={reservationId} kind="visited" />
+            <VisitAction reservationId={reservationId} kind="no_show" variant="destructive" />
+          </div>
+        </>
+      );
+    case 'visited':
+      return <p>방문 완료 · {when(panel.recordedAt)} 처리</p>;
+    case 'no_show':
+      return (
+        <>
+          <p>노쇼 · {when(panel.recordedAt)} 처리</p>
+          {panel.reverseBlock ? (
+            <p className="text-muted-foreground">{ADMIN_VISIT_ERRORS[panel.reverseBlock]}</p>
+          ) : (
+            <div>
+              <VisitAction reservationId={reservationId} kind="reverse" />
+            </div>
+          )}
+        </>
+      );
+  }
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
