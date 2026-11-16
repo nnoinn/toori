@@ -69,7 +69,7 @@ export async function readVoidTarget(
       couponAmount: orders.couponAmount,
       voidedAt: reservations.voidedAt,
       refundedAmount: sql<number>`coalesce((select sum(r.refund_amount) from ${refunds} r where r.order_id = ${orders.id} and r.status = 'done'), 0)::int`,
-      settlementBundled: sql<boolean>`exists (select 1 from ${settlementItems} s where s.order_id = ${orders.id} and s.settlement_id is null)`,
+      settlementBundled: sql<boolean>`exists (select 1 from ${settlementItems} s where s.order_id = ${orders.id} and s.settlement_id is not null)`,
       couponInUse: sql<boolean>`exists (select 1 from ${coupons} c where c.id = ${orders.couponId} and c.used_order_id = ${orders.id})`,
     })
     .from(reservations)
@@ -164,7 +164,15 @@ export async function startVoid(
 
 /** 돌려준 돈이 없는 무효 요청을 지운다(포트원이 거절했고 돌아간 돈도 없음). 예약은 그대로다 */
 export async function clearVoidRequest(db: Pick<Db, 'delete'>, reservationId: string) {
-  await db.delete(refunds).where(and(eq(refunds.reservationId, reservationId)));
+  await db
+    .delete(refunds)
+    .where(
+      and(
+        eq(refunds.reservationId, reservationId),
+        eq(refunds.reason, 'void'),
+        eq(refunds.status, 'requested'),
+      ),
+    );
 }
 
 export type FinishedVoid = { couponReturned: boolean };
@@ -196,7 +204,7 @@ export async function finishVoid(
     .for('update');
   if (!locked || locked.voidedAt) return null;
 
-  const wasConfirmed = locked.status !== 'cancelled';
+  const wasConfirmed = locked.status === 'confirmed';
   await tx
     .update(reservations)
     .set(
@@ -240,7 +248,7 @@ export async function finishVoid(
     .from(orders)
     .where(eq(orders.id, input.orderId));
   let couponReturned = false;
-  if (order?.couponId && input.refundAmount < 0) {
+  if (order?.couponId) {
     const returned = await tx
       .update(coupons)
       .set({ usedOrderId: null, usedAt: null })
@@ -319,7 +327,7 @@ export async function readStaleVoids(
       and(
         inArray(refunds.reason, ['void']),
         eq(refunds.status, 'requested'),
-        lt(refunds.createdAt, new Date(input.requestedBefore.getTime() + 1)),
+        lt(refunds.createdAt, input.requestedBefore),
       ),
     )
     .orderBy(refunds.createdAt)

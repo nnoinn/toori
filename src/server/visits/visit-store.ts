@@ -74,7 +74,7 @@ export async function recordVisitInTx(
     .where(
       and(
         eq(refunds.reservationId, input.reservationId),
-        inArray(refunds.reason, [...CANCEL_REFUND_REASONS]),
+        inArray(refunds.reason, [...CANCEL_REFUND_REASONS, 'void']),
         eq(refunds.status, 'requested'),
       ),
     )
