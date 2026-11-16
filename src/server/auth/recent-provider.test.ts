@@ -1,4 +1,4 @@
-// 최근 로그인 방식 값 읽기 (11/16 nnoinn, AUTH-14). 쿠키에 적고 지우는 것은 로그인 콜백 테스트(route.test.ts)가 본다.
+// 최근 로그인 방식 값 읽기 (11/16 nnoinn, AUTH-15). 쿠키에 적고 지우는 것은 로그인 콜백 테스트(route.test.ts)가 본다.
 
 import { describe, expect, it } from 'vitest';
 

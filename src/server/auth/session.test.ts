@@ -92,7 +92,7 @@ describe('signInWithProvider', () => {
       'redirect:https://nid.example/d',
     );
     expect(state.signInWithOAuth.mock.calls[0][0].provider).toBe('custom:naver');
-    // 최근 로그인 표시는 화면의 버튼 이름(naver)으로 기억한다(AUTH-14)
+    // 최근 로그인 표시는 화면의 버튼 이름(naver)으로 기억한다(AUTH-15)
     expect(state.signInWithOAuth.mock.calls[0][0].options.redirectTo).toBe(
       'http://localhost:3000/api/auth/callback?mode=customer&next=%2Fhome&provider=naver',
     );

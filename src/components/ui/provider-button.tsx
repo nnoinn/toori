@@ -50,32 +50,33 @@ type ProviderButtonProps = {
   disabled?: boolean;
   /** 누른 버튼이면 문구 대신 이동 중 안내 */
   pending?: boolean;
-  /** 이 기기에서 가장 최근에 로그인한 방식이면 테두리와 "최근 로그인" 표시(11/16 nnoinn, AUTH-14) */
+  /** 이 기기에서 가장 최근에 로그인한 방식이면 테두리와 "최근 로그인" 표시(11/16 nnoinn, AUTH-15) */
   recent?: boolean;
   onClick: () => void;
 };
 
-// 시안 고르기용(임시): a 초록 테두리·초록 라벨, b 초록 테두리·연한 초록 라벨(긴 문구), c 검정 테두리·검정 라벨
-const RECENT_VARIANT = 'a' as 'a' | 'b' | 'c';
-const RECENT_RING = {
-  a: 'ring-2 ring-primary ring-offset-2 ring-offset-card',
-  b: 'ring-2 ring-primary ring-offset-2 ring-offset-card',
-  c: 'ring-2 ring-foreground ring-offset-2 ring-offset-card',
-}[RECENT_VARIANT];
-const RECENT_BADGE = {
-  a: 'bg-primary text-primary-foreground',
-  b: 'border border-primary bg-accent text-accent-foreground',
-  c: 'bg-foreground text-background',
-}[RECENT_VARIANT];
-/** 최근 로그인 표시 문구 */
-export const RECENT_LOGIN_LABEL = RECENT_VARIANT === 'b' ? '최근에 로그인한 방식' : '최근 로그인';
+/** 최근 로그인 표시(11/16 nnoinn 시안 C): 검정 테두리와 검정 라벨. 테두리 바깥 틈은 버튼 바탕(폰: 화면 바탕, PC: 흰 카드) 색이다 */
+const RECENT_RING =
+  'ring-2 ring-foreground ring-offset-2 ring-offset-background md:ring-offset-card';
+const RECENT_BADGE = 'bg-foreground text-background';
+/** 최근 로그인 표시 문구(11/16 nnoinn) */
+export const RECENT_LOGIN_LABEL = '최근 로그인';
+
+// 구글 버튼 시안 고르기용(임시): light 지금(흰 바탕·회색 테두리), neutral(연회색 바탕·테두리 없음), dark(검정 바탕)
+const GOOGLE_THEME = 'light' as 'light' | 'neutral' | 'dark';
+const GOOGLE_THEME_STYLES = {
+  light: 'border border-google-border bg-google text-google-foreground hover:bg-muted',
+  neutral: 'bg-[#f2f2f2] text-[#1f1f1f] hover:opacity-90',
+  dark: 'border border-[#8e918f] bg-[#131314] text-[#e3e3e3] hover:opacity-90',
+}[GOOGLE_THEME];
 
 /** 제공자마다 다른 모양(배경·글자·글꼴). 둥근 모서리와 높이는 같다 */
 const PROVIDER_STYLES: Record<ProviderKey, string> = {
   kakao: 'bg-kakao font-kakao text-[15px] font-semibold text-kakao-foreground hover:opacity-90',
   google: cn(
     googleSans.variable,
-    'border border-google-border bg-google font-google text-[14px] leading-5 font-medium text-google-foreground hover:bg-muted',
+    'font-google text-[14px] leading-5 font-medium',
+    GOOGLE_THEME_STYLES,
   ),
   // 네이버 가이드에 글꼴 지정이 없어서 카카오처럼 기기 기본 서체를 쓴다
   naver: 'bg-naver font-kakao text-[15px] font-semibold text-naver-foreground hover:opacity-90',

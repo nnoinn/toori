@@ -19,7 +19,7 @@ export function AdminLoginForm({
 }: {
   next: string;
   error: string | null;
-  /** 이 기기에서 가장 최근에 로그인한 방식. 그 버튼에 "최근 로그인" 표시를 한다(AUTH-14) */
+  /** 이 기기에서 가장 최근에 로그인한 방식. 그 버튼에 "최근 로그인" 표시를 한다(AUTH-15) */
   recentProvider?: ProviderKey | null;
 }) {
   const [message, setMessage] = useState<string | null>(error);

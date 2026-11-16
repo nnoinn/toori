@@ -123,7 +123,7 @@ describe('GET /api/auth/callback', () => {
     );
   });
 
-  describe('최근 로그인 방식 기억하기 (AUTH-14)', () => {
+  describe('최근 로그인 방식 기억하기 (AUTH-15)', () => {
     /** 최근 로그인 쿠키를 적은 값들 */
     const recentWrites = () =>
       state.cookieSet.mock.calls.filter(([name]) => name === 'recent_login_provider');
