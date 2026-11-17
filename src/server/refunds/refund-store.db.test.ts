@@ -47,6 +47,7 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
         couponAmount: 0,
         startAt: slot.startAt,
         requested: null,
+        voidInProgress: false,
       });
 
       await tx

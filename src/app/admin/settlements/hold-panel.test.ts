@@ -14,6 +14,7 @@ function input(extra: Partial<ReservationHoldInput> = {}): ReservationHoldInput 
     visitRecordedAt: LATER,
     cancelledAt: null,
     cancelActor: null,
+    voidedAt: null,
     startAt: START,
     refunds: [],
     settlementBundled: false,
@@ -56,7 +57,7 @@ describe('reservationHoldBlock', () => {
     expect(reservationHoldBlock(input({ settlementBundled: true }))).toBe('ALREADY_BUNDLED');
   });
 
-  it('정산 줄이 생기지 않는 예약(원장님 사정·자동 취소, 운영자 취소 환불)은 NOTHING_TO_SETTLE', () => {
+  it('정산 줄이 생기지 않는 예약(원장님 사정·자동 취소, 운영자 취소 환불, 무효)은 NOTHING_TO_SETTLE', () => {
     expect(
       reservationHoldBlock(
         cancelled('owner_fault', [{ reason: 'owner_fault', status: 'done', penaltyRate: 0 }]),
@@ -68,5 +69,7 @@ describe('reservationHoldBlock', () => {
         input({ refunds: [{ reason: 'admin_exception', status: 'done', penaltyRate: 0 }] }),
       ),
     ).toBe('NOTHING_TO_SETTLE');
+    // 무효 예약(A-108)도 정산 줄이 없다
+    expect(reservationHoldBlock(input({ voidedAt: LATER }))).toBe('NOTHING_TO_SETTLE');
   });
 });

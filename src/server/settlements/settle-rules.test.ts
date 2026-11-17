@@ -29,6 +29,7 @@ function visited(start: string, extra: Partial<SettleTarget> = {}): SettleTarget
   return {
     status: 'completed',
     startAt,
+    voidedAt: null,
     visitResult: 'visited',
     visitRecordedAt: new Date(startAt.getTime() + HOUR),
     cancelledAt: null,
@@ -87,6 +88,11 @@ describe('settlementKindOf: 정산 종류', () => {
       visited('2026-11-15 15:00', { hasAdminRefund: true }),
     ],
     ['운영자 취소 환불이 있는 고객 취소', cancelled('customer', 30, { hasAdminRefund: true })],
+    [
+      '무효로 처리한 이용 완료(A-108)',
+      visited('2026-11-15 15:00', { voidedAt: kst('2026-11-16 10:00') }),
+    ],
+    ['무효로 처리한 고객 취소', cancelled('customer', 30, { voidedAt: kst('2026-11-16 10:00') })],
   ])('%s는 정산 줄이 없다(기준 금액 0)', (_, target) => {
     expect(settlementKindOf(target)).toBeNull();
   });

@@ -35,6 +35,7 @@ function row(extra: Partial<SettlementRow> = {}): SettlementRow {
     reservationCode: '100000000001',
     status: 'completed',
     startAt: kst('2026-11-15 15:00'),
+    voidedAt: null,
     visitResult: 'visited',
     visitRecordedAt: kst('2026-11-15 16:00'),
     cancelledAt: null,

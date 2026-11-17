@@ -33,6 +33,7 @@ function row(extra: Partial<SettlementRow> = {}): SettlementRow {
     reservationCode: '123456789012',
     status: 'completed',
     startAt: kst('2026-11-15 15:00'),
+    voidedAt: null,
     visitResult: 'visited',
     visitRecordedAt: kst('2026-11-15 16:00'),
     cancelledAt: null,
@@ -219,6 +220,45 @@ describe('toSettlementItemView: 원장님 사정 취소', () => {
       status: 'no_payout',
       payoutDate: null,
     });
+  });
+});
+
+describe('toSettlementItemView: 무효 (A-108, #423)', () => {
+  it('정산 줄 없이 "무효, 기준 금액 0원"·정산할 금액 없음으로 남긴다(이용 완료·고객 취소 모두)', () => {
+    const voidedAt = kst('2026-11-16 10:00');
+    for (const target of [row({ voidedAt }), cancelledRow('customer', 30, { voidedAt })]) {
+      expect(
+        toSettlementItemView(target, { now: NOW, paymentFeeRate: DOC_PAYMENT_FEE_RATE }),
+      ).toMatchObject({
+        kind: 'void',
+        penaltyRate: null,
+        hoursBeforeStart: null,
+        baseAmount: 0,
+        platformFee: 0,
+        paymentFeeRate: null,
+        paymentFee: 0,
+        payoutAmount: 0,
+        ownerPenalty: null,
+        hold: null,
+        status: 'no_payout',
+        payoutDate: null,
+      });
+    }
+  });
+
+  it('무효 전에 묶인 줄이 있으면(정산 묶기와 겹침) 그 줄을 그대로 보여준다', () => {
+    expect(
+      toSettlementItemView(
+        row({
+          voidedAt: kst('2026-11-19 10:00'),
+          item: settled({ settlement: { status: 'pending', payoutDate: '2026-11-26' } }),
+        }),
+        {
+          now: NOW,
+          paymentFeeRate: DOC_PAYMENT_FEE_RATE,
+        },
+      ),
+    ).toMatchObject({ kind: 'sale', status: 'pending' });
   });
 });
 

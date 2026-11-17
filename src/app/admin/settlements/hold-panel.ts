@@ -11,6 +11,8 @@ export type ReservationHoldInput = {
   visitRecordedAt: Date | null;
   cancelledAt: Date | null;
   cancelActor: string | null;
+  /** 예약 무효 시각(A-108). 무효 예약은 정산 줄이 없다 */
+  voidedAt: Date | null;
   startAt: Date;
   refunds: readonly { reason: string; status: string; penaltyRate: number }[];
   settlementBundled: boolean;
@@ -37,6 +39,7 @@ export function reservationHoldBlock(
     startAt: input.startAt,
     cancelPenaltyRate: cancelRefund?.penaltyRate ?? null,
     hasAdminRefund: input.refunds.some((refund) => refund.reason === 'admin_exception'),
+    voidedAt: input.voidedAt,
   });
   return kind ? null : 'NOTHING_TO_SETTLE';
 }

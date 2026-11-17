@@ -154,6 +154,7 @@ describeDb('원장님 정산 내역 읽기 (실제 DB)', () => {
         cancelledAt: null,
         cancelActor: null,
         startAt: at('2026-11-01T09:00:00'),
+        voidedAt: null,
         menuName: '커트',
         listPrice: 20_000,
         salePrice: 14_000,

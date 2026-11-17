@@ -17,6 +17,8 @@ import { ensureAdminPage } from '@/server/auth';
 import { getBusinessDocUrl } from '@/server/storage/upload';
 import { bankName, categoryLabel } from '@/server/policy';
 
+import { ShopCancelStatsView } from '../cancel-stats';
+import { selectShopCancelStats } from '../cancel-stats-queries';
 import { labelPgSellerStatus, labelReviewAction } from '../format';
 import { selectShopForReview, type ShopReviewDetail } from '../queries';
 import { StatusBadge } from '../status-badge';
@@ -46,7 +48,8 @@ async function ReviewDetail({ params }: { params: Params }) {
   const admin = await ensureAdminPage();
   const { shopId } = await params;
   if (!isUuid(shopId)) notFound();
-  const detail = await selectShopForReview(getDb(), shopId);
+  const db = getDb();
+  const detail = await selectShopForReview(db, shopId);
   if (!detail) notFound();
   await recordAdminAccess(admin.userId, {
     action: 'view',
@@ -56,6 +59,8 @@ async function ReviewDetail({ params }: { params: Params }) {
   });
   // 비공개 버킷이라 5분 동안만 열리는 주소를 화면을 열 때마다 새로 받는다(#116)
   const doc = await getBusinessDocUrl(shopId);
+  // 입점 승인된 샵만 예약을 받으므로 그때만 취소 기록을 본다
+  const cancelStats = detail.status === 'approved' ? await selectShopCancelStats(db, shopId) : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -147,6 +152,12 @@ async function ReviewDetail({ params }: { params: Params }) {
           <PayoutFields payout={detail.payout} />
         </Section>
       </div>
+
+      {cancelStats ? (
+        <Section title="취소 기록">
+          <ShopCancelStatsView stats={cancelStats} />
+        </Section>
+      ) : null}
 
       <Section title="심사 기록">
         {detail.history.length === 0 ? (

@@ -1,4 +1,5 @@
 // 진행 중으로 남은 고객 취소 정리 (W14, #222). 서버에서만 부른다. 예약 작업(/api/cron/payments-sweep)이 부른다.
+// 진행 중으로 남은 예약 무효(A-108, #423)도 같이 정리하고 개수를 더한다(void-flow.ts).
 // 취소 요청이 포트원 환불 전후로 멈추면 진행 중(requested) 기록이 남는다. 고객이 다시 누르지 않아도 여기서 끝낸다.
 // 다시 불러도 같은 결과라서, 실행이 겹치거나 중간에 끊겨도 다음 실행이 이어서 처리한다.
 
@@ -9,6 +10,7 @@ import { ORDER_SWEEP_BATCH, STALE_CANCEL_MINUTES } from '@/server/policy';
 
 import { type SettleResult, settleRequestedCancel } from './finish-cancel';
 import { readStaleCancels } from './refund-store';
+import { sweepStaleVoids } from './void-flow';
 
 export type CancelSweepSummary = { checked: number } & Record<SettleResult, number>;
 
@@ -32,5 +34,11 @@ export async function sweepStaleCancels(
       summary.left += 1;
     }
   }
-  return summary;
+  const voids = await sweepStaleVoids(db, now);
+  return {
+    checked: summary.checked + voids.checked,
+    finished: summary.finished + voids.finished,
+    cleared: summary.cleared + voids.cleared,
+    left: summary.left + voids.left,
+  };
 }
