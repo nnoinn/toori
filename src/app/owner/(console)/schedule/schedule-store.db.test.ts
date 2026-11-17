@@ -140,7 +140,8 @@ describeDb('원장님 예약 현황 조회 (실제 DB)', () => {
         testSlot(shop, '13:00', '14:00', { windowId, ...hold }),
         testSlot(shop, '15:00', '16:00', { windowId, status: 'reserved' }),
       ]);
-      const now = kst('2026-11-01 09:00');
+      // 09:00 매물 시작 전(시작 시각이 되면 게시중은 마감으로 본다, getSlotStatus). 홀딩은 09:10까지라 결제 중이다
+      const now = kst('2026-11-01 08:55');
 
       const rows = await selectScheduleSlots(tx, shop.shopId, { from, to, now });
       expect(rows.map((slot) => [slot.startAt, slot.status, slot.onHold, slot.editable])).toEqual([
