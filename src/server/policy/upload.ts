@@ -19,3 +19,9 @@ export type BusinessDocContentType = (typeof BUSINESS_DOC_ALLOWED_TYPES)[number]
 
 /** 사업자등록증(비공개)을 여는 주소가 열려 있는 시간(초). 운영자·원장님이 화면을 열 때마다 새로 받는다 */
 export const BUSINESS_DOC_URL_TTL_SECONDS = 5 * 60;
+
+/**
+ * 쓰이지 않는 사업자등록증(비공개)을 지우기까지 두는 날 수(#478, 11/17 nnoinn).
+ * 가입하다 그만두면 올린 날부터, 반려 뒤 다시 냈으면 다시 낸 날부터 센다. 개인정보라 계속 두지 않는다(#116)
+ */
+export const BUSINESS_DOC_KEEP_DAYS = 30;
