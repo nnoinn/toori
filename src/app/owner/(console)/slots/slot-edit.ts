@@ -19,6 +19,8 @@ export const SLOT_CLOSE_REASON_LABELS: Record<SlotCloseReason, string> = {
   other: '기타',
   // 원장님이 고르는 사유가 아니다(아래 SLOT_CLOSE_REASON_OPTIONS에는 넣지 않는다, #308 ④)
   hold_released: '결제 없이 홀딩 끝남',
+  // 운영자가 문제 매물을 강제 마감한 것(#373 ④). 원장님이 고르는 사유가 아니다
+  admin: '운영자 마감',
 };
 
 /**
