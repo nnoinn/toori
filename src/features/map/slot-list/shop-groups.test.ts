@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  buildFavoriteGroups,
   GROUP_PREVIEW_COUNT,
   groupByShop,
+  groupByShopInOrder,
   groupPreview,
   groupSummaryText,
-  type ShopHeader,
 } from './shop-groups';
 import type { ListItem } from './types';
 
@@ -84,38 +83,25 @@ describe('샵별 묶기', () => {
   });
 });
 
-// 찜한 샵(11/15 회의 3번): 찜한 샵마다 한 묶음, 매물 없는 샵도 남긴다
+// 찜한 샵(11/15 회의 3번): 매물이 있는 찜한 샵마다 한 묶음(매물 없는 샵은 숨김, 11/18)
 describe('찜한 샵 묶기', () => {
-  const shop = (shopId: string): ShopHeader => ({
-    shopId,
-    shopName: `샵 ${shopId}`,
-    category: '미용실',
-    imageUrl: null,
-    distanceMeters: null,
-  });
-
-  it('매물이 있는 샵은 가장 빠른 매물 순서대로, 매물 없는 샵은 그 뒤에 받은 순서 그대로', () => {
-    // 찜한 순서(최근 먼저): a, b, c, d. 매물은 시작이 가까운 순으로 c, a, c, a
-    const groups = buildFavoriteGroups(
-      [shop('a'), shop('b'), shop('c'), shop('d')],
-      [slot('1', 'c'), slot('2', 'a'), window('w', 'c', 40), slot('3', 'a')],
-    );
+  it('시작이 가까운 순으로 받은 매물을 샵마다 모으고, 샵은 가장 빠른 매물 순', () => {
+    // 매물은 시작이 가까운 순: c, a, c(시간대), a, b
+    const groups = groupByShopInOrder([
+      slot('1', 'c'),
+      slot('2', 'a'),
+      window('w', 'c', 40),
+      slot('3', 'a'),
+      slot('4', 'b'),
+    ]);
     expect(groups.map((group) => [group.shop.shopId, ids(group.items)])).toEqual([
       ['c', ['1', 'w']],
       ['a', ['2', '3']],
-      ['b', []],
-      ['d', []],
+      ['b', ['4']],
     ]);
   });
 
-  it('찜한 샵 목록에 없는 샵의 매물은 버린다', () => {
-    expect(buildFavoriteGroups([shop('a')], [slot('1', 'x')])).toEqual([
-      { shop: shop('a'), items: [] },
-    ]);
-  });
-
-  it('매물 없는 샵의 요약은 "지금 올라온 매물이 없어요"', () => {
-    const [group] = buildFavoriteGroups([shop('a')], []);
-    expect(groupSummaryText(group)).toBe('지금 올라온 매물이 없어요');
+  it('매물이 없으면 묶음도 없다(매물 없는 찜한 샵은 보여주지 않는다)', () => {
+    expect(groupByShopInOrder([])).toEqual([]);
   });
 });

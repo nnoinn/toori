@@ -22,7 +22,6 @@ import {
   type HomeSlotQuery,
   selectFavoriteSlots,
   selectMapShops,
-  selectFavoriteShops,
   selectSlotPage,
 } from './queries';
 import type { SlotSort } from './sort';
@@ -170,49 +169,6 @@ describeDb('홈 목록·지도 조회', () => {
       const near = await selectFavoriteSlots(tx, {
         customerId: me.customerId,
         now: NOW,
-        origin: TEST_LOCATION,
-      });
-      expect(near[1].distanceMeters).toBeLessThan(1);
-      expect(near[0].distanceMeters).toBeGreaterThan(10_000);
-    });
-  });
-
-  it('찜한 샵: 내가 찜한 보이는 샵만 최근에 찜한 순, 지금 매물이 없는 샵도 준다(11/15 회의 3번)', async () => {
-    await withRollback(async (tx) => {
-      const older = await createTestShop(tx, { status: 'approved' });
-      const newer = await createTestShop(tx, { status: 'approved', location: FAR_LOCATION });
-      const hidden = await createTestShop(tx, { status: 'pending' });
-      const othersShop = await createTestShop(tx, { status: 'approved' });
-      const me = await createTestCustomer(tx);
-      const other = await createTestCustomer(tx);
-      await tx.insert(favorites).values([
-        {
-          customerId: me.customerId,
-          shopId: older.shopId,
-          createdAt: new Date('2026-10-01T00:00:00Z'),
-        },
-        {
-          customerId: me.customerId,
-          shopId: newer.shopId,
-          createdAt: new Date('2026-10-02T00:00:00Z'),
-        },
-        {
-          customerId: me.customerId,
-          shopId: hidden.shopId,
-          createdAt: new Date('2026-10-03T00:00:00Z'),
-        },
-        { customerId: other.customerId, shopId: othersShop.shopId },
-      ]);
-      // 매물은 older에만 있다. newer는 지금 매물이 없어도 나온다
-      await insertSlot(tx, older, '10:00', '11:00');
-
-      const list = await selectFavoriteShops(tx, { customerId: me.customerId, origin: null });
-      expect(list.map((shop) => shop.shopId)).toEqual([newer.shopId, older.shopId]);
-      expect(list.map((shop) => shop.distanceMeters)).toEqual([null, null]);
-      expect(list[0].category).toBe('미용실');
-
-      const near = await selectFavoriteShops(tx, {
-        customerId: me.customerId,
         origin: TEST_LOCATION,
       });
       expect(near[1].distanceMeters).toBeLessThan(1);
