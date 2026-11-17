@@ -173,7 +173,7 @@ const windowEntry = (
   state: 'published',
   closeReason: null,
   newCustomerOnly: false,
-  menus: [{ name: '커트', discountRate: 30 }],
+  menus: [{ menuId: 'm1', name: '커트', listPrice: 20000, discountRate: 30 }],
   keptSlots: [],
   ...extra,
 });
