@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
 import { cn } from 'cn';
 import { ChevronDown, ChevronUp } from 'lucide-react';
@@ -17,7 +20,49 @@ import { windowMenuText } from './window-card';
 import { windowRangeText } from './window-range';
 
 /**
- * 거리순 목록의 샵 하나(11/18 정찬형). 머리 줄(샵 사진·이름·업종·거리, 매물 수·최대 할인율) 아래에
+ * 샵 묶음 목록(거리순 목록, 찜한 샵). 흰 판(frameClassName) 안에 묶음을 쌓고, 펼친 샵을 기억한다
+ */
+export function ShopGroupList({
+  groups,
+  serverNow,
+  frameClassName,
+}: {
+  groups: ShopGroup[];
+  serverNow: string;
+  frameClassName: string;
+}) {
+  // 펼친 샵 묶음(샵 id)
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+
+  function toggle(shopId: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(shopId)) next.delete(shopId);
+      else next.add(shopId);
+      return next;
+    });
+  }
+
+  return (
+    <div className={frameClassName}>
+      <ul className="-mb-px [&>li]:border-b">
+        {groups.map((group, index) => (
+          <li key={`${group.shop.shopId}:${index}`}>
+            <ShopGroupBlock
+              group={group}
+              serverNow={serverNow}
+              expanded={expanded.has(group.shop.shopId)}
+              onToggle={() => toggle(group.shop.shopId)}
+            />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * 샵 묶음 하나(거리순 목록 11/18 정찬형, 찜한 샵 11/15 회의 3번). 머리 줄(샵 사진·이름·업종·거리, 매물 수·최대 할인율) 아래에
  * 그 샵 매물을 짧은 줄로 놓는다. 3개가 넘으면 접어 두고 [매물 N개 더 보기]로 편다
  */
 export function ShopGroupBlock({
@@ -31,25 +76,25 @@ export function ShopGroupBlock({
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const first = group.items[0];
-  const distance = formatDistance(first.distanceMeters);
+  const { shop } = group;
+  const distance = formatDistance(shop.distanceMeters);
   const { visible, hiddenCount } = groupPreview(group, expanded);
   const foldable = group.items.length > visible.length || expanded;
 
   return (
-    <section aria-label={first.shopName} className="flex flex-col gap-1 px-4 py-4">
+    <section aria-label={shop.shopName} className="flex flex-col gap-1 px-4 py-4">
       <div className="flex items-center gap-3">
         <PhotoFrame
-          src={first.imageUrl}
-          alt={`${first.shopName} 대표 이미지`}
+          src={shop.imageUrl}
+          alt={`${shop.shopName} 대표 이미지`}
           sizes="56px"
           className="size-14 shrink-0 rounded-lg"
         />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="flex min-w-0 items-baseline gap-1.5">
-            <span className="truncate font-semibold">{first.shopName}</span>
+            <span className="truncate font-semibold">{shop.shopName}</span>
             <span className="shrink-0 text-xs text-muted-foreground">
-              {first.category}
+              {shop.category}
               {distance ? ` · ${distance}` : ''}
             </span>
           </p>

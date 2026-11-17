@@ -26,6 +26,7 @@ import { encodeCursor, SLOT_PAGE_SIZE, type SlotCursor } from './cursor';
 import { shopImageUrl } from './image-url';
 import { addWindowPins, mergePage, type SortKey } from './merge';
 import type { SlotSort } from './sort';
+import type { ShopHeader } from './shop-groups';
 import type { ListItem, SlotListItem, SlotListPage, WindowListItem } from './types';
 
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
@@ -332,10 +333,15 @@ function listColumns<Distance extends number | null>(distance: SQL<Distance>) {
     holdCustomerId: slots.holdCustomerId,
     holdExpiresAt: slots.holdExpiresAt,
     distanceMeters: distance,
-    imagePath: sql<
-      string | null
-    >`(select ${shopImages.storagePath} from ${shopImages} where ${shopImages.shopId} = ${shops.id} and ${shopImages.kind} = 'main' order by ${shopImages.sortOrder} limit 1)`,
+    imagePath: mainImagePath(),
   };
+}
+
+/** 샵 대표 사진 하나의 저장 위치(목록 카드·찜한 샵 머리 줄) */
+function mainImagePath() {
+  return sql<
+    string | null
+  >`(select ${shopImages.storagePath} from ${shopImages} where ${shopImages.shopId} = ${shops.id} and ${shopImages.kind} = 'main' order by ${shopImages.sortOrder} limit 1)`;
 }
 
 /** 배지는 서버 시각으로 정한다(공통 UI SlotCard 규칙, badges.ts) */
@@ -420,6 +426,35 @@ async function toWindowItems(
     };
     return [{ item, card }];
   });
+}
+
+/**
+ * 찜한 샵(11/15 회의 3번, 샵별로 묶어 보여주기). 고객에게 보이는 샵(승인)만, 최근에 찜한 순이다.
+ * 지금 매물이 없는 샵도 준다. origin(내 위치·고른 동네)이 있으면 거리를 같이 준다
+ */
+export async function selectFavoriteShops(
+  db: DbReader,
+  query: { customerId: string; origin: LatLng | null },
+): Promise<ShopHeader[]> {
+  const rows = await db
+    .select({
+      shopId: shops.id,
+      shopName: shops.name,
+      category: shops.category,
+      distanceMeters: query.origin ? distanceFrom(query.origin) : sql<null>`null::float8`,
+      imagePath: mainImagePath(),
+    })
+    .from(favorites)
+    .innerJoin(shops, eq(shops.id, favorites.shopId))
+    .where(and(eq(favorites.customerId, query.customerId), customerVisibleShop()))
+    .orderBy(desc(favorites.createdAt), asc(shops.id));
+  return rows.map((row) => ({
+    shopId: row.shopId,
+    shopName: row.shopName,
+    category: categoryLabel(row.category),
+    imageUrl: shopImageUrl(row.imagePath),
+    distanceMeters: row.distanceMeters,
+  }));
 }
 
 /** 찜한 샵 매물 화면에 한 번에 보여주는 수 상한(찜한 샵의 지금 예약할 수 있는 매물이라 많지 않다). 시간대도 1개로 센다 */

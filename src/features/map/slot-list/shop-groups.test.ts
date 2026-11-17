@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { GROUP_PREVIEW_COUNT, groupByShop, groupPreview, groupSummaryText } from './shop-groups';
+import {
+  buildFavoriteGroups,
+  GROUP_PREVIEW_COUNT,
+  groupByShop,
+  groupPreview,
+  groupSummaryText,
+  type ShopHeader,
+} from './shop-groups';
 import type { ListItem } from './types';
 
 // 거리순 목록 샵별 묶기(11/18 정찬형): 붙어 있는 같은 샵 줄을 한 묶음으로, 3개 넘으면 접기
@@ -46,7 +53,7 @@ describe('샵별 묶기', () => {
       window('w', 'b', 40),
       slot('3', 'b'),
     ]);
-    expect(groups.map((group) => [group.shopId, ids(group.items)])).toEqual([
+    expect(groups.map((group) => [group.shop.shopId, ids(group.items)])).toEqual([
       ['a', ['1', '2']],
       ['b', ['w', '3']],
     ]);
@@ -54,7 +61,7 @@ describe('샵별 묶기', () => {
 
   it('같은 샵이 떨어져서 다시 나오면 따로 묶는다', () => {
     const groups = groupByShop([slot('1', 'a'), slot('2', 'b'), slot('3', 'a')]);
-    expect(groups.map((group) => group.shopId)).toEqual(['a', 'b', 'a']);
+    expect(groups.map((group) => group.shop.shopId)).toEqual(['a', 'b', 'a']);
   });
 
   it('빈 목록은 묶음도 없다', () => {
@@ -74,5 +81,41 @@ describe('샵별 묶기', () => {
     expect(ids(folded.visible)).toEqual(['1', '2', '3']);
     expect(folded.hiddenCount).toBe(2);
     expect(groupPreview(five, true)).toEqual({ visible: five.items, hiddenCount: 0 });
+  });
+});
+
+// 찜한 샵(11/15 회의 3번): 찜한 샵마다 한 묶음, 매물 없는 샵도 남긴다
+describe('찜한 샵 묶기', () => {
+  const shop = (shopId: string): ShopHeader => ({
+    shopId,
+    shopName: `샵 ${shopId}`,
+    category: '미용실',
+    imageUrl: null,
+    distanceMeters: null,
+  });
+
+  it('매물이 있는 샵은 가장 빠른 매물 순서대로, 매물 없는 샵은 그 뒤에 받은 순서 그대로', () => {
+    // 찜한 순서(최근 먼저): a, b, c, d. 매물은 시작이 가까운 순으로 c, a, c, a
+    const groups = buildFavoriteGroups(
+      [shop('a'), shop('b'), shop('c'), shop('d')],
+      [slot('1', 'c'), slot('2', 'a'), window('w', 'c', 40), slot('3', 'a')],
+    );
+    expect(groups.map((group) => [group.shop.shopId, ids(group.items)])).toEqual([
+      ['c', ['1', 'w']],
+      ['a', ['2', '3']],
+      ['b', []],
+      ['d', []],
+    ]);
+  });
+
+  it('찜한 샵 목록에 없는 샵의 매물은 버린다', () => {
+    expect(buildFavoriteGroups([shop('a')], [slot('1', 'x')])).toEqual([
+      { shop: shop('a'), items: [] },
+    ]);
+  });
+
+  it('매물 없는 샵의 요약은 "지금 올라온 매물이 없어요"', () => {
+    const [group] = buildFavoriteGroups([shop('a')], []);
+    expect(groupSummaryText(group)).toBe('지금 올라온 매물이 없어요');
   });
 });
