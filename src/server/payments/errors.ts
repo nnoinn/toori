@@ -34,7 +34,7 @@ export const PAYMENT_ERRORS = {
   /** 쿠폰(C-407, #300). 화면은 쿠폰 목록을 다시 불러오고 '쓰지 않음'으로 돌린다 */
   COUPON_NOT_FOUND: '쿠폰을 찾을 수 없어요',
   COUPON_EXPIRED: '기한이 지난 쿠폰이에요. 다른 쿠폰을 골라 주세요',
-  COUPON_USED: '이미 쓴 쿠폰이에요',
+  COUPON_USED: '이미 사용한 쿠폰이에요',
   COUPON_NOT_APPLICABLE: `이 매물에는 쿠폰을 쓸 수 없어요(쿠폰을 빼면 결제 금액이 ${MIN_PAYMENT_AMOUNT}원보다 작아져요)`,
 } as const;
 

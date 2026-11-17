@@ -144,7 +144,7 @@ PR 검사가 자동으로 막는 것:
 | COUPON-01 | 결제 1건에 1장이고, 쓴 쿠폰은 다시 쓸 수 없다 | C-407 | ✅ | `src/server/coupons/coupon-store.db.test.ts` 사용 처리는 아직 안 쓴 쿠폰만 한 번 바꾼다 |
 | COUPON-02 | 유효기간은 90일이다. 쓸 수 있는 쿠폰만 고를 수 있다(쓴 것·기한 지난 것·남의 쿠폰 제외) | C-407 | ✅ | `src/server/coupons/coupon-store.db.test.ts` 쓸 수 있는 쿠폰만 기한 빠른 순으로 읽는다<br>`src/server/coupons/rules.test.ts` 내 쿠폰이 아니면 NOT_FOUND |
 | COUPON-03 | 쓸 수 있는 쿠폰이 여러 장이면 할인이 가장 큰 쿠폰을 골라 둔 채로 예약 확인을 연다(같으면 기한 빠른 순). 다른 쿠폰이나 '쓰지 않음'으로 바꿀 수 있다 | #300 | ✅ | `src/server/coupons/rules.test.ts` 할인 큰 순, 같으면 기한 빠른 순. 첫 번째가 기본 쿠폰 |
-| COUPON-04 | 쿠폰 선택·결제 동의·취소 화면에 "쿠폰을 쓴 예약을 취소하면 쿠폰은 돌려드리지 않고, 환불은 실제 결제한 금액 기준"을 보여 준다 | C-407·C-402 | ✅ | `src/app/(customer)/(focus)/checkout/[slotId]/coupon-texts.test.ts` 취소하면 돌려주지 않음<br>`src/app/(customer)/(tabs)/reservations/[reservationId]/cancel-texts.test.ts` 쿠폰 안내는 동의 문구와 같다 |
+| COUPON-04 | 쿠폰 선택·결제 동의·취소 화면에 "쿠폰을 사용한 예약을 취소하면 쿠폰은 돌려드리지 않고, 환불은 실제 결제한 금액 기준"을 보여 준다 | C-407·C-402 | ✅ | `src/app/(customer)/(focus)/checkout/[slotId]/coupon-texts.test.ts` 취소하면 돌려주지 않음<br>`src/app/(customer)/(tabs)/reservations/[reservationId]/cancel-texts.test.ts` 쿠폰 안내는 동의 문구와 같다 |
 | COUPON-05 | 원장님 정산은 쿠폰과 상관없이 판매가 기준이다(원장님은 쿠폰 때문에 손해도 이득도 없다) | C-407·X-205 | ✅ | `src/server/settlements/calc-settlement.test.ts` 원장님 정산은 쿠폰과 상관없이 같다(판매가 기준)<br>`tests/docs/rule-docs.test.ts` 3장·4장 이용 완료 표 |
 
 ## 11. 이의제기

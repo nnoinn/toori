@@ -64,7 +64,7 @@ export const AGREED_CANCEL_NOT_FOR = [
 /** "이렇게 처리돼요". 원장님 금액은 서버가 준 baseAmount */
 export function agreedCancelOutcomes(baseAmount: number): string[] {
   return [
-    `손님: 결제한 금액의 ${AGREED_CANCEL_REFUND_RATE}%를 환불받아요(쓴 쿠폰은 돌려드리지 않아요)`,
+    `손님: 결제한 금액의 ${AGREED_CANCEL_REFUND_RATE}%를 환불받아요(사용한 쿠폰은 돌려드리지 않아요)`,
     `원장님: 판매가의 ${OWNER_RATE}%(${formatWon(baseAmount)})를 정산받아요(수수료는 정산 규정대로). 패널티는 없어요`,
     `손님이 ${SITE_NAME} 앱에서 동의해야 취소돼요. ${AGREED_CANCEL_RESPONSE_HOURS}시간 안에 동의하지 않으면 요청이 사라져요`,
   ];
