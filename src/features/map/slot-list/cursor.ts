@@ -16,11 +16,21 @@ export type SlotCursor = {
   value: number | string;
   /** 마지막 매물 ID(같은 정렬 값끼리 순서) */
   id: string;
+  /** 거리순만: 마지막 줄의 샵 ID와 시작 시각(ISO). 같은 거리끼리 샵 → 시작 시각 순으로 놓아서(11/18) 같이 담는다 */
+  shopId?: string;
+  startAt?: string;
 };
 
 // 정렬을 더하면 여기에도 그 정렬의 모양을 더한다
 const cursorSchema = z.discriminatedUnion('sort', [
-  z.object({ sort: z.literal('near'), value: z.number().finite().min(0), id: z.uuid() }),
+  // 샵·시작 시각이 없는 예전 거리순 커서는 받지 않는다(처음부터 다시 불러온다)
+  z.object({
+    sort: z.literal('near'),
+    value: z.number().finite().min(0),
+    id: z.uuid(),
+    shopId: z.uuid(),
+    startAt: z.iso.datetime({ offset: true }),
+  }),
   z.object({ sort: z.literal('discount'), value: z.number().int().min(0).max(100), id: z.uuid() }),
   z.object({ sort: z.literal('imminent'), value: z.iso.datetime({ offset: true }), id: z.uuid() }),
 ]);

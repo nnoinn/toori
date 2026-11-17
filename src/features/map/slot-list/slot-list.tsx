@@ -6,7 +6,7 @@ import { cn } from 'cn';
 
 import { Button } from '@/components/ui/button';
 import { SlotCard } from '@/components/ui/slot-card';
-import { ErrorState, LoadingTiles } from '@/components/ui/state';
+import { ErrorState, LoadingList } from '@/components/ui/state';
 
 import { formatDistance } from './distance';
 import { applySortToSearch, SLOT_SORTS, type SlotSort } from './sort';
@@ -30,21 +30,16 @@ type SlotListProps = {
   /** 매물이 없을 때 보여줄 것 */
   empty: React.ReactNode;
   /**
-   * 카드를 몇 칸으로 놓을지(11/15 회의, 위에 사진이 있는 카드).
-   * page: 폰 2칸, 태블릿 3칸, 1024px 4칸, 1280px 5칸(매물 목록·찜한 샵 매물). panel: 늘 2칸(지도 옆 칸, 폰의 지도 아래 목록).
-   * PC는 카드가 너무 커 보이지 않게 사진을 4:3으로 낮춘다(폰은 정사각형)
+   * 목록 판 모양. 한 줄은 왼쪽 글 + 오른쪽 사진이고, 줄 사이는 구분선이다(지도 앱 장소 목록처럼, 11/18 정찬형).
+   * page: 폰은 화면 폭, PC는 둥근 흰 판(매물 목록·찜한 샵 매물). panel: 지도 옆 칸, 폰의 지도 아래 목록. 둘 다 한 줄씩 쌓는다
    */
   columns?: 'page' | 'panel';
 };
 
-const GRID_CLASS = {
-  page: 'px-4 md:grid-cols-3 md:px-0 lg:grid-cols-4 xl:grid-cols-5',
-  panel: 'px-4',
-} as const;
-
-const IMAGE_SIZES = {
-  page: '(min-width: 1280px) 220px, (min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw',
-  panel: '(min-width: 1024px) 240px, (min-width: 768px) 190px, 50vw',
+// 흰 판. 줄마다 아래 구분선을 긋고, 마지막 줄의 선은 판 밖으로 밀어 숨긴다(-mb-px + overflow-hidden)
+const FRAME_CLASS = {
+  page: 'overflow-hidden bg-card md:rounded-2xl md:border',
+  panel: 'overflow-hidden border-y bg-card md:border-b-0',
 } as const;
 
 /** 정렬 탭 (C-205). 고른 정렬은 주소창에 저장한다 */
@@ -121,7 +116,7 @@ export function SlotList({
     <div className="flex flex-col gap-2">
       {sort ? <SortTabs sort={sort} /> : null}
       {status === 'loading' ? (
-        <LoadingTiles count={4} className={GRID_CLASS[columns]} />
+        <LoadingList count={4} className={FRAME_CLASS[columns]} />
       ) : status === 'error' ? (
         <ErrorState
           description={errorMessage}
@@ -136,49 +131,50 @@ export function SlotList({
       ) : items.length === 0 ? (
         empty
       ) : (
-        // 위에 사진이 있는 카드를 여러 칸으로 놓는다(11/15 회의). 폰은 화면 끝에 붙지 않게 양옆 16px 여백을 둔다
-        <ul className={cn('grid grid-cols-2 gap-3', GRID_CLASS[columns])}>
-          {items.map((item) => (
-            <li key={listItemKey(item)}>
-              {item.kind === 'slot' ? (
-                <SlotCard
-                  layout="tile"
-                  imageSizes={IMAGE_SIZES[columns]}
-                  href={`/slots/${item.slotId}`}
-                  imageUrl={item.imageUrl}
-                  shopName={item.shopName}
-                  menuName={item.menuName}
-                  startAt={item.startAt}
-                  serverNow={serverNow}
-                  listPrice={item.listPrice}
-                  salePrice={item.salePrice}
-                  discountRate={item.discountRate}
-                  badges={item.badges}
-                  distanceText={formatDistance(item.distanceMeters)}
-                />
-              ) : (
-                <WindowCard
-                  imageSizes={IMAGE_SIZES[columns]}
-                  href={`/windows/${item.windowId}`}
-                  imageUrl={item.imageUrl}
-                  shopName={item.shopName}
-                  firstMenuName={item.firstMenuName}
-                  menuCount={item.menuCount}
-                  startAt={item.startAt}
-                  endAt={item.endAt}
-                  maxDiscountRate={item.maxDiscountRate}
-                  minSalePrice={item.minSalePrice}
-                  badges={item.badges}
-                  distanceText={formatDistance(item.distanceMeters)}
-                />
-              )}
-            </li>
-          ))}
-        </ul>
+        <div className={FRAME_CLASS[columns]}>
+          <ul className="-mb-px [&>li]:border-b">
+            {items.map((item) => (
+              <li key={listItemKey(item)}>
+                {item.kind === 'slot' ? (
+                  <SlotCard
+                    layout="list"
+                    href={`/slots/${item.slotId}`}
+                    imageUrl={item.imageUrl}
+                    shopName={item.shopName}
+                    category={item.category}
+                    menuName={item.menuName}
+                    startAt={item.startAt}
+                    serverNow={serverNow}
+                    listPrice={item.listPrice}
+                    salePrice={item.salePrice}
+                    discountRate={item.discountRate}
+                    badges={item.badges}
+                    distanceText={formatDistance(item.distanceMeters)}
+                  />
+                ) : (
+                  <WindowCard
+                    href={`/windows/${item.windowId}`}
+                    imageUrl={item.imageUrl}
+                    shopName={item.shopName}
+                    category={item.category}
+                    firstMenuName={item.firstMenuName}
+                    menuCount={item.menuCount}
+                    startAt={item.startAt}
+                    endAt={item.endAt}
+                    maxDiscountRate={item.maxDiscountRate}
+                    minSalePrice={item.minSalePrice}
+                    badges={item.badges}
+                    distanceText={formatDistance(item.distanceMeters)}
+                  />
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       {status === 'ready' && hasMore ? (
         <div ref={sentinelRef} className="py-2">
-          {loadingMore ? <LoadingTiles count={2} className={GRID_CLASS[columns]} /> : null}
+          {loadingMore ? <LoadingList count={2} className={FRAME_CLASS[columns]} /> : null}
         </div>
       ) : null}
     </div>

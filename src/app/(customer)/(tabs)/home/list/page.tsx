@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
-import { LoadingTiles } from '@/components/ui/state';
+import { LoadingList } from '@/components/ui/state';
 import { FilterSheet } from '@/features/map/filter-sheet';
 import { parseFilters } from '@/features/map/filters';
 import { resolveListArea } from '@/features/map/list-area';
@@ -28,13 +28,10 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 // 매물이 없으면 그 동네를 관심 동네로 등록하는 새 매물 알림 권유를 같이 보여준다(C-208)
 export default function ListPage({ searchParams }: { searchParams: SearchParams }) {
   return (
-    <main className="flex flex-1 flex-col gap-3 py-3 md:mx-auto md:w-full md:max-w-6xl md:px-6 md:py-6">
+    <main className="flex flex-1 flex-col gap-3 py-3 md:mx-auto md:w-full md:max-w-2xl md:px-6 md:py-6">
       <Suspense
         fallback={
-          <LoadingTiles
-            count={5}
-            className="px-4 md:grid-cols-3 md:px-0 lg:grid-cols-4 xl:grid-cols-5"
-          />
+          <LoadingList count={4} className="overflow-hidden bg-card md:rounded-2xl md:border" />
         }
       >
         <ListContent searchParams={searchParams} />

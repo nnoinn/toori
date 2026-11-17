@@ -15,7 +15,7 @@ import { favorites, shopImages, shops, slots } from '@/db/schema';
 import { slotStatusIs } from '@/features/slot-status/slot-status-sql';
 import { KST_TIME_ZONE } from '@/lib/time';
 import { newCustomerOnlyVisible } from '@/server/customers';
-import { PRICE_FILTER_RANGES, TIME_FILTER_RANGES } from '@/server/policy';
+import { categoryLabel, PRICE_FILTER_RANGES, TIME_FILTER_RANGES } from '@/server/policy';
 import { customerVisibleShop } from '@/server/shops/visibility';
 import { listSlotWindows, notWindowSlot, type SlotWindowCard } from '@/server/slot-windows';
 
@@ -218,6 +218,7 @@ export type SlotPageQuery = VisibleSlotQuery & {
 
 /**
  * 목록 한 쪽(20개, D8). 매물 정렬은 DB에서 하고, 같은 정렬 값끼리는 매물 ID 순으로 순서를 정한다.
+ * 거리순만은 거리가 같으면 샵 → 시작 시각 → 매물 ID 순이다(같은 샵 매물을 붙여 시작이 빠른 순으로, 11/18 정찬형).
  * 범위 안 시간대(#308)는 같은 정렬 값으로 끼워 넣는다(merge.ts). 커서는 매물이든 시간대든 마지막 줄을 가리킨다
  */
 export async function selectSlotPage(db: DbReader, query: SlotPageQuery): Promise<SlotListPage> {
@@ -229,10 +230,10 @@ export async function selectSlotPage(db: DbReader, query: SlotPageQuery): Promis
   let afterCursor: SQL | undefined;
   switch (query.sort) {
     case 'near': {
-      order = [asc(distance), asc(slots.id)];
-      if (cursor) {
-        const value = float(Number(cursor.value));
-        afterCursor = or(gt(distance, value), and(eq(distance, value), gt(slots.id, cursor.id)));
+      order = [asc(distance), asc(slots.shopId), asc(slots.startAt), asc(slots.id)];
+      if (cursor?.shopId && cursor.startAt) {
+        // (거리, 샵, 시작 시각, ID)가 커서의 값보다 뒤인 줄. 행 비교는 왼쪽 값부터 차례로 비교한다
+        afterCursor = sql`(${distance}, ${slots.shopId}, ${slots.startAt}, ${slots.id}) > (${float(Number(cursor.value))}, ${cursor.shopId}::uuid, ${cursor.startAt}::timestamptz, ${cursor.id}::uuid)`;
       }
       break;
     }
@@ -301,6 +302,7 @@ type SlotRow = {
   slotId: string;
   shopId: string;
   shopName: string;
+  category: string;
   menuName: string;
   startAt: Date;
   listPrice: number;
@@ -320,6 +322,7 @@ function listColumns<Distance extends number | null>(distance: SQL<Distance>) {
     slotId: slots.id,
     shopId: slots.shopId,
     shopName: shops.name,
+    category: shops.category,
     menuName: slots.menuName,
     startAt: slots.startAt,
     listPrice: slots.listPrice,
@@ -342,6 +345,7 @@ function toListItem(row: SlotRow, query: Pick<HomeSlotQuery, 'customerId' | 'now
     slotId: row.slotId,
     shopId: row.shopId,
     shopName: row.shopName,
+    category: categoryLabel(row.category),
     menuName: row.menuName,
     startAt: row.startAt.toISOString(),
     listPrice: row.listPrice,
@@ -361,7 +365,7 @@ function slotSortKey(sort: SlotSort, row: SlotRow): SortKey {
       : sort === 'discount'
         ? row.discountRate
         : row.startAt.getTime();
-  return { value, id: row.slotId };
+  return { value, id: row.slotId, shop: row.shopId, time: row.startAt.getTime() };
 }
 
 /** 시간대의 정렬 값: 샵 거리, 서비스 중 가장 큰 할인율, 가장 빠른 시작 시각 */
@@ -372,7 +376,12 @@ function windowSortKey(sort: SlotSort, item: WindowListItem, card: SlotWindowCar
       : sort === 'discount'
         ? card.maxDiscountRate
         : new Date(card.earliestStartAt).getTime();
-  return { value, id: card.windowId };
+  return {
+    value,
+    id: card.windowId,
+    shop: card.shopId,
+    time: new Date(card.earliestStartAt).getTime(),
+  };
 }
 
 /** 시간대 카드 → 목록 한 줄. 거리는 매물과 같은 계산으로 DB에서 구한다(같은 샵 매물과 거리가 같다) */
@@ -395,6 +404,7 @@ async function toWindowItems(
       windowId: card.windowId,
       shopId: card.shopId,
       shopName: card.shopName,
+      category: categoryLabel(card.category),
       firstMenuName: card.firstMenuName,
       menuCount: card.menuCount,
       startAt: card.startAt,
