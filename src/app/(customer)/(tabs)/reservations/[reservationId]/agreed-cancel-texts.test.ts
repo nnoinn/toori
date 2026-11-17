@@ -33,7 +33,7 @@ describe('합의 후 취소 요청 카드 문구', () => {
     expect(agreedCancelRefundText(30500, 0)).toBe(
       `합의 후 취소에 동의하시면 결제액의 ${AGREED_CANCEL_REFUND_RATE}%(30,500원)만 환불받을 수 있어요.`,
     );
-    expect(agreedCancelRefundText(30500, 3000)).toContain('쓴 쿠폰은 돌려드리지 않아요.');
+    expect(agreedCancelRefundText(30500, 3000)).toContain('사용하신 쿠폰은 돌려드리지 않아요.');
   });
 
   it('답할 마지막 시각은 한국 시각으로', () => {
