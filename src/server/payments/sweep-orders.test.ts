@@ -8,7 +8,7 @@ import type { getDb } from '@/db';
 import type { StaleOrder } from './order-store';
 import type { PortOneLookup, PortOnePayment } from './portone';
 import type { SettleOutcome } from './settle-order';
-import { sweepStaleOrders } from './sweep-orders';
+import { sweepOneOrder, sweepStaleOrders } from './sweep-orders';
 
 const state = vi.hoisted(() => ({
   stale: [] as unknown[],
@@ -197,5 +197,21 @@ describe('sweepStaleOrders', () => {
       { orderId: 'order-a', now: NOW },
       { orderId: 'order-b', now: NOW },
     ]);
+  });
+});
+
+describe('sweepOneOrder (운영자 [다시 시도], #373 ①)', () => {
+  it('정리 작업과 같은 처리로 결과 하나를 돌려준다', async () => {
+    state.lookups.set('toori-a', found('PAID'));
+    expect(await sweepOneOrder(db, order('a'), NOW)).toBe('confirmed');
+    expect(await sweepOneOrder(db, order('b', 'paid'), NOW)).toBe('autoCancelled');
+    expect(state.cancelled).toEqual(['order-b']);
+    expect(state.marked).toEqual([]);
+  });
+
+  it('실패하면 던지지 않고 left로 보고 뒤로 보낸다', async () => {
+    state.lookups.set('toori-a', new Error('boom'));
+    expect(await sweepOneOrder(db, order('a'), NOW)).toBe('left');
+    expect(state.marked).toEqual([{ orderId: 'order-a', now: NOW }]);
   });
 });

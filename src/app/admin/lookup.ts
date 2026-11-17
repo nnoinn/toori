@@ -12,6 +12,22 @@ export function toListResult<Row>(rows: Row[]): ListResult<Row> {
   return { rows: rows.slice(0, ADMIN_LIST_LIMIT), hasMore: rows.length > ADMIN_LIST_LIMIT };
 }
 
+/** 쪽으로 나눠 보는 긴 기록의 한 쪽 줄 수(기술 가이드 7장 "운영자 목록", 11/15 nnoinn) */
+export const ADMIN_PAGE_SIZE = 20;
+
+/** 한 쪽 결과. page는 실제로 보여 준 쪽(쪽 수보다 큰 쪽을 달라고 하면 마지막 쪽) */
+export type PageResult<Row> = { rows: Row[]; total: number; page: number; pageCount: number };
+
+/** 전체 수와 달라고 한 쪽으로 보여 줄 쪽과 건너뛸 줄 수를 정한다. 기록이 없으면 1쪽에 0건 */
+export function toPage(
+  total: number,
+  requestedPage: number,
+): { page: number; pageCount: number; offset: number } {
+  const pageCount = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+  const page = Math.min(Math.max(1, Math.floor(requestedPage) || 1), pageCount);
+  return { page, pageCount, offset: (page - 1) * ADMIN_PAGE_SIZE };
+}
+
 /** 검색어를 다듬는다. 없으면 빈 문자열 */
 export function toSearchQuery(value: string | undefined): string {
   return (value ?? '').trim().slice(0, 50);

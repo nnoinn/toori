@@ -120,6 +120,34 @@
       "when": 1794673213002,
       "tag": "0016_admin_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794794723367,
+      "tag": "0017_notification_inbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794806887768,
+      "tag": "0018_owner_fault_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794842363831,
+      "tag": "0019_reservation_void",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794894548493,
+      "tag": "0020_admin_ops",
+      "breakpoints": true
     }
   ]
 }

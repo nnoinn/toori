@@ -11,3 +11,12 @@ export const PUSH_QUIET_HOURS = { start: 21, end: 8 } as const;
 
 /** 광고성 정보 수신 동의를 다시 확인하는 주기(개월) */
 export const MARKETING_CONSENT_RECHECK_MONTHS = 24;
+
+/** 알림함에서 보여주는 기간(일). 지난 알림은 정리 작업으로 지운다(#371, 11/13 nnoinn) */
+export const NOTIFICATION_INBOX_DAYS = 90;
+
+/** 화면 안내(투리를 보고 있을 때 화면 위 가운데)를 보여 주는 시간(초, #371 11/13 nnoinn) */
+export const NOTIFICATION_TOAST_SECONDS = 5;
+
+/** 투리를 보고 있을 때 새 알림을 확인하는 간격(초). 푸시 알림을 켜지 않은 기기도 1분 안에 화면 안내가 뜬다(#371 11/13 nnoinn) */
+export const NOTIFICATION_CHECK_SECONDS = 60;

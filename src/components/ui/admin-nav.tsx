@@ -2,6 +2,8 @@
 
 import {
   BadgeCheck,
+  BellRing,
+  CircleAlert,
   ClipboardList,
   MessageSquareWarning,
   ScrollText,
@@ -23,6 +25,8 @@ export function AdminNav() {
         { href: '/admin/users', label: '회원', icon: Users },
         { href: '/admin/reservations', label: '매물·예약', icon: ClipboardList },
         { href: '/admin/disputes', label: '이의제기', icon: MessageSquareWarning },
+        { href: '/admin/payment-issues', label: '결제·환불 확인', icon: CircleAlert },
+        { href: '/admin/notifications', label: '알림 확인', icon: BellRing },
         { href: '/admin/settlements', label: '정산', icon: Wallet },
         { href: '/admin/logs', label: '운영자 기록', icon: ScrollText },
       ]}

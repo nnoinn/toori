@@ -5,11 +5,15 @@ import { describe, expect, it } from 'vitest';
 
 import { TERMS_TYPES } from '@/db/schema/accounts';
 
+import { ADMIN_REASON_LIMIT, STUCK_CANCEL_MINUTES, STUCK_ORDER_MINUTES } from './admin';
 import { BANK_CODES, BANKS } from './banks';
 import { PRICE_FILTER_RANGES, TIME_FILTER_RANGES } from './filters';
 import {
   INTEREST_DIGEST_HOUR,
   MARKETING_CONSENT_RECHECK_MONTHS,
+  NOTIFICATION_CHECK_SECONDS,
+  NOTIFICATION_INBOX_DAYS,
+  NOTIFICATION_TOAST_SECONDS,
   PUSH_QUIET_HOURS,
   REMINDER_MINUTES_BEFORE,
 } from './notifications';
@@ -58,6 +62,15 @@ describe('시간 (#48 1장)', () => {
     expect(STALE_CANCEL_MINUTES).toBe(5);
     expect(ORDER_SWEEP_BATCH).toBe(20);
   });
+
+  it('운영자 결제·환불 확인(#373 ①): 정리 작업이 세 번쯤 돌고도 남은 주문(60분)과 두세 번 돌고도 남은 환불(30분)', () => {
+    expect(STUCK_ORDER_MINUTES).toBe(60);
+    expect(STUCK_CANCEL_MINUTES).toBe(30);
+    // 정리 대상이 된 뒤에야 꼬인 건으로 본다
+    expect(STUCK_ORDER_MINUTES).toBeGreaterThan(STALE_ORDER_MINUTES);
+    expect(STUCK_CANCEL_MINUTES).toBeGreaterThan(STALE_CANCEL_MINUTES);
+    expect(ADMIN_REASON_LIMIT).toBe(1000);
+  });
 });
 
 describe('환불 (#48 2장)', () => {
@@ -99,6 +112,12 @@ describe('알림·동의 (#48 6장)', () => {
   it('관심 지역 알림 시각은 야간 금지 시간이 아니다', () => {
     expect(INTEREST_DIGEST_HOUR).toBeGreaterThanOrEqual(PUSH_QUIET_HOURS.end);
     expect(INTEREST_DIGEST_HOUR).toBeLessThan(PUSH_QUIET_HOURS.start);
+  });
+
+  it('알림함은 최근 90일, 화면 안내는 위 가운데 5초, 보고 있으면 1분마다 새 알림 확인(#371, 11/13 nnoinn)', () => {
+    expect(NOTIFICATION_INBOX_DAYS).toBe(90);
+    expect(NOTIFICATION_TOAST_SECONDS).toBe(5);
+    expect(NOTIFICATION_CHECK_SECONDS).toBe(60);
   });
 
   it('약관 버전은 DB의 약관 종류마다 하나씩 있다', () => {

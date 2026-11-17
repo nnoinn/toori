@@ -30,10 +30,15 @@ export const ACTION_LABELS: Record<string, string> = {
   'dispute.register': '이의제기 등록(카카오톡 채널)',
   'dispute.resolve': '이의제기 결론',
   'visit.override': '방문으로 바꿈(노쇼 취소)',
+  'visit.record': '방문·노쇼 대신 처리',
   'refund.exception': '환불 예외',
   'reservation.void': '예약 무효',
   'settlement.payout_request': '지급 요청',
   'settlement.payout_retry': '지급 다시 요청',
+  'notification.resend': '알림 다시 보내기',
+  'payment.retry': '결제 다시 시도',
+  'refund.retry': '환불 다시 시도',
+  'refund.review_check': '환불 금액 확인함',
 };
 
 /** 열람 기록의 한 일(admin_access_logs.action) */
@@ -50,6 +55,9 @@ export const TARGET_TYPE_LABELS: Record<string, string> = {
   customer: '고객',
   owner: '원장님',
   settlement: '정산',
+  notification: '알림',
+  order: '주문',
+  refund: '환불',
   list: '목록',
 };
 
@@ -122,6 +130,8 @@ export type LogParams = {
   /** 기간(한국 날짜, 둘 다 포함). 없으면 거르지 않는다 */
   from: string | null;
   to: string | null;
+  /** 쪽(1부터, 한 쪽 20줄) */
+  page: number;
 };
 
 const dateSchema = z.iso.date();
@@ -134,7 +144,10 @@ const parseOr = <T>(schema: z.ZodType<T>, value: string | undefined): T | null =
   return parsed.success ? parsed.data : null;
 };
 
-/** 주소 값 읽기. 모르는 탭은 처리 기록, 모르는 정렬은 최근 순, 모양이 틀린 값은 거르지 않는다 */
+/** 쪽 번호 모양(1 이상의 정수) */
+const pageSchema = z.coerce.number().int().min(1);
+
+/** 주소 값 읽기. 모르는 탭은 처리 기록, 모르는 정렬은 최근 순, 모양이 틀린 값은 거르지 않고, 틀린 쪽은 1쪽 */
 export function toLogParams(input: {
   tab?: string;
   sort?: string;
@@ -143,6 +156,7 @@ export function toLogParams(input: {
   target?: string;
   from?: string;
   to?: string;
+  page?: string;
 }): LogParams {
   return {
     tab: LOG_TABS.find((tab) => tab === input.tab) ?? 'actions',
@@ -152,10 +166,11 @@ export function toLogParams(input: {
     target: parseOr(codeSchema, input.target),
     from: parseOr(dateSchema, input.from),
     to: parseOr(dateSchema, input.to),
+    page: parseOr(pageSchema, input.page) ?? 1,
   };
 }
 
-/** 기록 화면 주소. 기본값(처리 기록, 최근 순, 빈 거르기)은 주소에 넣지 않는다 */
+/** 기록 화면 주소. 기본값(처리 기록, 최근 순, 빈 거르기, 1쪽)은 주소에 넣지 않는다 */
 export function logsHref(params: Partial<LogParams> & { tab: LogTab }): string {
   const search = new URLSearchParams();
   if (params.tab !== 'actions') search.set('tab', params.tab);
@@ -164,6 +179,7 @@ export function logsHref(params: Partial<LogParams> & { tab: LogTab }): string {
     const value = params[key];
     if (value) search.set(key, value);
   }
+  if (params.page && params.page > 1) search.set('page', String(params.page));
   const text = search.toString();
   return text ? `/admin/logs?${text}` : '/admin/logs';
 }

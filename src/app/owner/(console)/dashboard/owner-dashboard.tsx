@@ -5,7 +5,7 @@
 // [더보기]는 고른 상태 필터를 그대로 두고(11/13 정민석), 탭 버튼을 직접 누르면 필터를 '전체'로 돌린다.
 // 판매 전 매물은 목록에서 [수정]·[마감](O10, S-206). 결제 중(홀딩)이면 버튼을 잠근다("다른 고객이 결제 중" 배지가 같이 보인다).
 // 버튼은 글자만 쓰고 [수정]·[마감] 둘 다 테두리 버튼이다.
-// 예약이 있는 매물(예약됨·완료·취소)과 "처리 필요" 줄은 [상세]로 예약 상세(O11)에 간다.
+// 예약이 있는 매물(예약됨·완료·취소)과 "처리 필요" 줄은 줄을 두 번 누르거나 Enter로 예약 상세(O11)에 간다([상세] 버튼 없음, 11/16 정민석).
 // 방문 완료·노쇼(O14)는 "처리 필요" 줄에서 바로 누르거나(#23 B1) 예약 상세에서 처리한다. 둘 다 같은 확인 창을 거친다.
 // 시작 전 '취소' 매물은 [재등록](O13, S-408)으로 같은 조건의 새 매물을 올리고, 재등록한 매물에는 "재등록함"을 보여준다.
 // 시간대 매물(#308)도 같은 목록에 시작 순서로 섞어 보여주고 [마감]할 수 있다. 시간대 안에서 들어온 예약은 매물 줄로 나온다.
@@ -19,6 +19,7 @@ import { ChevronRight, SquarePlus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { SelectableRows } from '@/components/ui/selectable-rows';
 import { EmptyState } from '@/components/ui/state';
 import type { SlotStatus } from '@/features/slot-status/slot-status';
 import { ADVANCE_LISTING_DAYS, PUBLISH_WINDOW_HOURS } from '@/server/policy';
@@ -27,6 +28,7 @@ import { visitSummary } from '../reservations/reservation-detail';
 import { VisitConfirmDialog, type VisitTarget } from '../reservations/visit-confirm-dialog';
 import { CloseSlotDialog } from './close-slot-dialog';
 import { CloseWindowDialog } from './close-window-dialog';
+import { EditWindowDialog } from './edit-window-dialog';
 import {
   type AllTabSection,
   allTabSections,
@@ -78,6 +80,7 @@ export function OwnerDashboard({
   const [closing, setClosing] = useState<DashboardSlot | null>(null);
   // [마감]을 누른 시간대(확인 창)
   const [closingWindow, setClosingWindow] = useState<DashboardWindow | null>(null);
+  const [editingWindow, setEditingWindow] = useState<DashboardWindow | null>(null);
   // "처리 필요" 줄에서 [방문 완료]·[노쇼]를 누른 예약(확인 창)
   const [visiting, setVisiting] = useState<VisitTarget | null>(null);
   // [더보기]로 탭을 바꾸면 그 탭 버튼으로 초점을 옮긴다(목록 아래에서 누르면 화면도 탭 줄로 올라간다)
@@ -94,7 +97,12 @@ export function OwnerDashboard({
   /** 매물 줄 또는 시간대 줄 */
   const row = (entry: DashboardEntry) =>
     entry.kind === 'window' ? (
-      <WindowRow key={entry.id} window={entry} onClose={setClosingWindow} />
+      <WindowRow
+        key={entry.id}
+        window={entry}
+        onEdit={setEditingWindow}
+        onClose={setClosingWindow}
+      />
     ) : (
       <SlotRow key={entry.id} slot={entry} now={now} onClose={setClosing} />
     );
@@ -205,6 +213,11 @@ export function OwnerDashboard({
       )}
 
       <CloseSlotDialog shopId={shopId} slot={closing} onDone={() => setClosing(null)} />
+      <EditWindowDialog
+        shopId={shopId}
+        window={editingWindow}
+        onDone={() => setEditingWindow(null)}
+      />
       <CloseWindowDialog
         shopId={shopId}
         window={closingWindow}
@@ -220,11 +233,13 @@ export function OwnerDashboard({
   );
 }
 
-/** 매물 줄 목록 카드 */
+/** 매물 줄 목록 카드. 한 목록에서 한 줄을 고를 수 있다(SelectableRows) */
 function SlotList({ children }: { children: React.ReactNode }) {
   return (
-    <Card className="gap-0 py-0">
-      <ul className="divide-y">{children}</ul>
+    <Card className="gap-0 overflow-hidden py-0">
+      <SelectableRows as="ul" className="divide-y">
+        {children}
+      </SelectableRows>
     </Card>
   );
 }

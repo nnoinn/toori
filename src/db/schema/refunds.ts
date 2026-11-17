@@ -21,13 +21,14 @@ import { settlements } from './settlements';
 import { shops } from './shops';
 import { createdAt, inValues, timestamptz } from './types';
 
-/** 환불 사유: 고객 취소 / 원장님 귀책 / 자동 취소 / 운영자 예외 / 합의 후 취소(X-208, #320) */
+/** 환불 사유: 고객 취소 / 원장님 귀책 / 자동 취소 / 운영자 예외 / 합의 후 취소(X-208, #320) / 예약 무효(A-108, #423) */
 export const REFUND_REASONS = [
   'customer_cancel',
   'owner_fault',
   'auto_cancel',
   'admin_exception',
   'agreed_cancel',
+  'void',
 ] as const;
 export type RefundReason = (typeof REFUND_REASONS)[number];
 
@@ -79,10 +80,18 @@ export const refunds = pgTable(
       sql`${t.status} <> 'done' or ${t.processedAt} is not null`,
     ),
     check('refunds_band_check', sql`${t.band} is null or ${inValues(t.band, REFUND_BANDS_DB)}`),
-    // 한 예약에 취소 환불 기록(고객 취소·합의 후 취소)은 하나만. 둘이 동시에 처리돼도 환불은 한 번(#320)
+    // 한 예약에 취소 환불 기록(고객 취소·합의 후 취소·원장님 귀책 취소)은 하나만. 같은 순간 처리돼도 환불은 한 번(#320, #419)
     uniqueIndex('refunds_cancel_unique')
       .on(t.reservationId)
-      .where(sql`${t.reason} in ('customer_cancel', 'agreed_cancel')`),
+      .where(sql`${t.reason} in ('customer_cancel', 'agreed_cancel', 'owner_fault')`),
+    // 무효 환불(A-108)은 예약 하나에 하나만. 고객 취소로 일부 돌려준 예약에도 남은 금액을 한 번 더 돌려줄 수 있어서 취소 환불과 따로 둔다(#423)
+    uniqueIndex('refunds_void_unique')
+      .on(t.reservationId)
+      .where(sql`${t.reason} = 'void'`),
+    // 진행 중(requested) 환불은 예약 하나에 하나만. 무효와 취소(고객·합의 후·원장님 귀책)가 같은 순간 시작돼도 한쪽만 진행한다(#423)
+    uniqueIndex('refunds_requested_unique')
+      .on(t.reservationId)
+      .where(sql`${t.status} = 'requested'`),
     // 정리 작업이 오래된 진행 중 기록을 찾을 때
     index('refunds_requested_created_at_idx')
       .on(t.createdAt)
@@ -113,6 +122,10 @@ export const coupons = pgTable(
   (t) => [
     check('coupons_reason_check', inValues(t.reason, COUPON_REASONS)),
     index('coupons_customer_id_expires_at_idx').on(t.customerId, t.expiresAt),
+    // 원장님 귀책 보상 쿠폰은 원인 예약 하나에 한 장. 처리를 다시 해도 두 장이 나가지 않게(#419)
+    uniqueIndex('coupons_compensation_unique')
+      .on(t.sourceReservationId)
+      .where(sql`${t.reason} = 'owner_fault_compensation'`),
   ],
 ).enableRLS();
 

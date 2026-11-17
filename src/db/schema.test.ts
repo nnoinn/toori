@@ -10,7 +10,7 @@ import * as schema from './schema';
 const tables = Object.values(schema).filter((value) => is(value, PgTable)) as unknown as PgTable[];
 
 describe('DB 스키마 (docs/schema-v1.md W1a·W1b)', () => {
-  it('테이블 31개가 모두 있다(운영자 열람 기록 #269, 정산 계좌 변경 기록 #295, 시간대 매물 #308, 합의 후 취소 요청 #320, 운영자 프로필 #372 포함)', () => {
+  it('테이블 33개가 모두 있다(운영자 열람 기록 #269, 정산 계좌 변경 기록 #295, 시간대 매물 #308, 합의 후 취소 요청 #320, 운영자 프로필 #372, 예약 작업 기록·정산 보류 #433 포함)', () => {
     expect(tables.map((t) => getTableName(t)).sort()).toEqual(
       [
         'admin_access_logs',
@@ -18,6 +18,7 @@ describe('DB 스키마 (docs/schema-v1.md W1a·W1b)', () => {
         'admin_profiles',
         'agreed_cancel_requests',
         'coupons',
+        'cron_runs',
         'customers',
         'disputes',
         'favorites',
@@ -35,6 +36,7 @@ describe('DB 스키마 (docs/schema-v1.md W1a·W1b)', () => {
         'push_subscriptions',
         'refunds',
         'reservations',
+        'settlement_holds',
         'settlement_items',
         'settlements',
         'shop_images',

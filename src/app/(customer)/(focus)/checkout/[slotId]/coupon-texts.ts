@@ -19,7 +19,7 @@ export const COUPON_NOT_APPLICABLE_NOTE = `이 매물에는 쓸 수 없어요(�
 export const COUPON_SELECT_NOTES = [
   `쿠폰은 결제 1건에 1장만 쓸 수 있어요(받은 날부터 ${COUPON_VALID_DAYS}일).`,
   COUPON_NOT_RETURNED_NOTE,
-  '원장님 사정으로 취소되면 쓴 쿠폰도 돌려드려요.',
+  '원장님 사정으로 취소되면 사용하신 쿠폰도 돌려드려요.',
 ] as const;
 
 /** 쿠폰 실패(COUPON_*) 뒤 '쓰지 않음'으로 돌렸을 때 */

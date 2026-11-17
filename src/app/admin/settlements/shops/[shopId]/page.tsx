@@ -144,7 +144,7 @@ function StatementTable({
 }) {
   return (
     <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
-      <table className="w-full min-w-[64rem] text-sm">
+      <table className="w-full text-sm">
         <thead className="text-left text-muted-foreground">
           <tr className="border-b">
             <th className={HEAD_CELL}>지급일</th>
@@ -171,8 +171,9 @@ function StatementTable({
             return (
               <SelectableRow key={statement.payoutDate} id={statement.payoutDate} href={href}>
                 <td className={cn(CELL, 'whitespace-nowrap')}>{statement.payoutDate}</td>
-                <td className={cn(CELL, 'whitespace-nowrap text-muted-foreground')}>
-                  {statement.periodStart} ~ {statement.periodEnd}
+                <td className={cn(CELL, 'text-muted-foreground')}>
+                  <span className="whitespace-nowrap">{statement.periodStart} ~</span>{' '}
+                  <span className="whitespace-nowrap">{statement.periodEnd}</span>
                 </td>
                 <td className={cn(CELL, 'text-right')}>{count}</td>
                 <td className={cn(CELL, 'text-right whitespace-nowrap')}>

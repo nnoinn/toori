@@ -75,6 +75,7 @@ const { cancelReservation, previewRefund } = await import('./cancel');
 
 function target(extra: Partial<RefundTarget> = {}): RefundTarget {
   return {
+    voidInProgress: false,
     reservationId: RESERVATION,
     orderId: 'order-1',
     slotId: 'slot-1',
@@ -361,6 +362,13 @@ describe('cancelReservation', () => {
         requestedAt: before(30),
       },
     });
+    expect(codeOf(await cancel())).toBe('CANCEL_FINISHING');
+    expect(state.pgCalls).toEqual([]);
+    expect(state.requests).toEqual([]);
+  });
+
+  it('예약 무효(A-108)가 진행 중이면 포트원을 부르지 않고 CANCEL_FINISHING', async () => {
+    state.target = target({ voidInProgress: true });
     expect(codeOf(await cancel())).toBe('CANCEL_FINISHING');
     expect(state.pgCalls).toEqual([]);
     expect(state.requests).toEqual([]);

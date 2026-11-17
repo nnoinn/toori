@@ -69,19 +69,27 @@ export function CustomerBottomNav() {
   );
 }
 
-/** PC(md 이상) 위쪽 메뉴. 왼쪽에 로고, 오른쪽에 메뉴. 폰에서는 숨긴다 */
-export function CustomerTopNav() {
+type CustomerTopNavProps = {
+  /** 메뉴 오른쪽 끝에 둘 것. 예: 알림 종(#371). 선택값 */
+  actions?: React.ReactNode;
+};
+
+/** PC(md 이상) 위쪽 메뉴. 왼쪽에 로고, 오른쪽에 메뉴(와 actions). 폰에서는 숨긴다 */
+export function CustomerTopNav({ actions }: CustomerTopNavProps = {}) {
   return (
     <header className="sticky top-0 z-40 hidden h-16 border-b bg-card md:block">
       <div className="flex h-full w-full items-center justify-between px-6">
         <Link href={CUSTOMER_HOME} className="flex items-center">
           <Logo className="h-7" />
         </Link>
-        <nav aria-label="고객 메뉴">
-          <Suspense fallback={<NavItems pathname={null} variant="top" />}>
-            <ActiveNavItems variant="top" />
-          </Suspense>
-        </nav>
+        <div className="flex items-center gap-2">
+          <nav aria-label="고객 메뉴">
+            <Suspense fallback={<NavItems pathname={null} variant="top" />}>
+              <ActiveNavItems variant="top" />
+            </Suspense>
+          </nav>
+          {actions}
+        </div>
       </div>
     </header>
   );

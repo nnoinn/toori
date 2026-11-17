@@ -126,7 +126,7 @@ function TradeSection({ item }: { item: SettlementItemView }) {
       <Row label="판매가" value={formatWon(item.salePrice)} />
       {item.couponUsed ? (
         <p className="text-xs text-muted-foreground">
-          쿠폰을 쓴 예약이에요. 쿠폰은 투리가 부담해서 정산 금액과 상관없어요.
+          쿠폰을 사용한 예약이에요. 쿠폰은 투리가 부담해서 정산 금액과 상관없어요.
         </p>
       ) : null}
     </Section>

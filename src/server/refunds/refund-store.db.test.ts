@@ -47,6 +47,7 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
         couponAmount: 0,
         startAt: slot.startAt,
         requested: null,
+        voidInProgress: false,
       });
 
       await tx
@@ -361,6 +362,32 @@ describeDb('예약 취소 DB 읽기 (실제 DB)', () => {
           ...amounts,
           requestedAt: REQUESTED_AT,
         });
+      });
+    });
+
+    it('예약 하나를 주면 그 예약의 오래된 진행 중 기록만 읽는다(운영자 [다시 시도], #373 ①)', async () => {
+      await withRollback(async (tx) => {
+        const older = await booking(tx);
+        const target = await booking(tx);
+        const fresh = await booking(tx);
+        await requestCancelRefund(tx, older.request);
+        await requestCancelRefund(tx, {
+          ...target.request,
+          requestedAt: new Date(REQUESTED_AT.getTime() + 60_000),
+        });
+        await requestCancelRefund(tx, { ...fresh.request, requestedAt: NOW });
+
+        const read = (reservationId: string) =>
+          readStaleCancels(tx, { requestedBefore: NOW, limit: 1, reservationId });
+        // 더 오래된 기록이 있어도 고른 예약만
+        expect((await read(target.reservation.id)).map((row) => row.reservationId)).toEqual([
+          target.reservation.id,
+        ]);
+        // 아직 진행 중일 수 있는 최근 기록은 읽지 않는다
+        expect(await read(fresh.reservation.id)).toEqual([]);
+        // 진행 중 취소가 없는 예약
+        const none = await booking(tx);
+        expect(await read(none.reservation.id)).toEqual([]);
       });
     });
 

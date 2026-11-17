@@ -47,6 +47,8 @@ erDiagram
   shops ||--o{ owner_penalties : ""
   shops ||--o{ settlements : ""
   settlements ||--o{ settlement_items : ""
+  reservations ||--o{ settlement_holds : "거래 보류"
+  shops ||--o{ settlement_holds : "샵 보류"
 ```
 
 ---
@@ -153,6 +155,8 @@ erDiagram
 | applied_at | timestamptz | 입점 신청(다시 신청 포함) 시각 |
 | reviewed_at | timestamptz, null | |
 | reviewed_by | uuid, null → profiles | 처리한 관리자 |
+| publish_paused_at | timestamptz, null | 운영자가 새 매물 게시를 멈춘 시각(#373 ④, #433). 비어 있으면 게시할 수 있다. 새 등록(매물·시간대 매물)만 막고 이미 등록한 매물(게시예정 포함)은 그대로다(11/15 nnoinn). 누가 멈추고 풀었는지는 `admin_actions`(`shop.publish_pause`·`shop.publish_resume`) |
+| publish_paused_reason | text, null | 멈춘 사유. check: 멈춘 시각과 같이 채우고 같이 비운다 |
 | created_at, updated_at | timestamptz | |
 
 판매자 정보(전자상거래법 통신판매중개자 의무): 고객이 결제하기 전에 상호·대표자명·주소·전화번호·사업자등록번호를 보여준다. 통신판매업 신고번호는 받지 않는다(10/13, 중개자가 확인·제공할 항목이 아니고 신고 면제인 원장님이 많다). 전자우편은 원장님 로그인 이메일(`profiles.email`)을 쓴다.
@@ -258,7 +262,7 @@ erDiagram
 | hold_customer_id | uuid, null → customers | 10분 홀딩한 고객 |
 | hold_expires_at | timestamptz, null | 홀딩 만료 시각 |
 | closed_at | timestamptz, null | 원장님이 직접 마감한 시각 |
-| close_reason | text, null | `other_channel`(다른 곳 예약) / `mistake`(잘못 올림) / `other`(기타) / `hold_released`(결제 없이 홀딩 끝남: 손님이 시간대 안에 만든 칸을 결제 없이 비움. 원장님이 고르는 사유가 아니고, 원장님 대시보드·예약 현황·운영자 목록·통계에서는 뺀다, #308 ④) |
+| close_reason | text, null | `other_channel`(다른 곳 예약) / `mistake`(잘못 올림) / `other`(기타) / `hold_released`(결제 없이 홀딩 끝남: 손님이 시간대 안에 만든 칸을 결제 없이 비움. 원장님이 고르는 사유가 아니고, 원장님 대시보드·예약 현황·운영자 목록·통계에서는 뺀다, #308 ④) / `admin`(운영자 마감: 운영자가 문제 매물을 강제 마감. 원장님이 고르는 사유가 아니다. 사유는 `admin_actions` `slot.force_close`에 남는다, #373 ④ #433) |
 | relisted_from_slot_id | uuid, null → slots | 재등록(S-408)으로 만든 매물이면 원래 매물 |
 | window_id | uuid, null → slot_windows | 시간대 매물 안에서 고객이 [예약하기]로 만든 매물이면 그 시간대(#308). 한 시술 매물은 비어 있다 |
 | created_by | uuid → profiles | 등록한 사람 |
@@ -302,7 +306,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | status | text | `scheduled`(게시예정) / `published`(게시중) / `closed`(마감). 시간이 지나서 마감되는 것은 조회할 때 계산한다 |
 | new_customer_only | boolean, 기본 false | 시간대 전체에 켠다. 안에서 만든 매물도 같은 값 |
 | closed_at | timestamptz, null | 원장님이 직접 마감한 시각 |
-| close_reason | text, null | 매물과 같은 사유(`other_channel` / `mistake` / `other`) |
+| close_reason | text, null | 매물과 같은 사유(`other_channel` / `mistake` / `other` / `hold_released` / `admin`) |
 | created_by | uuid → profiles | 올린 사람 |
 | created_at, updated_at | timestamptz | |
 
@@ -381,6 +385,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | cancel_actor | text, null | `customer`(고객 취소) / `owner_fault`(원장님 귀책) / `system`(자동) / `admin`(운영자) / `agreed`(합의 후 취소, X-208) |
 | cancel_reason | text, null | |
 | hours_before_start_at_cancel | numeric, null | 취소할 때 시작까지 남은 시간. 원장님 귀책 취소 제재 기준을 정할 데이터 |
+| voided_at | timestamptz, null | 운영자가 예약을 무효로 한 시각(A-108, #423). 비어 있으면 무효 아님. 화면은 "무효"로 보여 주고 정산은 기준 금액 0으로 뺀다. 돌려줄 돈이 없어도(이미 다 돌려줬거나 쿠폰으로 0원 결제) 무효 기록은 이 칸으로 남는다. 예정 예약을 무효로 하면 `status`는 `cancelled`, `cancel_actor`는 `admin`이고, 이용 완료 예약은 상태와 방문 기록을 그대로 둔다 |
 | created_at | timestamptz | |
 
 신규 고객 판별(X-104): 고객이 그 샵 매물에 `confirmed` 또는 `completed` 예약이 있으면 "이력 있음"이다. 취소된 예약(위약금만 낸 건 포함)은 이력이 아니다.
@@ -395,6 +400,20 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | created_at | timestamptz | |
 
 위치 좌표는 저장하지 않고 "언제, 누가, 무엇에 위치를 썼는지"만 남긴다. 위치정보법은 위치정보 이용 사실 확인자료를 자동으로 기록하고 6개월 이상 보관하라고 한다. 위치기반서비스사업 신고 때 기준을 다시 확인한다.
+
+### cron_runs — 예약 작업 실행 기록 (#373 ⑥, #433)
+
+예약 작업(`src/db/cron/*.sql`이 부르는 `src/app/api/cron/*`)이 시작할 때 한 줄을 넣고 끝날 때 결과를 채운다. 운영자 화면이 작업마다 마지막 실행·성공 여부·실패 이유를 보여 주고, 마지막 성공이 오래됐거나 3번 이어서 실패하면 경고한다. pg_cron의 `cron.job_run_details`는 "주소를 불렀다"까지만 알고 테스트 DB에 pg_cron이 없어서 이 표를 따로 둔다. 30일이 지난 기록은 각 작업이 끝날 때 자기 기록을 지운다(11/15 nnoinn).
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| id | uuid PK | |
+| job | text | `payments-sweep`(결제 정리) / `reminders`(리마인드) / `settlement-batch`(정산 묶기) / `slot-digest`(새 매물 알림) |
+| started_at | timestamptz | 시작 시각 |
+| finished_at | timestamptz, null | 끝난 시각. 비어 있으면 도는 중이거나 중간에 멈춘 것 |
+| ok | boolean, null | 성공 여부. check: 끝난 시각과 같이 채운다 |
+| summary | jsonb, null | 처리 개수(예: `{"checked":3,"confirmed":1}`) |
+| error | text, null | 실패 이유: 오류 이름과 메시지만(값이 들어가는 detail은 남기지 않는다) |
 
 ### webhook_events — 포트원 웹훅 수신 기록
 
@@ -419,7 +438,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | id | uuid PK | |
 | order_id | uuid → orders | |
 | reservation_id | uuid, null → reservations | 예약을 만들기 전에 결제를 취소하는 자동 취소(`auto_cancel`, C-406)에서는 비어 있다. 어떤 결제의 환불인지는 `order_id`로 안다(#64) |
-| reason | text | `customer_cancel` / `owner_fault` / `auto_cancel` / `admin_exception` / `agreed_cancel`(합의 후 취소: 실제 결제액 × 50%, `band`는 비우고 `penalty_rate` 50) |
+| reason | text | `customer_cancel` / `owner_fault` / `auto_cancel` / `admin_exception` / `agreed_cancel`(합의 후 취소: 실제 결제액 × 50%, `band`는 비우고 `penalty_rate` 50) / `void`(예약 무효 A-108: 실제 결제액 중 아직 돌려주지 않은 금액, `band`는 비우고 `penalty_rate` 0, `processed_by`는 처리한 운영자) |
 | status | text, 기본값 `done` | `requested`(포트원을 부르기 전에 저장한 취소 진행 중) / `done`(끝남) |
 | band | text, null | 적용 구간: `over_24h`(30%) / `6h_to_24h`(50%) / `under_6h`(100%) |
 | penalty_rate | integer | 적용한 위약금 비율(당시 값) |
@@ -431,7 +450,9 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | processed_by | uuid, null → profiles | 운영자 처리일 때 |
 | created_at | timestamptz | 정리 작업이 오래된 진행 중 기록을 찾을 때 쓴다 |
 
-한 예약에 취소 환불 기록(고객 취소·합의 후 취소)은 하나만 둔다(unique `refunds_cancel_unique`, #320). 손님이 직접 취소하는 순간 합의 후 취소 동의가 같이 들어와도 환불은 한 번만 나간다.
+한 예약에 취소 환불 기록(고객 취소·합의 후 취소·원장님 귀책 취소)은 하나만 둔다(unique `refunds_cancel_unique`, #320, #419). 손님이 직접 취소하는 순간 합의 후 취소 동의나 원장님 귀책 취소가 같이 들어와도 환불은 한 번만 나간다.
+
+무효 환불(`void`)은 예약 하나에 하나다(unique `refunds_void_unique`). 고객 취소로 일부 돌려준 예약에도 남은 금액을 한 번 더 돌려줄 수 있어서 취소 환불과 따로 둔다. 진행 중(`requested`) 환불은 이유와 상관없이 예약 하나에 하나만 둔다(unique `refunds_requested_unique`, A-108): 무효와 취소가 동시에 포트원을 부르지 않는다. 진행 중 기록을 넣는 쪽은 어느 unique에 걸려도 넣지 않고 "다른 처리가 진행 중"으로 답한다.
 
 ### agreed_cancel_requests — 합의 후 취소 요청 (S-410·C-506·X-208, #320)
 
@@ -469,7 +490,8 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | used_at | timestamptz, null | |
 
 - 고객이 직접 취소하면 쓴 쿠폰은 그대로 "사용됨"으로 둔다(돌려주지 않음)
-- 원장님 귀책 취소면 `used_order_id`, `used_at`을 비워서 다시 쓸 수 있게 돌려주고, 보상 쿠폰을 새로 발급한다
+- 원장님 귀책 취소면 `used_order_id`, `used_at`을 비워서 다시 쓸 수 있게 돌려주고(기한은 원래 그대로, 11/15), 보상 쿠폰을 새로 발급한다
+- 원장님 귀책 보상 쿠폰은 원인 예약 하나에 한 장이다(unique `coupons_compensation_unique`: `reason = 'owner_fault_compensation'`인 쿠폰의 `source_reservation_id`, #419). 처리를 다시 해도 두 장이 나가지 않는다
 
 ### owner_penalties — 원장님 귀책 취소 패널티
 
@@ -538,6 +560,23 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | memo | text, null | |
 | created_at | timestamptz | |
 
+### settlement_holds — 정산 보류 (#373 ②, #433)
+
+이의제기가 아닌 이유(예: 원장님 계좌 확인 필요)로 거래 하나나 샵 전체의 정산을 운영자가 멈추고 푼다. 아직 정산에 묶이지 않은 거래·샵만 멈추고(이미 묶인 정산은 지급 요청 A-105에서 막는다), 정산 묶기는 풀리지 않은 보류가 있는 거래·샵을 뺀다. 원장님 화면에는 "운영자 확인 중"만 보이고 사유는 숨긴다(11/15 nnoinn). 지난 보류도 지우지 않고 남기고, 운영자 처리 기록(`settlement.hold`·`settlement.release`)에도 같이 남긴다.
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| id | uuid PK | |
+| reservation_id | uuid, null → reservations | 거래 하나를 멈출 때 |
+| shop_id | uuid, null → shops | 샵 전체를 멈출 때. check: 거래와 샵 중 하나만 채운다 |
+| reason | text | 보류 사유(운영자만 본다) |
+| held_by | uuid → profiles | 건 운영자 |
+| held_at | timestamptz | 건 시각 |
+| released_by | uuid, null → profiles | 푼 운영자 |
+| released_at | timestamptz, null | 푼 시각. 비어 있으면 보류 중 |
+| release_memo | text, null | 푼 메모. check: 푼 운영자·시각·메모는 셋 다 비거나 셋 다 채운다 |
+| created_at | timestamptz | |
+
 ---
 
 ## 7. 알림·관심
@@ -555,7 +594,9 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | user_agent | text, null | 기기 정보 |
 | created_at | timestamptz | |
 
-### notifications — 알림 발송 기록
+### notifications — 알림 기록·알림함
+
+받는 계정마다 알림을 늘 한 줄 남기고(푸시 알림을 켠 기기가 없어도), 알림함(오른쪽 위 종)에 최근 90일(정책 값 `NOTIFICATION_INBOX_DAYS`)을 보여 준다. 90일이 지난 알림은 매일 오후 1시 새 매물 알림 작업이 끝날 때 지운다(`deleteExpiredNotifications`, 개인정보를 오래 두지 않게). 화면 안내(투리를 보고 있을 때 위 가운데 5초)는 1분마다 새 알림을 확인해서 띄운다(#371, 11/13 nnoinn).
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
@@ -565,10 +606,13 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | event | text | 예: `reservation.confirmed`, `reservation.reminder`, `shop.approved` |
 | channel | text | `web_push`(앱 단계에서 `app_push` 추가) |
 | dedupe_key | text, unique | 같은 알림을 두 번 보내지 않게. 예: `reminder:15m:예약ID` |
-| payload | jsonb | |
-| status | text | `sent` / `failed` |
+| payload | jsonb | 알림함에 보이는 `{ title, body, url }`(url은 누르면 열 투리 안 주소) |
+| status | text | 푸시 알림 보낸 결과. `sent` / `failed` / `no_device`(푸시 알림을 켠 기기가 없어서 보내지 않음. 알림함에는 남는다) |
 | error | text, null | |
+| read_at | timestamptz, null | 알림함에서 읽은 시각. 비어 있으면 안 읽음(종의 숫자) |
 | created_at | timestamptz | |
+
+인덱스 `notifications_inbox_idx`(user_id, account_type, created_at, id): 알림함 목록(최근 순)과 안 읽은 수를 찾는다.
 
 ### interest_areas — 관심 동네
 
@@ -636,7 +680,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 
 ### admin_profiles — 운영자 프로필
 
-운영자 화면 위 이름과 운영자 기록 화면(`/admin/logs`)에 보일 이름이다(#372 4장, 11/13 nnoinn). 권한을 켜고 끄는 것은 `profiles.is_admin`이고, 맡은 일로 권한 차이를 두지 않는다. 그만둔 운영자도 기록 화면에 이름이 보여야 해서 지우지 않는다(DB 트리거가 지우기·비우기를 막는다, 이름은 고칠 수 있다). 새 운영자는 당분간 강규민이 SQL로 `is_admin`과 프로필을 같이 넣는다.
+운영자 화면 위 이름과 운영자 기록 화면(`/admin/logs`)에 보일 이름이다(#372 4장, 11/13 nnoinn). 권한을 켜고 끄는 것은 `profiles.is_admin`이고, 맡은 일로 권한 차이를 두지 않는다. 그만둔 운영자도 기록 화면에 이름이 보여야 해서 지우지 않는다(DB 트리거가 지우기·비우기를 막는다, 이름은 고칠 수 있다). 새 운영자는 `is_admin`만 켜면 되고, 이름은 운영자가 운영자 화면 위 오른쪽 프로필 메뉴의 [이름 바꾸기]로 자기 것만 정한다(앞뒤 공백 빼고 1~20자, '운영자'와 다른 운영자가 쓰는 이름은 안 된다. 이름이 없으면 '운영자'로 보인다, 11/16 nnoinn, AUTH-14). 겹치는지는 저장할 때 앱이 본다(DB 제약은 두지 않는다).
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
@@ -676,6 +720,9 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | slot_windows | (shop_id, start_at), (status, start_at), (publish_at), 시간대끼리 겹침 EXCLUDE, 매물과 겹침 트리거 | 원장님 대시보드, 고객 목록, 새 매물 알림, S-209 |
 | slot_window_menus | unique(window_id, menu_id), check: discount_rate 10~50, duration_minutes > 0 | 한 시간대에 같은 메뉴 한 번 |
 | location_use_logs | (created_at) | 6개월 지난 기록 정리 |
+| cron_runs | (job, started_at desc), check: 끝난 시각 ⇔ 성공 여부 | 작업마다 최근 실행 보기, 30일 지난 기록 지우기(#433) |
+| settlement_holds | unique(reservation_id) where released_at is null, unique(shop_id) where released_at is null, check: 거래·샵 중 하나, 푼 운영자·시각·메모 같이 | 풀리지 않은 보류는 대상마다 하나, 정산 묶기가 보류 중인 거래·샵 찾기(#433) |
+| shops (게시 멈춤) | check: publish_paused_at ⇔ publish_paused_reason | 멈춘 시각과 사유를 같이(#433) |
 | admin_access_logs | (created_at), (admin_id, created_at), UPDATE·DELETE·TRUNCATE 막는 트리거 | 보관 기간 확인, 운영자별 월 1회 점검, 기록 위·변조 방지 |
 | admin_actions | UPDATE·DELETE·TRUNCATE 막는 트리거 | 작업 기록 위·변조 방지(#372) |
 | admin_profiles | DELETE·TRUNCATE 막는 트리거 | 그만둔 운영자도 기록에 이름 남기기(#372) |
@@ -683,10 +730,10 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | slots | check: discount_rate 10~50, end_at > start_at | |
 | reservations | unique(code), unique(slot_id), (customer_id), (status) | 예약번호, 매물당 하나, 내 예약 |
 | orders | unique(payment_id), (customer_id), (status) | 결제 검증, 복구 |
-| refunds | unique(reservation_id) where reason in (`customer_cancel`, `agreed_cancel`), (created_at) where status = `requested` | 한 예약에 취소 환불 기록 하나, 오래된 진행 중 기록 찾기 |
+| refunds | unique(reservation_id) where reason in (`customer_cancel`, `agreed_cancel`, `owner_fault`), (created_at) where status = `requested` | 한 예약에 취소 환불 기록 하나, 오래된 진행 중 기록 찾기 |
 | agreed_cancel_requests | unique(reservation_id) where status = `requested`, (reservation_id, requested_at), (expires_at) where status = `requested` | 답을 기다리는 요청 하나, 가장 최근 요청, 만료 처리 작업 |
 | disputes | unique(reservation_id), check: `kakao` ⇔ registered_by 있음, `resolved` ⇔ outcome 있음 | 한 예약에 이의제기 하나, 등록한 운영자·결론 종류 빠뜨리지 않기 |
-| coupons | (customer_id, expires_at) | 보유 쿠폰 |
+| coupons | (customer_id, expires_at), unique(source_reservation_id) where reason = `owner_fault_compensation` | 보유 쿠폰, 원장님 귀책 보상 쿠폰은 예약 하나에 한 장(#419) |
 | settlement_items | (shop_id, settlement_id), unique(order_id) | 정산 묶기, 거래 하나에 한 줄 |
 | notifications | unique(dedupe_key) | 중복 발송 방지 |
 | 상태 값 컬럼 전부 | check(값 목록) | 잘못된 값 저장 방지 |
@@ -733,3 +780,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | 2026-11-12 | `disputes`에 `channel`(접수 경로)·`received_at`(접수 시각)·`registered_by`(카카오톡 채널 건을 등록한 운영자)·`outcome`(결론 종류 6개)을 더하고 unique(`reservation_id`)를 건다. 지금 있는 기록은 `app`, `created_at`으로 채운다. check는 양쪽으로: `kakao` ⇔ 등록한 운영자 있음, `resolved` ⇔ 결론 종류 있음. 돈이 오가는 결론 셋은 처리 기능이 생길 때까지 서버가 막는다. 정산 보류는 칸 없이 "`open` 이의제기가 있으면"으로 본다(#350, 11/12 nnoinn). 마이그레이션 0013 |
 | 2026-11-12 | 정산 묶는 방식: 정산 줄은 목요일 새벽 묶기 작업이 지급일 0시(한국 시간) 기준으로 만들고 그날의 결제 수수료율을 쓴다(플랫폼 수수료 방식도 같다. 법인 전환 때는 공급자 약관 시행일 뒤 첫 정산일 묶음부터). 묶음은 샵 하나 × 지급일 하나, 기간은 직전 지급일 다음 날 ~ 지급일. 패널티를 떼고 0원이면 지급 요청 없이 지급 완료(0원)로 끝내고 S-501에 이유를 보인다. `settlement_items`에 unique(`order_id`), `pg_fee_actual` null 허용(#353, 11/12 nnoinn). 마이그레이션 0014 |
 | 2026-11-15 | `admin_profiles`(운영자 프로필: 이름·맡은 일)를 더하고, `admin_actions`(운영자 작업 기록)도 열람 기록처럼 DB 트리거로 고치기·지우기·비우기를 막는다. 프로필은 지우지 않는다(#372 4·5장, 11/13 nnoinn). 마이그레이션 0016 |
+| 2026-11-16 | `notifications`에 `read_at`(알림함 읽은 시각)과 알림함 인덱스를 더하고, `status`에 `no_device`(푸시 알림을 켠 기기 없음)를 더한다. 받는 계정마다 알림을 늘 남겨 알림함에 보여 준다(#371, 11/13 nnoinn). 마이그레이션 0017 |
+| 2026-11-16 | 원장님 귀책 취소(X-207, #419, 11/15 nnoinn 승인): 취소 환불 하나 조건(`refunds_cancel_unique`)에 `owner_fault`를 넣고, 보상 쿠폰은 원인 예약 하나에 한 장(`coupons_compensation_unique`)으로 막는다. 칸은 더하지 않는다. 마이그레이션 0018 |
+| 2026-11-17 | 예약 무효(A-108, #423, 11/15 nnoinn 승인): `refunds.reason`에 `void`, 무효 환불은 예약 하나에 하나(`refunds_void_unique`), `reservations.voided_at`(무효 시각)을 더한다. 진행 중 환불은 이유와 상관없이 예약 하나에 하나(`refunds_requested_unique`)로 막는다. 마이그레이션 0019 |
+| 2026-11-16 | 운영자 문제 대처 DB(#373 ②④⑥, #433, 11/15 nnoinn 승인): 예약 작업 실행 기록 `cron_runs`(30일 보관), 정산 보류 `settlement_holds`(묶이기 전 거래·샵만, 원장님에게는 사유를 숨김), `shops.publish_paused_at`·`publish_paused_reason`(새 등록만 막는다), `slots`·`slot_windows`의 `close_reason`에 `admin`(운영자 마감). 마이그레이션 0020 |

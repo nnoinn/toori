@@ -54,8 +54,8 @@ export type DashboardWindow = {
   /** 원장님이 마감했으면 사유 */
   closeReason: SlotCloseReason | null;
   newCustomerOnly: boolean;
-  /** 올린 서비스(메뉴 순서)와 할인율 */
-  menus: { name: string; discountRate: number }[];
+  /** 올린 서비스(메뉴 순서)와 할인율. 정가·메뉴 id는 할인율 수정 창이 쓴다 */
+  menus: { menuId: string; name: string; listPrice: number; discountRate: number }[];
   /** 원장님이 마감했을 때 손님이 결제 중이라 남긴 칸(시작 순). 결제가 끝나거나 칸이 닫히면 빠진다. 없으면 [] */
   keptSlots: KeptSlotSummary[];
 };
@@ -80,6 +80,14 @@ export function keptSlotsNotice(kept: readonly KeptSlotSummary[]): string | null
     )
     .join(', ');
   return `손님이 결제 중인 ${times}은 결제가 끝날 때까지 남아 있어요. 결제하면 예약으로 남고, 결제하지 않으면 자동으로 닫혀요.`;
+}
+
+/** 예약이 있는 줄에 마우스를 올리면 보이는 안내(11/16 정민석: [상세] 버튼 대신 두 번 누르기) */
+export const ROW_DETAIL_HINT = '두 번 누르면 예약 상세';
+
+/** 줄을 두 번 누르거나 Enter를 누르면 여는 예약 상세(O11). 예약이 없는 줄은 null(고르기만 된다) */
+export function rowDetailHref(slot: Pick<DashboardSlot, 'reservationId'>): string | null {
+  return slot.reservationId ? `/owner/reservations/${slot.reservationId}` : null;
 }
 
 /** 대시보드 상태 필터 순서(상태 이름 6개, X-301) */

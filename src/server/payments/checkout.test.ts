@@ -616,7 +616,7 @@ describe('쿠폰 (C-407, #300)', () => {
     state.coupons.set(COUPON, { ...state.coupons.get(COUPON)!, usedOrderId: 'order-x' });
     expect(await startPayment({ slotId: SLOT, ...AGREED, couponId: COUPON })).toMatchObject({
       ok: false,
-      error: { code: 'COUPON_USED', message: '이미 쓴 쿠폰이에요' },
+      error: { code: 'COUPON_USED', message: '이미 사용한 쿠폰이에요' },
     });
     expect(state.orders).toEqual([]);
   });
