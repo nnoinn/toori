@@ -92,6 +92,14 @@ export async function readRefundTargetForShop(
   return readTargetWhere(db, and(eq(reservations.id, reservationId), eq(slots.shopId, shopId)));
 }
 
+/** 예약 하나(운영자 대신 처리, #373 ③-2). 권한은 부른 쪽이 확인한다. 없으면 null */
+export async function readRefundTargetById(
+  reservationId: string,
+  db: DbReader = getDb(),
+): Promise<RefundTarget | null> {
+  return readTargetWhere(db, eq(reservations.id, reservationId));
+}
+
 /** 주문의 예약. 웹훅처럼 고객 없이 볼 때 쓴다. 예약이 없으면 null */
 export async function readRefundTargetByOrder(
   db: DbReader,

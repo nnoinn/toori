@@ -15,26 +15,15 @@ import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { ok } from '@/lib/result';
 import { requireOwner } from '@/server/auth';
-import { OWNER_FAULT_COUPON_AMOUNT, OWNER_FAULT_PENALTY_AMOUNT } from '@/server/policy/owner-fault';
 
-import { calcRefund } from './calc-refund';
 import { runCancelRefund } from './cancel-flow';
 import { refundFail, type RefundResult } from './errors';
+import { ownerFaultPreview, ownerFaultRequest } from './owner-fault-rules';
 import { OWNER_FAULT_CANCEL_REASON } from './refund-payment';
-import { readRefundTargetForShop, type RefundTarget } from './refund-store';
+import { readRefundTargetForShop } from './refund-store';
 import type { CancelledReservation, OwnerFaultCancelPreview } from './types';
 
 const reservationIdSchema = z.uuid();
-
-/** 지금 원장님 귀책 취소를 막는 이유. 취소할 수 있으면 null */
-function blockReason(target: RefundTarget, now: Date) {
-  if (target.status === 'cancelled') return 'ALREADY_CANCELLED' as const;
-  // 방문·노쇼 처리됐거나 서비스가 시작됐다
-  if (target.status === 'completed' || now.getTime() >= target.startAt.getTime()) {
-    return 'ALREADY_STARTED' as const;
-  }
-  return null;
-}
 
 /** 내 샵 예약을 읽는다. 없거나 남의 샵 예약이면 null */
 async function readMyTarget(reservationId: unknown) {
@@ -53,30 +42,13 @@ export async function previewOwnerFaultCancel(
   if (!auth.ok) return auth;
   if (!target) return refundFail('RESERVATION_NOT_FOUND');
   if (target.status === 'cancelled') return refundFail('ALREADY_CANCELLED');
-  const now = await getRequestNow();
-  const calc = calcRefund({
-    paidAmount: target.paidAmount,
-    salePrice: target.salePrice,
-    startAt: target.startAt,
-    now,
-    reason: 'owner_fault',
-  });
-  return ok({
-    reservationId: target.reservationId,
-    cancellable: blockReason(target, now) === null,
-    paidAmount: target.paidAmount,
-    refundAmount: calc.refundAmount,
-    usedCouponAmount: target.couponAmount,
-    compensationCouponAmount: OWNER_FAULT_COUPON_AMOUNT,
-    penaltyAmount: OWNER_FAULT_PENALTY_AMOUNT,
-    startAt: target.startAt.toISOString(),
-    serverNow: now.toISOString(),
-  });
+  return ok(ownerFaultPreview(target, await getRequestNow()));
 }
 
 /**
  * [원장님 사정으로 취소] 확인. 결제액 전부를 돌려준다. 다른 취소(고객 취소·합의 후 취소)가 진행 중이면 CANCEL_FINISHING,
- * 결과를 기다리면 CANCEL_FINISHING(정리 작업이 끝낸다), 돌려준 돈이 없으면 REFUND_FAILED(예약은 그대로)
+ * 결과를 기다리면 CANCEL_FINISHING(정리 작업이 끝낸다), 돌려준 돈이 없으면 REFUND_FAILED(예약은 그대로).
+ * 막는 조건과 진행 중 이어서 하기는 owner-fault-rules.ts(운영자 대신 취소와 같다)
  */
 export async function cancelByOwnerFault(input: {
   reservationId: string;
@@ -85,34 +57,11 @@ export async function cancelByOwnerFault(input: {
   if (!auth.ok) return auth;
   if (!target) return refundFail('RESERVATION_NOT_FOUND');
   const now = await getRequestNow();
-  // 진행 중인 원장님 귀책 취소를 다시 누른 것이면 저장해 둔 값으로 이어서 한다(그 사이 시작 시각이 지나도 돈은 이미 돌아가는 중이다)
-  const resuming = target.requested?.reason === 'owner_fault' && target.status === 'confirmed';
-  if (!resuming) {
-    const blocked = blockReason(target, now);
-    if (blocked) return refundFail(blocked);
-  }
-  if (target.requested && target.requested.reason !== 'owner_fault') {
-    return refundFail('CANCEL_FINISHING');
-  }
-
-  const calc = calcRefund({
-    paidAmount: target.paidAmount,
-    salePrice: target.salePrice,
-    startAt: target.startAt,
-    now,
-    reason: 'owner_fault',
-  });
-  const requested = target.requested ?? {
-    reason: 'owner_fault' as const,
-    band: null,
-    penaltyRate: calc.penaltyRate,
-    refundAmount: calc.refundAmount,
-    penaltyAmount: calc.penaltyAmount,
-    requestedAt: now,
-  };
+  const request = ownerFaultRequest(target, now);
+  if (!request.ok) return refundFail(request.code);
   return runCancelRefund(getDb(), {
     target,
-    requested,
+    requested: request.requested,
     now,
     pgReason: OWNER_FAULT_CANCEL_REASON,
   });

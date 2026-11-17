@@ -40,6 +40,7 @@ const {
   notifyNoShow,
   notifyNoShowReversed,
   notifyOwnerFaultCancelled,
+  notifyOwnerFaultCancelledByAdmin,
   notifyPaymentAutoCancelled,
   notifyPayoutAccountChanged,
   notifyReservationCancelled,
@@ -457,6 +458,22 @@ describe('운영자 대신 처리·노쇼 되돌리기 (#373 ③, 11/16)', () =>
 });
 
 describe('원장님 귀책 취소 (#419, 11/15 nnoinn 문구)', () => {
+  it('운영자가 대신 취소하면(#373 ③-2) 원장님에게 메뉴·시각과 패널티를 알린다', async () => {
+    notifyOwnerFaultCancelledByAdmin(db, 'r-1');
+    await runAfterTasks();
+    expect(state.notified).toEqual([
+      {
+        userId: 'owner-user',
+        accountType: 'owner',
+        event: 'reservation.owner_fault_cancelled_by_admin',
+        dedupeKey: 'reservation.owner_fault_cancelled_by_admin:owner:r-1',
+        title: '운영자가 원장님 사정으로 예약을 취소했어요',
+        body: '커트 · 11/5(목) 15:00. 패널티 5,000원은 정산에서 빼요',
+        url: '/owner/reservations/r-1',
+      },
+    ]);
+  });
+
   it('손님에게만 그 예약 상세로. 쓴 쿠폰을 돌려줬으면 그것도 알린다', async () => {
     notifyOwnerFaultCancelled(db, 'r-1', { couponReturned: false });
     notifyOwnerFaultCancelled(db, 'r-2', { couponReturned: true });
