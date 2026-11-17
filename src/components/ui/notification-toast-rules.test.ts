@@ -70,22 +70,22 @@ describe('화면 안내 규칙', () => {
 });
 
 describe('pushToastAction: 서비스 워커의 푸시 메시지 (#371)', () => {
-  const customer = { account: 'customer' as const, visible: true };
+  const customer = { account: 'customer' as const, watching: true };
 
-  it('이 계정의 푸시이고 화면이 보이면 바로 묻는다(ask)', () => {
+  it('이 계정의 푸시이고 이 화면을 쓰고 있으면(보이고 포커스) 바로 묻는다(ask)', () => {
     expect(pushToastAction({ type: PUSH_TOAST_MESSAGE, account: 'customer' }, customer)).toBe(
       'ask',
     );
   });
 
-  it('다른 계정의 푸시이거나 화면이 보이지 않으면 띄우지 않는다고 답한다(decline): 서비스 워커가 기기 알림을 띄운다', () => {
+  it('다른 계정의 푸시이거나 이 화면을 쓰고 있지 않으면(다른 앱·다른 탭) 띄우지 않는다고 답한다(decline): 서비스 워커가 기기 알림을 띄운다', () => {
     expect(pushToastAction({ type: PUSH_TOAST_MESSAGE, account: 'owner' }, customer)).toBe(
       'decline',
     );
     expect(
       pushToastAction(
         { type: PUSH_TOAST_MESSAGE, account: 'customer' },
-        { ...customer, visible: false },
+        { ...customer, watching: false },
       ),
     ).toBe('decline');
   });

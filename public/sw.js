@@ -2,7 +2,8 @@
 // 보내는 내용은 src/server/notifications/notify.ts가 정한다: { title, body, url, account }
 // 한 기기에서 고객·원장님 알림을 모두 받는다. 지금 들어와 있지 않은 계정의 알림은 흑백 아이콘과 제목 앞 계정 이름으로 가르고,
 // 누르면 로그인 화면을 거쳐 그 알림의 화면으로 간다(기술 가이드 7장 "한 기기의 알림", docs/brand.md).
-// 지금 계정의 알림이면 앞에 보이는 투리 창의 화면 안내(src/components/ui/notification-toast.tsx)에 먼저 전해서 바로 띄운다.
+// 지금 계정의 알림이면 지금 쓰고 있는 투리 창(앞에 보이고 포커스가 있는 창)의 화면 안내(src/components/ui/notification-toast.tsx)에
+// 먼저 전해서 바로 띄운다. 다른 앱을 보는 중이면 창이 화면에 보여도 기기 알림을 띄운다.
 // 화면 안내가 띄웠다고 답하고 크롬 계열이면 기기 알림을 생략한다(두 번 뜨지 않게, #371). 사파리는 푸시마다 기기 알림을
 // 띄워야 해서(어기면 푸시가 끊길 수 있다) 늘 띄우고, 답이 없으면(화면 안내가 없는 화면, 응답 지연) 기기 알림을 띄운다.
 
@@ -53,12 +54,15 @@ function canSkipNotification() {
 }
 
 /**
- * 앞에 보이는 투리 창들에 새 알림이 왔다고 전한다. 그 계정의 화면 안내가 있는 창은 서버에 새 알림을 묻고 답한다.
- * 한 창이라도 띄웠다고(shown) 답하면 true. 보이는 창이 없거나, 모두 아니라고 답하거나, 기다리는 시간이 지나면 false
+ * 지금 쓰고 있는 투리 창(앞에 보이고 포커스가 있는 창)에 새 알림이 왔다고 전한다. 그 계정의 화면 안내가 있는 창은 서버에
+ * 새 알림을 묻고 답한다. 띄웠다고(shown) 답하면 true. 쓰고 있는 창이 없거나, 아니라고 답하거나, 기다리는 시간이 지나면 false.
+ * 다른 앱을 보는 중이면 크롬 창이 화면에 보여도(visible) 포커스가 없어서 묻지 않는다(사람이 보지 않는 화면 안내만 뜨지 않게)
  */
 async function askToast(account) {
   const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  const visible = windows.filter((client) => client.visibilityState === 'visible');
+  const visible = windows.filter(
+    (client) => client.visibilityState === 'visible' && client.focused === true,
+  );
   if (visible.length === 0) return false;
   return new Promise((resolve) => {
     let waiting = visible.length;

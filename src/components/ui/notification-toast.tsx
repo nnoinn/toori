@@ -103,9 +103,10 @@ export function NotificationToaster({
 
     /** 서비스 워커가 이 계정의 푸시를 받았다고 알리면 바로 묻고, 같이 온 포트로 물었는지 답한다 */
     function handlePush(event: MessageEvent) {
+      // 다른 앱을 보는 중이면 창이 보여도 포커스가 없다. 그때는 기기 알림이 뜨게 아니라고 답한다
       const action = pushToastAction(event.data, {
         account,
-        visible: document.visibilityState === 'visible',
+        watching: document.visibilityState === 'visible' && document.hasFocus(),
       });
       if (action === 'ignore') return;
       const port = event.ports[0];

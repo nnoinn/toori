@@ -16,6 +16,7 @@ type Client = {
   focus: () => Promise<void>;
   navigate: (path: string) => Promise<void>;
   visibilityState?: 'visible' | 'hidden';
+  focused?: boolean;
   postMessage?: (message: unknown, ports: FakePort[]) => void;
 };
 type FakePort = { postMessage: (data: unknown) => void };
@@ -48,12 +49,13 @@ const state = {
   asked: [] as unknown[],
 };
 
-/** 앞에 보이는 투리 창. answer가 있으면 화면 안내처럼 { shown: answer }로 답하고, 없으면 답하지 않는다 */
+/** 지금 쓰고 있는 투리 창(보이고 포커스). answer가 있으면 화면 안내처럼 { shown: answer }로 답하고, 없으면 답하지 않는다 */
 function visibleWindow(answer?: boolean): Client {
   return {
     focus: async () => {},
     navigate: async () => {},
     visibilityState: 'visible',
+    focused: true,
     postMessage: (message, ports) => {
       state.asked.push(message);
       if (answer !== undefined) ports[0].postMessage({ shown: answer });
@@ -195,6 +197,13 @@ describe('push: 화면 안내와 겹치지 않게 (#371)', () => {
     expect(state.shown).toEqual([]);
     await vi.advanceTimersByTimeAsync(1);
     await work;
+    expect(state.shown).toHaveLength(1);
+  });
+
+  it('다른 앱을 보는 중이면(창은 보이지만 포커스가 없음) 묻지 않고 기기 알림을 띄운다', async () => {
+    state.clients = [{ ...visibleWindow(true), focused: false }];
+    await fire(load().push, push(ALERT));
+    expect(state.asked).toEqual([]);
     expect(state.shown).toHaveLength(1);
   });
 

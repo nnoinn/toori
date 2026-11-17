@@ -57,14 +57,15 @@ export function parseSeen(raw: string | null): string[] {
 
 /**
  * 서비스 워커가 보낸 메시지(public/sw.js, #371)에 이 화면 안내가 할 일.
- * ask: 이 계정의 푸시라 바로 묻고 답한다 / decline: 다른 계정이거나 화면이 보이지 않아 띄우지 않는다고 답한다 / ignore: 푸시 메시지가 아니다
+ * ask: 이 계정의 푸시이고 지금 이 화면을 쓰고 있어서(보이고 포커스가 있음) 바로 묻고 답한다 /
+ * decline: 다른 계정이거나 이 화면을 쓰고 있지 않아 띄우지 않는다고 답한다(서비스 워커가 기기 알림을 띄운다) / ignore: 푸시 메시지가 아니다
  */
 export function pushToastAction(
   data: unknown,
-  input: { account: NotificationAccount; visible: boolean },
+  input: { account: NotificationAccount; watching: boolean },
 ): 'ask' | 'decline' | 'ignore' {
   if (typeof data !== 'object' || data === null) return 'ignore';
   const message = data as { type?: unknown; account?: unknown };
   if (message.type !== PUSH_TOAST_MESSAGE) return 'ignore';
-  return message.account === input.account && input.visible ? 'ask' : 'decline';
+  return message.account === input.account && input.watching ? 'ask' : 'decline';
 }
