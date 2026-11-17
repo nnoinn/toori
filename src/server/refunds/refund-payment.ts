@@ -13,6 +13,9 @@ export const AGREED_CANCEL_REASON = '합의 후 취소';
 /** 원장님 귀책 취소(X-207, #419) 때 포트원에 보내는 사유. 웹훅은 진행 중 기록이 있으면 정리 작업에 맡긴다(sync-cancel.ts) */
 export const OWNER_FAULT_CANCEL_REASON = '원장님 사정 취소';
 
+/** 예약 무효(A-108, #423) 때 포트원에 보내는 사유. 무효 흐름이 포트원 취소 내역에서 이 사유로 무효 환불을 찾는다(void-flow.ts) */
+export const VOID_REFUND_REASON = '예약 무효';
+
 /**
  * 시드·시나리오가 만든 주문의 결제 번호 앞부분(scripts/dev-db.mjs). 포트원에 결제가 없어서 부를 수 없다.
  * 진짜 주문은 toori-로 시작해서(newPaymentId) 여기에 걸리지 않고, 모르는 번호는 포트원에 물어 실패하게 둔다
@@ -32,6 +35,8 @@ export async function refundPayment(input: {
   paidAmount: number;
   refundAmount: number;
   reason?: string;
+  /** 지금 취소할 수 있는 금액. 이미 일부 돌려준 결제(무효의 남은 금액)면 결제액 − 돌려준 금액, 기본은 결제액 */
+  cancellableAmount?: number;
 }): Promise<PortOneCancel> {
   const { paymentId, paidAmount, refundAmount, reason = CUSTOMER_CANCEL_REASON } = input;
   if (skipsPortOne(paymentId, refundAmount)) {
@@ -39,6 +44,6 @@ export async function refundPayment(input: {
   }
   return cancelPortOnePayment(paymentId, reason, {
     amount: refundAmount,
-    currentCancellableAmount: paidAmount,
+    currentCancellableAmount: input.cancellableAmount ?? paidAmount,
   });
 }

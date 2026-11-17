@@ -208,14 +208,14 @@ describeDb('원장님 대시보드 조회 (실제 DB)', () => {
           kst('2026-11-01 10:00').toISOString(),
           'closed',
           'mistake',
-          [{ name: '커트', discountRate: 20 }],
+          [{ menuId: shop.menuId, name: '커트', listPrice: 20000, discountRate: 20 }],
         ],
         [
           'window',
           kst('2026-11-01 13:00').toISOString(),
           'published',
           null,
-          [{ name: '커트', discountRate: 30 }],
+          [{ menuId: shop.menuId, name: '커트', listPrice: 20000, discountRate: 30 }],
         ],
       ]);
     });

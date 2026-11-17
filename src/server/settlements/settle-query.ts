@@ -4,7 +4,7 @@
 
 import 'server-only';
 
-import { and, eq, inArray, isNotNull, not, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, not, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 import { refunds, reservations, slots } from '@/db/schema';
@@ -22,6 +22,9 @@ export const cancelRefundJoin = and(
 /** 운영자 취소 환불(admin_exception)이 있는 예약. 원장님 기준 금액이 0이다(기술 가이드 7장 "앱을 거치지 않은 취소") */
 export const hasAdminRefund = sql<boolean>`exists (select 1 from ${refunds} where ${refunds.reservationId} = ${reservations.id} and ${refunds.reason} = 'admin_exception')`;
 
+/** 예약 무효(A-108, #423)가 진행 중인 예약. 무효가 끝나면 정산 줄이 없으므로 끝날 때까지 묶지 않는다 */
+export const voidInProgress = sql<boolean>`exists (select 1 from ${refunds} where ${refunds.reservationId} = ${reservations.id} and ${refunds.reason} = 'void' and ${refunds.status} = 'requested')`;
+
 /** 정산 규칙(SettleTarget)에 필요한 칸. reservations·slots를 조인하고 cancelRefund를 leftJoin한 쿼리에서 쓴다 */
 export const settleTargetColumns = {
   status: reservations.status,
@@ -30,6 +33,7 @@ export const settleTargetColumns = {
   cancelledAt: reservations.cancelledAt,
   cancelActor: reservations.cancelActor,
   startAt: slots.startAt,
+  voidedAt: reservations.voidedAt,
   cancelPenaltyRate: cancelRefund.penaltyRate,
   hasAdminRefund,
 };
@@ -55,7 +59,8 @@ export function narrowSettleTarget<
 /**
  * 정산 줄을 만들 수 있는 예약(정산 규칙 settlementKindOf와 같은 조건을 SQL로):
  * 방문·노쇼 처리된 이용 완료이거나, 끝난 고객 취소·합의 후 취소 환불이 있는 취소. 운영자 취소 환불이 있으면 뺀다.
- * 원장님 사정 취소·자동 취소·운영자 취소는 정산 줄이 없어서 묶기 후보에서 뺀다(#394 리뷰 2번, 읽는 줄이 계속 늘지 않게)
+ * 원장님 사정 취소·자동 취소·운영자 취소는 정산 줄이 없어서 묶기 후보에서 뺀다(#394 리뷰 2번, 읽는 줄이 계속 늘지 않게).
+ * 무효로 처리했거나 무효가 진행 중인 예약도 뺀다(A-108, #423)
  */
 export const settleableReservation = and(
   or(
@@ -70,4 +75,6 @@ export const settleableReservation = and(
     ),
   ),
   not(hasAdminRefund),
+  isNull(reservations.voidedAt),
+  not(voidInProgress),
 );

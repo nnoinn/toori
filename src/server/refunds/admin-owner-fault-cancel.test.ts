@@ -59,6 +59,7 @@ const TARGET: RefundTarget = {
   couponAmount: 3_000,
   startAt: START,
   requested: null,
+  voidInProgress: false,
 };
 
 const cancel = (reason = '원장님이 전화로 요청') =>
@@ -149,6 +150,14 @@ describe('cancelByOwnerFaultAsAdmin', () => {
   ])('%s이면 %s이고 환불·기록·알림을 하지 않는다', async (_, change, code) => {
     state.target = { ...TARGET, ...change };
     expect(await cancel()).toMatchObject({ ok: false, error: { code } });
+    expect(state.flows).toEqual([]);
+    expect(state.actions).toEqual([]);
+    expect(state.notified).toEqual([]);
+  });
+
+  it('예약 무효(A-108)가 진행 중이면 CANCEL_FINISHING이고 환불·기록·알림을 하지 않는다(VOID-05, 원장님 취소와 같다)', async () => {
+    state.target = { ...TARGET, voidInProgress: true };
+    expect(await cancel()).toMatchObject({ ok: false, error: { code: 'CANCEL_FINISHING' } });
     expect(state.flows).toEqual([]);
     expect(state.actions).toEqual([]);
     expect(state.notified).toEqual([]);

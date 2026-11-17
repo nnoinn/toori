@@ -52,7 +52,7 @@ export function ownerFaultPreview(target: RefundTarget, now: Date): OwnerFaultCa
 /**
  * 환불 진행(cancel-flow.ts)에 넘길 원장님 귀책 취소 요청. 막히면 그 코드.
  * - 진행 중인 원장님 귀책 취소를 다시 누른 것이면 저장해 둔 값으로 이어서 한다(그 사이 시작 시각이 지나도 돈은 이미 돌아가는 중이다)
- * - 다른 취소(고객 취소·합의 후 취소)가 진행 중이면 CANCEL_FINISHING(한 예약에 취소 환불은 하나)
+ * - 다른 취소(고객 취소·합의 후 취소)나 예약 무효(A-108)가 진행 중이면 CANCEL_FINISHING(그쪽이 끝낸다. 진행 중 환불은 예약당 하나, VOID-05)
  */
 export function ownerFaultRequest(
   target: RefundTarget,
@@ -68,7 +68,7 @@ export function ownerFaultRequest(
     const blocked = ownerFaultBlock(target, now);
     if (blocked) return { ok: false, code: blocked };
   }
-  if (target.requested && target.requested.reason !== 'owner_fault') {
+  if ((target.requested && target.requested.reason !== 'owner_fault') || target.voidInProgress) {
     return { ok: false, code: 'CANCEL_FINISHING' };
   }
   const calc = calcOwnerFault(target, now);

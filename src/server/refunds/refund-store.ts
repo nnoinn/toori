@@ -66,6 +66,8 @@ export type RefundTarget = CancelTarget & {
   couponAmount: number;
   /** 진행 중인 취소(고객 취소 또는 합의 후 취소). 없으면 null */
   requested: RequestedCancel | null;
+  /** 예약 무효(A-108)가 진행 중이다. 그동안 취소·웹훅은 시작하지 않고 무효 흐름이 끝내기를 기다린다 */
+  voidInProgress: boolean;
 };
 
 /** 진행 중으로 남은 취소 하나 */
@@ -126,6 +128,7 @@ async function readTargetWhere(db: DbReader, where: SQL | undefined): Promise<Re
       requestedRefund: refunds.refundAmount,
       requestedPenalty: refunds.penaltyAmount,
       requestedAt: refunds.createdAt,
+      voidInProgress: sql<boolean>`exists (select 1 from ${refunds} v where v.reservation_id = ${reservations.id} and v.reason = 'void' and v.status = 'requested')`,
     })
     .from(reservations)
     .innerJoin(orders, eq(orders.id, reservations.orderId))
@@ -175,7 +178,8 @@ async function readTargetWhere(db: DbReader, where: SQL | undefined): Promise<Re
 
 /**
  * 포트원을 부르기 전에 취소(고객 취소·합의 후 취소)를 진행 중(requested)으로 저장한다. 중간에 멈춰도 정리 작업이 이 기록을 보고 마무리한다.
- * 그 예약에 취소 환불 기록이 이미 있으면(동시에 누름, 고객 취소와 합의 후 취소가 겹침) 넣지 않고 false
+ * 그 예약에 취소 환불 기록이 이미 있거나(동시에 누름, 고객 취소와 합의 후 취소가 겹침) 다른 환불이 진행 중이면(예약 무효, 진행 중 환불은 예약당 하나)
+ * 넣지 않고 false
  */
 export async function requestCancelRefund(
   db: DbWriter,
@@ -194,7 +198,8 @@ export async function requestCancelRefund(
       penaltyAmount: input.penaltyAmount,
       createdAt: input.requestedAt,
     })
-    .onConflictDoNothing({ target: refunds.reservationId, where: CANCEL_REFUND })
+    // 대상을 정하지 않아서 refunds_cancel_unique와 refunds_requested_unique 어느 쪽에 걸려도 넣지 않는다
+    .onConflictDoNothing()
     .returning({ id: refunds.id });
   return inserted.length > 0;
 }

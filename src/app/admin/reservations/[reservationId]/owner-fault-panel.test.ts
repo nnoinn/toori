@@ -21,6 +21,7 @@ const TARGET: RefundTarget = {
   couponAmount: 3_000,
   startAt: START,
   requested: null,
+  voidInProgress: false,
 };
 
 const requested = (reason: 'owner_fault' | 'customer_cancel') => ({
@@ -51,9 +52,13 @@ describe('ownerFaultPanel', () => {
     });
   });
 
-  it('딱 시작 시각부터는 ALREADY_STARTED, 다른 취소가 진행 중이면 CANCEL_FINISHING', () => {
+  it('딱 시작 시각부터는 ALREADY_STARTED, 다른 취소나 예약 무효가 진행 중이면 CANCEL_FINISHING', () => {
     expect(ownerFaultPanel(TARGET, START)).toEqual({ kind: 'blocked', code: 'ALREADY_STARTED' });
     expect(ownerFaultPanel({ ...TARGET, requested: requested('customer_cancel') }, NOW)).toEqual({
+      kind: 'blocked',
+      code: 'CANCEL_FINISHING',
+    });
+    expect(ownerFaultPanel({ ...TARGET, voidInProgress: true }, NOW)).toEqual({
       kind: 'blocked',
       code: 'CANCEL_FINISHING',
     });

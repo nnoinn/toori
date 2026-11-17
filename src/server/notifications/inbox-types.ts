@@ -27,6 +27,13 @@ export type MyNotification = {
  */
 export const NOTIFICATIONS_CHANGED_EVENT = 'toori:notifications-read';
 
+/**
+ * 서비스 워커(public/sw.js)가 푸시를 받았을 때 앞에 보이는 창의 화면 안내에 보내는 메시지 이름(#371).
+ * 메시지는 { type, account }이고, 그 계정의 화면 안내가 새 알림을 물은 뒤 함께 온 포트로 { shown }을 답한다.
+ * sw.js의 같은 이름 값과 같아야 한다(sw.test.ts가 확인한다)
+ */
+export const PUSH_TOAST_MESSAGE = 'toori:push-toast';
+
 /** 알림함에서 한 번에 불러오는 수(기본) */
 export const NOTIFICATIONS_PAGE_SIZE = 20;
 
