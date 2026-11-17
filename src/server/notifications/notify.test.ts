@@ -1,4 +1,4 @@
-// 알림 보내기 (X-505-1, W16). 켜 둔 기기, 중복, 끝난 구독, 실패 기록을 본다. 푸시와 구독 저장은 가짜로 바꾼다. 실제 중복 막기는 notify.db.test.ts가 본다.
+// 알림 기록과 보내기 (X-505-1, W16, #371). 켜 둔 기기, 기기 없음(no_device), 중복, 끝난 구독, 실패 기록을 본다. 푸시와 구독 저장은 가짜로 바꾼다. 실제 중복 막기는 notify.db.test.ts가 본다.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -91,12 +91,23 @@ describe('notify', () => {
     expect(updated).toEqual([]);
   });
 
-  it('켜 둔 기기가 없으면 기록도 남기지 않는다', async () => {
+  it('켜 둔 기기가 없어도 알림함에 남게 no_device로 기록하고, 보내지는 않는다(NOTI-05)', async () => {
     state.targets = [];
-    const { db, inserted } = fakeDb();
+    const { db, inserted, updated } = fakeDb();
     await notify(db, INPUT);
-    expect(inserted).toEqual([]);
+    expect(inserted).toEqual([
+      {
+        userId: 'user-1',
+        accountType: 'owner',
+        event: 'reservation.confirmed',
+        dedupeKey: 'reservation.confirmed:owner:r-1',
+        channel: 'web_push',
+        payload: { title: INPUT.title, body: INPUT.body, url: INPUT.url },
+        status: 'no_device',
+      },
+    ]);
     expect(state.sent).toEqual([]);
+    expect(updated).toEqual([]);
   });
 
   it('같은 dedupe_key가 이미 있으면 보내지 않는다', async () => {

@@ -152,4 +152,26 @@ describeDb('방문·노쇼 처리 저장 (실제 DB)', () => {
       expect(reservation).toMatchObject({ status: 'confirmed', visitResult: null });
     });
   });
+
+  it('원장님 귀책 취소 환불이 진행 중이어도 CANCEL_IN_PROGRESS이고 바꾸지 않는다(#419)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const { customerId } = await createTestCustomer(tx);
+      const made = await createTestReservation(tx, shop, customerId, '10:00', '11:00', 'confirmed');
+      await tx.insert(refunds).values({
+        orderId: made.order.id,
+        reservationId: made.reservation.id,
+        reason: 'owner_fault',
+        status: 'requested',
+        penaltyRate: 0,
+        refundAmount: 14_000,
+        penaltyAmount: 0,
+      });
+
+      const result = await record(tx, shop, made.reservation.id, 'no_show');
+      expect(result.ok ? null : result.error.code).toBe('CANCEL_IN_PROGRESS');
+      const { reservation } = await reservationOf(tx, made.reservation.id);
+      expect(reservation).toMatchObject({ status: 'confirmed', visitResult: null });
+    });
+  });
 });

@@ -1,4 +1,5 @@
-// 환불이 끝난 취소(고객 취소·합의 후 취소) 기록과, 진행 중으로 남은 취소의 결과 정하기 (X-203, W14, #222, X-208 #320). 서버에서만 부른다.
+// 환불이 끝난 취소(고객 취소·합의 후 취소·원장님 귀책 취소) 기록과, 진행 중으로 남은 취소의 결과 정하기
+// (X-203, W14, #222, X-208 #320, X-207 #419). 서버에서만 부른다.
 
 import 'server-only';
 
@@ -6,12 +7,14 @@ import type { getDb } from '@/db';
 import { hoursUntil } from '@/lib/time';
 import {
   notifyAgreedCancelResult,
+  notifyOwnerFaultCancelled,
   notifyReservationCancelled,
 } from '@/server/notifications/alerts';
 import { finishedCancellation, getPortOnePayment } from '@/server/payments/portone';
 
 import { skipsPortOne } from './refund-payment';
 import { reopenAgreedRequest } from './agreed-cancel-store';
+import { recordOwnerFaultExtras } from './owner-fault-store';
 import { type CancelRequest, clearRequestedCancel, finishCancelRecord } from './refund-store';
 
 type Db = ReturnType<typeof getDb>;
@@ -36,8 +39,8 @@ export async function finishCancel(
       request.reservationId,
     );
   }
-  const finished = await db.transaction((tx) =>
-    finishCancelRecord(tx, {
+  const finished = await db.transaction(async (tx) => {
+    const recorded = await finishCancelRecord(tx, {
       reason: request.reason,
       reservationId: request.reservationId,
       orderId: request.orderId,
@@ -57,11 +60,26 @@ export async function finishCancel(
       hoursBeforeStart: hoursUntil(request.startAt, request.requestedAt),
       requestedAt: request.requestedAt,
       now,
-    }),
-  );
+    });
+    if (!recorded) return null;
+    // 원장님 귀책 취소는 같은 트랜잭션에서 쓴 쿠폰 돌려주기·보상 쿠폰·패널티·합의 후 요청 닫기까지 한다(#419)
+    if (request.reason === 'owner_fault') {
+      return recordOwnerFaultExtras(tx, {
+        reservationId: request.reservationId,
+        orderId: request.orderId,
+        now,
+      });
+    }
+    return { couponReturned: false };
+  });
   if (!finished) return null;
   // 바로 끝난 취소·정리 작업·포트원이 늦게 처리한 취소 모두 여기를 지난다
-  if (request.reason === 'agreed_cancel') {
+  if (request.reason === 'owner_fault') {
+    // 원장님 귀책 취소: 손님에게 전액 환불·보상 쿠폰 알림. 원장님 사정이라 재등록 안내는 보내지 않는다(11/15 nnoinn)
+    notifyOwnerFaultCancelled(db, request.reservationId, {
+      couponReturned: finished.couponReturned,
+    });
+  } else if (request.reason === 'agreed_cancel') {
     // 합의 후 취소: 원장님에게 동의 알림(재등록 안내는 없다). 예약마다 한 번이라 예약 id로 중복을 막는다
     notifyAgreedCancelResult(db, {
       reservationId: request.reservationId,

@@ -1,6 +1,6 @@
 // 합의 후 취소 요청 표와 새 값(마이그레이션 0012, #320·#308 ④)을 실제 DB(TEST_DATABASE_URL이 있을 때만)로 확인한다.
 // - 답을 기다리는 요청은 한 예약에 하나(agreed_cancel_requests_pending_unique), 거절·만료 뒤에는 다시 요청할 수 있다
-// - 취소 환불 기록(고객 취소·합의 후 취소)은 한 예약에 하나(refunds_cancel_unique)
+// - 취소 환불 기록(고객 취소·합의 후 취소)은 한 예약에 하나(refunds_cancel_unique. 0018부터 원장님 귀책 취소도 같이, owner-fault-unique.db.test.ts)
 // - 취소한 쪽 agreed, 환불 이유 agreed_cancel, 정산 줄 종류 agreed_cancel, 매물 마감 사유 hold_released
 
 import { eq } from 'drizzle-orm';
