@@ -383,7 +383,7 @@ export function notifyShopReviewed(
 }
 
 /** 운영자 매물 관리 알림에 붙이는 문의 안내. 운영자가 적은 사유는 원장님에게 보이지 않는다(#373 ④, 11/16 강규민 결정) */
-const ADMIN_CONTACT_NOTE = '궁금하면 투리 카카오톡 채널로 문의해 주세요';
+const ADMIN_CONTACT_NOTE = '문의는 투리 카카오톡 채널로 해 주세요';
 
 /** 샵 원장님의 로그인 id. 없는 샵이면 null */
 async function readShopOwnerUserId(db: Db, shopId: string): Promise<string | null> {
