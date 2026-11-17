@@ -91,7 +91,8 @@ export async function cancelByOwnerFault(input: {
     const blocked = blockReason(target, now);
     if (blocked) return refundFail(blocked);
   }
-  if (target.requested && target.requested.reason !== 'owner_fault') {
+  // 다른 취소나 예약 무효(A-108)가 진행 중이면 그쪽이 끝낸다
+  if ((target.requested && target.requested.reason !== 'owner_fault') || target.voidInProgress) {
     return refundFail('CANCEL_FINISHING');
   }
 

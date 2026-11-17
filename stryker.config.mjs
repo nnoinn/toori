@@ -18,6 +18,7 @@ const config = {
     'src/server/policy/slot-time.ts',
     'src/server/refunds/calc-refund.ts',
     'src/server/refunds/agreed-cancel-rules.ts',
+    'src/server/refunds/void-rules.ts',
     'src/server/settlements/calc-settlement.ts',
     'src/server/settlements/payout-date.ts',
     'src/server/settlements/settle-rules.ts',
