@@ -1,6 +1,14 @@
 'use client';
 
-import { LayoutDashboard, LogOut, SquarePlus, Store, UserRound, Wallet } from 'lucide-react';
+import {
+  CalendarDays,
+  LayoutDashboard,
+  LogOut,
+  SquarePlus,
+  Store,
+  UserRound,
+  Wallet,
+} from 'lucide-react';
 import { cn } from 'cn';
 
 import { Button } from '@/components/ui/button';
@@ -12,7 +20,7 @@ type OwnerNavProps = {
   canCreateSlot?: boolean;
 };
 
-// 원장님 메뉴(대시보드 / 매물 등록 / 매장 설정 / 내 계정 / 정산). 주소는 정민석이 화면을 만들면서 바꿀 수 있다(바꾸면 여기만 고친다).
+// 원장님 메뉴(대시보드 / 예약 현황 / 매물 등록 / 매장 설정 / 내 계정 / 정산). 주소는 정민석이 화면을 만들면서 바꿀 수 있다(바꾸면 여기만 고친다).
 // 왼쪽 아래에 로그아웃(O7 ①). 내 계정 화면(#307)에도 같은 로그아웃 버튼(OwnerSignOutButton)이 있다
 export function OwnerNav({ canCreateSlot = true }: OwnerNavProps) {
   return (
@@ -21,6 +29,8 @@ export function OwnerNav({ canCreateSlot = true }: OwnerNavProps) {
       rootHref="/owner"
       items={[
         { href: '/owner', label: '대시보드', icon: LayoutDashboard },
+        // 예약 현황 캘린더(S-402). 자주 보는 화면이라 대시보드 바로 아래(11/15 정민석, #23)
+        { href: '/owner/schedule', label: '예약 현황', icon: CalendarDays },
         {
           href: '/owner/slots/new',
           label: '매물 등록',
