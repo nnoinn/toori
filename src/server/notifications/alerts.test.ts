@@ -476,7 +476,7 @@ describe('원장님 귀책 취소 (#419, 11/15 nnoinn 문구)', () => {
       },
       expect.objectContaining({
         userId: 'customer-user',
-        body: '결제한 금액을 모두 돌려드리고 3,000원 쿠폰을 드렸어요. 쓰신 쿠폰도 돌려드렸어요',
+        body: '결제한 금액을 모두 돌려드리고 3,000원 쿠폰을 드렸어요. 사용하신 쿠폰도 돌려드렸어요',
         url: '/reservations/r-2',
       }),
     ]);

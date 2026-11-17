@@ -186,7 +186,7 @@ export function notifyOwnerFaultCancelled(
       dedupeKey: `${event}:customer:${reservationId}`,
       title: '원장님 사정으로 예약이 취소됐어요',
       body: couponReturned
-        ? `결제한 금액을 모두 돌려드리고 ${coupon}을 드렸어요. 쓰신 쿠폰도 돌려드렸어요`
+        ? `결제한 금액을 모두 돌려드리고 ${coupon}을 드렸어요. 사용하신 쿠폰도 돌려드렸어요`
         : `결제한 금액을 모두 돌려드리고 ${coupon}을 드렸어요`,
       url: `/reservations/${reservationId}`,
     });

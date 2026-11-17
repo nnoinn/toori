@@ -113,7 +113,7 @@ describe('원장님 사정으로 취소 (S-409)', () => {
   it('쓴 쿠폰이 있으면 원래 기한 그대로 돌려받는다는 줄을 더한다', () => {
     const lines = ownerFaultOutcomes({ ...preview, refundAmount: 11000, usedCouponAmount: 3000 });
     expect(lines[0]).toBe('손님: 결제한 금액 11,000원을 모두 돌려받아요');
-    expect(lines[1]).toBe('손님: 쓴 쿠폰 3,000원도 돌려받아요(원래 기한 그대로)');
+    expect(lines[1]).toBe('손님: 사용한 쿠폰 3,000원도 돌려받아요(원래 기한 그대로)');
     expect(lines).toHaveLength(5);
   });
 

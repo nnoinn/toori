@@ -190,7 +190,7 @@ export function ownerFaultOutcomes(
   return [
     `손님: 결제한 금액 ${formatWon(preview.refundAmount)}을 모두 돌려받아요`,
     ...(preview.usedCouponAmount > 0
-      ? [`손님: 쓴 쿠폰 ${formatWon(preview.usedCouponAmount)}도 돌려받아요(원래 기한 그대로)`]
+      ? [`손님: 사용한 쿠폰 ${formatWon(preview.usedCouponAmount)}도 돌려받아요(원래 기한 그대로)`]
       : []),
     `손님: 사과의 뜻으로 ${formatWon(preview.compensationCouponAmount)} 쿠폰을 받아요`,
     `원장님: 패널티 ${formatWon(preview.penaltyAmount)}을 아직 지급하지 않은 정산금에서 먼저 빼고, 모자라면 다음 정산에서 빼요`,
