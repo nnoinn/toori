@@ -1,6 +1,6 @@
 'use client';
 
-// 예약 상세의 [예약 취소] 카드 (S-410, 연결 #19, #301). 예정 예약(방문·노쇼 처리 전, 시작 뒤 포함)에 [예약 취소]를 두고,
+// 예약 상세의 [예약 취소] 카드 (S-409·S-410, 연결 #18·#19, #301·#419). 예정 예약(방문·노쇼 처리 전, 시작 뒤 포함)에 [예약 취소]를 두고,
 // 합의 후 취소를 요청한 적이 있으면 가장 최근 요청의 상태(답 기다림·동의·거절·만료·끝남)를 같이 보여준다.
 // [예약 취소]는 고르기 창(cancel-dialog.tsx)을 연다. 요청하면 화면이 새로 고쳐져 상태가 바뀌는데,
 // 창은 닫힐 때까지 남도록 이 부품은 예약 상세에서 늘 같은 자리에 둔다(카드가 사라져도 창은 남는다).
@@ -29,6 +29,7 @@ export function ReservationCancelCard({
   reservationId,
   summary,
   canCancel,
+  ownerFaultAllowed,
   agreedCancel,
 }: {
   reservationId: string;
@@ -36,6 +37,8 @@ export function ReservationCancelCard({
   summary: string;
   /** [예약 취소]를 보여줄지: 예정이고 방문·노쇼 처리 전(시작 뒤 포함) */
   canCancel: boolean;
+  /** 원장님 사정으로 취소를 고를 수 있는지: 예정이고 서비스 시작 전(S-409) */
+  ownerFaultAllowed: boolean;
   /** getAgreedCancelStatus 결과. 읽지 못했으면 null */
   agreedCancel: AgreedCancelStatusView | null;
 }) {
@@ -93,6 +96,7 @@ export function ReservationCancelCard({
         open={open}
         reservationId={reservationId}
         summary={summary}
+        ownerFaultAllowed={ownerFaultAllowed}
         agreedCancel={agreedCancel}
         onClose={() => setOpen(false)}
       />
