@@ -26,7 +26,7 @@ describe('원장님 합의 후 취소 요청 (S-410)', () => {
   it('처리 안내: 비율은 정책값, 원장님 금액은 서버가 준 기준 금액 그대로', () => {
     const [customer, owner, consent] = agreedCancelOutcomes(8750);
     expect(customer).toContain(`결제한 금액의 ${AGREED_CANCEL_REFUND_RATE}%를 환불받아요`);
-    expect(customer).toContain('쓴 쿠폰은 돌려드리지 않아요');
+    expect(customer).toContain('사용한 쿠폰은 돌려드리지 않아요');
     expect(owner).toContain(`판매가의 ${100 - AGREED_CANCEL_REFUND_RATE}%(8,750원)`);
     expect(owner).toContain('패널티는 없어요');
     expect(consent).toContain(`${AGREED_CANCEL_RESPONSE_HOURS}시간 안에`);
