@@ -20,7 +20,7 @@ type WindowCardProps = {
   endAt: string;
   maxDiscountRate: number;
   minSalePrice: number;
-  /** 서버가 정한 배지(임박, 신규 고객 전용) */
+  /** 서버가 정한 배지(임박). 신규 고객 전용은 고객 화면에 보여 주지 않는다(#459) */
   badges: SlotBadgeKind[];
   distanceText?: string;
 };

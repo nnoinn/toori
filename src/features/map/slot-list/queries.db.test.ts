@@ -347,7 +347,8 @@ describeDb('홈 목록·지도 조회', () => {
       });
       expect(ids(result.items)).toEqual([soon.id, later.id]);
       expect(result.items[0].badges).toEqual(['nonRefundable', 'imminent', 'onHold']);
-      expect(result.items[1].badges).toEqual(['newCustomerOnly']);
+      // 신규 고객 전용 배지는 고객 화면에 보여 주지 않는다(#459). 매물은 신규 고객인 나에게 보인다
+      expect(result.items[1].badges).toEqual([]);
     });
   });
 });
