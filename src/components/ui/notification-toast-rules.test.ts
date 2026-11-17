@@ -2,11 +2,12 @@
 
 import { describe, expect, it } from 'vitest';
 
-import type { MyNotification } from '@/server/notifications/inbox-types';
+import { type MyNotification, PUSH_TOAST_MESSAGE } from '@/server/notifications/inbox-types';
 
 import {
   parseSeen,
   pickToastItems,
+  pushToastAction,
   rememberSeen,
   TOAST_MAX_AGE_MS,
   TOAST_SEEN_LIMIT,
@@ -65,5 +66,33 @@ describe('화면 안내 규칙', () => {
     expect(parseSeen('나쁜 값')).toEqual([]);
     expect(parseSeen('{"a":1}')).toEqual([]);
     expect(parseSeen('["a", 2, "b"]')).toEqual(['a', 'b']);
+  });
+});
+
+describe('pushToastAction: 서비스 워커의 푸시 메시지 (#371)', () => {
+  const customer = { account: 'customer' as const, visible: true };
+
+  it('이 계정의 푸시이고 화면이 보이면 바로 묻는다(ask)', () => {
+    expect(pushToastAction({ type: PUSH_TOAST_MESSAGE, account: 'customer' }, customer)).toBe(
+      'ask',
+    );
+  });
+
+  it('다른 계정의 푸시이거나 화면이 보이지 않으면 띄우지 않는다고 답한다(decline): 서비스 워커가 기기 알림을 띄운다', () => {
+    expect(pushToastAction({ type: PUSH_TOAST_MESSAGE, account: 'owner' }, customer)).toBe(
+      'decline',
+    );
+    expect(
+      pushToastAction(
+        { type: PUSH_TOAST_MESSAGE, account: 'customer' },
+        { ...customer, visible: false },
+      ),
+    ).toBe('decline');
+  });
+
+  it('푸시 메시지가 아니면 아무것도 하지 않는다(ignore)', () => {
+    expect(pushToastAction({ type: 'other', account: 'customer' }, customer)).toBe('ignore');
+    expect(pushToastAction(null, customer)).toBe('ignore');
+    expect(pushToastAction('toori:push-toast', customer)).toBe('ignore');
   });
 });

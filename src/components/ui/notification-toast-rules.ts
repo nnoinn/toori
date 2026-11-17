@@ -1,6 +1,10 @@
 // 화면 안내(#371) 규칙. 1분마다 받은 새 알림 중 무엇을 띄울지, 이미 본 알림을 얼마나 기억할지. 화면(notification-toast.tsx)이 쓴다.
 
-import type { MyNotification } from '@/server/notifications/inbox-types';
+import {
+  type MyNotification,
+  type NotificationAccount,
+  PUSH_TOAST_MESSAGE,
+} from '@/server/notifications/inbox-types';
 
 /**
  * 이보다 오래된 알림은 화면 안내로 띄우지 않는다(서버 시각 기준). 화면을 다시 열었거나 다른 앱에 갔다 왔을 때
@@ -49,4 +53,18 @@ export function parseSeen(raw: string | null): string[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * 서비스 워커가 보낸 메시지(public/sw.js, #371)에 이 화면 안내가 할 일.
+ * ask: 이 계정의 푸시라 바로 묻고 답한다 / decline: 다른 계정이거나 화면이 보이지 않아 띄우지 않는다고 답한다 / ignore: 푸시 메시지가 아니다
+ */
+export function pushToastAction(
+  data: unknown,
+  input: { account: NotificationAccount; visible: boolean },
+): 'ask' | 'decline' | 'ignore' {
+  if (typeof data !== 'object' || data === null) return 'ignore';
+  const message = data as { type?: unknown; account?: unknown };
+  if (message.type !== PUSH_TOAST_MESSAGE) return 'ignore';
+  return message.account === input.account && input.visible ? 'ask' : 'decline';
 }
