@@ -13,6 +13,12 @@ nnoinn이 팀원에게 알릴 내용을 PR과 함께 이 파일에 추가한다.
 
 ---
 
+## 2026-11-17 · 전원 (Next.js 16.4.6)
+- 바뀜: Next.js와 eslint-config-next를 16.4.3에서 16.4.6으로 올렸다(#474, 보안 공지 GHSA-mfr8-8qww-v76h, 심각도 보통). 우리 코드는 `unstable_cache`를 쓰지 않아 실제 영향은 없지만, 16.4.3에서는 내 컴퓨터의 `npm run build`가 마지막 버전 보안 확인에서 멈출 수 있었다
+- 할 일: main을 받은 뒤 `npm install`(세션 시작 브리핑이 알아서 한다)
+
+---
+
 ## 2026-11-17 · 전원 (예약 무효 서버, 진행 중 환불은 예약당 하나)
 - 들어옴: 예약 무효 서버 함수 `previewVoidReservation`·`voidReservation`(`@/server/refunds/void-reservation`, A-108, #423). 운영자만 부르고 원장님이 요청한 내용이 필수다. 남은 결제액 환불, 쓴 쿠폰 돌려주기, 정산 기준 금액 0, 손님과 원장님 알림까지 한다. 운영자 화면과 이의제기 결론 "무효" 연결은 다음 PR
 - DB(마이그레이션 0019, 머지 뒤 nnoinn이 개발 DB에 바로 적용): `reservations.voided_at`(무효 시각, 비어 있으면 무효 아님), 환불 이유 `void`. 진행 중(`requested`) 환불은 이유와 상관없이 예약 하나에 하나만 둔다(`refunds_requested_unique`)
