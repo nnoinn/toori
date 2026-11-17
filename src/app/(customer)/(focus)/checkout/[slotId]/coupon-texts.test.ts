@@ -30,14 +30,14 @@ describe('쿠폰 문구', () => {
     const text = COUPON_SELECT_NOTES.join(' ');
     expect(text).toContain(`결제 1건에 1장만 쓸 수 있어요(받은 날부터 ${COUPON_VALID_DAYS}일)`);
     expect(text).toContain(
-      '쿠폰을 쓴 예약을 취소하면 쿠폰은 돌려드리지 않고, 환불은 실제 결제한 금액 기준이에요.',
+      '쿠폰을 사용한 예약을 취소하면 쿠폰은 돌려드리지 않고, 환불은 실제 결제한 금액 기준이에요.',
     );
-    expect(text).toContain('원장님 사정으로 취소되면 쓴 쿠폰도 돌려드려요.');
+    expect(text).toContain('원장님 사정으로 취소되면 사용하신 쿠폰도 돌려드려요.');
   });
 
   it('쿠폰 실패 뒤에는 쓰지 않음으로 돌렸다고 알린다', () => {
-    expect(couponResetText('이미 쓴 쿠폰이에요')).toBe(
-      "이미 쓴 쿠폰이에요. 쿠폰을 '쓰지 않음'으로 바꿨어요. 금액을 확인해 주세요.",
+    expect(couponResetText('이미 사용한 쿠폰이에요')).toBe(
+      "이미 사용한 쿠폰이에요. 쿠폰을 '쓰지 않음'으로 바꿨어요. 금액을 확인해 주세요.",
     );
   });
 
