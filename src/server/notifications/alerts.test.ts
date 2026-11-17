@@ -501,7 +501,7 @@ describe('예약 무효 (A-108, #423 11/15 nnoinn 문구)', () => {
         event: 'reservation.voided',
         dedupeKey: 'reservation.voided:customer:r-1',
         title: '예약이 무효 처리됐어요',
-        body: '29,400원을 돌려드렸어요. 쓰신 쿠폰도 돌려드렸어요',
+        body: '29,400원을 돌려드렸어요. 사용하신 쿠폰도 돌려드렸어요',
         url: '/reservations/r-1',
       },
       {
@@ -518,7 +518,7 @@ describe('예약 무효 (A-108, #423 11/15 nnoinn 문구)', () => {
 
   it('손님 본문: 돌려준 돈이 없으면 금액을 말하지 않는다(이미 다 돌려줬거나 쿠폰으로 0원 결제)', () => {
     expect(voidedCustomerBody(42_000, false)).toBe('42,000원을 돌려드렸어요');
-    expect(voidedCustomerBody(0, true)).toBe('쓰신 쿠폰을 돌려드렸어요');
+    expect(voidedCustomerBody(0, true)).toBe('사용하신 쿠폰을 돌려드렸어요');
     expect(voidedCustomerBody(0, false)).toBe('자세한 내용은 예약 상세에서 확인해 주세요');
   });
 

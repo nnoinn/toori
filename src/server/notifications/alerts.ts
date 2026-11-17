@@ -193,13 +193,15 @@ export function notifyOwnerFaultCancelled(
   });
 }
 
-/** 예약 무효 손님 알림의 본문(A-108, #423 승인 문구). 돌려준 돈이 없으면(이미 다 돌려줬거나 쿠폰으로 0원 결제) 금액은 말하지 않는다 */
+/** 예약 무효 손님 알림의 본문(A-108, #423 승인 문구, 11/17 nnoinn "사용하신"). 돌려준 돈이 없으면(이미 다 돌려줬거나 쿠폰으로 0원 결제) 금액은 말하지 않는다 */
 export function voidedCustomerBody(refundAmount: number, couponReturned: boolean): string {
   if (refundAmount > 0) {
     const refunded = `${refundAmount.toLocaleString('ko-KR')}원을 돌려드렸어요`;
-    return couponReturned ? `${refunded}. 쓰신 쿠폰도 돌려드렸어요` : refunded;
+    return couponReturned ? `${refunded}. 사용하신 쿠폰도 돌려드렸어요` : refunded;
   }
-  return couponReturned ? '쓰신 쿠폰을 돌려드렸어요' : '자세한 내용은 예약 상세에서 확인해 주세요';
+  return couponReturned
+    ? '사용하신 쿠폰을 돌려드렸어요'
+    : '자세한 내용은 예약 상세에서 확인해 주세요';
 }
 
 /**
