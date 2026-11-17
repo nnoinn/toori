@@ -1,4 +1,6 @@
-// 원장님 예약 상세의 [예약 취소] 카드와 합의 후 취소 안내 창의 문구·규칙 (S-410, 연결 #19, #301). 서버와 화면이 같이 쓴다.
+// 원장님 예약 상세의 [예약 취소] 카드, 원장님 사정 취소 확인 창(S-409, 연결 #18, #419)과 합의 후 취소 안내 창(S-410, 연결 #19, #301)의
+// 문구·규칙. 서버와 화면이 같이 쓴다.
+// 원장님 사정 취소 금액(환불·쓴 쿠폰·보상 쿠폰·패널티)은 화면에서 계산하지 않고 previewOwnerFaultCancel 값을 그대로 쓴다.
 // 안내 창 문구는 동의 문구 8-1장이고, 50%·24시간은 정책값에서 가져온다.
 // 원장님 기준 금액(판매가 × 50%)은 화면에서 계산하지 않고 getAgreedCancelStatus의 baseAmount를 그대로 쓴다.
 
@@ -7,6 +9,8 @@ import { SITE_NAME } from '@/lib/site';
 import { formatKst } from '@/lib/time';
 import { AGREED_CANCEL_REFUND_RATE, AGREED_CANCEL_RESPONSE_HOURS } from '@/server/policy/refund';
 import type { AgreedCancelErrorCode } from '@/server/refunds/agreed-cancel-errors';
+import { REFUND_ERRORS, type RefundErrorCode } from '@/server/refunds/errors';
+import type { CancelledReservation, OwnerFaultCancelPreview } from '@/server/refunds/types';
 import {
   AGREED_CANCEL_REASON_LABELS,
   AGREED_CANCEL_REASON_TEXT_MAX,
@@ -30,11 +34,12 @@ export const AGREED_CANCEL_LOAD_FAILED =
 /** [예약 취소]를 누르면 여는 고르기 창 */
 export const CANCEL_CHOOSER_TITLE = '어떻게 취소할까요?';
 export const CANCEL_METHODS = {
-  /** S-409. 처리 함수(X-207)가 생기면 연다 */
+  /** S-409. 서비스 시작 전까지만(시작 뒤 문제는 손님이 이의제기, A-104) */
   ownerFault: {
     title: '원장님 사정으로 취소',
     description: '원장님 사정으로 시술할 수 없을 때 써요.',
-    notReady: '준비 중',
+    /** 서비스가 시작된 예약(방문 처리 필요)에서 잠글 때 */
+    startedNote: REFUND_ERRORS.ALREADY_STARTED,
   },
   agreed: {
     title: '손님과 합의 후 취소',
@@ -168,6 +173,57 @@ export function agreedCancelFailIsFinal(code: string): boolean {
   const final: AgreedCancelErrorCode[] = [
     'ALREADY_REQUESTED',
     'NOT_REQUESTABLE',
+    'RESERVATION_NOT_FOUND',
+  ];
+  return (final as string[]).includes(code);
+}
+
+// ── 원장님 사정으로 취소 (S-409, X-207, #419) ──
+
+/** 확인 창 "이렇게 처리돼요". 금액은 모두 previewOwnerFaultCancel 값이다(쓴 쿠폰이 없으면 그 줄은 뺀다) */
+export function ownerFaultOutcomes(
+  preview: Pick<
+    OwnerFaultCancelPreview,
+    'refundAmount' | 'usedCouponAmount' | 'compensationCouponAmount' | 'penaltyAmount'
+  >,
+): string[] {
+  return [
+    `손님: 결제한 금액 ${formatWon(preview.refundAmount)}을 모두 돌려받아요`,
+    ...(preview.usedCouponAmount > 0
+      ? [`손님: 사용한 쿠폰 ${formatWon(preview.usedCouponAmount)}도 돌려받아요(원래 기한 그대로)`]
+      : []),
+    `손님: 사과의 뜻으로 ${formatWon(preview.compensationCouponAmount)} 쿠폰을 받아요`,
+    `원장님: 패널티 ${formatWon(preview.penaltyAmount)}을 아직 지급하지 않은 정산금에서 먼저 빼고, 모자라면 다음 정산에서 빼요`,
+    '취소하면 되돌릴 수 없어요. 손님에게 취소 알림이 가요',
+  ];
+}
+
+/** 확인 창의 확인 체크(11/17 정민석). 체크해야 [원장님 사정으로 취소하기]를 누를 수 있다 */
+export function ownerFaultConfirmLabel(penaltyAmount: number): string {
+  return `손님 전액 환불과 패널티 ${formatWon(penaltyAmount)}을 확인했어요`;
+}
+
+export const OWNER_FAULT_SUBMIT = '원장님 사정으로 취소하기';
+export const OWNER_FAULT_LOAD_FAILED = '취소 금액을 불러오지 못했어요. 잠시 후 다시 시도해 주세요';
+export const OWNER_FAULT_CANCEL_FAILED = '취소하지 못했어요. 잠시 후 다시 시도해 주세요';
+export const OWNER_FAULT_DONE_TITLE = '예약을 취소했어요';
+
+/** 취소한 뒤 창에 보여줄 결과. 돌려준 금액은 처리 결과 값, 쿠폰·패널티는 확인 창을 열 때 받은 값이다 */
+export function ownerFaultDoneText(
+  done: Pick<CancelledReservation, 'refundAmount'>,
+  preview: Pick<OwnerFaultCancelPreview, 'compensationCouponAmount' | 'penaltyAmount'>,
+): string {
+  return `손님께 ${formatWon(done.refundAmount)}을 환불하고 ${formatWon(preview.compensationCouponAmount)} 쿠폰을 드렸어요. 패널티 ${formatWon(preview.penaltyAmount)}은 정산에서 빼요.`;
+}
+
+/**
+ * 다시 눌러도 결과가 같은 실패. [원장님 사정으로 취소하기]를 잠근다.
+ * 환불 실패(REFUND_FAILED)와 처리 중(CANCEL_FINISHING)은 다시 누를 수 있다(처리 중이면 저장해 둔 금액으로 이어서 한다)
+ */
+export function ownerFaultFailIsFinal(code: string): boolean {
+  const final: RefundErrorCode[] = [
+    'ALREADY_STARTED',
+    'ALREADY_CANCELLED',
     'RESERVATION_NOT_FOUND',
   ];
   return (final as string[]).includes(code);

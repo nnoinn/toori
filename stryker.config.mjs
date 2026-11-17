@@ -18,6 +18,7 @@ const config = {
     'src/server/policy/slot-time.ts',
     'src/server/refunds/calc-refund.ts',
     'src/server/refunds/agreed-cancel-rules.ts',
+    'src/server/refunds/void-rules.ts',
     'src/server/settlements/calc-settlement.ts',
     'src/server/settlements/payout-date.ts',
     'src/server/settlements/settle-rules.ts',
@@ -34,7 +35,9 @@ const config = {
     'src/features/slot-status/slot-status.ts',
     'src/app/owner/(console)/slots/slot-time.ts',
     'src/app/owner/(console)/slots/window/window-draft.ts',
+    'src/app/owner/(console)/slots/window/window-rates.ts',
     'src/app/owner/(console)/settings/shop/hours-table.ts',
+    'src/app/owner/(console)/settings/shop/hours-change.ts',
     // 고객 화면 규칙(정찬형). 주소 폴더 [slotId] 같은 이름은 글롭에서 글자 묶음이 돼서 *로 쓴다
     'src/features/map/slot-list/badges.ts',
     'src/features/map/slot-list/merge.ts',

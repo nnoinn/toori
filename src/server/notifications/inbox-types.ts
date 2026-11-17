@@ -21,8 +21,24 @@ export type MyNotification = {
   readAt: string | null;
 };
 
+/**
+ * 알림함이 바뀌었을 때(읽음으로 바꿈, 새 알림이 옴) 알리는 브라우저 이벤트. 종이 듣고 안 읽은 수를 다시 묻는다.
+ * 고객 알림함(#443)이 쓰던 이름 그대로다
+ */
+export const NOTIFICATIONS_CHANGED_EVENT = 'toori:notifications-read';
+
+/**
+ * 서비스 워커(public/sw.js)가 푸시를 받았을 때 앞에 보이는 창의 화면 안내에 보내는 메시지 이름(#371).
+ * 메시지는 { type, account }이고, 그 계정의 화면 안내가 새 알림을 물은 뒤 함께 온 포트로 { shown }을 답한다.
+ * sw.js의 같은 이름 값과 같아야 한다(sw.test.ts가 확인한다)
+ */
+export const PUSH_TOAST_MESSAGE = 'toori:push-toast';
+
 /** 알림함에서 한 번에 불러오는 수(기본) */
 export const NOTIFICATIONS_PAGE_SIZE = 20;
+
+/** 알림 종을 누르면 상자에 보여 주는 최근 알림 수(11/16 nnoinn "5~6개") */
+export const NOTIFICATIONS_BELL_COUNT = 5;
 
 /** 알림함에서 한 번에 불러올 수 있는 가장 큰 수 */
 export const NOTIFICATIONS_PAGE_MAX = 50;

@@ -274,6 +274,8 @@ async function agreeAndRefund(input: {
   const db = getDb();
   const target = await readRefundTarget(reservationId, input.customerId, db);
   if (!target) return agreedCancelFail('REQUEST_NOT_FOUND');
+  // 운영자가 예약 무효(A-108)를 진행 중이다
+  if (target.voidInProgress) return agreedCancelFail('RESERVATION_CHANGED');
   const { refundAmount } = calcAgreedCancel(target);
   const requested: RequestedCancel = {
     reason: 'agreed_cancel',

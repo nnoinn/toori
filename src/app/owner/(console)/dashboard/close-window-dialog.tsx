@@ -166,6 +166,6 @@ function ClosedWindowNotice({
 }
 
 /** 창에 쓰는 시간대 범위. 예: "11/14(토) 13:00 ~ 18:00", 다음 날 끝나면 "~ 02:00(익일)" */
-function windowRange(window: DashboardWindow): string {
+export function windowRange(window: DashboardWindow): string {
   return `${formatKst(new Date(window.startAt))} ~ ${formatEndTime(window.startAt, window.endAt)}`;
 }

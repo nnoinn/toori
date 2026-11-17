@@ -115,6 +115,7 @@ export async function readShopSettlementRows(
     cancelledAt: row.cancelledAt,
     cancelActor: row.cancelActor,
     startAt: row.startAt,
+    voidedAt: row.voidedAt,
     menuName: row.menuName,
     listPrice: row.listPrice,
     salePrice: row.salePrice,

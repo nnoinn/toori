@@ -6,7 +6,7 @@
 // 결제 중(홀딩)이면 [수정]·[마감]을 잠근다.
 // 예약이 있는 줄(예약됨·완료·취소, "처리 필요")은 [상세] 버튼 없이 줄을 두 번 누르거나 Enter로 예약 상세(O11)를 연다
 // (11/16 정민석, 공통 UI SelectableRow). 한 번 누르면 그 줄이 연한 초록으로 골라진다. 줄 안의 버튼을 두 번 눌러도 상세로 가지 않는다.
-// 시간대 매물(#308)은 WindowRow가 그린다: 시간·서비스·최대 할인율·상태와 [마감]. 시간대 안에서 손님이 만든 매물(windowId)은
+// 시간대 매물(#308)은 WindowRow가 그린다: 시간·서비스·최대 할인율·상태와 [수정]·[마감]. [수정]은 서비스마다 할인율만 바꾼다(11/16 정민석). 시간대 안에서 손님이 만든 매물(windowId)은
 // "시간대 예약"으로 표시하고, 원장님이 올린 매물이 아니라서 [수정]·[마감]·[재등록]을 두지 않는다(취소되면 그 시간은 시간대에 저절로 다시 열린다).
 // 손님이 아직 결제 중인 시간대 칸은 매물 줄로 나오지 않는다(ownerListedSlot). 마감한 시간대에 그런 칸이 남아 있으면
 // 시간대 줄에 마감 창과 같은 안내(keptSlotsNotice)를 붙인다(WINDOW-06).
@@ -189,9 +189,12 @@ function windowMenuSummary(menus: DashboardWindow['menus']): string {
  */
 export function WindowRow({
   window,
+  onEdit,
   onClose,
 }: {
   window: DashboardWindow;
+  /** [수정]: 서비스마다 할인율 바꾸기 창(edit-window-dialog.tsx) */
+  onEdit: (window: DashboardWindow) => void;
   onClose: (window: DashboardWindow) => void;
 }) {
   const status = WINDOW_VIEW_STATUS[window.state];
@@ -240,9 +243,14 @@ export function WindowRow({
       </div>
       <div className="flex w-36 shrink-0 justify-end gap-1">
         {window.state === 'closed' ? null : (
-          <Button type="button" variant="outline" onClick={() => onClose(window)}>
-            마감
-          </Button>
+          <>
+            <Button type="button" variant="outline" onClick={() => onEdit(window)}>
+              수정
+            </Button>
+            <Button type="button" variant="outline" onClick={() => onClose(window)}>
+              마감
+            </Button>
+          </>
         )}
       </div>
     </SelectableRow>

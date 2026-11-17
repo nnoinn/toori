@@ -1,5 +1,6 @@
 // 입점 심사 화면 표시 모양 (A-101). 화면 코드에서만 쓰는 이름 바꾸기라 이 폴더에 둔다.
 
+import type { AgreedCancelRequestStatus } from '@/db/schema/refunds';
 import type { PgSellerStatus } from '@/db/schema/shops';
 
 import type { ReviewFilter } from './queries';
@@ -61,3 +62,12 @@ const REVIEW_ACTION_LABELS: Record<string, string> = {
 export function labelReviewAction(action: string): string {
   return REVIEW_ACTION_LABELS[action] ?? action;
 }
+
+/** 합의 후 취소 요청의 결과 이름(운영자 샵 상세 '취소 기록') */
+export const AGREED_REQUEST_STATUS_LABELS: Record<AgreedCancelRequestStatus, string> = {
+  requested: '손님 답 기다림',
+  agreed: '손님 동의(취소됨)',
+  declined: '손님 거절',
+  expired: '24시간 안에 답이 없어 끝남',
+  closed: '답하기 전에 끝남',
+};

@@ -136,6 +136,15 @@ function entrySpan(entry: { open: string; close: string }): OpenSpan {
   return { start: open, end: close > open ? close : close + DAY_MINUTES };
 }
 
+/**
+ * 그 날짜 요일에 입력한 영업시간 구간 하나(전날에서 이어진 새벽은 빼고, 다음 날 새벽까지 이어지면 1440보다 크다).
+ * 쉬는 날이거나 입력하지 않았으면 null. 예약 현황 캘린더(S-402)가 세로 범위를 정할 때 쓴다
+ */
+export function ownOpenSpan(dateKey: string, hours: BusinessHours): OpenSpan | null {
+  const entry = hours.find((item) => item.weekday === weekdayOfKey(dateKey));
+  return entry && !('closed' in entry) ? entrySpan(entry) : null;
+}
+
 /** 이어지거나 겹치는 구간을 하나로 묶는다(시작 순서) */
 function mergeSpans(spans: OpenSpan[]): OpenSpan[] {
   const merged: OpenSpan[] = [];
