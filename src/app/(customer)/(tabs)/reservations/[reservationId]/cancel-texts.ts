@@ -15,9 +15,9 @@ export function appliedRefundRule(penaltyRate: number): string | null {
   return index === -1 ? null : refundPolicyLines(REFUND_BANDS, NO_SHOW_PENALTY_RATE)[index];
 }
 
-/** 쿠폰을 쓴 예약을 취소할 때 꼭 보여주는 안내(C-407, 동의 문구 3장과 같은 문구) */
+/** 쿠폰을 사용한 예약을 취소할 때 꼭 보여주는 안내(C-407, 동의 문구 3장과 같은 문구) */
 export const COUPON_NOT_RETURNED_NOTE =
-  '쿠폰을 쓴 예약을 취소하면 쿠폰은 돌려드리지 않고, 환불은 실제 결제한 금액 기준이에요.';
+  '쿠폰을 사용한 예약을 취소하면 쿠폰은 돌려드리지 않고, 환불은 실제 결제한 금액 기준이에요.';
 
 /** 취소한 뒤 안내. 돌려줄 금액이 0원이면(쿠폰으로 전액 결제 등) 환불 문구 대신 그 사실을 알린다 */
 export function cancelDoneText(refundAmount: number): string {
