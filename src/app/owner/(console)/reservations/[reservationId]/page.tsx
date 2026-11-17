@@ -30,8 +30,8 @@ type Params = Promise<{ reservationId: string }>;
 // 원장님 예약 상세 (O11, S-403). 주소: /owner/reservations/[reservationId]
 // 예약번호·예약자(이름·휴대폰, 닉네임은 샵에 주지 않는다 #375)·서비스·시간·결제 금액(판매가). 그 샵 원장님만 본다. PC 기준
 // 시작이 지났고 처리하지 않은 예약은 [방문 완료]·[노쇼](O14, S-405).
-// 예정 예약(시작 뒤 포함, 방문·노쇼 처리 전)은 [예약 취소] 카드(S-410 손님과 합의 후 취소, cancel-card.tsx).
-// 원장님 사정으로 취소(S-409)는 처리 함수(X-207)가 생기면 그 창에서 연다.
+// 예정 예약(시작 뒤 포함, 방문·노쇼 처리 전)은 [예약 취소] 카드(cancel-card.tsx). 그 창에서 원장님 사정으로 취소(S-409, 서비스 시작 전까지)와
+// 손님과 합의 후 취소(S-410)를 고른다.
 // 이 파일은 예약을 읽고 배치하고, 카드와 안내 상자는 reservation-cards.tsx가 그린다.
 export default function OwnerReservationPage({ params }: { params: Params }) {
   return (
@@ -92,6 +92,7 @@ async function ReservationContent({ params }: { params: Params }) {
         reservationId={reservation.id}
         summary={summary}
         canCancel={view === 'upcoming' || view === 'needsVisit'}
+        ownerFaultAllowed={view === 'upcoming'}
         agreedCancel={agreedCancel.ok ? agreedCancel.data : null}
       />
 

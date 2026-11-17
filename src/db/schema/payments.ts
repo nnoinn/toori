@@ -106,6 +106,9 @@ export const reservations = pgTable(
     cancelReason: text(),
     // 취소할 때 시작까지 남은 시간. 원장님 귀책 취소 제재 기준을 정할 데이터
     hoursBeforeStartAtCancel: numeric({ mode: 'number' }),
+    // 운영자가 예약을 무효로 한 시각(A-108, #423). 비어 있으면 무효 아님. 화면이 "무효"로 보여 주고 정산은 기준 금액 0으로 뺀다.
+    // 돌려줄 돈이 없어도(이미 다 돌려줬거나 쿠폰으로 0원 결제) 무효 기록은 이 칸으로 남는다
+    voidedAt: timestamptz(),
     createdAt: createdAt(),
   },
   (t) => [
