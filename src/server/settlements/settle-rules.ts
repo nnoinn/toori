@@ -19,6 +19,8 @@ export type SettleTarget = DisputeTarget & {
   cancelPenaltyRate: number | null;
   /** 운영자 취소 환불(admin_exception)이 있는 예약. 원장님 기준 금액이 0이다(기술 가이드 7장 "앱을 거치지 않은 취소") */
   hasAdminRefund: boolean;
+  /** 운영자가 무효로 처리한 시각(A-108, #423). 무효면 정산 줄이 없다(기준 금액 0). 비어 있으면 무효 아님 */
+  voidedAt: Date | null;
 };
 
 /** 정산 줄의 종류. 고객 취소·합의 후 취소는 기준 금액을 정할 위약금 비율을 같이 준다 */
@@ -28,10 +30,10 @@ export type SettleKind =
 
 /**
  * 정산 줄을 만들 거래면 종류, 아니면 null.
- * 예정 예약, 끝난 환불 기록이 없는 취소(환불 진행 중), 기준 금액이 0인 취소는 null이다
+ * 예정 예약, 끝난 환불 기록이 없는 취소(환불 진행 중), 기준 금액이 0인 취소, 무효 예약은 null이다
  */
 export function settlementKindOf(target: SettleTarget): SettleKind | null {
-  if (target.hasAdminRefund) return null;
+  if (target.hasAdminRefund || target.voidedAt) return null;
   if (target.status === 'completed') {
     if (target.visitResult === 'visited') return { kind: 'sale' };
     if (target.visitResult === 'no_show') return { kind: 'no_show' };

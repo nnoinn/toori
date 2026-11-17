@@ -28,6 +28,7 @@ import { visitSummary } from '../reservations/reservation-detail';
 import { VisitConfirmDialog, type VisitTarget } from '../reservations/visit-confirm-dialog';
 import { CloseSlotDialog } from './close-slot-dialog';
 import { CloseWindowDialog } from './close-window-dialog';
+import { EditWindowDialog } from './edit-window-dialog';
 import {
   type AllTabSection,
   allTabSections,
@@ -79,6 +80,7 @@ export function OwnerDashboard({
   const [closing, setClosing] = useState<DashboardSlot | null>(null);
   // [마감]을 누른 시간대(확인 창)
   const [closingWindow, setClosingWindow] = useState<DashboardWindow | null>(null);
+  const [editingWindow, setEditingWindow] = useState<DashboardWindow | null>(null);
   // "처리 필요" 줄에서 [방문 완료]·[노쇼]를 누른 예약(확인 창)
   const [visiting, setVisiting] = useState<VisitTarget | null>(null);
   // [더보기]로 탭을 바꾸면 그 탭 버튼으로 초점을 옮긴다(목록 아래에서 누르면 화면도 탭 줄로 올라간다)
@@ -95,7 +97,12 @@ export function OwnerDashboard({
   /** 매물 줄 또는 시간대 줄 */
   const row = (entry: DashboardEntry) =>
     entry.kind === 'window' ? (
-      <WindowRow key={entry.id} window={entry} onClose={setClosingWindow} />
+      <WindowRow
+        key={entry.id}
+        window={entry}
+        onEdit={setEditingWindow}
+        onClose={setClosingWindow}
+      />
     ) : (
       <SlotRow key={entry.id} slot={entry} now={now} onClose={setClosing} />
     );
@@ -206,6 +213,11 @@ export function OwnerDashboard({
       )}
 
       <CloseSlotDialog shopId={shopId} slot={closing} onDone={() => setClosing(null)} />
+      <EditWindowDialog
+        shopId={shopId}
+        window={editingWindow}
+        onDone={() => setEditingWindow(null)}
+      />
       <CloseWindowDialog
         shopId={shopId}
         window={closingWindow}

@@ -19,6 +19,8 @@ import { getBusinessDocUrl } from '@/server/storage/upload';
 import { bankName, categoryLabel } from '@/server/policy';
 
 import { lookupHref } from '../../reservations/format';
+import { ShopCancelStatsView } from '../cancel-stats';
+import { selectShopCancelStats } from '../cancel-stats-queries';
 import { labelPgSellerStatus, labelReviewAction } from '../format';
 import { selectShopForReview, type ShopReviewDetail } from '../queries';
 import { SlotControlAction } from '../slot-control-actions';
@@ -66,6 +68,8 @@ async function ReviewDetail({ params }: { params: Params }) {
     detail.status === 'approved'
       ? await selectShopSlotControl(db, shopId, await getRequestNow())
       : null;
+  // 입점 승인된 샵만 예약을 받으므로 그때만 취소 기록을 본다
+  const cancelStats = detail.status === 'approved' ? await selectShopCancelStats(db, shopId) : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -161,6 +165,12 @@ async function ReviewDetail({ params }: { params: Params }) {
       {control ? (
         <Section title="매물 관리">
           <SlotControlPanel shopId={detail.shopId} shopName={detail.shop.name} control={control} />
+        </Section>
+      ) : null}
+
+      {cancelStats ? (
+        <Section title="취소 기록">
+          <ShopCancelStatsView stats={cancelStats} />
         </Section>
       ) : null}
 

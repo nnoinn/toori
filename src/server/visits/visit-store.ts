@@ -67,14 +67,14 @@ export async function recordVisitInTx(
     input.now,
   );
   if (blocked) return visitFail(blocked);
-  // 취소 환불은 예약 줄을 잠근 뒤 진행 중 기록을 넣으므로, 같은 줄을 잠근 지금 보면 겹치지 않는다
+  // 취소 환불과 예약 무효(A-108)는 예약 줄을 잠근 뒤 진행 중 기록을 넣으므로, 같은 줄을 잠근 지금 보면 겹치지 않는다
   const [pending] = await tx
     .select({ id: refunds.id })
     .from(refunds)
     .where(
       and(
         eq(refunds.reservationId, input.reservationId),
-        inArray(refunds.reason, CANCEL_REFUND_REASONS),
+        inArray(refunds.reason, [...CANCEL_REFUND_REASONS, 'void']),
         eq(refunds.status, 'requested'),
       ),
     )

@@ -41,6 +41,7 @@ vi.mock('./cancel-flow', () => ({
 const { cancelByOwnerFault, previewOwnerFaultCancel } = await import('./owner-fault-cancel');
 
 const TARGET: RefundTarget = {
+  voidInProgress: false,
   reservationId: RESERVATION,
   orderId: 'order-1',
   slotId: 'slot-1',
@@ -175,6 +176,14 @@ describe('cancelByOwnerFault', () => {
         error: { code: 'CANCEL_FINISHING' },
       });
     }
+    expect(state.flows).toEqual([]);
+  });
+
+  it('예약 무효(A-108)가 진행 중이면 CANCEL_FINISHING', async () => {
+    state.target = { ...TARGET, voidInProgress: true };
+    expect(await cancelByOwnerFault({ reservationId: RESERVATION })).toMatchObject({
+      error: { code: 'CANCEL_FINISHING' },
+    });
     expect(state.flows).toEqual([]);
   });
 
