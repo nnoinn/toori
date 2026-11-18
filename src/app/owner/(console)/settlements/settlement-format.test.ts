@@ -11,11 +11,13 @@ import {
   payoutAccountText,
   periodHrefValue,
   periodLabel,
+  resolveSettlementItemSort,
   resolveSettlementPeriod,
   resolveSettlementView,
   settlementsHref,
   settlementStatusText,
   shiftMonth,
+  sortSettlementItems,
   STATEMENT_STATUS_LABELS,
   statementAmountNote,
   statementCountsText,
@@ -309,5 +311,62 @@ describe('정산 내역 기간 (O15, S-502)', () => {
     expect(formatDateKey('2026-11-19')).toBe('11/19(목)');
     expect(periodLabel('2026-11-01', '2026-11-30')).toBe('11/1(일) ~ 11/30(월)');
     expect(periodLabel('2026-12-01', '2027-01-31')).toBe('2026. 12/1(화) ~ 2027. 1/31(일)');
+  });
+});
+
+describe('거래 내역 정렬 (#358 5번, 11/18 정민석)', () => {
+  /** 거래 하나: 이름, 처리·취소 시각, 서비스 일시(한국 시간) */
+  const item = (name: string, occurred: string, start: string) => ({
+    name,
+    occurredAt: new Date(`${occurred}+09:00`).toISOString(),
+    startAt: new Date(`${start}+09:00`).toISOString(),
+  });
+  // 서버 함수가 주는 순서(처리·취소 최신 순). C와 D는 같은 시각에 처리했고, B와 D는 서비스 일시가 같다
+  const items = [
+    item('A', '2026-11-16T20:00', '2026-11-16T18:00'),
+    item('C', '2026-11-15T12:00', '2026-11-14T10:00'),
+    item('D', '2026-11-15T12:00', '2026-11-17T15:00'),
+    item('B', '2026-11-13T09:00', '2026-11-17T15:00'),
+  ];
+  const names = (list: readonly { name: string }[]) => list.map((entry) => entry.name).join('');
+
+  it('처리·취소 시각 순: 같은 시각에 처리했으면 서비스 일시도 같은 방향으로', () => {
+    expect(names(sortSettlementItems(items, 'occurred_desc'))).toBe('ADCB');
+    expect(names(sortSettlementItems(items, 'occurred_asc'))).toBe('BCDA');
+  });
+
+  it('서비스 일시 순(목록 첫 칸): 서비스 일시가 같으면 처리·취소 시각도 같은 방향으로', () => {
+    expect(names(sortSettlementItems(items, 'start_desc'))).toBe('DBAC');
+    expect(names(sortSettlementItems(items, 'start_asc'))).toBe('CABD');
+  });
+
+  it('순서만 바꾸고 받은 목록은 그대로 둔다', () => {
+    const sorted = sortSettlementItems(items, 'start_asc');
+    expect(names(items)).toBe('ACDB');
+    expect(sorted[0]).toBe(items[1]);
+  });
+
+  it('주소의 sort: 모르는 값·없으면 처리·취소 최신 순', () => {
+    expect(resolveSettlementItemSort('start_asc')).toBe('start_asc');
+    expect(resolveSettlementItemSort('amount')).toBe('occurred_desc');
+    expect(resolveSettlementItemSort(undefined)).toBe('occurred_desc');
+  });
+
+  it('주소: 거래 내역 탭에서 기본이 아닌 정렬만 sort=로 쓰고, 정산서 탭에는 쓰지 않는다', () => {
+    expect(settlementsHref({ month: '2026-11' }, { view: 'items', sort: 'start_desc' })).toBe(
+      '/owner/settlements?view=items&month=2026-11&sort=start_desc',
+    );
+    expect(
+      settlementsHref(
+        { from: '2026-09-01', to: '2026-11-14' },
+        { view: 'items', sort: 'occurred_asc' },
+      ),
+    ).toBe('/owner/settlements?view=items&from=2026-09-01&to=2026-11-14&sort=occurred_asc');
+    expect(settlementsHref({ month: '2026-11' }, { view: 'items', sort: 'occurred_desc' })).toBe(
+      '/owner/settlements?view=items&month=2026-11',
+    );
+    expect(settlementsHref({ month: '2026-11' }, { view: 'statements', sort: 'start_desc' })).toBe(
+      '/owner/settlements?month=2026-11',
+    );
   });
 });

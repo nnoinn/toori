@@ -9,6 +9,8 @@ export type SlotListItem = {
   slotId: string;
   shopId: string;
   shopName: string;
+  /** 업종 이름(예: "미용실"). 카드에서 샵 이름 옆에 작게 보인다 */
+  category: string;
   menuName: string;
   /** 서비스 시작 시각(ISO) */
   startAt: string;
@@ -28,6 +30,8 @@ export type WindowListItem = {
   windowId: string;
   shopId: string;
   shopName: string;
+  /** 업종 이름(예: "미용실") */
+  category: string;
   /** 지금 고를 수 있는 첫 서비스 이름과 서비스 수("여성 커트 외 3개") */
   firstMenuName: string;
   menuCount: number;

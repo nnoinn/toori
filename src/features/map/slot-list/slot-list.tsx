@@ -6,7 +6,7 @@ import { cn } from 'cn';
 
 import { Button } from '@/components/ui/button';
 import { SlotCard } from '@/components/ui/slot-card';
-import { ErrorState, LoadingCards } from '@/components/ui/state';
+import { ErrorState, LoadingList } from '@/components/ui/state';
 
 import { formatDistance } from './distance';
 import { applySortToSearch, SLOT_SORTS, type SlotSort } from './sort';
@@ -29,7 +29,18 @@ type SlotListProps = {
   onLoadMore?: () => void;
   /** 매물이 없을 때 보여줄 것 */
   empty: React.ReactNode;
+  /**
+   * 목록 판 모양. 한 줄은 왼쪽 글 + 오른쪽 사진이고, 줄 사이는 구분선이다(지도 앱 장소 목록처럼, 11/18 정찬형).
+   * page: 폰은 화면 폭, PC는 둥근 흰 판(매물 목록·찜한 샵 매물). panel: 지도 옆 칸, 폰의 지도 아래 목록. 둘 다 한 줄씩 쌓는다
+   */
+  columns?: 'page' | 'panel';
 };
+
+// 흰 판. 줄마다 아래 구분선을 긋고, 마지막 줄의 선은 판 밖으로 밀어 숨긴다(-mb-px + overflow-hidden)
+const FRAME_CLASS = {
+  page: 'overflow-hidden bg-card md:rounded-2xl md:border',
+  panel: 'overflow-hidden border-y bg-card md:border-b-0',
+} as const;
 
 /** 정렬 탭 (C-205). 고른 정렬은 주소창에 저장한다 */
 export function SortTabs({ sort }: { sort: SlotSort }) {
@@ -79,6 +90,7 @@ export function SlotList({
   loadingMore = false,
   onLoadMore,
   empty,
+  columns = 'page',
 }: SlotListProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const onLoadMoreRef = useRef(onLoadMore);
@@ -104,7 +116,7 @@ export function SlotList({
     <div className="flex flex-col gap-2">
       {sort ? <SortTabs sort={sort} /> : null}
       {status === 'loading' ? (
-        <LoadingCards count={3} className="max-md:px-4" />
+        <LoadingList count={4} className={FRAME_CLASS[columns]} />
       ) : status === 'error' ? (
         <ErrorState
           description={errorMessage}
@@ -119,46 +131,50 @@ export function SlotList({
       ) : items.length === 0 ? (
         empty
       ) : (
-        // 폰에서는 카드가 화면 끝에 붙어 둥근 모서리가 잘려 보여서, 양옆 16px 여백과 카드 사이 간격을 둔다
-        <ul className="flex flex-col divide-y max-md:gap-2 max-md:divide-y-0 max-md:px-4">
-          {items.map((item) => (
-            <li key={listItemKey(item)}>
-              {item.kind === 'slot' ? (
-                <SlotCard
-                  href={`/slots/${item.slotId}`}
-                  imageUrl={item.imageUrl}
-                  shopName={item.shopName}
-                  menuName={item.menuName}
-                  startAt={item.startAt}
-                  serverNow={serverNow}
-                  listPrice={item.listPrice}
-                  salePrice={item.salePrice}
-                  discountRate={item.discountRate}
-                  badges={item.badges}
-                  distanceText={formatDistance(item.distanceMeters)}
-                />
-              ) : (
-                <WindowCard
-                  href={`/windows/${item.windowId}`}
-                  imageUrl={item.imageUrl}
-                  shopName={item.shopName}
-                  firstMenuName={item.firstMenuName}
-                  menuCount={item.menuCount}
-                  startAt={item.startAt}
-                  endAt={item.endAt}
-                  maxDiscountRate={item.maxDiscountRate}
-                  minSalePrice={item.minSalePrice}
-                  badges={item.badges}
-                  distanceText={formatDistance(item.distanceMeters)}
-                />
-              )}
-            </li>
-          ))}
-        </ul>
+        <div className={FRAME_CLASS[columns]}>
+          <ul className="-mb-px [&>li]:border-b">
+            {items.map((item) => (
+              <li key={listItemKey(item)}>
+                {item.kind === 'slot' ? (
+                  <SlotCard
+                    layout="list"
+                    href={`/slots/${item.slotId}`}
+                    imageUrl={item.imageUrl}
+                    shopName={item.shopName}
+                    category={item.category}
+                    menuName={item.menuName}
+                    startAt={item.startAt}
+                    serverNow={serverNow}
+                    listPrice={item.listPrice}
+                    salePrice={item.salePrice}
+                    discountRate={item.discountRate}
+                    badges={item.badges}
+                    distanceText={formatDistance(item.distanceMeters)}
+                  />
+                ) : (
+                  <WindowCard
+                    href={`/windows/${item.windowId}`}
+                    imageUrl={item.imageUrl}
+                    shopName={item.shopName}
+                    category={item.category}
+                    firstMenuName={item.firstMenuName}
+                    menuCount={item.menuCount}
+                    startAt={item.startAt}
+                    endAt={item.endAt}
+                    maxDiscountRate={item.maxDiscountRate}
+                    minSalePrice={item.minSalePrice}
+                    badges={item.badges}
+                    distanceText={formatDistance(item.distanceMeters)}
+                  />
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       {status === 'ready' && hasMore ? (
         <div ref={sentinelRef} className="py-2">
-          {loadingMore ? <LoadingCards count={1} className="max-md:px-4" /> : null}
+          {loadingMore ? <LoadingList count={2} className={FRAME_CLASS[columns]} /> : null}
         </div>
       ) : null}
     </div>

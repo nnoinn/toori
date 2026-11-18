@@ -221,6 +221,27 @@ describeDb('원장님 대시보드 조회 (실제 DB)', () => {
     });
   });
 
+  it('매물·시간대의 등록 시각을 같이 읽는다(등록 최신 순 정렬, #358 5번)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx);
+      await tx
+        .insert(slots)
+        .values(testSlot(shop, '09:00', '10:00', { createdAt: kst('2026-10-29 21:30') }));
+      await addWindow(tx, shop, '2026-11-01 13:00', '2026-11-01 18:00', {
+        createdAt: kst('2026-10-30 08:15'),
+      });
+
+      const [slotRows, windowRows] = await Promise.all([
+        selectDashboardSlots(tx, shop.shopId, from),
+        selectDashboardWindows(tx, shop.shopId, from, kst('2026-11-01 08:00')),
+      ]);
+      expect(slotRows.map((row) => row.createdAt)).toEqual([kst('2026-10-29 21:30').toISOString()]);
+      expect(windowRows.map((row) => row.createdAt)).toEqual([
+        kst('2026-10-30 08:15').toISOString(),
+      ]);
+    });
+  });
+
   it('시간대 상태: 게시 전이면 게시예정, 남은 시간에 들어가는 서비스가 없으면 full(#308)', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
