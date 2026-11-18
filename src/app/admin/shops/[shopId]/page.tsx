@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
 import { formatBusinessNumber } from '@/lib/business-number';
 import { getRequestNow } from '@/lib/request-time';
-import { formatEndTime, formatKst } from '@/lib/time';
+import { formatEndTime, formatKst, kstDateKey } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
@@ -19,7 +19,18 @@ import { getBusinessDocUrl } from '@/server/storage/upload';
 import { bankName, categoryLabel } from '@/server/policy';
 
 import { lookupHref } from '../../reservations/format';
-import { ShopCancelStatsView } from '../cancel-stats';
+import {
+  CANCEL_STATS_ANCHOR,
+  CANCEL_STATS_PERIOD_ERROR,
+  CancelStatsPeriodForm,
+  ShopCancelStatsView,
+} from '../cancel-stats';
+import {
+  type CancelStatsSearch,
+  labelCancelStatsPeriod,
+  readCancelStatsSearch,
+  toCancelStatsRange,
+} from '../cancel-stats-period';
 import { selectShopCancelStats } from '../cancel-stats-queries';
 import { labelPgSellerStatus, labelReviewAction } from '../format';
 import { selectShopForReview, type ShopReviewDetail } from '../queries';
@@ -32,9 +43,17 @@ import { ReviewActions } from './review-actions';
 export const metadata: Metadata = { title: '입점 심사' };
 
 type Params = Promise<{ shopId: string }>;
+type SearchParams = Promise<CancelStatsSearch>;
 
 // 입점 심사 상세 (A-101). 주소: /admin/shops/[shopId]. 승인 대기면 승인·반려 버튼. PC 기준
-export default function AdminShopReviewPage({ params }: { params: Params }) {
+// 입점 승인된 샵은 취소 기록의 기간을 cancelFrom·cancelTo로 고른다(#486, 예: ?cancelFrom=2026-11-01&cancelTo=2026-11-18)
+export default function AdminShopReviewPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
   return (
     <main className="flex w-full max-w-4xl flex-1 flex-col gap-4 p-6">
       <div className="flex items-center gap-2">
@@ -42,13 +61,19 @@ export default function AdminShopReviewPage({ params }: { params: Params }) {
         <h1 className="text-xl font-bold">입점 심사</h1>
       </div>
       <Suspense fallback={<DetailSkeleton />}>
-        <ReviewDetail params={params} />
+        <ReviewDetail params={params} searchParams={searchParams} />
       </Suspense>
     </main>
   );
 }
 
-async function ReviewDetail({ params }: { params: Params }) {
+async function ReviewDetail({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
   const admin = await ensureAdminPage();
   const { shopId } = await params;
   if (!isUuid(shopId)) notFound();
@@ -63,13 +88,15 @@ async function ReviewDetail({ params }: { params: Params }) {
   });
   // 비공개 버킷이라 5분 동안만 열리는 주소를 화면을 열 때마다 새로 받는다(#116)
   const doc = await getBusinessDocUrl(shopId);
+  const approved = detail.status === 'approved';
+  const now = await getRequestNow();
   // 입점 승인된 샵만 매물을 올리므로 그때만 매물 관리 칸을 보여 준다(#373 ④)
-  const control =
-    detail.status === 'approved'
-      ? await selectShopSlotControl(db, shopId, await getRequestNow())
-      : null;
-  // 입점 승인된 샵만 예약을 받으므로 그때만 취소 기록을 본다
-  const cancelStats = detail.status === 'approved' ? await selectShopCancelStats(db, shopId) : null;
+  const control = approved ? await selectShopSlotControl(db, shopId, now) : null;
+  // 입점 승인된 샵만 예약을 받으므로 그때만 취소 기록을 본다. 기간이 잘못됐으면 기록 대신 안내를 보인다(#486)
+  const cancelPeriod = readCancelStatsSearch(await searchParams);
+  const cancelRange = toCancelStatsRange(cancelPeriod);
+  const cancelStats =
+    approved && cancelRange ? await selectShopCancelStats(db, shopId, cancelRange) : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -168,9 +195,23 @@ async function ReviewDetail({ params }: { params: Params }) {
         </Section>
       ) : null}
 
-      {cancelStats ? (
-        <Section title="취소 기록">
-          <ShopCancelStatsView stats={cancelStats} />
+      {approved ? (
+        <Section
+          id={CANCEL_STATS_ANCHOR}
+          title={cancelRange ? `취소 기록 · ${labelCancelStatsPeriod(cancelPeriod)}` : '취소 기록'}
+        >
+          <CancelStatsPeriodForm
+            shopId={detail.shopId}
+            period={cancelPeriod}
+            today={kstDateKey(now)}
+          />
+          {cancelStats ? (
+            <ShopCancelStatsView stats={cancelStats} />
+          ) : (
+            <p role="alert" className="text-sm text-destructive">
+              {CANCEL_STATS_PERIOD_ERROR}
+            </p>
+          )}
         </Section>
       ) : null}
 
@@ -273,9 +314,18 @@ function PayoutFields({ payout }: { payout: ShopReviewDetail['payout'] }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  id,
+  children,
+}: {
+  title: string;
+  /** 주소의 #자리로 이 칸에 바로 오게 할 때 */
+  id?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <Card>
+    <Card id={id} className={id ? 'scroll-mt-4' : undefined}>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
