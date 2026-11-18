@@ -137,6 +137,46 @@ describe('checkWindowDraft', () => {
     });
   });
 
+  it('끝이 시작과 같거나 빠른 묶음이 하나라도 있으면 INVALID_INPUT', () => {
+    expect(draft({ ranges: [range('10:00', '10:00')] })).toEqual({
+      ok: false,
+      code: 'INVALID_INPUT',
+    });
+    expect(draft({ ranges: [range('13:00', '18:00'), range('10:00', '10:00')] })).toEqual({
+      ok: false,
+      code: 'INVALID_INPUT',
+    });
+  });
+
+  it('끝만 30분 단위가 아니어도 NOT_ON_STEP이고, 여러 묶음 중 하나만 그래도 막는다', () => {
+    expect(draft({ ranges: [range('10:00', '12:15')] })).toEqual({
+      ok: false,
+      code: 'NOT_ON_STEP',
+    });
+    expect(draft({ ranges: [range('13:00', '18:00'), range('10:00', '12:15')] })).toEqual({
+      ok: false,
+      code: 'NOT_ON_STEP',
+    });
+  });
+
+  it('선택지에 없는 할인율이 서비스 하나에만 있어도 INVALID_INPUT', () => {
+    expect(
+      draft({
+        menus: [
+          { menuId: CUT.id, discountRate: 30 },
+          { menuId: PERM.id, discountRate: 25 },
+        ],
+      }),
+    ).toEqual({ ok: false, code: 'INVALID_INPUT' });
+  });
+
+  it('서비스 소요 시간이 가장 긴 묶음과 딱 같으면 고를 수 있다(펌 3시간, 10:00~13:00)', () => {
+    expect(
+      draft({ ranges: [range('10:00', '13:00')], menus: [{ menuId: PERM.id, discountRate: 30 }] })
+        .ok,
+    ).toBe(true);
+  });
+
   it('영업시간 밖이거나 쉬는 날이면 막는다(영업시간을 입력하지 않은 요일은 막지 않는다)', () => {
     const hours = [{ weekday: 5, open: '11:00', close: '20:00' }];
     expect(draft({ businessHours: hours })).toEqual({ ok: false, code: 'OUTSIDE_HOURS' });

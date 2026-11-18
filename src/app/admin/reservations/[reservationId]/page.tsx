@@ -18,6 +18,7 @@ import { disputeDeadline, disputeOpensAt, disputeTypes } from '@/server/disputes
 import { DISPUTE_DEADLINE_BUSINESS_HOURS } from '@/server/policy/dispute';
 import { REFUND_ERRORS } from '@/server/refunds/errors';
 import { readRefundTargetById } from '@/server/refunds/refund-store';
+import { SETTLEMENT_HOLD_ERRORS } from '@/server/settlements/hold-errors';
 import { ADMIN_VISIT_ERRORS } from '@/server/visits/admin-errors';
 
 import {
@@ -30,6 +31,14 @@ import {
 } from '../format';
 import { DISPUTE_TYPE_LABELS, labelDisputeStatus, toKstInputValue } from '../../disputes/format';
 import { labelReservation } from '../../lookup';
+import { HoldAction } from '../../settlements/hold-actions';
+import { HoldList } from '../../settlements/hold-list';
+import { reservationHoldBlock } from '../../settlements/hold-panel';
+import {
+  isShopHeld,
+  selectReservationHolds,
+  type SettlementHoldRow,
+} from '../../settlements/hold-queries';
 import { selectReservationDetail } from '../queries';
 import { OwnerFaultCancelAction } from './owner-fault-action';
 import { type OwnerFaultPanel, ownerFaultPanel } from './owner-fault-panel';
@@ -46,6 +55,7 @@ const when = (date: Date | null) => (date ? formatKst(date) : '-');
 // 예약 상세 (A-103). 주소: /admin/reservations/[reservationId]. 결제와 취소·환불 기록, 운영자 확인 이유를 본다.
 // 카카오톡 채널로 받은 이의제기는 여기서 등록한다(A-104, [이의제기 등록]). 이미 있으면 그 이의제기로 보낸다.
 // 원장님이 못 하면 운영자가 원장님 사정으로 대신 취소한다(#373 ③-2, '취소·환불' 칸)
+// 정산에 묶이기 전이면 이 거래의 정산을 보류하고 푼다(#373 ②)
 export default function AdminReservationPage({ params }: { params: Params }) {
   return (
     <main className="flex w-full max-w-4xl flex-1 flex-col gap-4 p-6">
@@ -73,9 +83,11 @@ async function Detail({ params }: { params: Params }) {
     targetId: reservationId,
     path: `/admin/reservations/${reservationId}`,
   });
-  const [now, refundTarget] = await Promise.all([
+  const [now, refundTarget, holds, shopHeld] = await Promise.all([
     getRequestNow(),
     readRefundTargetById(reservationId, db),
+    selectReservationHolds(db, reservationId),
+    isShopHeld(db, detail.shopId),
   ]);
   const ownerFault: OwnerFaultPanel = refundTarget
     ? ownerFaultPanel(refundTarget, now)
@@ -231,7 +243,68 @@ async function Detail({ params }: { params: Params }) {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>정산 보류</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 text-sm">
+          <HoldPanelView
+            reservationId={detail.reservationId}
+            shopId={detail.shopId}
+            holds={holds}
+            shopHeld={shopHeld}
+            block={reservationHoldBlock(detail)}
+          />
+        </CardContent>
+      </Card>
     </div>
+  );
+}
+
+/** 정산 보류 칸(#373 ②). 묶이기 전이면 이 거래만 멈추고 풀 수 있다. 샵 전체 보류는 샵 정산 화면에서 한다 */
+function HoldPanelView({
+  reservationId,
+  shopId,
+  holds,
+  shopHeld,
+  block,
+}: {
+  reservationId: string;
+  shopId: string;
+  holds: SettlementHoldRow[];
+  shopHeld: boolean;
+  block: ReturnType<typeof reservationHoldBlock>;
+}) {
+  const active = holds.some((hold) => hold.releasedAt === null);
+  return (
+    <>
+      {shopHeld ? (
+        <p>
+          이 샵 전체가 정산 보류 중이에요.{' '}
+          <Link
+            href={`/admin/settlements/shops/${shopId}`}
+            className="text-primary hover:underline"
+          >
+            샵 정산 보기
+          </Link>
+        </p>
+      ) : null}
+      {active ? null : block ? (
+        <p className="text-muted-foreground">{SETTLEMENT_HOLD_ERRORS[block]}</p>
+      ) : (
+        <>
+          <p className="text-muted-foreground">
+            목요일 정산에 묶이기 전에 이 거래만 멈출 수 있어요. 원장님에게는 &quot;운영자 확인
+            중&quot;만 보여요.
+          </p>
+          <div>
+            <HoldAction target={{ kind: 'reservation', reservationId }} />
+          </div>
+        </>
+      )}
+      {holds.length > 0 ? <HoldList holds={holds} /> : null}
+    </>
   );
 }
 

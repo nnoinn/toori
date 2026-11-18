@@ -6,6 +6,7 @@ import {
   START_PROBLEM_MESSAGES,
 } from '@/app/owner/(console)/slots/slot-time';
 import type { ResultError } from '@/lib/result';
+import { PUBLISH_PAUSED_MESSAGE } from '@/server/shops/publish-pause-message';
 
 export const SLOT_WINDOW_ERRORS = {
   /** 묶음·서비스가 없거나 모양이 틀림, 할인율이 선택지에 없음, 같은 메뉴를 두 번, 묶음끼리 겹침 */
@@ -21,6 +22,8 @@ export const SLOT_WINDOW_ERRORS = {
   WINDOW_NOT_FOUND: '시간대를 찾을 수 없어요',
   /** 마감: 이미 마감했거나 시간이 지남 */
   WINDOW_CLOSED: '이미 마감한 시간대예요',
+  /** 등록: 운영자가 그 샵의 새 매물 게시를 멈춤(#373 ④). 사유는 보이지 않는다 */
+  PUBLISH_PAUSED: PUBLISH_PAUSED_MESSAGE,
   ...START_PROBLEM_MESSAGES,
   ...HOURS_PROBLEM_MESSAGES,
 } as const;

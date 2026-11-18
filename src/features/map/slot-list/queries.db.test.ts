@@ -289,6 +289,22 @@ describeDb('홈 목록·지도 조회', () => {
     });
   });
 
+  it('거리순: 거리가 같은 두 샵도 섞이지 않고 샵끼리, 같은 샵 안은 시작이 빠른 순(11/18 정찬형)', async () => {
+    await withRollback(async (tx) => {
+      // 같은 자리(같은 거리)의 두 샵. 샵 id 순서로 모인다
+      const one = await createTestShop(tx, { status: 'approved' });
+      const two = await createTestShop(tx, { status: 'approved' });
+      const [first, second] = one.shopId < two.shopId ? [one, two] : [two, one];
+      const a = await insertSlot(tx, second, '09:00', '10:00');
+      const b = await insertSlot(tx, first, '15:00', '16:00');
+      const c = await insertSlot(tx, first, '11:00', '12:00');
+      const d = await insertSlot(tx, second, '13:00', '14:00');
+
+      const result = await page(tx, { sort: 'near' });
+      expect(ids(result.items)).toEqual([c.id, b.id, a.id, d.id]);
+    });
+  });
+
   it('20개씩 커서로 이어 불러오면 빠지거나 겹치는 매물이 없다(같은 거리끼리도)', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
@@ -311,9 +327,12 @@ describeDb('홈 목록·지도 조회', () => {
         expect(new Set(seen).size).toBe(all.length);
         expect([...seen].sort()).toEqual([...all].sort());
       }
-      // 임박순은 시작 시각 순서 그대로
+      // 임박순은 시작 시각 순서 그대로. 거리순도 한 샵이라 시작 시각 순서 그대로(11/18), 다음 장도 이어서
       const imminent = await page(tx, { sort: 'imminent' });
       expect(ids(imminent.items)).toEqual(all.slice(0, SLOT_PAGE_SIZE));
+      const nearFirst = await page(tx, { sort: 'near' });
+      const nearSecond = await page(tx, { sort: 'near', cursor: nearFirst.nextCursor });
+      expect([...ids(nearFirst.items), ...ids(nearSecond.items)]).toEqual(all);
     });
   });
 

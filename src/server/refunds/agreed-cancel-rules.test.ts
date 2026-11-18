@@ -38,6 +38,14 @@ describe('calcAgreedCancel', () => {
   it('금액이 정수가 아니거나 음수면 멈춘다', () => {
     expect(() => calcAgreedCancel({ paidAmount: -1, salePrice: 100 })).toThrow(RangeError);
     expect(() => calcAgreedCancel({ paidAmount: 100, salePrice: 1.5 })).toThrow(RangeError);
+    expect(() => calcAgreedCancel({ paidAmount: 100, salePrice: -1 })).toThrow(RangeError);
+  });
+
+  it('결제액이 0원이면(쿠폰으로 다 냈으면) 손님 환불은 0원이고 원장님 기준 금액은 판매가 기준이다', () => {
+    expect(calcAgreedCancel({ paidAmount: 0, salePrice: 23_450 })).toEqual({
+      refundAmount: 0,
+      baseAmount: 11_725,
+    });
   });
 });
 

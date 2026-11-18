@@ -43,11 +43,14 @@ const {
   notifyOwnerFaultCancelledByAdmin,
   notifyPaymentAutoCancelled,
   notifyPayoutAccountChanged,
+  notifyPublishPauseChanged,
   notifyReservationCancelled,
   notifyReservationConfirmed,
   notifyReservationVoided,
   notifyShopReviewed,
+  notifySlotForceClosed,
   notifyVisitRecordedByAdmin,
+  notifyWindowForceClosed,
   sendAgreedCancelResult,
   voidedCustomerBody,
 } = await import('./alerts');
@@ -542,6 +545,79 @@ describe('예약 무효 (A-108, #423 11/15 nnoinn 문구)', () => {
   it('예약이 없으면 보내지 않는다', async () => {
     state.row = null;
     notifyReservationVoided(db, 'r-x', { refundAmount: 1_000, couponReturned: false });
+    await runAfterTasks();
+    expect(state.notified).toEqual([]);
+  });
+});
+
+describe('운영자 매물 관리 (#373 ④, 사유는 원장님에게 숨김)', () => {
+  const CONTACT = '문의는 투리 카카오톡 채널로 해 주세요';
+  const changedAt = new Date('2026-11-16T09:00:00.000Z');
+
+  it('게시를 멈추거나 다시 열면 원장님에게만, 바꾼 시각마다 한 번', async () => {
+    notifyPublishPauseChanged(db, { shopId: 'shop-1', paused: true, changedAt });
+    notifyPublishPauseChanged(db, { shopId: 'shop-1', paused: false, changedAt });
+    await runAfterTasks();
+    expect(state.notified).toEqual([
+      {
+        userId: 'owner-user',
+        accountType: 'owner',
+        event: 'shop.publish_paused',
+        dedupeKey: `shop.publish_paused:owner:shop-1:${changedAt.toISOString()}`,
+        title: '새 매물 등록이 잠시 멈췄어요',
+        body: `운영자 확인 중이에요. 이미 올린 매물과 예약은 그대로예요. ${CONTACT}`,
+        url: '/owner',
+      },
+      {
+        userId: 'owner-user',
+        accountType: 'owner',
+        event: 'shop.publish_resumed',
+        dedupeKey: `shop.publish_resumed:owner:shop-1:${changedAt.toISOString()}`,
+        title: '새 매물을 다시 올릴 수 있어요',
+        body: '운영자 확인이 끝났어요',
+        url: '/owner',
+      },
+    ]);
+  });
+
+  it('매물·시간대 매물을 강제 마감하면 원장님에게만 메뉴·시각과 문의 안내를 보낸다', async () => {
+    state.row = {
+      ...(state.row as object),
+      shopId: 'shop-1',
+      endAt: new Date('2026-11-05T09:00:00.000Z'),
+    };
+    notifySlotForceClosed(db, 'slot-1');
+    notifyWindowForceClosed(db, 'window-1');
+    await runAfterTasks();
+    expect(state.notified).toEqual([
+      {
+        userId: 'owner-user',
+        accountType: 'owner',
+        event: 'slot.force_closed',
+        dedupeKey: 'slot.force_closed:owner:slot-1',
+        title: '운영자가 매물을 마감했어요',
+        body: `커트 · 11/5(목) 15:00. ${CONTACT}`,
+        url: '/owner',
+      },
+      expect.objectContaining({
+        userId: 'owner-user',
+        accountType: 'owner',
+        event: 'window.force_closed',
+        dedupeKey: 'window.force_closed:owner:window-1',
+        title: '운영자가 시간대 매물을 마감했어요',
+        url: '/owner',
+      }),
+    ]);
+    const windowBody = (state.notified[1] as { body: string }).body;
+    expect(windowBody).toMatch(/^11\/5\(목\) 15:00~.*18:00\. 결제가 끝난 예약은 그대로예요\. /);
+    expect(windowBody.endsWith(CONTACT)).toBe(true);
+  });
+
+  it('샵·매물이 없으면 보내지 않는다', async () => {
+    state.row = null;
+    notifyPublishPauseChanged(db, { shopId: 'shop-x', paused: true, changedAt });
+    notifySlotForceClosed(db, 'slot-x');
+    notifyWindowForceClosed(db, 'window-x');
     await runAfterTasks();
     expect(state.notified).toEqual([]);
   });

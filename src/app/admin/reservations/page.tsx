@@ -40,7 +40,8 @@ import {
   toReservationSort,
   toSlotFilter,
 } from './format';
-import { selectReservations, selectSlots } from './queries';
+import { SlotControlAction } from '../shops/slot-control-actions';
+import { selectReservations, selectSlots, type SlotRow } from './queries';
 
 export const metadata: Metadata = { title: '매물·예약' };
 
@@ -259,7 +260,7 @@ async function SlotList({ status, query }: { status: string | undefined; query: 
         <EmptyState title="맞는 매물이 없어요" className="rounded-xl bg-card" />
       ) : (
         <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
-          <table className="w-full min-w-[56rem] text-sm">
+          <table className="w-full min-w-[62rem] text-sm">
             <thead className="text-left text-muted-foreground">
               <tr className="border-b">
                 <th className={HEAD_CELL}>샵</th>
@@ -269,6 +270,9 @@ async function SlotList({ status, query }: { status: string | undefined; query: 
                 <th className={HEAD_CELL}>할인</th>
                 <th className={HEAD_CELL}>판매가</th>
                 <th className={HEAD_CELL}>상태</th>
+                <th className={HEAD_CELL}>
+                  <span className="sr-only">관리</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -297,6 +301,15 @@ async function SlotList({ status, query }: { status: string | undefined; query: 
                       {isSlotOnHold(row, now) ? <Badge>결제 중</Badge> : null}
                     </div>
                   </td>
+                  <td className={cn(CELL, 'text-right')}>
+                    {/* 판매 전이고 결제 중이 아니면 운영자가 강제 마감한다(#373 ④). 막는 것은 서버가 다시 본다 */}
+                    {canForceClose(row, now) ? (
+                      <SlotControlAction
+                        target={{ kind: 'close_slot', slotId: row.slotId }}
+                        size="sm"
+                      />
+                    ) : null}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -306,6 +319,12 @@ async function SlotList({ status, query }: { status: string | undefined; query: 
       <MoreNotice hasMore={hasMore} />
     </>
   );
+}
+
+/** 운영자가 강제 마감할 수 있는 매물: 지금 판매 전(게시예정·게시중)이고 손님이 결제 중이 아님 */
+function canForceClose(row: SlotRow, now: Date): boolean {
+  const status = getSlotStatus(row, now);
+  return (status === 'scheduled' || status === 'published') && !isSlotOnHold(row, now);
 }
 
 function MoreNotice({ hasMore }: { hasMore: boolean }) {

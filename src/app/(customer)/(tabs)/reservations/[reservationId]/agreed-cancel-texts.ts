@@ -24,7 +24,7 @@ export function agreedCancelReasonText(
 
 /** 동의하면 돌려받는 금액. 쓴 쿠폰이 있으면 돌려주지 않는다고 같이 알린다(C-407) */
 export function agreedCancelRefundText(refundAmount: number, couponAmount: number): string {
-  const coupon = couponAmount > 0 ? ' 쓴 쿠폰은 돌려드리지 않아요.' : '';
+  const coupon = couponAmount > 0 ? ' 사용하신 쿠폰은 돌려드리지 않아요.' : '';
   return `합의 후 취소에 동의하시면 결제액의 ${AGREED_CANCEL_REFUND_RATE}%(${formatWon(refundAmount)})만 환불받을 수 있어요.${coupon}`;
 }
 

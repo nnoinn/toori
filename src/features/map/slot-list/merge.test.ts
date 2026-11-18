@@ -7,6 +7,7 @@ import type { MapShop } from '../types';
 import type { SlotCursor } from './cursor';
 import {
   addWindowPins,
+  compareKeys,
   cursorKey,
   type Keyed,
   keyCursor,
@@ -22,7 +23,41 @@ const entry = (value: number, n: number): Keyed<string> => ({
   item: uuid(n),
 });
 
+// 거리순 줄(11/18 정찬형): 거리, 샵(같은 거리끼리 샵을 모은다), 시작 시각, id. 샵 id는 uuid(900 + 번호)
+const placed = (value: number, shop: number, hour: number, n: number): Keyed<string> => ({
+  key: { value, id: uuid(n), shop: uuid(900 + shop), time: Date.UTC(2026, 10, 19, hour) },
+  item: uuid(n),
+});
+
 describe('매물과 시간대 섞기', () => {
+  it('거리순: 거리가 같아도 같은 샵끼리 모이고, 같은 샵 안에서는 시작이 빠른 순(11/18 정찬형)', () => {
+    // 샵 1과 샵 2는 같은 거리(같은 건물). id 순서대로 놓으면 두 샵의 매물이 섞인다
+    const { items } = mergePage({
+      sort: 'near',
+      slots: [
+        placed(100, 1, 15, 1),
+        placed(100, 2, 11, 2),
+        placed(100, 1, 11, 3),
+        placed(50, 3, 18, 4),
+      ],
+      windows: [placed(100, 2, 13, 5)],
+      cursor: null,
+      size: 20,
+    });
+    expect(items).toEqual([uuid(4), uuid(3), uuid(1), uuid(2), uuid(5)]);
+  });
+
+  it('할인율순·임박순은 샵으로 묶지 않는다(값이 같으면 id 순)', () => {
+    const { items } = mergePage({
+      sort: 'discount',
+      slots: [placed(30, 2, 11, 1), placed(30, 1, 15, 2), placed(30, 2, 9, 3)],
+      windows: [],
+      cursor: null,
+      size: 20,
+    });
+    expect(items).toEqual([uuid(1), uuid(2), uuid(3)]);
+  });
+
   it('거리순: 가까운 순, 거리가 같으면 id 순(같은 샵의 매물과 시간대)', () => {
     const { items } = mergePage({
       sort: 'near',
@@ -79,9 +114,8 @@ describe('매물과 시간대 섞기', () => {
 
   // DB처럼 커서 뒤 매물을 (size + 1)개까지만 주고, 끝까지 이어 불러와 본다
   function readAll(sort: SlotSort, slots: Keyed<string>[], windows: Keyed<string>[], size: number) {
-    const compare = (a: Keyed<string>, b: Keyed<string>) =>
-      (sort === 'discount' ? b.key.value - a.key.value : a.key.value - b.key.value) ||
-      (a.key.id < b.key.id ? -1 : a.key.id > b.key.id ? 1 : 0);
+    // DB도 같은 순서로 준다(queries.ts selectSlotPage의 ORDER BY)
+    const compare = (a: Keyed<string>, b: Keyed<string>) => compareKeys(sort, a.key, b.key);
     const sorted = [...slots].sort(compare);
     const pages: string[][] = [];
     let cursor: SlotCursor | null = null;
@@ -115,6 +149,38 @@ describe('매물과 시간대 섞기', () => {
       expect(pages.flat()).toEqual(expected);
       expect(new Set(pages.flat()).size).toBe(32);
     }
+  });
+
+  it('거리순으로 같은 거리의 여러 샵을 이어 불러와도 샵끼리 모인 순서 그대로, 빠지거나 겹치지 않는다', () => {
+    // 같은 거리 샵 3곳에 매물 9개씩, 시작 시각이 뒤섞여 있다
+    const slots = Array.from({ length: 27 }, (_, i) =>
+      placed(200, (i % 3) + 1, [15, 9, 12, 18, 10][i % 5], i + 1),
+    );
+    const windows = [placed(200, 2, 14, 100), placed(200, 3, 8, 101)];
+    const pages = readAll('near', slots, windows, 20);
+    expect(pages.map((page) => page.length)).toEqual([20, 9]);
+    const flat = pages.flat();
+    expect(flat).toEqual(
+      mergePage({ sort: 'near', slots, windows, cursor: null, size: 100 }).items,
+    );
+    // 샵이 바뀌는 곳은 두 번뿐(샵 1 → 2 → 3)
+    const shopOf = (id: string) =>
+      [...slots, ...windows].find((entry) => entry.item === id)?.key.shop;
+    const changes = flat.filter((id, i) => i > 0 && shopOf(id) !== shopOf(flat[i - 1])).length;
+    expect(changes).toBe(2);
+  });
+
+  it('거리순 커서는 거리·샵·시작 시각(ISO)·id로 주고받는다', () => {
+    const key = { value: 120.5, id: uuid(1), shop: uuid(901), time: Date.UTC(2026, 10, 19, 2) };
+    const cursor = keyCursor('near', key);
+    expect(cursor).toEqual({
+      sort: 'near',
+      value: 120.5,
+      id: uuid(1),
+      shopId: uuid(901),
+      startAt: '2026-11-19T02:00:00.000Z',
+    });
+    expect(cursorKey(cursor)).toEqual(key);
   });
 
   it('임박순 커서는 시작 시각(ISO)으로 주고받는다', () => {

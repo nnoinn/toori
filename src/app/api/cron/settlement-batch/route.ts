@@ -4,6 +4,7 @@
 
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
+import { recordCronRun } from '@/server/cron/run-log';
 import { isCronRequest } from '@/server/cron/auth';
 import { PAYMENT_FEE_RATE } from '@/server/policy';
 import { runSettlementBatch } from '@/server/settlements/batch';
@@ -15,9 +16,11 @@ export async function POST(request: Request) {
   if (!isCronRequest(request)) {
     return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   }
-  const result = await runSettlementBatch(getDb(), {
-    now: await getRequestNow(),
-    paymentFeeRate: PAYMENT_FEE_RATE,
-  });
+  const db = getDb();
+  const now = await getRequestNow();
+  // 실행 기록을 남긴다(#373 ⑥). 결과는 지급일과 묶은 샵·거래 수만이다
+  const result = await recordCronRun(db, 'settlement-batch', now, () =>
+    runSettlementBatch(db, { now, paymentFeeRate: PAYMENT_FEE_RATE }),
+  );
   return Response.json(result);
 }

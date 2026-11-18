@@ -2,13 +2,22 @@
 // 매물은 DB가 정렬해 오고, 시간대(listSlotWindows)는 범위 안 것을 모두 받아 여기서 같은 순서로 끼워 넣는다.
 // 정렬 값: 거리순은 샵 거리, 할인율순은 할인율(시간대는 서비스 중 가장 큰 할인율), 임박순은 시작 시각(시간대는 가장 빠른 시작).
 // 같은 정렬 값끼리는 id 오름차순이다. DB의 uuid 순서는 소문자 uuid 글자를 앞에서부터 비교한 순서와 같다.
+// 거리순만은 거리가 같으면 샵 id → 시작 시각 → id 순이다. 같은 샵 매물이 붙어서 시작이 빠른 순으로 나오고,
+// 거리가 같은 두 샵(같은 건물)도 섞이지 않는다(11/18 정찬형). 할인율순·임박순은 그대로다.
 
 import type { MapShop } from '../types';
 import type { SlotCursor } from './cursor';
 import type { SlotSort } from './sort';
 
-/** 한 줄의 정렬 값. near: 거리(m), discount: 할인율(%), imminent: 시작 시각(ms) */
-export type SortKey = { value: number; id: string };
+/**
+ * 한 줄의 정렬 값. value는 near: 거리(m), discount: 할인율(%), imminent: 시작 시각(ms).
+ * shop(샵 id)과 time(시작 시각 ms, 시간대는 가장 빠른 시작)은 거리순에서만 쓴다
+ */
+export type SortKey = { value: number; id: string; shop?: string; time?: number };
+
+function compareText(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
 
 export type Keyed<T> = { key: SortKey; item: T };
 
@@ -16,24 +25,40 @@ export type Keyed<T> = { key: SortKey; item: T };
 export function compareKeys(sort: SlotSort, a: SortKey, b: SortKey): number {
   const byValue = sort === 'discount' ? b.value - a.value : a.value - b.value;
   if (byValue !== 0) return byValue;
-  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  if (sort === 'near') {
+    const byShop = compareText(a.shop ?? '', b.shop ?? '');
+    if (byShop !== 0) return byShop;
+    const byTime = (a.time ?? 0) - (b.time ?? 0);
+    if (byTime !== 0) return byTime;
+  }
+  return compareText(a.id, b.id);
 }
 
 /** 커서(마지막으로 본 한 줄) → 정렬 값 */
 export function cursorKey(cursor: SlotCursor): SortKey {
-  return {
+  const key: SortKey = {
     value: cursor.sort === 'imminent' ? new Date(cursor.value).getTime() : Number(cursor.value),
     id: cursor.id,
   };
+  if (cursor.sort === 'near' && cursor.shopId && cursor.startAt) {
+    key.shop = cursor.shopId;
+    key.time = new Date(cursor.startAt).getTime();
+  }
+  return key;
 }
 
 /** 정렬 값 → 커서 */
 export function keyCursor(sort: SlotSort, key: SortKey): SlotCursor {
-  return {
+  const cursor: SlotCursor = {
     sort,
     value: sort === 'imminent' ? new Date(key.value).toISOString() : key.value,
     id: key.id,
   };
+  if (sort === 'near' && key.shop !== undefined && key.time !== undefined) {
+    cursor.shopId = key.shop;
+    cursor.startAt = new Date(key.time).toISOString();
+  }
+  return cursor;
 }
 
 /**

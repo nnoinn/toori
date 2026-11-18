@@ -71,6 +71,10 @@ describe('addBusinessHours (이의제기 접수 기한, 48시간)', () => {
     expect(addBusinessHours(kst('2026-11-13 15:00'), 48)).toEqual(kst('2026-11-17 15:00'));
   });
 
+  it('영업일 시간을 딱 다 쓰면 그 순간이 끝이다: 금요일 00:00 + 24시간 → 토요일 00:00(주말을 건너 월요일로 밀리지 않는다)', () => {
+    expect(addBusinessHours(kst('2026-11-13 00:00'), 24)).toEqual(kst('2026-11-14 00:00'));
+  });
+
   it('#299 예시: 수요일 18:00 → 금요일 18:00', () => {
     expect(addBusinessHours(kst('2026-11-11 18:00'), 48)).toEqual(kst('2026-11-13 18:00'));
   });

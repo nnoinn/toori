@@ -403,6 +403,94 @@ export function notifyShopReviewed(
   });
 }
 
+/** 운영자 매물 관리 알림에 붙이는 문의 안내. 운영자가 적은 사유는 원장님에게 보이지 않는다(#373 ④, 11/16 강규민 결정) */
+const ADMIN_CONTACT_NOTE = '문의는 투리 카카오톡 채널로 해 주세요';
+
+/** 샵 원장님의 로그인 id. 없는 샵이면 null */
+async function readShopOwnerUserId(db: Db, shopId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ ownerUserId: owners.userId })
+    .from(shops)
+    .innerJoin(owners, eq(owners.id, shops.ownerId))
+    .where(eq(shops.id, shopId));
+  return row?.ownerUserId ?? null;
+}
+
+/**
+ * 운영자가 샵의 새 매물 게시를 멈추거나 다시 열었을 때 원장님에게(#373 ④). 멈출 때마다 새로 가도록 바꾼 시각을 중복 방지 키에 넣는다
+ */
+export function notifyPublishPauseChanged(
+  db: Db,
+  input: { shopId: string; paused: boolean; changedAt: Date },
+) {
+  const event = input.paused ? 'shop.publish_paused' : 'shop.publish_resumed';
+  sendAfterResponse(event, async () => {
+    const ownerUserId = await readShopOwnerUserId(db, input.shopId);
+    if (!ownerUserId) return;
+    await notify(db, {
+      userId: ownerUserId,
+      accountType: 'owner',
+      event,
+      dedupeKey: `${event}:owner:${input.shopId}:${input.changedAt.toISOString()}`,
+      title: input.paused ? '새 매물 등록이 잠시 멈췄어요' : '새 매물을 다시 올릴 수 있어요',
+      body: input.paused
+        ? `운영자 확인 중이에요. 이미 올린 매물과 예약은 그대로예요. ${ADMIN_CONTACT_NOTE}`
+        : '운영자 확인이 끝났어요',
+      url: '/owner',
+    });
+  });
+}
+
+/** 운영자가 매물을 강제 마감했을 때 원장님에게(#373 ④). 매물 하나에 한 번 */
+export function notifySlotForceClosed(db: Db, slotId: string) {
+  const event = 'slot.force_closed';
+  sendAfterResponse(event, async () => {
+    const [row] = await db
+      .select({ shopId: slots.shopId, menuName: slots.menuName, startAt: slots.startAt })
+      .from(slots)
+      .where(eq(slots.id, slotId));
+    if (!row) return;
+    const ownerUserId = await readShopOwnerUserId(db, row.shopId);
+    if (!ownerUserId) return;
+    await notify(db, {
+      userId: ownerUserId,
+      accountType: 'owner',
+      event,
+      dedupeKey: `${event}:owner:${slotId}`,
+      title: '운영자가 매물을 마감했어요',
+      body: `${row.menuName} · ${formatKst(row.startAt)}. ${ADMIN_CONTACT_NOTE}`,
+      url: '/owner',
+    });
+  });
+}
+
+/** 운영자가 시간대 매물을 강제 마감했을 때 원장님에게(#373 ④). 결제가 끝난 예약은 그대로라고 알린다. 시간대 하나에 한 번 */
+export function notifyWindowForceClosed(db: Db, windowId: string) {
+  const event = 'window.force_closed';
+  sendAfterResponse(event, async () => {
+    const [row] = await db
+      .select({
+        shopId: slotWindows.shopId,
+        startAt: slotWindows.startAt,
+        endAt: slotWindows.endAt,
+      })
+      .from(slotWindows)
+      .where(eq(slotWindows.id, windowId));
+    if (!row) return;
+    const ownerUserId = await readShopOwnerUserId(db, row.shopId);
+    if (!ownerUserId) return;
+    await notify(db, {
+      userId: ownerUserId,
+      accountType: 'owner',
+      event,
+      dedupeKey: `${event}:owner:${windowId}`,
+      title: '운영자가 시간대 매물을 마감했어요',
+      body: `${formatKst(row.startAt)}~${formatEndTime(row.startAt, row.endAt)}. 결제가 끝난 예약은 그대로예요. ${ADMIN_CONTACT_NOTE}`,
+      url: '/owner',
+    });
+  });
+}
+
 /**
  * 정산 계좌가 바뀌었을 때 원장님에게(#295, 11/1 결정). 직접 바꾸지 않았으면 바로 알아채게 한다.
  * 은행·뒷자리는 잠금 화면에 보일 수 있어서 넣지 않는다. 바꿀 때마다 보내도록 변경 기록 id를 중복 방지 키에 넣는다

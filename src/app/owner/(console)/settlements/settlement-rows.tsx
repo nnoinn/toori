@@ -33,7 +33,7 @@ const AMOUNT_COLUMN = 'w-28 shrink-0 text-right';
 const STATUS_COLUMN = 'w-32 shrink-0 text-right';
 const ROW_GAP = 'flex items-center gap-3 px-4';
 
-/** 거래 목록. 처리·취소 시각이 늦은 것부터(함수가 준 순서 그대로) */
+/** 거래 목록. 받은 순서 그대로(화면이 고른 정렬로 놓아서 넘긴다, 기본 처리·취소 최신 순) */
 export function SettlementItemList({
   items,
   now,
@@ -126,7 +126,7 @@ function TradeSection({ item }: { item: SettlementItemView }) {
       <Row label="판매가" value={formatWon(item.salePrice)} />
       {item.couponUsed ? (
         <p className="text-xs text-muted-foreground">
-          쿠폰을 쓴 예약이에요. 쿠폰은 투리가 부담해서 정산 금액과 상관없어요.
+          쿠폰을 사용한 예약이에요. 쿠폰은 투리가 부담해서 정산 금액과 상관없어요.
         </p>
       ) : null}
     </Section>
