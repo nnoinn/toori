@@ -16,6 +16,8 @@ import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
 import { disputeDeadline, disputeOpensAt, disputeTypes } from '@/server/disputes/rules';
 import { DISPUTE_DEADLINE_BUSINESS_HOURS } from '@/server/policy/dispute';
+import { REFUND_ERRORS } from '@/server/refunds/errors';
+import { readRefundTargetById } from '@/server/refunds/refund-store';
 import { SETTLEMENT_HOLD_ERRORS } from '@/server/settlements/hold-errors';
 import { ADMIN_VISIT_ERRORS } from '@/server/visits/admin-errors';
 
@@ -38,6 +40,8 @@ import {
   type SettlementHoldRow,
 } from '../../settlements/hold-queries';
 import { selectReservationDetail } from '../queries';
+import { OwnerFaultCancelAction } from './owner-fault-action';
+import { type OwnerFaultPanel, ownerFaultPanel } from './owner-fault-panel';
 import { RegisterDispute } from './register-dispute';
 import { VisitAction } from './visit-actions';
 import { type VisitPanel, visitPanel } from './visit-panel';
@@ -50,6 +54,7 @@ const when = (date: Date | null) => (date ? formatKst(date) : '-');
 
 // 예약 상세 (A-103). 주소: /admin/reservations/[reservationId]. 결제와 취소·환불 기록, 운영자 확인 이유를 본다.
 // 카카오톡 채널로 받은 이의제기는 여기서 등록한다(A-104, [이의제기 등록]). 이미 있으면 그 이의제기로 보낸다.
+// 원장님이 못 하면 운영자가 원장님 사정으로 대신 취소한다(#373 ③-2, '취소·환불' 칸)
 // 정산에 묶이기 전이면 이 거래의 정산을 보류하고 푼다(#373 ②)
 export default function AdminReservationPage({ params }: { params: Params }) {
   return (
@@ -78,11 +83,15 @@ async function Detail({ params }: { params: Params }) {
     targetId: reservationId,
     path: `/admin/reservations/${reservationId}`,
   });
-  const [now, holds, shopHeld] = await Promise.all([
+  const [now, refundTarget, holds, shopHeld] = await Promise.all([
     getRequestNow(),
+    readRefundTargetById(reservationId, db),
     selectReservationHolds(db, reservationId),
     isShopHeld(db, detail.shopId),
   ]);
+  const ownerFault: OwnerFaultPanel = refundTarget
+    ? ownerFaultPanel(refundTarget, now)
+    : { kind: 'none' };
   const disputeTarget = {
     status: detail.status,
     startAt: detail.startAt,
@@ -151,6 +160,7 @@ async function Detail({ params }: { params: Params }) {
           <CardTitle>취소·환불</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
+          <OwnerFaultPanelView reservationId={detail.reservationId} panel={ownerFault} />
           {detail.status === 'cancelled' ? (
             <dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2 text-sm">
               <Field label="취소한 쪽">{labelCancelActor(detail.cancelActor)}</Field>
@@ -335,6 +345,42 @@ function VisitPanelView({ reservationId, panel }: { reservationId: string; panel
             </div>
           )}
         </>
+      );
+  }
+}
+
+/** 원장님 사정 취소 대신 하기(#373 ③-2). 예정 예약일 때만 보인다. 시작 뒤 문제는 손님이 이의제기한다(A-104) */
+function OwnerFaultPanelView({
+  reservationId,
+  panel,
+}: {
+  reservationId: string;
+  panel: OwnerFaultPanel;
+}) {
+  switch (panel.kind) {
+    case 'none':
+      return null;
+    case 'blocked':
+      return (
+        <p className="text-sm text-muted-foreground">
+          원장님 사정 취소: {REFUND_ERRORS[panel.code]}
+          {panel.code === 'ALREADY_STARTED' ? '. 시작 뒤 문제는 이의제기로 처리해요.' : null}
+        </p>
+      );
+    case 'can_cancel':
+      return (
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <p className="text-muted-foreground">
+            {panel.resuming
+              ? '원장님 사정 취소가 진행 중이에요. 이어서 하면 저장해 둔 금액으로 마무리해요.'
+              : '원장님이 하지 못하면 운영자가 원장님 사정으로 대신 취소해요. 금액은 원장님이 한 것과 같아요.'}
+          </p>
+          <OwnerFaultCancelAction
+            reservationId={reservationId}
+            preview={panel.preview}
+            resuming={panel.resuming}
+          />
+        </div>
       );
   }
 }
