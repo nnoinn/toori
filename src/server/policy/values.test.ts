@@ -44,6 +44,7 @@ import {
 import { CHECKOUT_CONSENT_VERSIONS, TERMS_VERSIONS } from './terms';
 import {
   BUSINESS_DOC_ALLOWED_TYPES,
+  BUSINESS_DOC_KEEP_DAYS,
   BUSINESS_DOC_URL_TTL_SECONDS,
   UPLOAD_ALLOWED_TYPES,
   UPLOAD_MAX_BYTES,
@@ -165,6 +166,8 @@ describe('필터 구간 (#48 7장)', () => {
 describe('업로드 (#48 8장)', () => {
   it('5MB는 5,000,000바이트(버킷 5MiB보다 작게), 샵 사진은 jpeg·png·webp, 등록증은 PDF까지, 등록증 주소는 5분', () => {
     expect(UPLOAD_MAX_BYTES).toBe(5_000_000);
+    // 쓰이지 않는 등록증은 30일 뒤 지운다(#478)
+    expect(BUSINESS_DOC_KEEP_DAYS).toBe(30);
     expect(UPLOAD_ALLOWED_TYPES).toEqual(['image/jpeg', 'image/png', 'image/webp']);
     expect(BUSINESS_DOC_ALLOWED_TYPES).toEqual([
       'image/jpeg',
