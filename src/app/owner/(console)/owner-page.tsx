@@ -22,15 +22,25 @@ type OwnerPageProps = {
   backHref?: string;
   /** 제목 아래 한 줄 설명 */
   description?: string;
+  /** 제목 줄 오른쪽 끝에 둘 버튼. 예: 알림함의 [모두 읽음] */
+  action?: React.ReactNode;
   children: React.ReactNode;
 };
 
-export function OwnerPage({ title, width, backHref, description, children }: OwnerPageProps) {
+export function OwnerPage({
+  title,
+  width,
+  backHref,
+  description,
+  action,
+  children,
+}: OwnerPageProps) {
   return (
     <main className={cn('flex w-full flex-1 flex-col gap-4 p-6', WIDTH_CLASS[width])}>
       <div className="flex items-center gap-2">
         {backHref ? <BackButton fallbackHref={backHref} /> : null}
         <h1 className="text-xl font-bold">{title}</h1>
+        {action ? <div className="ml-auto">{action}</div> : null}
       </div>
       {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
       {children}
