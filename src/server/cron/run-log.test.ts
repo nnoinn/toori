@@ -32,6 +32,11 @@ describe('실패 이유', () => {
     expect(describeCronError(noCause)).toBe('DrizzleQueryError');
   });
 
+  it('Drizzle이 감싼 오류가 아니면 원인(cause)이 있어도 그 오류를 쓴다', () => {
+    const error = new TypeError('fetch failed', { cause: new Error('connect ECONNREFUSED') });
+    expect(describeCronError(error)).toBe('TypeError: fetch failed');
+  });
+
   it('글자가 아닌 오류는 unknown, 긴 메시지는 300자까지', () => {
     expect(describeCronError('boom')).toBe('unknown');
     expect(describeCronError(new Error('가'.repeat(500)))).toHaveLength(300);

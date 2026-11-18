@@ -71,6 +71,14 @@ describe('작업 상태', () => {
     expect(twice).toMatchObject({ state: 'ok', consecutiveFailures: 2 });
   });
 
+  it('최근 실행을 받지 않아도 마지막 성공이 있으면 기록 없음이 아니다', () => {
+    expect(cronJobStatus('reminders', [], minutesAgo(5), NOW)).toMatchObject({
+      state: 'ok',
+      lastRun: null,
+    });
+    expect(cronJobStatus('reminders', [], minutesAgo(16), NOW).state).toBe('stale');
+  });
+
   it('최근 기록이 모두 실패여도 마지막 성공은 따로 받고, 성공이 한 번도 없으면 늦음', () => {
     expect(cronJobStatus('reminders', [done(3, false)], null, NOW)).toMatchObject({
       state: 'stale',

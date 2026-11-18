@@ -72,4 +72,19 @@ describe('reservationHoldBlock', () => {
     // 무효 예약(A-108)도 정산 줄이 없다
     expect(reservationHoldBlock(input({ voidedAt: LATER }))).toBe('NOTHING_TO_SETTLE');
   });
+
+  it('고객 취소·합의 후 취소의 환불이 아직 끝나지 않았으면 NOTHING_TO_SETTLE(정산 묶기도 끝난 환불만 본다)', () => {
+    expect(
+      reservationHoldBlock(
+        cancelled('customer', [
+          { reason: 'customer_cancel', status: 'requested', penaltyRate: 30 },
+        ]),
+      ),
+    ).toBe('NOTHING_TO_SETTLE');
+    expect(
+      reservationHoldBlock(
+        cancelled('agreed', [{ reason: 'agreed_cancel', status: 'requested', penaltyRate: 50 }]),
+      ),
+    ).toBe('NOTHING_TO_SETTLE');
+  });
 });
