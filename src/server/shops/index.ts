@@ -4,7 +4,7 @@
 // - 상태 문구 SHOP_STATUS_LABELS: '@/server/shops/status'
 // - getShopReviewStatus, resubmitShopForReview, approveShop, rejectShop: '@/server/shops/review'
 
-export { assertShopCanPublish, readPublishPausedAt } from './publish-pause';
+export { assertShopCanPublish, readPublishPause, readPublishPausedAt } from './publish-pause';
 export { PUBLISH_PAUSED_MESSAGE } from './publish-pause-message';
 export { assertShopApproved, SHOP_REVIEW_ERRORS, type ShopReviewStatus } from './review-store';
 export { SHOP_STATUS_LABELS, type ShopStatus } from './status';

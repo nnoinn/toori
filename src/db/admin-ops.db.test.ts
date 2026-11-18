@@ -87,7 +87,12 @@ describeDb('운영자 문제 대처 DB 구조 (실제 DB)', () => {
         '10:00',
         'confirmed',
       );
-      const base = { reason: '원장님 계좌 확인 필요', heldBy: adminId, heldAt: AT };
+      const base = {
+        reason: '원장님 계좌 확인 필요',
+        reasonCode: 'payout_info_check',
+        heldBy: adminId,
+        heldAt: AT,
+      };
 
       await tx.insert(settlementHolds).values([
         { ...base, reservationId: reservation.id },
@@ -137,7 +142,7 @@ describeDb('운영자 문제 대처 DB 구조 (실제 DB)', () => {
         '10:00',
         'confirmed',
       );
-      const base = { reason: '확인 필요', heldBy: adminId, heldAt: AT };
+      const base = { reason: '확인 필요', reasonCode: 'other', heldBy: adminId, heldAt: AT };
       await tx.insert(settlementHolds).values([
         { ...base, reservationId: reservation.id },
         { ...base, shopId: shop.shopId },
@@ -167,7 +172,7 @@ describeDb('운영자 문제 대처 DB 구조 (실제 DB)', () => {
     });
   });
 
-  it('샵 게시 멈춤: 멈춘 시각과 사유는 같이 채우고 같이 비운다', async () => {
+  it('샵 게시 멈춤: 멈춘 시각과 사유(0021부터 사유 코드도)는 같이 채우고 같이 비운다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
       const pause = (values: Partial<typeof shops.$inferInsert>) =>
@@ -177,8 +182,16 @@ describeDb('운영자 문제 대처 DB 구조 (실제 DB)', () => {
       expect(await pause({ publishPausedReason: '신고 확인 중' })).toContain(
         'shops_publish_pause_check',
       );
-      expect(await pause({ publishPausedAt: AT, publishPausedReason: '신고 확인 중' })).toBeNull();
-      expect(await pause({ publishPausedAt: null, publishPausedReason: null })).toBeNull();
+      expect(
+        await pause({
+          publishPausedAt: AT,
+          publishPausedReason: '신고 확인 중',
+          publishPausedCode: 'user_inquiry',
+        }),
+      ).toBeNull();
+      expect(
+        await pause({ publishPausedAt: null, publishPausedReason: null, publishPausedCode: null }),
+      ).toBeNull();
     });
   });
 
@@ -191,6 +204,7 @@ describeDb('운영자 문제 대처 DB 구조 (실제 DB)', () => {
           testSlot(shop, '09:00', '10:00', {
             status: 'closed',
             closeReason: 'admin',
+            adminCloseCode: 'other',
             closedAt: AT,
           }),
         )
@@ -198,7 +212,10 @@ describeDb('운영자 문제 대처 DB 구조 (실제 DB)', () => {
       expect(slot.id).toBeTruthy();
       expect(
         await blockedMessage(tx, (t) =>
-          t.update(slots).set({ closeReason: 'deleted' }).where(eq(slots.id, slot.id)),
+          t
+            .update(slots)
+            .set({ closeReason: 'deleted', adminCloseCode: null })
+            .where(eq(slots.id, slot.id)),
         ),
       ).toContain('slots_close_reason_check');
 
@@ -211,6 +228,7 @@ describeDb('운영자 문제 대처 DB 구조 (실제 DB)', () => {
           publishAt: new Date('2026-10-30T13:00:00+09:00'),
           status: 'closed',
           closeReason: 'admin',
+          adminCloseCode: 'other',
           closedAt: AT,
           createdBy: shop.createdBy,
         })
@@ -219,7 +237,7 @@ describeDb('운영자 문제 대처 DB 구조 (실제 DB)', () => {
         await blockedMessage(tx, (t) =>
           t
             .update(slotWindows)
-            .set({ closeReason: 'deleted' })
+            .set({ closeReason: 'deleted', adminCloseCode: null })
             .where(eq(slotWindows.id, window.id)),
         ),
       ).toContain('slot_windows_close_reason_check');

@@ -44,6 +44,7 @@ describeDb('운영자 정산 보류 화면 읽기 (실제 DB)', () => {
           {
             reservationId: made.reservation.id,
             reason: '지난 확인',
+            reasonCode: 'other',
             heldBy: adminA,
             heldAt: at('09:00'),
             releasedBy: adminB,
@@ -53,10 +54,17 @@ describeDb('운영자 정산 보류 화면 읽기 (실제 DB)', () => {
           {
             reservationId: made.reservation.id,
             reason: '계좌 확인 필요',
+            reasonCode: 'payout_info_check',
             heldBy: adminB,
             heldAt: at('10:00'),
           },
-          { shopId: shop.shopId, reason: '사업자 정보 확인', heldBy: adminA, heldAt: at('11:00') },
+          {
+            shopId: shop.shopId,
+            reason: '사업자 정보 확인',
+            reasonCode: 'user_inquiry',
+            heldBy: adminA,
+            heldAt: at('11:00'),
+          },
         ])
         .returning({ id: settlementHolds.id });
 
@@ -68,6 +76,7 @@ describeDb('운영자 정산 보류 화면 읽기 (실제 DB)', () => {
           shopId: shop.shopId,
           shopName: '보류 샵',
           reason: '계좌 확인 필요',
+          reasonCode: 'payout_info_check',
           heldAt: at('10:00'),
           heldByName: '나 운영자',
           releasedAt: null,
@@ -82,7 +91,13 @@ describeDb('운영자 정산 보류 화면 읽기 (실제 DB)', () => {
         }),
       ]);
       expect(await selectShopHolds(tx, shop.shopId)).toMatchObject([
-        { holdId: shopHold.id, reservationId: null, reservationCode: null, shopName: '보류 샵' },
+        {
+          holdId: shopHold.id,
+          reservationId: null,
+          reservationCode: null,
+          shopName: '보류 샵',
+          reasonCode: 'user_inquiry',
+        },
       ]);
       expect((await selectShopReservationHolds(tx, shop.shopId)).map((row) => row.holdId)).toEqual([
         current.id,

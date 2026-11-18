@@ -17,6 +17,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+import { ADMIN_CLOSE_CODES } from '@/server/policy/admin-notice';
 import { SERVICE_TYPE_KEYS } from '@/server/policy/catalog';
 
 import { customers, profiles } from './accounts';
@@ -37,7 +38,8 @@ export type SlotStatus = (typeof SLOT_STATUSES)[number];
 /**
  * 마감 사유: 다른 곳 예약 / 잘못 올림 / 기타(원장님이 직접 고름, S-206) /
  * 결제 없이 홀딩 끝남(손님이 시간대 안에 만든 칸을 결제 없이 비움, #308 ④ 11/11. 원장님 목록·통계에서는 뺀다) /
- * 운영자 마감(운영자가 문제 매물을 강제 마감, #373 ④ #433. 사유는 admin_actions slot.force_close에 남는다)
+ * 운영자 마감(운영자가 문제 매물을 강제 마감, #373 ④ #433. 운영자가 쓴 사유는 admin_actions slot.force_close에, 원장님에게 보여 줄
+ * 사유 코드는 admin_close_code에 남는다, #489)
  */
 export const SLOT_CLOSE_REASONS = [
   'other_channel',
@@ -74,6 +76,8 @@ export const slotWindows = pgTable(
     // 원장님 직접 마감(S-206과 같은 사유)
     closedAt: timestamptz(),
     closeReason: text(),
+    // 운영자 마감(close_reason admin)일 때 원장님에게 보여 줄 사유 코드(#489, 정책 ADMIN_CLOSE_CODES). 0021 전 운영자 마감은 other
+    adminCloseCode: text(),
     createdBy: uuid()
       .notNull()
       .references(() => profiles.id),
@@ -86,6 +90,11 @@ export const slotWindows = pgTable(
     check(
       'slot_windows_close_reason_check',
       sql`${t.closeReason} is null or ${inValues(t.closeReason, SLOT_CLOSE_REASONS)}`,
+    ),
+    // 운영자 마감일 때만, 그때는 꼭 사유 코드를 채운다
+    check(
+      'slot_windows_admin_close_code_check',
+      sql`(${t.closeReason} is not distinct from 'admin') = (${t.adminCloseCode} is not null) and (${t.adminCloseCode} is null or ${inValues(t.adminCloseCode, ADMIN_CLOSE_CODES)})`,
     ),
     index('slot_windows_shop_id_start_at_idx').on(t.shopId, t.startAt),
     index('slot_windows_status_start_at_idx').on(t.status, t.startAt),
@@ -127,6 +136,8 @@ export const slots = pgTable(
     // 원장님 직접 마감(S-206)
     closedAt: timestamptz(),
     closeReason: text(),
+    // 운영자 마감(close_reason admin)일 때 원장님에게 보여 줄 사유 코드(#489, 정책 ADMIN_CLOSE_CODES). 0021 전 운영자 마감은 other
+    adminCloseCode: text(),
     // 재등록(S-408)으로 만든 매물이면 원래 매물
     relistedFromSlotId: uuid().references((): AnyPgColumn => slots.id),
     // 시간대 매물 안에서 고객이 [예약하기]로 만든 매물이면 그 시간대(#308). 한 시술 매물은 비어 있다
@@ -145,6 +156,11 @@ export const slots = pgTable(
     check(
       'slots_close_reason_check',
       sql`${t.closeReason} is null or ${inValues(t.closeReason, SLOT_CLOSE_REASONS)}`,
+    ),
+    // 운영자 마감일 때만, 그때는 꼭 사유 코드를 채운다
+    check(
+      'slots_admin_close_code_check',
+      sql`(${t.closeReason} is not distinct from 'admin') = (${t.adminCloseCode} is not null) and (${t.adminCloseCode} is null or ${inValues(t.adminCloseCode, ADMIN_CLOSE_CODES)})`,
     ),
     index('slots_status_start_at_idx').on(t.status, t.startAt),
     index('slots_shop_id_start_at_idx').on(t.shopId, t.startAt),
