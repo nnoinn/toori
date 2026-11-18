@@ -85,10 +85,24 @@ describe('정산 내역 문구 (O15, S-502)', () => {
     expect(settlementStatusText({ status: 'paid', payoutDate: '2026-11-19' })).toBe(
       '11/19(목) 지급 완료',
     );
-    expect(settlementStatusText({ status: 'held', payoutDate: null })).toBe('이의제기로 보류');
     expect(settlementStatusText({ status: 'no_payout', payoutDate: null })).toBe(
       '정산할 금액 없음',
     );
+  });
+
+  it('보류 줄은 함수가 준 이유대로: 이의제기면 "이의제기로 보류", 운영자 보류면 "운영자 확인으로 보류" (#468)', () => {
+    expect(
+      settlementStatusText({
+        status: 'held',
+        payoutDate: null,
+        hold: { reason: 'dispute', receivedAt: '2026-11-14T16:00:00.000Z' },
+      }),
+    ).toBe('이의제기로 보류');
+    expect(
+      settlementStatusText({ status: 'held', payoutDate: null, hold: { reason: 'admin' } }),
+    ).toBe('운영자 확인으로 보류');
+    // 함수는 보류 줄에 늘 이유를 주지만, 없으면 어느 쪽이라고 하지 않는다
+    expect(settlementStatusText({ status: 'held', payoutDate: null, hold: null })).toBe('보류');
   });
 
   it('시작 몇 시간 전에 취소했는지: 30 → "시작 30시간 전", 1시간이 안 됐으면 "시작 1시간 이내"', () => {
@@ -125,6 +139,17 @@ describe('정산 내역 문구 (O15, S-502)', () => {
         now,
       ),
     ).toBe('이의제기 확인 중이에요(11/15(일) 접수). 결론이 나면 그다음 지급일에 들어가요.');
+    // 운영자 보류(#373 ②)는 사유·날짜 없이(11/15 nnoinn)
+    expect(
+      disputeDeadlineText(
+        {
+          status: 'held',
+          disputeDeadlineAt: '2026-11-18T09:00:00.000Z',
+          hold: { reason: 'admin' },
+        },
+        now,
+      ),
+    ).toBe('운영자가 확인 중이에요. 확인이 끝나면 그다음 지급일에 들어가요.');
     expect(
       disputeDeadlineText(
         { status: 'no_payout', disputeDeadlineAt: '2026-11-18T09:00:00.000Z', hold: null },
