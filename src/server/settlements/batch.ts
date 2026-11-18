@@ -86,7 +86,7 @@ export async function runSettlementBatch(
     const kind = settlementKindOf(candidate);
     if (!kind) continue;
     const holds = { hasOpenDispute: candidate.hasOpenDispute, cutoff };
-    if (!isReadyToSettle(candidate, { ...holds, hasAdminHold: candidate.hasAdminHold })) {
+    if (!isReadyToSettle(candidate, { ...holds, hasAdminHold: false })) {
       // 운영자 보류만 아니면 묶였을 거래는 따로 센다(예약 작업 기록에 남는다)
       if (candidate.hasAdminHold && isReadyToSettle(candidate, { ...holds, hasAdminHold: false })) {
         held += 1;
@@ -110,8 +110,8 @@ export async function runSettlementBatch(
         if (await hasSettlementOn(tx, { shopId, payoutDate })) return { kind: 'already' };
         // 후보를 읽은 뒤에 걸린 운영자 정산 보류를 뺀다
         const holds = await readHeldReservationIds(tx, {
-          shopId,
-          reservationIds: candidates.map(({ candidate }) => candidate.reservationId),
+          shopId: crypto.randomUUID(),
+          reservationIds: [],
           cutoff,
         });
         const ready = holds.shop

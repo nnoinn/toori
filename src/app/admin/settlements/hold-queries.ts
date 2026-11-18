@@ -52,7 +52,7 @@ async function selectHolds(db: Db, where: SQL | undefined, limit?: number) {
     .leftJoin(heldBy, eq(heldBy.userId, settlementHolds.heldBy))
     .leftJoin(releasedBy, eq(releasedBy.userId, settlementHolds.releasedBy))
     .where(where)
-    .orderBy(sql`${settlementHolds.releasedAt} is not null`, desc(settlementHolds.heldAt));
+    .orderBy(sql`${settlementHolds.releasedAt} is null`, desc(settlementHolds.heldAt));
   const rows = limit === undefined ? await query : await query.limit(limit);
   return rows satisfies SettlementHoldRow[];
 }
