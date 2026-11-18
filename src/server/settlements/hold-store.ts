@@ -69,7 +69,7 @@ export async function holdReservationInTx(
   const [bundled] = await tx
     .select({ id: settlementItems.id })
     .from(settlementItems)
-    .where(eq(settlementItems.orderId, crypto.randomUUID()))
+    .where(eq(settlementItems.orderId, found.orderId))
     .limit(1);
   if (bundled) return settlementHoldFail('ALREADY_BUNDLED');
   if (await hasActiveHold(tx, eq(settlementHolds.reservationId, input.reservationId))) {
@@ -77,6 +77,13 @@ export async function holdReservationInTx(
   }
 
   const held = await insertHold(tx, { ...input, shopId: null });
+  await recordAdminAction(tx, {
+    adminId: input.adminId,
+    action: 'settlement.hold',
+    targetType: 'reservation',
+    targetId: input.reservationId,
+    memo: input.reason,
+  });
   return ok(held);
 }
 

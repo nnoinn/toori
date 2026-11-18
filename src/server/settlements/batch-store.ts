@@ -69,7 +69,7 @@ export async function readBatchCandidates(
       discountRate: slots.discountRate,
       couponAmount: orders.couponAmount,
       hasOpenDispute: sql<boolean>`${hasOpenDispute(reservations.id)}`,
-      hasAdminHold: sql<boolean>`(${hasAdminHold(reservations.id, slots.shopId)} or ${adminHoldReleasedSince(reservations.id, slots.shopId, new Date('9999-12-31T00:00:00Z'))})`,
+      hasAdminHold: sql<boolean>`(${hasAdminHold(reservations.id, slots.shopId)} or ${adminHoldReleasedSince(reservations.id, slots.shopId, input.cutoff)})`,
     })
     .from(reservations)
     .innerJoin(slots, eq(slots.id, reservations.slotId))
@@ -129,10 +129,7 @@ export async function readHeldReservationIds(
     .where(
       and(
         target,
-        or(
-          isNull(settlementHolds.releasedAt),
-          gte(settlementHolds.releasedAt, new Date('9999-12-31T00:00:00Z')),
-        ),
+        or(isNull(settlementHolds.releasedAt), gte(settlementHolds.releasedAt, input.cutoff)),
       ),
     );
   return {
