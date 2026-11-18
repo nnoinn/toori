@@ -4,6 +4,8 @@
 // 이의제기 보류(disputes/conditions.ts)와 같은 모양이다
 
 import { and, type AnyColumn, eq, exists, gte, isNull, or, type SQL, sql } from 'drizzle-orm';
+
+import type { SettlementHoldCode } from '@/server/policy/admin-notice';
 import { QueryBuilder } from 'drizzle-orm/pg-core';
 
 import { settlementHolds } from '@/db/schema';
@@ -23,6 +25,22 @@ export function hasAdminHold(reservationId: AnyColumn, shopId: AnyColumn): SQL {
       .from(settlementHolds)
       .where(and(holdOf(reservationId, shopId), isNull(settlementHolds.releasedAt))),
   );
+}
+
+/**
+ * 그 예약이나 그 샵에 풀리지 않은 운영자 보류의 사유 코드(원장님에게 보여 줄 것, #489). 없으면 null(= 보류 아님).
+ * 거래 보류와 샵 전체 보류가 같이 있으면 거래 보류의 코드를 준다(#499)
+ */
+export function adminHoldCode(
+  reservationId: AnyColumn,
+  shopId: AnyColumn,
+): SQL<SettlementHoldCode | null> {
+  return sql<SettlementHoldCode | null>`(${queryBuilder
+    .select({ code: settlementHolds.reasonCode })
+    .from(settlementHolds)
+    .where(and(holdOf(reservationId, shopId), isNull(settlementHolds.releasedAt)))
+    .orderBy(sql`${settlementHolds.reservationId} is null`)
+    .limit(1)})`;
 }
 
 /**

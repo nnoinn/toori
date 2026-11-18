@@ -7,6 +7,7 @@ import { and, asc, eq, gt, inArray } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { shops, slotWindows } from '@/db/schema';
+import { type PublishPauseCode, toAdminNoticeCode } from '@/server/policy/admin-notice';
 
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 
@@ -18,8 +19,8 @@ export type OpenWindowRow = {
 };
 
 export type ShopSlotControl = {
-  /** 새 매물 게시를 멈춘 시각과 사유. 멈추지 않았으면 null */
-  pause: { pausedAt: Date; reason: string } | null;
+  /** 새 매물 게시를 멈춘 시각, 운영자가 쓴 사유, 원장님에게 보여 줄 사유 코드(#489). 멈추지 않았으면 null */
+  pause: { pausedAt: Date; reason: string; code: PublishPauseCode } | null;
   /** 지금 올라와 있는 시간대 매물(시작이 이른 것부터). 운영자가 강제 마감할 수 있다 */
   openWindows: OpenWindowRow[];
 };
@@ -31,7 +32,11 @@ export async function selectShopSlotControl(
   now: Date,
 ): Promise<ShopSlotControl | null> {
   const [shop] = await db
-    .select({ pausedAt: shops.publishPausedAt, reason: shops.publishPausedReason })
+    .select({
+      pausedAt: shops.publishPausedAt,
+      reason: shops.publishPausedReason,
+      code: shops.publishPausedCode,
+    })
     .from(shops)
     .where(eq(shops.id, shopId));
   if (!shop) return null;
@@ -52,8 +57,15 @@ export async function selectShopSlotControl(
     )
     .orderBy(asc(slotWindows.startAt));
   return {
-    // 시각과 사유는 같이 채우고 같이 비운다(shops_publish_pause_check)
-    pause: shop.pausedAt && shop.reason ? { pausedAt: shop.pausedAt, reason: shop.reason } : null,
+    // 시각·사유·사유 코드는 같이 채우고 같이 비운다(shops_publish_pause_check)
+    pause:
+      shop.pausedAt && shop.reason
+        ? {
+            pausedAt: shop.pausedAt,
+            reason: shop.reason,
+            code: toAdminNoticeCode('publish_pause', shop.code),
+          }
+        : null,
     openWindows,
   };
 }

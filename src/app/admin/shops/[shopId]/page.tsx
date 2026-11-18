@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
 import { getBusinessDocUrl } from '@/server/storage/upload';
-import { bankName, categoryLabel } from '@/server/policy';
+import { adminNoticeText, bankName, categoryLabel } from '@/server/policy';
 
 import { lookupHref } from '../../reservations/format';
 import { ShopCancelStatsView } from '../cancel-stats';
@@ -215,7 +215,9 @@ function SlotControlPanel({
           <p className="font-medium">새 매물 등록: {control.pause ? '멈춤' : '올릴 수 있어요'}</p>
           {control.pause ? (
             <p className="break-all text-muted-foreground">
-              {formatKst(control.pause.pausedAt)}부터 · 사유: {control.pause.reason}
+              {formatKst(control.pause.pausedAt)}부터 · 원장님에게 보이는 사유:{' '}
+              {adminNoticeText(control.pause.code, 'publish_pause').label} · 운영자 메모:{' '}
+              {control.pause.reason}
             </p>
           ) : (
             <p className="text-muted-foreground">
