@@ -81,7 +81,7 @@ export function OwnerFaultCancelAction({
           <dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1 text-sm">
             <dt className="text-muted-foreground">손님 환불</dt>
             <dd>{formatWon(preview.refundAmount)}(결제액 전부)</dd>
-            <dt className="text-muted-foreground">손님이 쓴 쿠폰</dt>
+            <dt className="text-muted-foreground">손님이 사용한 쿠폰</dt>
             <dd>
               {preview.usedCouponAmount > 0
                 ? `${formatWon(preview.usedCouponAmount)} 돌려줘요`
