@@ -3,6 +3,7 @@
 
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
+import { recordCronRun } from '@/server/cron/run-log';
 import { isCronRequest } from '@/server/cron/auth';
 import { sendSlotDigest } from '@/server/notifications';
 
@@ -13,6 +14,11 @@ export async function POST(request: Request) {
   if (!isCronRequest(request)) {
     return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   }
-  const digest = await sendSlotDigest(getDb(), await getRequestNow());
-  return Response.json({ digest });
+  const db = getDb();
+  const now = await getRequestNow();
+  // 실행 기록을 남긴다(#373 ⑥). 결과는 보낸 개수만이다
+  const result = await recordCronRun(db, 'slot-digest', now, async () => ({
+    digest: await sendSlotDigest(db, now),
+  }));
+  return Response.json(result);
 }

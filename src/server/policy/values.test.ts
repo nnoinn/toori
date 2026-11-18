@@ -7,6 +7,12 @@ import { TERMS_TYPES } from '@/db/schema/accounts';
 
 import { ADMIN_REASON_LIMIT, STUCK_CANCEL_MINUTES, STUCK_ORDER_MINUTES } from './admin';
 import { BANK_CODES, BANKS } from './banks';
+import {
+  CRON_FAILURE_ALERT_COUNT,
+  CRON_RUN_KEEP_DAYS,
+  CRON_RUN_TIMEOUT_MINUTES,
+  CRON_STALE_MINUTES,
+} from './cron';
 import { PRICE_FILTER_RANGES, TIME_FILTER_RANGES } from './filters';
 import {
   INTEREST_DIGEST_HOUR,
@@ -61,6 +67,18 @@ describe('시간 (#48 1장)', () => {
     expect(STALE_ORDER_MINUTES).toBe(30);
     expect(STALE_CANCEL_MINUTES).toBe(5);
     expect(ORDER_SWEEP_BATCH).toBe(20);
+  });
+
+  it('예약 작업 경고(#373 ⑥, 11/16): 늦음은 결제 정리 30분·리마인드 15분·하루 작업 26시간, 3번 이어서 실패, 10분 넘게 안 끝나면 멈춤, 기록 30일', () => {
+    expect(CRON_STALE_MINUTES).toEqual({
+      'payments-sweep': 30,
+      reminders: 15,
+      'settlement-batch': 26 * 60,
+      'slot-digest': 26 * 60,
+    });
+    expect(CRON_FAILURE_ALERT_COUNT).toBe(3);
+    expect(CRON_RUN_TIMEOUT_MINUTES).toBe(10);
+    expect(CRON_RUN_KEEP_DAYS).toBe(30);
   });
 
   it('운영자 결제·환불 확인(#373 ①): 정리 작업이 세 번쯤 돌고도 남은 주문(60분)과 두세 번 돌고도 남은 환불(30분)', () => {

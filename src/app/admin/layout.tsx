@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { AdminNav } from '@/components/ui/admin-nav';
 
 import { AdminTopBar } from './admin-top-bar';
+import { CronWarning } from './cron-warning';
 
 // 운영자 화면 레이아웃(PC 기준). 화면은 강규민 담당, 레이아웃 틀은 현동훈 담당(공통 UI).
 // 접근 보호: proxy가 1차로 막고(운영자 모드가 아니면 운영자 입구로), 화면과 서버 함수에서 requireAdmin()으로 한 번 더 확인한다.
@@ -18,6 +19,10 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
       <div className="flex min-w-0 flex-1 flex-col">
         <Suspense fallback={null}>
           <AdminTopBar />
+        </Suspense>
+        {/* 예약 작업 경고 한 줄(#373 ⑥). 문제가 있을 때만 그린다 */}
+        <Suspense fallback={null}>
+          <CronWarning />
         </Suspense>
         {children}
       </div>
