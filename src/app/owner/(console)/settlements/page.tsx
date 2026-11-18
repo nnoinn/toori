@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
 import { Card } from '@/components/ui/card';
+import { SortSelect } from '@/components/ui/sort-select';
 import { EmptyState, ErrorState, LoadingCards } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
@@ -15,9 +16,16 @@ import { PeriodPicker } from './period-picker';
 import { SettlementSummaryCards } from './settlement-cards';
 import {
   currentMonth,
+  periodHrefValue,
+  resolveSettlementItemSort,
   resolveSettlementPeriod,
   resolveSettlementView,
+  SETTLEMENT_ITEM_SORT_LABELS,
+  SETTLEMENT_ITEM_SORTS,
+  type SettlementItemSort,
   type SettlementPeriod,
+  settlementsHref,
+  sortSettlementItems,
 } from './settlement-format';
 import { SettlementItemList } from './settlement-rows';
 import { SettlementTabs } from './settlement-tabs';
@@ -33,11 +41,13 @@ type SearchParams = Promise<{
   from?: SearchValue;
   to?: SearchValue;
   payout?: SearchValue;
+  sort?: SearchValue;
 }>;
 
 // 원장님 정산 내역 (O15, 연결 #10·#20, #129). 탭 두 개(11/14 정민석):
 // - [정산서] S-501: 지급일마다 한 장. 주소 /owner/settlements?month=YYYY-MM(또는 ?from=&to=)&payout=펼친 지급일
-// - [거래 내역] S-502: 거래 하나하나. 주소 /owner/settlements?view=items&month=YYYY-MM(또는 ?from=&to=)
+// - [거래 내역] S-502: 거래 하나하나. 주소 /owner/settlements?view=items&month=YYYY-MM(또는 ?from=&to=)&sort=정렬
+//   (목록 위 오른쪽에서 정렬을 고른다, #358 5번. 기본 처리·취소 최신 순은 주소에 쓰지 않고, 달·기간을 바꿔도 남는다)
 // 강규민님 함수 결과를 그대로 보여주고 화면에서 금액을 계산하지 않는다. PC 기준
 export default function OwnerSettlementsPage({ searchParams }: { searchParams: SearchParams }) {
   return (
@@ -68,13 +78,14 @@ async function SettlementsContent({ searchParams }: { searchParams: SearchParams
     now,
   );
   const thisMonth = currentMonth(now);
+  const sort = resolveSettlementItemSort(firstParam(params.sort));
 
   return (
     <div className="flex flex-col gap-4">
       <SettlementTabs view={view} period={period} />
-      <PeriodPicker view={view} period={period} thisMonth={thisMonth} />
+      <PeriodPicker view={view} period={period} thisMonth={thisMonth} sort={sort} />
       {view === 'items' ? (
-        <ItemsTab shopId={auth.shopId} period={period} />
+        <ItemsTab shopId={auth.shopId} period={period} sort={sort} />
       ) : (
         <StatementsTab
           shopId={auth.shopId}
@@ -87,8 +98,16 @@ async function SettlementsContent({ searchParams }: { searchParams: SearchParams
   );
 }
 
-/** [거래 내역] 탭 (S-502). 기간은 방문·노쇼 처리나 취소한 한국 날짜 기준 */
-async function ItemsTab({ shopId, period }: { shopId: string; period: SettlementPeriod }) {
+/** [거래 내역] 탭 (S-502). 기간은 방문·노쇼 처리나 취소한 한국 날짜 기준. 목록은 고른 정렬대로(요약 카드는 정렬과 상관없다) */
+async function ItemsTab({
+  shopId,
+  period,
+  sort,
+}: {
+  shopId: string;
+  period: SettlementPeriod;
+  sort: SettlementItemSort;
+}) {
   const [result, account] = await Promise.all([
     getSettlementItems({ shopId, from: period.from, to: period.to }),
     // 받는 계좌는 지금 등록된 계좌(은행·끝 4자리, 11/13 nnoinn). 계좌 없이 만든 원장님이면 null
@@ -111,7 +130,22 @@ async function ItemsTab({ shopId, period }: { shopId: string; period: Settlement
         account={account}
       />
       {result.data.items.length > 0 ? (
-        <SettlementItemList items={result.data.items} now={new Date(result.data.serverNow)} />
+        <>
+          <div className="flex justify-end">
+            <SortSelect
+              value={sort}
+              options={SETTLEMENT_ITEM_SORTS.map((value) => ({
+                value,
+                label: SETTLEMENT_ITEM_SORT_LABELS[value],
+                href: settlementsHref(periodHrefValue(period), { view: 'items', sort: value }),
+              }))}
+            />
+          </div>
+          <SettlementItemList
+            items={sortSettlementItems(result.data.items, sort)}
+            now={new Date(result.data.serverNow)}
+          />
+        </>
       ) : (
         <Card>
           <EmptyState

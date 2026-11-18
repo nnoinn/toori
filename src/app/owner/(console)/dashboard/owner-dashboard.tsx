@@ -8,7 +8,9 @@
 // 예약이 있는 매물(예약됨·완료·취소)과 "처리 필요" 줄은 줄을 두 번 누르거나 Enter로 예약 상세(O11)에 간다([상세] 버튼 없음, 11/16 정민석).
 // 방문 완료·노쇼(O14)는 "처리 필요" 줄에서 바로 누르거나(#23 B1) 예약 상세에서 처리한다. 둘 다 같은 확인 창을 거친다.
 // 시작 전 '취소' 매물은 [재등록](O13, S-408)으로 같은 조건의 새 매물을 올리고, 재등록한 매물에는 "재등록함"을 보여준다.
-// 시간대 매물(#308)도 같은 목록에 시작 순서로 섞어 보여주고 [마감]할 수 있다. 시간대 안에서 들어온 예약은 매물 줄로 나온다.
+// 시간대 매물(#308)도 같은 목록에 섞어 보여주고 [마감]할 수 있다. 시간대 안에서 들어온 예약은 매물 줄로 나온다.
+// 상태 필터 줄 오른쪽 끝에서 정렬을 고른다(#358 5번, 기본 시작 시각 빠른 순). 정렬은 주소(?sort=)에 남고, 탭·필터는 그대로 둔다.
+// [전체] 탭은 오늘·예정 구역 안에서 각각 정렬하고, 구역마다 정렬한 순서의 앞 7개를 보여준다.
 // 이 파일은 탭·필터와 마감·방문 확인 창을 맡고, 매물 줄과 "처리 필요" 카드는 dashboard-rows.tsx가 그린다.
 // 확인 창을 줄 안이 아니라 여기 두는 까닭: 처리하거나 그 사이 다른 곳에서 처리되면 그 줄이 사라지는데, 창은 결과 문구를 보여줄 때까지 남아야 한다.
 
@@ -20,6 +22,7 @@ import { ChevronRight, SquarePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { SelectableRows } from '@/components/ui/selectable-rows';
+import { SortSelect } from '@/components/ui/sort-select';
 import { EmptyState } from '@/components/ui/state';
 import type { SlotStatus } from '@/features/slot-status/slot-status';
 import { ADVANCE_LISTING_DAYS, PUBLISH_WINDOW_HOURS } from '@/server/policy';
@@ -33,10 +36,14 @@ import {
   type AllTabSection,
   allTabSections,
   countByStatus,
+  DASHBOARD_SORT_LABELS,
+  DASHBOARD_SORTS,
   DASHBOARD_STATUSES,
   type DashboardDay,
   type DashboardEntry,
+  dashboardHref,
   type DashboardSlot,
+  type DashboardSort,
   type DashboardTab,
   type DashboardWindow,
   filterByStatus,
@@ -62,6 +69,7 @@ export function OwnerDashboard({
   slots,
   windows,
   needsVisit,
+  sort,
 }: {
   shopId: string;
   nowIso: string;
@@ -71,9 +79,14 @@ export function OwnerDashboard({
   windows: DashboardWindow[];
   /** 시작이 지났는데 방문·노쇼를 처리하지 않은 예약 */
   needsVisit: DashboardSlot[];
+  /** 매물 목록 정렬(주소의 sort) */
+  sort: DashboardSort;
 }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
-  const byDay = useMemo(() => splitByDay(mergeEntries(slots, windows), now), [slots, windows, now]);
+  const byDay = useMemo(
+    () => splitByDay(mergeEntries(slots, windows, sort), now),
+    [slots, windows, sort, now],
+  );
   const [tab, setTab] = useState<DashboardTab>('all');
   const [status, setStatus] = useState<StatusFilter>('all');
   // [마감]을 누른 매물(확인 창)
@@ -162,20 +175,30 @@ export function OwnerDashboard({
         </Button>
       </div>
 
-      <div className="flex flex-wrap gap-2" role="group" aria-label="상태">
-        <FilterChip active={status === 'all'} onClick={() => setStatus('all')}>
-          전체 {inTab.length}
-        </FilterChip>
-        {DASHBOARD_STATUSES.map((key) => (
-          <FilterChip
-            key={key}
-            active={status === key}
-            disabled={counts[key] === 0}
-            onClick={() => setStatus(key)}
-          >
-            {SLOT_STATUS_LABELS[key]} {counts[key]}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="상태">
+          <FilterChip active={status === 'all'} onClick={() => setStatus('all')}>
+            전체 {inTab.length}
           </FilterChip>
-        ))}
+          {DASHBOARD_STATUSES.map((key) => (
+            <FilterChip
+              key={key}
+              active={status === key}
+              disabled={counts[key] === 0}
+              onClick={() => setStatus(key)}
+            >
+              {SLOT_STATUS_LABELS[key]} {counts[key]}
+            </FilterChip>
+          ))}
+        </div>
+        <SortSelect
+          value={sort}
+          options={DASHBOARD_SORTS.map((value) => ({
+            value,
+            label: DASHBOARD_SORT_LABELS[value],
+            href: dashboardHref(value),
+          }))}
+        />
       </div>
 
       {shown.length === 0 ? (

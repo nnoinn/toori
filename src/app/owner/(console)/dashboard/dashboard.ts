@@ -1,6 +1,6 @@
 // 원장님 대시보드 매물 나누기 (O9, S-401). 화면('use client')과 서버가 같이 쓴다.
 // 상태는 O1의 getSlotStatus로 계산한다(시간이 지나서 바뀌는 상태). "지금"은 서버 시각을 받는다.
-// 시간대 매물(#308)도 같은 목록에 시작 순서로 섞는다. 시간대 상태는 서버가 화면을 열 때 windowStatus로 계산해 넘기고,
+// 시간대 매물(#308)도 같은 목록에 섞고, 원장님이 고른 정렬(기본 시작 시각 빠른 순, #358 5번)로 놓는다. 시간대 상태는 서버가 화면을 열 때 windowStatus로 계산해 넘기고,
 // 필터·숫자에서는 매물 상태 이름 6개(X-301) 중 하나로 센다(게시예정·게시중·마감).
 // 시간대를 마감할 때 손님이 결제 중이라 남긴 칸은 마감 창과 시간대 줄에서 같은 문구(keptSlotsNotice)로 알린다(WINDOW-06).
 
@@ -23,6 +23,8 @@ export type DashboardSlot = {
   startAt: string;
   endAt: string;
   publishAt: string;
+  /** 등록 시각(등록 최신 순 정렬). 시간대 안에서 손님이 만든 매물이면 손님이 [예약하기]를 누른 시각 */
+  createdAt: string;
   menuName: string;
   listPrice: number;
   salePrice: number;
@@ -49,6 +51,8 @@ export type DashboardWindow = {
   startAt: string;
   endAt: string;
   publishAt: string;
+  /** 등록 시각(등록 최신 순 정렬) */
+  createdAt: string;
   /** windowStatus 결과(서버가 화면을 연 시각으로 계산). full은 게시중이지만 남은 시간에 들어가는 서비스가 없음 */
   state: WindowState;
   /** 원장님이 마감했으면 사유 */
@@ -154,16 +158,52 @@ export function onHold(slot: DashboardSlot, now: Date): boolean {
   );
 }
 
-/**
- * 매물과 시간대를 한 목록으로: 시작 시각 순서, 같은 시각이면 시간대가 먼저(그 안의 예약 줄이 바로 아래에 온다)
- */
+/** 매물 목록 정렬(#358 5번, 11/12 점검 8-1). 목록 오른쪽 위에서 고르고, 지금 기준이 칸에 늘 보인다(11/18 정민석) */
+export const DASHBOARD_SORTS = ['start_asc', 'start_desc', 'created_desc'] as const;
+export type DashboardSort = (typeof DASHBOARD_SORTS)[number];
+
+/** 처음 열면 시작 시각 빠른 순(정렬 고르기가 생기기 전의 순서) */
+export const DEFAULT_DASHBOARD_SORT: DashboardSort = 'start_asc';
+
+export const DASHBOARD_SORT_LABELS: Record<DashboardSort, string> = {
+  start_asc: '시작 시각 빠른 순',
+  start_desc: '시작 시각 늦은 순',
+  created_desc: '등록 최신 순',
+};
+
+/** 주소의 sort 값. 모르는 값이나 없으면 기본 정렬 */
+export function toDashboardSort(value: string | undefined): DashboardSort {
+  return DASHBOARD_SORTS.find((sort) => sort === value) ?? DEFAULT_DASHBOARD_SORT;
+}
+
+/** 그 정렬의 대시보드 주소. 기본 정렬은 주소에 쓰지 않는다 */
+export function dashboardHref(sort: DashboardSort): string {
+  return sort === DEFAULT_DASHBOARD_SORT ? '/owner' : `/owner?sort=${sort}`;
+}
+
+const time = (iso: string) => new Date(iso).getTime();
+
+/** 시작 시각이 같으면 시간대가 먼저(그 안의 예약 줄이 바로 아래에 온다) */
+const windowFirst = (a: DashboardEntry, b: DashboardEntry) =>
+  (a.kind === 'window' ? 0 : 1) - (b.kind === 'window' ? 0 : 1);
+
+const startAsc = (a: DashboardEntry, b: DashboardEntry) =>
+  time(a.startAt) - time(b.startAt) || windowFirst(a, b);
+
+const COMPARE: Record<DashboardSort, (a: DashboardEntry, b: DashboardEntry) => number> = {
+  start_asc: startAsc,
+  start_desc: (a, b) => time(b.startAt) - time(a.startAt) || windowFirst(a, b),
+  // 같은 시각에 등록했으면(예: 한 번에 여러 개) 시작 시각 빠른 순
+  created_desc: (a, b) => time(b.createdAt) - time(a.createdAt) || startAsc(a, b),
+};
+
+/** 매물과 시간대를 한 목록으로 고른 정렬대로 놓는다(기본: 시작 시각 빠른 순) */
 export function mergeEntries(
   slots: readonly DashboardSlot[],
   windows: readonly DashboardWindow[],
+  sort: DashboardSort = DEFAULT_DASHBOARD_SORT,
 ): DashboardEntry[] {
-  return [...windows, ...slots].sort(
-    (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
-  );
+  return [...windows, ...slots].sort(COMPARE[sort]);
 }
 
 /** 오늘(한국 날짜) 시작하는 줄과 내일 이후 줄. 오늘 0시 전에 시작한 줄은 빼고, 순서 그대로 */
