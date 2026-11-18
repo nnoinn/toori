@@ -6,10 +6,12 @@ import {
   type DashboardSlot,
   type DashboardWindow,
   keptSlotsNotice,
+  dashboardHref,
   mergeEntries,
   onHold,
   rowDetailHref,
   splitByDay,
+  toDashboardSort,
   viewStatus,
 } from './dashboard';
 import { startOfKstDay } from '@/lib/time';
@@ -25,6 +27,7 @@ const slot = (start: string, extra: Partial<DashboardSlot> = {}): DashboardSlot 
   startAt: kst(start),
   endAt: kst(start),
   publishAt: kst('2026-10-30T00:00:00'),
+  createdAt: kst('2026-10-30T00:00:00'),
   menuName: '커트',
   listPrice: 20000,
   salePrice: 14000,
@@ -170,6 +173,7 @@ const windowEntry = (
   startAt: kst(start),
   endAt: kst(end),
   publishAt: kst('2026-10-30T00:00:00'),
+  createdAt: kst('2026-10-30T00:00:00'),
   state: 'published',
   closeReason: null,
   newCustomerOnly: false,
@@ -246,6 +250,100 @@ describe('대시보드 시간대 매물 (#308)', () => {
       ['today', ['window']],
       ['upcoming', []],
     ]);
+  });
+});
+
+describe('매물 목록 정렬 (#358 5번, 11/18 정민석)', () => {
+  /** 줄 이름: 종류와 id */
+  const names = (entries: readonly { kind: string; id: string }[]) =>
+    entries.map((entry) => `${entry.kind} ${entry.id}`);
+
+  // 11/1 10시와 10/31 15시 매물은 같은 시각에 등록했다(받은 순서는 늦게 시작하는 매물이 먼저)
+  const slots = [
+    slot('2026-11-01T10:00:00', { createdAt: kst('2026-10-30T09:00:00') }),
+    slot('2026-10-31T13:00:00', {
+      windowId: 'window-2026-10-31T13:00:00',
+      createdAt: kst('2026-10-31T11:00:00'),
+    }),
+    slot('2026-10-31T15:00:00', { createdAt: kst('2026-10-30T09:00:00') }),
+  ];
+  const windows = [
+    windowEntry('2026-10-31T13:00:00', '2026-10-31T18:00:00', {
+      createdAt: kst('2026-10-29T10:00:00'),
+    }),
+  ];
+
+  it('시작 시각 늦은 순: 늦게 시작하는 줄부터, 같은 시각이면 시간대가 먼저', () => {
+    expect(names(mergeEntries(slots, windows, 'start_desc'))).toEqual([
+      'slot 2026-11-01T10:00:00',
+      'slot 2026-10-31T15:00:00',
+      'window window-2026-10-31T13:00:00',
+      'slot 2026-10-31T13:00:00',
+    ]);
+  });
+
+  it('등록 최신 순: 늦게 등록한 줄부터, 같은 시각에 등록했으면 시작 시각 빠른 순', () => {
+    expect(names(mergeEntries(slots, windows, 'created_desc'))).toEqual([
+      'slot 2026-10-31T13:00:00',
+      'slot 2026-10-31T15:00:00',
+      'slot 2026-11-01T10:00:00',
+      'window window-2026-10-31T13:00:00',
+    ]);
+  });
+
+  it('정렬을 주지 않으면 시작 시각 빠른 순(지금까지의 순서)', () => {
+    expect(mergeEntries(slots, windows)).toEqual(mergeEntries(slots, windows, 'start_asc'));
+    expect(names(mergeEntries(slots, windows))).toEqual([
+      'window window-2026-10-31T13:00:00',
+      'slot 2026-10-31T13:00:00',
+      'slot 2026-10-31T15:00:00',
+      'slot 2026-11-01T10:00:00',
+    ]);
+  });
+
+  it('[전체] 탭은 오늘·예정 구역 안에서 각각 정렬하고, 구역마다 정렬한 순서의 앞 7개를 보여준다', () => {
+    // 예정 9개: 11/1 9시부터 1시간마다. 등록한 날은 시작 순서와 섞여 있다(9시 매물 10/20, 10시 매물 10/28 …)
+    const createdDays = [20, 28, 21, 27, 22, 26, 23, 25, 24];
+    const upcoming = createdDays.map((day, index) =>
+      slot(`2026-11-01T${String(9 + index).padStart(2, '0')}:00:00`, {
+        createdAt: kst(`2026-10-${day}T09:00:00`),
+      }),
+    );
+    const today = [
+      slot('2026-10-31T13:00:00', { createdAt: kst('2026-10-29T09:00:00') }),
+      slot('2026-10-31T15:00:00', { createdAt: kst('2026-10-30T09:00:00') }),
+    ];
+    const sections = allTabSections(
+      splitByDay(mergeEntries([...upcoming, ...today], [], 'created_desc'), now),
+      'all',
+      now,
+    );
+    expect(sections.map((section) => [section.day, names(section.shown), section.more])).toEqual([
+      ['today', ['slot 2026-10-31T15:00:00', 'slot 2026-10-31T13:00:00'], 0],
+      [
+        'upcoming',
+        // 늦게 등록한 매물부터 7개(10/28~10/22 등록), 가장 일찍 등록한 2개(11시 10/21, 9시 10/20)는 [더보기]
+        [
+          'slot 2026-11-01T10:00:00',
+          'slot 2026-11-01T12:00:00',
+          'slot 2026-11-01T14:00:00',
+          'slot 2026-11-01T16:00:00',
+          'slot 2026-11-01T17:00:00',
+          'slot 2026-11-01T15:00:00',
+          'slot 2026-11-01T13:00:00',
+        ],
+        2,
+      ],
+    ]);
+  });
+
+  it('주소의 sort: 모르는 값·없으면 시작 시각 빠른 순, 기본 정렬은 주소에 쓰지 않는다', () => {
+    expect(toDashboardSort('created_desc')).toBe('created_desc');
+    expect(toDashboardSort('start_desc')).toBe('start_desc');
+    expect(toDashboardSort('price')).toBe('start_asc');
+    expect(toDashboardSort(undefined)).toBe('start_asc');
+    expect(dashboardHref('start_asc')).toBe('/owner');
+    expect(dashboardHref('created_desc')).toBe('/owner?sort=created_desc');
   });
 });
 
