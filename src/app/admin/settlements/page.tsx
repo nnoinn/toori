@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { formatWon } from '@/lib/format';
 import { firstParam, type SearchValue } from '@/lib/search-params';
+import { formatKstDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
@@ -29,6 +30,7 @@ import {
   toSettlementFilter,
   toSettlementSort,
 } from './format';
+import { selectActiveHolds, type SettlementHoldRow } from './hold-queries';
 import {
   countOpenDisputes,
   type OutstandingPenaltyRow,
@@ -86,10 +88,11 @@ async function Overview({ searchParams }: { searchParams: SearchParams }) {
     query,
   });
   const db = getDb();
-  const [{ rows, hasMore }, penalties, openDisputes] = await Promise.all([
+  const [{ rows, hasMore }, penalties, openDisputes, holds] = await Promise.all([
     selectSettlements(db, { filter, sort, query, from, to }),
     selectOutstandingPenalties(db),
     countOpenDisputes(db),
+    selectActiveHolds(db, ADMIN_LIST_LIMIT),
   ]);
   const keep = { query, from, to };
 
@@ -109,6 +112,7 @@ async function Overview({ searchParams }: { searchParams: SearchParams }) {
             <Link href="/admin/disputes" className="w-fit text-primary hover:underline">
               이의제기 보기
             </Link>
+            <ActiveHolds holds={holds} />
           </CardContent>
         </Card>
       </div>
@@ -232,6 +236,41 @@ async function Overview({ searchParams }: { searchParams: SearchParams }) {
 }
 
 /** 미수 패널티(원장님 귀책 취소 패널티 중 아직 다 걷지 못한 것). 다음 정산에서 떼고, 미수가 있어도 이용 제한은 없다 */
+/** 운영자 정산 보류(#373 ②) 중인 거래·샵. 풀 때까지 목요일 정산에 들어가지 않는다. 풀기는 그 예약·샵 정산 화면에서 한다 */
+function ActiveHolds({ holds }: { holds: SettlementHoldRow[] }) {
+  return (
+    <div className="flex flex-col gap-2 border-t pt-2">
+      <p>
+        운영자 보류 <span className="font-medium">{holds.length}건</span>
+        {holds.length >= ADMIN_LIST_LIMIT ? ` (최근에 건 ${ADMIN_LIST_LIMIT}건)` : null}. 풀 때까지
+        정산서에 들어가지 않아요.
+      </p>
+      {holds.length > 0 ? (
+        <ul className="flex flex-col gap-1">
+          {holds.map((hold) => (
+            <li key={hold.holdId} className="flex flex-wrap gap-x-2">
+              <Link
+                href={
+                  hold.reservationId
+                    ? `/admin/reservations/${hold.reservationId}`
+                    : `/admin/settlements/shops/${hold.shopId}`
+                }
+                className="font-medium hover:underline"
+              >
+                {hold.reservationId ? hold.reservationCode : '샵 전체'}
+              </Link>
+              <span>{hold.shopName}</span>
+              <span className="break-all text-muted-foreground">
+                {formatKstDateTime(hold.heldAt)} · {hold.reason}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function OutstandingPenalties({ rows }: { rows: OutstandingPenaltyRow[] }) {
   const total = rows.reduce((sum, row) => sum + row.remaining, 0);
   return (

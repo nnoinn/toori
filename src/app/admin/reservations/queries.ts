@@ -191,6 +191,8 @@ export type ReservationDetail = {
   cancelledAt: Date | null;
   cancelActor: string | null;
   cancelReason: string | null;
+  /** 예약 무효 시각(A-108). 무효가 아니면 null */
+  voidedAt: Date | null;
   hoursBeforeStartAtCancel: number | null;
   createdAt: Date;
   customerNickname: string;
@@ -228,6 +230,7 @@ export async function selectReservationDetail(
       cancelledAt: reservations.cancelledAt,
       cancelActor: reservations.cancelActor,
       cancelReason: reservations.cancelReason,
+      voidedAt: reservations.voidedAt,
       hoursBeforeStartAtCancel: reservations.hoursBeforeStartAtCancel,
       createdAt: reservations.createdAt,
       customerNickname: customers.nickname,
