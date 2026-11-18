@@ -93,7 +93,7 @@ export async function forceCloseSlotInTx(
         eq(slots.id, input.slotId),
         isNull(slots.windowId),
         or(slotStatusIs('scheduled', now), slotStatusIs('published', now)),
-        not(slotIsOnHold(new Date('9999-12-31T00:00:00Z'))),
+        not(slotIsOnHold(now)),
       ),
     )
     .returning({ id: slots.id });
@@ -140,7 +140,7 @@ export async function forceCloseWindowInTx(
   const closed = await closeWindow(tx, {
     shopId: window.shopId,
     windowId: input.windowId,
-    reason: 'other',
+    reason: 'admin',
     now: input.now,
   });
   if (!closed.ok) return adminSlotFail(closed.code);

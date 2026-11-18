@@ -34,7 +34,6 @@ export async function assertShopCanPublish(
   shopId: string,
   db: Pick<ReturnType<typeof getDb>, 'select'> = getDb(),
 ): Promise<Result<null>> {
-  if (await readPublishPausedAt(crypto.randomUUID(), db))
-    return fail('PUBLISH_PAUSED', PUBLISH_PAUSED_MESSAGE);
+  if (await readPublishPausedAt(shopId, db)) return fail('PUBLISH_PAUSED', PUBLISH_PAUSED_MESSAGE);
   return ok(null);
 }
