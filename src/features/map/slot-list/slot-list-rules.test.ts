@@ -5,6 +5,7 @@ import { formatDistance } from './distance';
 import { applySortToSearch, DEFAULT_SORT, parseSort } from './sort';
 
 const ID = '3f1c2b9e-8a4d-4c1e-9b2f-1a2b3c4d5e6f';
+const SHOP = '7a2d4c6e-1b3f-4a5c-8d9e-0f1a2b3c4d5e';
 
 describe('정렬', () => {
   it('기본은 거리순, 목록에 없는 값도 거리순', () => {
@@ -52,14 +53,18 @@ describe('거리 글자', () => {
 });
 
 describe('커서', () => {
-  it('만들고 읽으면 같은 값', () => {
+  it('만들고 읽으면 같은 값(거리순은 샵·시작 시각도 담는다, 11/18)', () => {
     for (const cursor of [
-      { sort: 'near', value: 532.7, id: ID },
+      { sort: 'near', value: 532.7, id: ID, shopId: SHOP, startAt: '2026-11-19T02:00:00.000Z' },
       { sort: 'discount', value: 40, id: ID },
       { sort: 'imminent', value: '2026-10-25T05:00:00.000Z', id: ID },
     ] as const) {
       expect(decodeCursor(encodeCursor(cursor), cursor.sort)).toEqual(cursor);
     }
+  });
+
+  it('샵·시작 시각이 없는 예전 거리순 커서는 버린다(처음부터)', () => {
+    expect(decodeCursor(encodeCursor({ sort: 'near', value: 532.7, id: ID }), 'near')).toBeNull();
   });
 
   it('지금 정렬과 다른 커서는 버린다(처음부터)', () => {
@@ -74,8 +79,19 @@ describe('커서', () => {
       ['', 'near'],
       ['not-base64-json', 'near'],
       ['a'.repeat(600), 'near'],
-      [bad({ sort: 'near', value: -5, id: ID }), 'near'],
-      [bad({ sort: 'near', value: 1, id: 'abc' }), 'near'],
+      [
+        bad({ sort: 'near', value: -5, id: ID, shopId: SHOP, startAt: '2026-11-19T02:00:00Z' }),
+        'near',
+      ],
+      [
+        bad({ sort: 'near', value: 1, id: 'abc', shopId: SHOP, startAt: '2026-11-19T02:00:00Z' }),
+        'near',
+      ],
+      [
+        bad({ sort: 'near', value: 1, id: ID, shopId: 'abc', startAt: '2026-11-19T02:00:00Z' }),
+        'near',
+      ],
+      [bad({ sort: 'near', value: 1, id: ID, shopId: SHOP, startAt: 'tomorrow' }), 'near'],
       [bad({ sort: 'discount', value: 33.3, id: ID }), 'discount'],
       [bad({ sort: 'discount', value: 120, id: ID }), 'discount'],
       [bad({ sort: 'imminent', value: 'tomorrow', id: ID }), 'imminent'],

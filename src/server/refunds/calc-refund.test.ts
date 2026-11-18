@@ -105,6 +105,19 @@ describe('calcRefund: 원장님 귀책 취소', () => {
       });
     }
   });
+
+  it('결제액이 0원이면(쿠폰으로 다 냈으면) 돌려줄 돈이 없고(refundable false), 1원이면 있다', () => {
+    const owner = (paidAmount: number) =>
+      calcRefund({
+        paidAmount,
+        salePrice: 45_000,
+        startAt: START,
+        now: before(HOUR),
+        reason: 'owner_fault',
+      });
+    expect(owner(0)).toMatchObject({ refundAmount: 0, refundable: false });
+    expect(owner(1)).toMatchObject({ refundAmount: 1, refundable: true });
+  });
 });
 
 describe('calcRefund: 잘못된 금액', () => {

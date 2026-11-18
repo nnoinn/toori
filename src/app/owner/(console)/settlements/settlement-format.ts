@@ -310,11 +310,12 @@ export function periodHrefValue(
 
 /**
  * 정산 내역 주소. 달이면 ?month=, 직접 고른 기간이면 ?from=&to=.
- * 거래 내역 탭이면 view=items, 펼친 정산서가 있으면 payout=지급일
+ * 거래 내역 탭이면 view=items, 펼친 정산서가 있으면 payout=지급일.
+ * 거래 내역 정렬은 거래 내역 탭에서만, 기본 정렬이 아닐 때만 sort=로 쓴다
  */
 export function settlementsHref(
   period: { month: string } | { from: string; to: string },
-  options: { view?: SettlementView; payout?: string | null } = {},
+  options: { view?: SettlementView; payout?: string | null; sort?: SettlementItemSort } = {},
 ): string {
   const query = new URLSearchParams();
   if (options.view === 'items') query.set('view', 'items');
@@ -325,7 +326,61 @@ export function settlementsHref(
     query.set('to', period.to);
   }
   if (options.payout) query.set('payout', options.payout);
+  if (options.view === 'items' && options.sort && options.sort !== DEFAULT_SETTLEMENT_ITEM_SORT) {
+    query.set('sort', options.sort);
+  }
   return `/owner/settlements?${query.toString()}`;
+}
+
+// ── 거래 내역 정렬 ────────────────────────────────────────────────────
+
+/**
+ * [거래 내역] 목록 정렬(#358 5번, 11/12 점검 8-1). 목록 오른쪽 위에서 고르고 지금 기준이 칸에 늘 보인다(11/18 정민석).
+ * 첫 칸이 서비스 일시라서 서비스 일시 순으로도 볼 수 있게 한다. 처음 열면 처리·취소 최신 순(getSettlementItems가 주는 순서)
+ */
+export const SETTLEMENT_ITEM_SORTS = [
+  'occurred_desc',
+  'occurred_asc',
+  'start_desc',
+  'start_asc',
+] as const;
+export type SettlementItemSort = (typeof SETTLEMENT_ITEM_SORTS)[number];
+
+export const DEFAULT_SETTLEMENT_ITEM_SORT: SettlementItemSort = 'occurred_desc';
+
+export const SETTLEMENT_ITEM_SORT_LABELS: Record<SettlementItemSort, string> = {
+  occurred_desc: '처리·취소 최신 순',
+  occurred_asc: '처리·취소 오래된 순',
+  start_desc: '서비스 일시 최신 순',
+  start_asc: '서비스 일시 오래된 순',
+};
+
+/** 주소의 sort 값. 모르는 값이나 없으면 기본 정렬 */
+export function resolveSettlementItemSort(value: string | undefined): SettlementItemSort {
+  return SETTLEMENT_ITEM_SORTS.find((sort) => sort === value) ?? DEFAULT_SETTLEMENT_ITEM_SORT;
+}
+
+const time = (iso: string) => new Date(iso).getTime();
+
+type SortableItem = Pick<SettlementItemView, 'occurredAt' | 'startAt'>;
+
+/** 앞 기준이 같으면 다른 시각으로 같은 방향(최신 순이면 최신, 오래된 순이면 오래된 것부터) */
+const COMPARE: Record<SettlementItemSort, (a: SortableItem, b: SortableItem) => number> = {
+  occurred_desc: (a, b) =>
+    time(b.occurredAt) - time(a.occurredAt) || time(b.startAt) - time(a.startAt),
+  occurred_asc: (a, b) =>
+    time(a.occurredAt) - time(b.occurredAt) || time(a.startAt) - time(b.startAt),
+  start_desc: (a, b) =>
+    time(b.startAt) - time(a.startAt) || time(b.occurredAt) - time(a.occurredAt),
+  start_asc: (a, b) => time(a.startAt) - time(b.startAt) || time(a.occurredAt) - time(b.occurredAt),
+};
+
+/** 거래를 고른 정렬대로 놓는다. 순서만 바꾸고 받은 값은 그대로 둔다 */
+export function sortSettlementItems<T extends SortableItem>(
+  items: readonly T[],
+  sort: SettlementItemSort,
+): T[] {
+  return [...items].sort(COMPARE[sort]);
 }
 
 /** 기간 이름. 예: "11/1(일) ~ 11/30(월)", 해가 다르면 연도를 붙인다 */

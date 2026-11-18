@@ -188,6 +188,7 @@ export function HomeExplorer({ center, myLocation, header, sort, serverNow }: Ho
             </div>
           ) : null}
           <SlotList
+            columns="panel"
             items={home.items}
             serverNow={home.serverNow ?? serverNow}
             sort={sort}

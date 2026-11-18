@@ -3,6 +3,7 @@
 
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
+import { recordCronRun } from '@/server/cron/run-log';
 import { isCronRequest } from '@/server/cron/auth';
 import { sendDueReminders } from '@/server/notifications';
 import { sweepAgreedCancelRequests } from '@/server/refunds';
@@ -16,7 +17,11 @@ export async function POST(request: Request) {
   }
   const db = getDb();
   const now = await getRequestNow();
-  const reminders = await sendDueReminders(db, now);
-  const agreedCancels = await sweepAgreedCancelRequests(db, now);
-  return Response.json({ reminders, agreedCancels });
+  // 실행 기록을 남긴다(#373 ⑥). 결과는 보낸 개수·정리한 개수만이다
+  const result = await recordCronRun(db, 'reminders', now, async () => {
+    const reminders = await sendDueReminders(db, now);
+    const agreedCancels = await sweepAgreedCancelRequests(db, now);
+    return { reminders, agreedCancels };
+  });
+  return Response.json(result);
 }

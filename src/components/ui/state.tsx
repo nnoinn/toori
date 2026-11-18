@@ -45,6 +45,30 @@ export function ErrorState({
   );
 }
 
+/**
+ * 로딩 중. 목록 줄(SlotCard list: 왼쪽 글 + 오른쪽 사진) 모양의 회색 틀을 count개 보여준다.
+ * 판(흰 바탕·테두리)은 className으로 정한다
+ */
+export function LoadingList({ count = 4, className }: { count?: number; className?: string }) {
+  return (
+    <div className={className} aria-busy="true" aria-label="불러오는 중">
+      <div className="-mb-px [&>div]:border-b">
+        {Array.from({ length: count }, (_, i) => (
+          <div key={i} className="flex gap-3 px-4 py-4">
+            <div className="flex flex-1 flex-col gap-2">
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-3 w-2/3" />
+              <Skeleton className="h-3 w-1/2" />
+              <Skeleton className="h-4 w-1/3" />
+            </div>
+            <Skeleton className="size-22 shrink-0 rounded-lg" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** 로딩 중. 매물 카드 모양의 회색 틀을 count개 보여준다 */
 export function LoadingCards({ count = 3, className }: { count?: number; className?: string }) {
   return (
