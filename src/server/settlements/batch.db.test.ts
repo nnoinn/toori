@@ -476,59 +476,104 @@ describeDb('목요일 정산 묶기 (실제 DB)', () => {
     });
   });
 
-  it('운영자 정산 보류(#373 ②): 보류 중인 거래·샵은 묶지 않고 held로 세며, 지급일 0시 뒤에 푼 보류도 그날은 묶지 않고, 0시 전에 푼 보류는 묶는다', async () => {
-    await withRollback(async (tx) => {
-      const db = tx as unknown as Db;
-      const adminId = await createTestUser(tx);
-      const shop = await createTestShop(tx, { status: 'approved' });
-      const heldShop = await createTestShop(tx, { status: 'approved' });
-      const done = (target: TestShop, start: string, end: string, at: string) =>
-        finished(tx, target, start, end, 'completed', visited(kst('2026-11-01', at)));
-      const free = await done(shop, '09:00', '10:00', '11:00');
-      const held = await done(shop, '10:00', '11:00', '12:00');
-      const releasedAfter = await done(shop, '11:00', '12:00', '13:00');
-      const releasedBefore = await done(shop, '12:00', '13:00', '14:00');
-      const inHeldShop = await done(heldShop, '09:00', '10:00', '11:00');
-      const hold = (target: Partial<typeof settlementHolds.$inferInsert>) => ({
-        reason: '계좌 확인 필요',
-        heldBy: adminId,
-        heldAt: kst('2026-11-02', '10:00'),
-        ...target,
-      });
-      const released = (at: Date) => ({
-        releasedBy: adminId,
-        releasedAt: at,
-        releaseMemo: '확인함',
-      });
-      await tx.insert(settlementHolds).values([
-        hold({ reservationId: held.reservation.id }),
-        hold({
-          reservationId: releasedAfter.reservation.id,
-          ...released(kst('2026-11-05', '00:10')),
-        }),
-        hold({
-          reservationId: releasedBefore.reservation.id,
-          ...released(kst('2026-11-04', '18:00')),
-        }),
-        hold({ shopId: heldShop.shopId }),
-      ]);
+  /**
+   * 운영자 정산 보류(#373 ②) 테스트 세 개가 같이 쓰는 준비. 지급일 2026-11-05 기준으로
+   * 한 샵에 보류 없음·보류 중·0시 뒤에 풂·0시 전에 풂 거래, 다른 샵은 샵 전체 보류를 둔다
+   */
+  async function seedAdminHolds(tx: TestTx) {
+    const adminId = await createTestUser(tx);
+    const shop = await createTestShop(tx, { status: 'approved' });
+    const heldShop = await createTestShop(tx, { status: 'approved' });
+    const done = (target: TestShop, start: string, end: string, at: string) =>
+      finished(tx, target, start, end, 'completed', visited(kst('2026-11-01', at)));
+    const free = await done(shop, '09:00', '10:00', '11:00');
+    const held = await done(shop, '10:00', '11:00', '12:00');
+    const releasedAfter = await done(shop, '11:00', '12:00', '13:00');
+    const releasedBefore = await done(shop, '12:00', '13:00', '14:00');
+    const inHeldShop = await done(heldShop, '09:00', '10:00', '11:00');
+    const hold = (target: Partial<typeof settlementHolds.$inferInsert>) => ({
+      reason: '계좌 확인 필요',
+      heldBy: adminId,
+      heldAt: kst('2026-11-02', '10:00'),
+      ...target,
+    });
+    const released = (at: Date) => ({
+      releasedBy: adminId,
+      releasedAt: at,
+      releaseMemo: '확인함',
+    });
+    await tx.insert(settlementHolds).values([
+      hold({ reservationId: held.reservation.id }),
+      hold({
+        reservationId: releasedAfter.reservation.id,
+        ...released(kst('2026-11-05', '00:10')),
+      }),
+      hold({
+        reservationId: releasedBefore.reservation.id,
+        ...released(kst('2026-11-04', '18:00')),
+      }),
+      hold({ shopId: heldShop.shopId }),
+    ]);
+    return { shop, heldShop, free, held, releasedAfter, releasedBefore, inHeldShop };
+  }
 
-      // 샵을 잠근 뒤 다시 읽는 보류도 같은 기준(지금 보류 중이거나 0시 뒤에 풀림)
-      const cutoff = kst('2026-11-05', '00:00');
+  const ADMIN_HOLD_CUTOFF = kst('2026-11-05', '00:00');
+
+  it('운영자 정산 보류(#373 ②): 샵을 잠근 뒤 다시 읽는 보류는 지금 보류 중이거나 지급일 0시 뒤에 풀린 거래이고, 샵 전체 보류면 shop이 true다', async () => {
+    await withRollback(async (tx) => {
+      const { shop, heldShop, free, held, releasedAfter, releasedBefore } =
+        await seedAdminHolds(tx);
       const reread = await readHeldReservationIds(tx, {
         shopId: shop.shopId,
         reservationIds: [free, held, releasedAfter, releasedBefore].map(
           (made) => made.reservation.id,
         ),
-        cutoff,
+        cutoff: ADMIN_HOLD_CUTOFF,
       });
       expect(reread.shop).toBe(false);
       expect([...reread.reservationIds].sort()).toEqual(
         [held.reservation.id, releasedAfter.reservation.id].sort(),
       );
       expect(
-        await readHeldReservationIds(tx, { shopId: heldShop.shopId, reservationIds: [], cutoff }),
+        await readHeldReservationIds(tx, {
+          shopId: heldShop.shopId,
+          reservationIds: [],
+          cutoff: ADMIN_HOLD_CUTOFF,
+        }),
       ).toEqual({ shop: true, reservationIds: new Set() });
+    });
+  });
+
+  it('운영자 정산 보류(#373 ②): 묶기 후보는 보류 중·지급일 0시 뒤에 푼 거래와 샵 전체 보류 샵의 거래를 보류로 읽고, 0시 전에 푼 거래는 보류가 아니다', async () => {
+    await withRollback(async (tx) => {
+      const seeded = await seedAdminHolds(tx);
+      const holdOf = new Map(
+        (await readBatchCandidates(tx, { cutoff: ADMIN_HOLD_CUTOFF })).map((candidate) => [
+          candidate.reservationId,
+          candidate.hasAdminHold,
+        ]),
+      );
+      const pick = (made: { reservation: { id: string } }) => holdOf.get(made.reservation.id);
+      expect({
+        free: pick(seeded.free),
+        held: pick(seeded.held),
+        releasedAfter: pick(seeded.releasedAfter),
+        releasedBefore: pick(seeded.releasedBefore),
+        inHeldShop: pick(seeded.inHeldShop),
+      }).toEqual({
+        free: false,
+        held: true,
+        releasedAfter: true,
+        releasedBefore: false,
+        inHeldShop: true,
+      });
+    });
+  });
+
+  it('운영자 정산 보류(#373 ②): 보류 중인 거래·샵은 묶지 않고 held로 세며, 지급일 0시 뒤에 푼 보류도 그날은 묶지 않고, 0시 전에 푼 보류는 묶는다', async () => {
+    await withRollback(async (tx) => {
+      const db = tx as unknown as Db;
+      const { shop, heldShop, free, releasedBefore, inHeldShop } = await seedAdminHolds(tx);
 
       const result = await runSettlementBatch(db, {
         now: PAYOUT_NOW,
