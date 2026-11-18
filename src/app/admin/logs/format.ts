@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 
-import { kstToUtc } from '@/lib/time';
+import { formatKst, kstToUtc } from '@/lib/time';
 
 /** 탭: 처리 기록(admin_actions) / 열람 기록(admin_access_logs). 주소 ?tab= 값 */
 export const LOG_TABS = ['actions', 'access'] as const;
@@ -37,6 +37,9 @@ export const ACTION_LABELS: Record<string, string> = {
   'settlement.payout_retry': '지급 다시 요청',
   'settlement.hold': '정산 보류',
   'settlement.release': '정산 보류 풀기',
+  'shop.publish_pause': '게시 멈춤',
+  'shop.publish_resume': '게시 다시 열기',
+  'slot.force_close': '운영자 마감',
   'notification.resend': '알림 다시 보내기',
   'payment.retry': '결제 다시 시도',
   'refund.retry': '환불 다시 시도',
@@ -57,6 +60,8 @@ export const TARGET_TYPE_LABELS: Record<string, string> = {
   customer: '고객',
   owner: '원장님',
   settlement: '정산',
+  slot: '매물',
+  slot_window: '시간대 매물',
   notification: '알림',
   order: '주문',
   refund: '환불',
@@ -77,6 +82,12 @@ export type TargetNames = {
   ownerName: string | null;
   settlementShopName: string | null;
   settlementPayoutDate: string | null;
+  /** 매물(slot)·시간대 매물(slot_window) 대상(#373 ④ 운영자 마감). 처리 기록만 채운다 */
+  slotShopName?: string | null;
+  slotMenuName?: string | null;
+  slotStartAt?: Date | null;
+  windowShopName?: string | null;
+  windowStartAt?: Date | null;
 };
 
 /** 대상 이름. 예: 샵 이름, 예약번호, 회원 이름, "샵 이름 11/19 정산". 없으면(목록·지운 대상) null */
@@ -95,6 +106,14 @@ export function targetLabel(targetType: string, names: TargetNames): string | nu
     case 'settlement':
       return names.settlementShopName && names.settlementPayoutDate
         ? `${names.settlementShopName} ${names.settlementPayoutDate} 정산`
+        : null;
+    case 'slot':
+      return names.slotShopName && names.slotMenuName && names.slotStartAt
+        ? `${names.slotShopName} ${names.slotMenuName} ${formatKst(names.slotStartAt)}`
+        : null;
+    case 'slot_window':
+      return names.windowShopName && names.windowStartAt
+        ? `${names.windowShopName} ${formatKst(names.windowStartAt)} 시간대`
         : null;
     default:
       return null;

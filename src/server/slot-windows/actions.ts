@@ -16,7 +16,7 @@ import { ok } from '@/lib/result';
 import { requireCustomer, requireShopOwner } from '@/server/auth';
 import { paymentFail, type PaymentResult } from '@/server/payments/errors';
 import type { HoldInfo } from '@/server/payments/types';
-import { assertShopApproved } from '@/server/shops';
+import { assertShopApproved, assertShopCanPublish } from '@/server/shops';
 
 import { type SlotWindowResult, slotWindowFail } from './errors';
 import { fakeWindowFailure } from './fake';
@@ -62,6 +62,9 @@ export async function createSlotWindows(
   if (!auth.ok) return auth;
   const approved = await assertShopApproved(shopId);
   if (!approved.ok) return approved;
+  // 운영자가 새 매물 게시를 멈춘 샵(#373 ④). 이미 올린 시간대와 그 안의 [예약하기]는 그대로다
+  const publishable = await assertShopCanPublish(shopId);
+  if (!publishable.ok) return publishable;
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) return slotWindowFail('INVALID_INPUT');
   const switched = fakeWindowFailure('createSlotWindows');
