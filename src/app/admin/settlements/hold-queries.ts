@@ -42,7 +42,7 @@ async function selectHolds(db: Db, where: SQL | undefined, limit?: number) {
       shopId: shops.id,
       shopName: shops.name,
       reason: settlementHolds.reason,
-      reasonCode: settlementHolds.reason,
+      reasonCode: settlementHolds.reasonCode,
       heldAt: settlementHolds.heldAt,
       heldByName: heldBy.name,
       releasedAt: settlementHolds.releasedAt,

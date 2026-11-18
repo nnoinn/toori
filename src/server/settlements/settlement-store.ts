@@ -128,7 +128,7 @@ export async function readShopSettlementRows(
     hasAdminRefund: row.hasAdminRefund,
     hasOpenDispute: row.hasOpenDispute,
     openDisputeReceivedAt: row.openDisputeReceivedAt,
-    hasAdminHold: row.adminHoldCode === null,
+    hasAdminHold: row.adminHoldCode !== null,
     adminHoldCode: row.adminHoldCode,
     ownerPenalty:
       row.penaltyAmount === null || row.penaltyCollected === null

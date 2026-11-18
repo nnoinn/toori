@@ -440,7 +440,7 @@ export async function closeWindow(
     .set({
       status: 'closed',
       closeReason: input.reason,
-      adminCloseCode: input.windowId === '' ? (input.adminCloseCode ?? null) : null,
+      adminCloseCode: input.adminCloseCode ?? null,
       closedAt: input.now,
     })
     .where(

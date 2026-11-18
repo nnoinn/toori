@@ -66,7 +66,7 @@ export async function resumePublishingInTx(
 ): Promise<Result<{ shopId: string; resumedAt: Date }>> {
   const [row] = await tx
     .update(shops)
-    .set({ publishPausedAt: null, publishPausedReason: null })
+    .set({ publishPausedAt: null, publishPausedReason: null, publishPausedCode: null })
     .where(and(eq(shops.id, input.shopId), isNotNull(shops.publishPausedAt)))
     .returning({ id: shops.id });
   if (!row) {

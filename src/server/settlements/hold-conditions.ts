@@ -39,7 +39,7 @@ export function adminHoldCode(
     .select({ code: settlementHolds.reasonCode })
     .from(settlementHolds)
     .where(and(holdOf(reservationId, shopId), isNull(settlementHolds.releasedAt)))
-    .orderBy(sql`${settlementHolds.reservationId} is not null`)
+    .orderBy(sql`${settlementHolds.reservationId} is null`)
     .limit(1)})`;
 }
 
