@@ -1,8 +1,12 @@
 // 운영자 샵 상세의 '취소 기록' 칸. 샵별 원장님 사정 취소 횟수·시작 몇 시간 전·패널티와 합의 후 취소 횟수·사유를 본다
-// (핵심 규칙 X-207·X-208: 샵별로 기록한다). 반복되는 샵을 찾고, 원장님과 이야기할 때 근거로 쓴다
+// (핵심 규칙 X-207·X-208: 샵별로 기록한다). 반복되는 샵을 찾고, 원장님과 이야기할 때 근거로 쓴다.
+// 기본은 전체 기간이고, 위의 기간 고르기(#486)로 고른 기간 안의 건수와 기록만 볼 수 있다
 
 import Link from 'next/link';
 
+import { QUICK_PERIOD_DAYS, recentPeriod } from '@/components/ui/account-history-query';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';
 import {
@@ -11,8 +15,89 @@ import {
 } from '@/server/refunds/agreed-cancel-types';
 
 import { labelHoursBefore } from '../reservations/format';
+import { type CancelStatsPeriod, cancelStatsHref } from './cancel-stats-period';
 import type { ShopCancelStats } from './cancel-stats-queries';
 import { AGREED_REQUEST_STATUS_LABELS } from './format';
+
+/** 샵 상세에서 취소 기록 칸의 자리. 기간을 고르면 화면이 이 칸으로 돌아온다 */
+export const CANCEL_STATS_ANCHOR = 'cancel-stats';
+
+/** 날짜 모양이 틀리거나 시작일이 끝일보다 늦을 때 */
+export const CANCEL_STATS_PERIOD_ERROR =
+  '기간을 다시 골라 주세요. 날짜가 맞지 않거나 시작일이 끝일보다 늦어요';
+
+/**
+ * 취소 기록의 기간 고르기(#486). 계정 이력(#436)과 같은 모양: 시작일~끝일과 [검색], 기간을 골랐으면 [전체 기간],
+ * 빠른 기간(최근 7·30·90일). 주소의 cancelFrom·cancelTo로 고른다
+ */
+export function CancelStatsPeriodForm({
+  shopId,
+  period,
+  today,
+}: {
+  shopId: string;
+  period: CancelStatsPeriod;
+  /** 오늘(한국 날짜 'YYYY-MM-DD') */
+  today: string;
+}) {
+  const href = (next: CancelStatsPeriod) =>
+    `${cancelStatsHref(shopId, next)}#${CANCEL_STATS_ANCHOR}`;
+  const filtered = Boolean(period.from || period.to);
+  return (
+    <form action={`/admin/shops/${shopId}#${CANCEL_STATS_ANCHOR}`} className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="mb-1.5 text-sm font-medium">기간</legend>
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              name="cancelFrom"
+              defaultValue={period.from}
+              max={today}
+              aria-label="시작일"
+              className="w-40"
+            />
+            <span aria-hidden className="text-muted-foreground">
+              ~
+            </span>
+            <Input
+              type="date"
+              name="cancelTo"
+              defaultValue={period.to}
+              max={today}
+              aria-label="끝일"
+              className="w-40"
+            />
+          </div>
+        </fieldset>
+        <div className="flex gap-2">
+          <Button type="submit">검색</Button>
+          {filtered ? (
+            <Link href={href({})} className={buttonVariants({ variant: 'ghost' })}>
+              전체 기간
+            </Link>
+          ) : null}
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2" aria-label="빠른 기간">
+        {QUICK_PERIOD_DAYS.map((days) => {
+          const quick = recentPeriod(today, days);
+          const active = period.from === quick.from && period.to === quick.to;
+          return (
+            <Link
+              key={days}
+              href={href(quick)}
+              aria-current={active ? 'true' : undefined}
+              className={buttonVariants({ variant: active ? 'default' : 'outline', size: 'sm' })}
+            >
+              최근 {days}일
+            </Link>
+          );
+        })}
+      </div>
+    </form>
+  );
+}
 
 export function ShopCancelStatsView({ stats }: { stats: ShopCancelStats }) {
   const { ownerFault, agreed } = stats;
