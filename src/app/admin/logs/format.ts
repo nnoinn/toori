@@ -35,6 +35,8 @@ export const ACTION_LABELS: Record<string, string> = {
   'reservation.void': '예약 무효',
   'settlement.payout_request': '지급 요청',
   'settlement.payout_retry': '지급 다시 요청',
+  'settlement.hold': '정산 보류',
+  'settlement.release': '정산 보류 풀기',
   'notification.resend': '알림 다시 보내기',
   'payment.retry': '결제 다시 시도',
   'refund.retry': '환불 다시 시도',

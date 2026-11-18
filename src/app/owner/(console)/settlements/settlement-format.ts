@@ -121,6 +121,10 @@ export function disputeDeadlineText(
   now: Date,
 ): string | null {
   if (item.status === 'no_payout') return null;
+  // 운영자 정산 보류(#373 ②)는 사유를 원장님에게 보이지 않는다(11/15 nnoinn)
+  if (item.hold?.reason === 'admin') {
+    return '운영자가 확인 중이에요. 확인이 끝나면 그다음 지급일에 들어가요.';
+  }
   if (item.hold) {
     const received = formatDateKey(kstDateKey(new Date(item.hold.receivedAt)));
     return `이의제기 확인 중이에요(${received} 접수). 결론이 나면 그다음 지급일에 들어가요.`;
