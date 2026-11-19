@@ -6,12 +6,11 @@
 //   <SortSelect value={sort} options={SORTS.map((value) => ({ value, label: LABELS[value], href: listHref({ ...now, sort: value }) }))} />
 
 import { useId, useTransition } from 'react';
-import { ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { cn } from '@/lib/utils';
 
-import { NATIVE_SELECT_CLASS } from './native-select';
+import { NativeSelect } from './native-select';
 
 export type SortOption = {
   value: string;
@@ -41,31 +40,23 @@ export function SortSelect({
       <label htmlFor={id} className="text-muted-foreground">
         {label}
       </label>
-      {/* 브라우저 기본 꺽쇠는 칸 테두리에 붙고 여백으로도 옮겨지지 않아서 숨기고, 테두리에서 띄운 꺽쇠를 그린다(11/19 피드백) */}
-      <span className="relative inline-flex">
-        {/* 고르자마자 칸에 보이도록 기본값만 주고(key로 다시 그림), 새 목록이 오면 그 정렬로 다시 맞춘다 */}
-        <select
-          key={value}
-          id={id}
-          defaultValue={value}
-          aria-busy={pending || undefined}
-          className={cn(NATIVE_SELECT_CLASS, 'appearance-none pr-9')}
-          onChange={(event) => {
-            const next = options.find((option) => option.value === event.target.value);
-            if (next) startTransition(() => router.push(next.href));
-          }}
-        >
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <ChevronDown
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground"
-        />
-      </span>
+      {/* 고르자마자 칸에 보이도록 기본값만 주고(key로 다시 그림), 새 목록이 오면 그 정렬로 다시 맞춘다 */}
+      <NativeSelect
+        key={value}
+        id={id}
+        defaultValue={value}
+        aria-busy={pending || undefined}
+        onChange={(event) => {
+          const next = options.find((option) => option.value === event.target.value);
+          if (next) startTransition(() => router.push(next.href));
+        }}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </NativeSelect>
     </div>
   );
 }
