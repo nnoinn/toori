@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { NATIVE_SELECT_CLASS } from '@/components/ui/native-select';
+import { NativeSelect } from '@/components/ui/native-select';
 import { Pagination } from '@/components/ui/pagination';
 import { DetailLink, SelectableRow, SelectableRows } from '@/components/ui/selectable-rows';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -123,34 +123,34 @@ async function Logs({ searchParams }: { searchParams: SearchParams }) {
         {params.tab !== 'actions' ? <input type="hidden" name="tab" value={params.tab} /> : null}
         {params.sort !== 'new' ? <input type="hidden" name="sort" value={params.sort} /> : null}
         <FilterField label="운영자">
-          <select name="admin" defaultValue={params.admin ?? ''} className={NATIVE_SELECT_CLASS}>
+          <NativeSelect name="admin" defaultValue={params.admin ?? ''}>
             <option value="">모든 운영자</option>
             {admins.map((option) => (
               <option key={option.adminId} value={option.adminId}>
                 {option.name ?? FALLBACK_ADMIN_NAME}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </FilterField>
         <FilterField label="한 일">
-          <select name="kind" defaultValue={params.kind ?? ''} className={NATIVE_SELECT_CLASS}>
+          <NativeSelect name="kind" defaultValue={params.kind ?? ''}>
             <option value="">모두</option>
             {Object.entries(kindLabels).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </FilterField>
         <FilterField label="대상">
-          <select name="target" defaultValue={params.target ?? ''} className={NATIVE_SELECT_CLASS}>
+          <NativeSelect name="target" defaultValue={params.target ?? ''}>
             <option value="">모두</option>
             {Object.entries(TARGET_TYPE_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </FilterField>
         <FilterField label="기간 시작">
           <Input type="date" name="from" defaultValue={params.from ?? ''} className="w-40" />
