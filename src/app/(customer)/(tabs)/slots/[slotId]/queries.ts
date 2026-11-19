@@ -13,6 +13,7 @@ import { isHeldByMe, isHeldByOther, slotBadges } from '@/features/map/slot-list/
 import { shopImageUrl } from '@/features/map/slot-list/image-url';
 import { getSlotStatus, type SlotStatus } from '@/features/slot-status/slot-status';
 import { newCustomerOnlyVisible } from '@/server/customers';
+import { categoryLabel, serviceTypeLabel } from '@/server/policy';
 import { customerVisibleShop } from '@/server/shops/visibility';
 
 import type { SlotAvailability, SlotDetail } from './types';
@@ -49,10 +50,13 @@ export async function selectSlotDetail(
       holdCustomerId: slots.holdCustomerId,
       holdExpiresAt: slots.holdExpiresAt,
       menuName: slots.menuName,
+      serviceType: slots.serviceType,
       menuDescription: slots.menuDescription,
       durationMinutes: slots.durationMinutes,
       shopId: shops.id,
       shopName: shops.name,
+      category: shops.category,
+      sigunguCode: shops.sigunguCode,
       roadAddress: shops.roadAddress,
       addressDetail: shops.addressDetail,
       phone: shops.phone,
@@ -95,9 +99,12 @@ export async function selectSlotDetail(
     discountRate: row.discountRate,
     menu: {
       name: row.menuName,
+      serviceType: serviceTypeLabel(row.serviceType),
       description: row.menuDescription,
       durationMinutes: row.durationMinutes,
     },
+    shopCategory: categoryLabel(row.category),
+    sigunguCode: row.sigunguCode,
     shop: {
       shopId: row.shopId,
       name: row.shopName,

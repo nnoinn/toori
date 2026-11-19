@@ -15,7 +15,10 @@ import {
   refundPolicyNotes,
   safeExternalUrl,
   telHref,
+  OTHER_SLOT_COUNT,
+  otherShopItems,
 } from './detail-format';
+import type { ListItem } from '@/features/map/slot-list/types';
 
 describe('사진 번호', () => {
   it('스크롤 위치에서 가장 가까운 사진', () => {
@@ -202,5 +205,54 @@ describe('카카오맵 크게 보기 링크', () => {
     expect(kakaoMapLink('샘플 헤어, 2층', 37.3, 126.8)).toBe(
       'https://map.kakao.com/link/map/%EC%83%98%ED%94%8C%20%ED%97%A4%EC%96%B4%2C%202%EC%B8%B5,37.3,126.8',
     );
+  });
+});
+
+describe('이 샵의 다른 매물(11/18 회의 피드백 5번)', () => {
+  const slot = (slotId: string): ListItem => ({
+    kind: 'slot',
+    slotId,
+    shopId: 'shop',
+    shopName: '샵',
+    category: '미용실',
+    menuName: '커트',
+    startAt: '2026-11-19T02:00:00.000Z',
+    listPrice: 20000,
+    salePrice: 14000,
+    discountRate: 30,
+    imageUrl: null,
+    distanceMeters: 0,
+    badges: [],
+  });
+  const window: ListItem = {
+    kind: 'window',
+    windowId: 'w',
+    shopId: 'shop',
+    shopName: '샵',
+    category: '미용실',
+    firstMenuName: '커트',
+    menuCount: 2,
+    startAt: '2026-11-19T04:00:00.000Z',
+    endAt: '2026-11-19T09:00:00.000Z',
+    maxDiscountRate: 30,
+    minSalePrice: 10000,
+    imageUrl: null,
+    distanceMeters: 0,
+    badges: [],
+  };
+  const ids = (items: ListItem[]) =>
+    items.map((item) => (item.kind === 'slot' ? item.slotId : item.windowId));
+
+  it('지금 보는 매물은 빼고 받은 순서 그대로, 시간대 매물도 넣는다', () => {
+    expect(ids(otherShopItems([slot('a'), slot('now'), window, slot('b')], 'now'))).toEqual([
+      'a',
+      'w',
+      'b',
+    ]);
+  });
+
+  it(`앞에서 ${OTHER_SLOT_COUNT}개까지만`, () => {
+    const many = ['1', '2', '3', '4', '5', '6', '7'].map(slot);
+    expect(ids(otherShopItems(many, 'now'))).toEqual(['1', '2', '3', '4', '5']);
   });
 });

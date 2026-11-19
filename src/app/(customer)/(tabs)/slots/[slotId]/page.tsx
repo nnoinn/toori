@@ -7,11 +7,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { isUuid } from '@/lib/uuid';
 
 import { getDb } from '@/db';
+import { EMPTY_FILTERS } from '@/features/map/filters';
+import { selectSlotPage } from '@/features/map/slot-list/queries';
 import { getRequestNow } from '@/lib/request-time';
 import { getCurrentAccount } from '@/server/auth';
 import { getOptionalConsents } from '@/server/auth/customer-account';
 
 import { isFavoriteShop } from '../../home/favorites/store';
+import { otherShopItems } from './detail-format';
 import { selectSlotDetail } from './queries';
 import { SlotDetailView } from './slot-detail-view';
 
@@ -54,18 +57,31 @@ async function DetailContent({ params }: { params: Params }) {
   const loaded = await loadSlot((await params).slotId);
   if (!loaded) notFound();
   const { slot, customerId, now } = loaded;
-  const [favorite, consents] = customerId
-    ? await Promise.all([
-        isFavoriteShop(getDb(), customerId, slot.shop.shopId),
-        getOptionalConsents(),
-      ])
-    : [false, null];
+  const db = getDb();
+  const [[favorite, consents], others] = await Promise.all([
+    customerId
+      ? Promise.all([isFavoriteShop(db, customerId, slot.shop.shopId), getOptionalConsents()])
+      : Promise.resolve([false, null] as const),
+    // 이 샵의 다른 매물: 매물 목록과 같은 조건(게시중·신규 고객 전용·시간대 포함)으로 그 샵 것만 임박순
+    selectSlotPage(db, {
+      sigunguCode: slot.sigunguCode,
+      filters: EMPTY_FILTERS,
+      customerId,
+      now,
+      origin: { lat: slot.shop.lat, lng: slot.shop.lng },
+      sort: 'imminent',
+      cursor: null,
+      shopId: slot.shop.shopId,
+    }),
+  ]);
+  const otherItems = otherShopItems(others.items, slot.slotId);
   return (
     <SlotDetailView
       slot={slot}
       serverNow={now.toISOString()}
       favorite={favorite}
       interestAlertAgreed={consents?.ok ? consents.data.interest_alert.agreed : false}
+      otherItems={otherItems}
     />
   );
 }
