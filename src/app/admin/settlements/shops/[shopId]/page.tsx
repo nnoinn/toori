@@ -29,6 +29,9 @@ import { buildStatementList } from '@/server/settlements/statement-view';
 import type { SettlementStatementList } from '@/server/settlements/types';
 
 import { ESTIMATE_MARK, SETTLEMENT_KIND_LABELS, statementHref } from '../../format';
+import { HoldAction } from '../../hold-actions';
+import { HoldList } from '../../hold-list';
+import { selectShopHolds, selectShopReservationHolds } from '../../hold-queries';
 import { selectShopName } from '../../queries';
 import { Field } from '../../statement-sections';
 import { StatusBadge } from '../../status-badge';
@@ -44,7 +47,8 @@ const CELL = 'px-4 py-3';
 const ALL_PERIOD = { from: '0000-01-01', to: '9999-12-31' };
 
 // 운영자 샵 정산 (A-105, W20 ④). 주소: /admin/settlements/shops/[shopId]
-// 원장님 정산서 목록(S-501, #408)과 같은 함수로, 묶인 정산서와 아직 묶이지 않은 지급 예정 정산서·이의제기 보류 거래를 같이 본다.
+// 원장님 정산서 목록(S-501, #408)과 같은 함수로, 묶인 정산서와 아직 묶이지 않은 지급 예정 정산서·보류 거래를 같이 본다.
+// 샵 전체 정산을 멈추고 풀며(#373 ②), 이 샵에서 보류 중인 거래를 모아 본다
 // 원장님이 "다음 주에 얼마 받아요?"라고 물으면 같은 숫자로 답한다(#129 3장). 지급 예정의 뗄 패널티·실지급액은 "예상"이다(11/14)
 export default function AdminShopSettlementsPage({ params }: { params: Params }) {
   return (
@@ -71,12 +75,22 @@ async function ShopSettlements({ params }: { params: Params }) {
   });
 
   const now = await getRequestNow();
-  const [stored, unpaidRows, penalties, lastPayoutDate, payoutAccount] = await Promise.all([
+  const [
+    stored,
+    unpaidRows,
+    penalties,
+    lastPayoutDate,
+    payoutAccount,
+    shopHolds,
+    reservationHolds,
+  ] = await Promise.all([
     readShopSettlements(db, { shopId }),
     readShopSettlementRows(db, { shopId, unpaidOnly: true }),
     readUnpaidPenalties(db, shopId),
     readLastPayoutDate(db, shopId),
     readPayoutAccount(db, shopId),
+    selectShopHolds(db, shopId),
+    selectShopReservationHolds(db, shopId),
   ]);
   const list = buildStatementList({
     stored,
@@ -88,6 +102,9 @@ async function ShopSettlements({ params }: { params: Params }) {
     now,
   });
   const idByDate = new Map(stored.map((settlement) => [settlement.periodEnd, settlement.id]));
+  const disputeHeld = list.held.items.filter((item) => item.hold?.reason === 'dispute').length;
+  const adminHeld = list.held.items.filter((item) => item.hold?.reason === 'admin').length;
+  const shopHeld = shopHolds.some((hold) => hold.releasedAt === null);
 
   return (
     <div className="flex flex-col gap-4">
@@ -116,7 +133,7 @@ async function ShopSettlements({ params }: { params: Params }) {
             <Field label="정산 보류">
               {list.held.count === 0
                 ? '없음'
-                : `이의제기 확인 중 ${list.held.count}건 · 기준 금액 ${formatWon(list.held.baseAmount)}. 결론이 나면 그다음 지급일에 들어가요`}
+                : `${heldCountText(disputeHeld, adminHeld)} · 기준 금액 ${formatWon(list.held.baseAmount)}. 결론이 나거나 풀리면 그다음 지급일에 들어가요`}
             </Field>
           </dl>
         </CardContent>
@@ -129,8 +146,49 @@ async function ShopSettlements({ params }: { params: Params }) {
       )}
 
       {list.held.count > 0 ? <HeldTable items={list.held.items} /> : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>운영자 정산 보류</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 text-sm">
+          {shopHeld ? null : (
+            <>
+              <p className="text-muted-foreground">
+                샵 전체를 멈추면 아직 정산에 묶이지 않은 이 샵의 거래가 풀 때까지 목요일 정산에서
+                빠져요. 거래 하나만 멈추려면 그 예약 정보에서 해요.
+              </p>
+              <div>
+                <HoldAction target={{ kind: 'shop', shopId }} />
+              </div>
+            </>
+          )}
+          {shopHolds.length > 0 ? (
+            <section className="flex flex-col gap-1">
+              <h2 className="font-medium">샵 전체 보류</h2>
+              <HoldList holds={shopHolds} />
+            </section>
+          ) : null}
+          {reservationHolds.length > 0 ? (
+            <section className="flex flex-col gap-1">
+              <h2 className="font-medium">보류 중인 거래 {reservationHolds.length}건</h2>
+              <HoldList holds={reservationHolds} showTarget />
+            </section>
+          ) : null}
+        </CardContent>
+      </Card>
     </div>
   );
+}
+
+/** 보류 건수 문구: 이의제기 확인 중과 운영자 확인 중을 나눠 적는다 */
+function heldCountText(dispute: number, admin: number): string {
+  return [
+    dispute > 0 ? `이의제기 확인 중 ${dispute}건` : null,
+    admin > 0 ? `운영자 확인 중 ${admin}건` : null,
+  ]
+    .filter((text) => text !== null)
+    .join(' · ');
 }
 
 function StatementTable({
@@ -204,7 +262,7 @@ function StatementTable({
   );
 }
 
-/** 이의제기로 보류 중인 거래. 결론이 나면 그다음 지급일 정산서에 들어간다 */
+/** 보류 중인 거래(이의제기·운영자 보류). 결론이 나거나 풀리면 그다음 지급일 정산서에 들어간다 */
 function HeldTable({ items }: { items: SettlementStatementList['held']['items'] }) {
   return (
     <Card>
@@ -223,7 +281,10 @@ function HeldTable({ items }: { items: SettlementStatementList['held']['items'] 
                   {item.reservationCode}
                 </Link>{' '}
                 · {SETTLEMENT_KIND_LABELS[item.kind]}
-                {item.hold ? ` · 이의제기 ${formatKstDateTime(item.hold.receivedAt)} 접수` : null}
+                {item.hold?.reason === 'dispute'
+                  ? ` · 이의제기 ${formatKstDateTime(item.hold.receivedAt)} 접수`
+                  : null}
+                {item.hold?.reason === 'admin' ? ' · 운영자 보류' : null}
               </span>
               <span>기준 금액 {formatWon(item.baseAmount)}</span>
             </li>

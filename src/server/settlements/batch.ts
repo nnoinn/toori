@@ -3,8 +3,9 @@
 // 지급일 다음 날(SETTLEMENT_CATCH_UP_DAYS) 새벽에도 그 지급일 기준(그날 0시)으로 아직 묶지 않은 샵을 묶는다(따라잡기, #394 리뷰 3번).
 //
 // 1. 기준 시각 = 지급일 0시(한국 시간). 아직 정산 줄이 없는 끝난 거래 중 정산할 종류이고(settlementKindOf),
-//    이의제기 접수 기한이 기준 시각까지 지났고 확인 중 이의제기가 없는 것(isReadyToSettle)을 고른다
+//    이의제기 접수 기한이 기준 시각까지 지났고 확인 중 이의제기와 운영자 정산 보류(#373 ②)가 없는 것(isReadyToSettle)을 고른다
 // 2. 샵마다 한 트랜잭션으로 정산 묶음·정산 줄·패널티 뗀 기록을 저장한다(batch-rules.ts buildShopSettlement).
+//    먼저 샵 줄을 잠그고 운영자 정산 보류를 다시 읽어서, 후보를 읽은 뒤에 걸린 보류도 뺀다(보류를 거는 함수도 같은 샵 줄을 잠근다).
 //    한 샵이 실패해도 다른 샵은 계속하고, 실패한 샵은 다음 지급일에 다시 묶인다
 // 3. 결제 수수료율(PAYMENT_FEE_RATE)이 정해지기 전(PG 계약 전)에는 정산 금액을 확정할 수 없어서 묶지 않는다(#134, #353)
 //
@@ -17,12 +18,20 @@ import type { getDb } from '@/db';
 import { violatedConstraint } from '@/lib/db-error';
 import { type PlatformFeeMode, SETTLEMENT_CATCH_UP_DAYS } from '@/server/policy';
 
-import { buildShopSettlement, catchUpPayoutDate, kstDateStart, payoutDateOn } from './batch-rules';
+import {
+  buildShopSettlement,
+  catchUpPayoutDate,
+  kstDateStart,
+  payoutDateOn,
+  type ShopSettlementDraft,
+} from './batch-rules';
 import {
   type BatchCandidate,
   hasSettlementOn,
   insertShopSettlement,
+  lockShopForBatch,
   readBatchCandidates,
+  readHeldReservationIds,
   readOutstandingPenalties,
   readPreviousPayoutDate,
 } from './batch-store';
@@ -45,11 +54,19 @@ export type SettlementBatchResult =
       zeroPayouts: number;
       /** 이 지급일에 이미 묶여 있어 건너뛴 샵 수 */
       skipped: number;
+      /** 운영자 정산 보류(#373 ②)만 아니면 이번에 묶였을 거래 수. 풀리면 돌아오는 지급일에 묶인다 */
+      held: number;
       /** 저장하다 실패한 샵 수(다음 지급일에 다시 묶인다) */
       failed: number;
     };
 
 type ReadyItem = { candidate: BatchCandidate; kind: SettleKind; occurredAt: Date };
+
+/** 샵 하나의 묶기 결과: 이미 묶임 / 모두 운영자 보류라 묶지 않음 / 저장함(held는 보류로 뺀 거래 수) */
+type ShopOutcome =
+  | { kind: 'already' }
+  | { kind: 'held'; held: number }
+  | { kind: 'saved'; draft: ShopSettlementDraft; held: number };
 
 /** 오늘이 지급일이면 그날, 지급일 다음 날이면 그 지급일(따라잡기)로 묶을 거래를 샵별로 묶어 저장한다 */
 export async function runSettlementBatch(
@@ -64,10 +81,16 @@ export async function runSettlementBatch(
 
   const cutoff = kstDateStart(payoutDate);
   const byShop = new Map<string, ReadyItem[]>();
+  let held = 0;
   for (const candidate of await readBatchCandidates(db, { cutoff })) {
     const kind = settlementKindOf(candidate);
     if (!kind) continue;
-    if (!isReadyToSettle(candidate, { hasOpenDispute: candidate.hasOpenDispute, cutoff })) {
+    const holds = { hasOpenDispute: candidate.hasOpenDispute, cutoff };
+    if (!isReadyToSettle(candidate, { ...holds, hasAdminHold: candidate.hasAdminHold })) {
+      // 운영자 보류만 아니면 묶였을 거래는 따로 센다(예약 작업 기록에 남는다)
+      if (candidate.hasAdminHold && isReadyToSettle(candidate, { ...holds, hasAdminHold: false })) {
+        held += 1;
+      }
       continue;
     }
     const occurredAt =
@@ -79,11 +102,24 @@ export async function runSettlementBatch(
     ]);
   }
 
-  const result = { shops: 0, items: 0, zeroPayouts: 0, skipped: 0, failed: 0 };
-  for (const [shopId, ready] of byShop) {
+  const result = { shops: 0, items: 0, zeroPayouts: 0, skipped: 0, held, failed: 0 };
+  for (const [shopId, candidates] of byShop) {
     try {
-      const saved = await db.transaction(async (tx) => {
-        if (await hasSettlementOn(tx, { shopId, payoutDate })) return null;
+      const outcome = await db.transaction(async (tx): Promise<ShopOutcome> => {
+        await lockShopForBatch(tx, shopId);
+        if (await hasSettlementOn(tx, { shopId, payoutDate })) return { kind: 'already' };
+        // 후보를 읽은 뒤에 걸린 운영자 정산 보류를 뺀다
+        const holds = await readHeldReservationIds(tx, {
+          shopId,
+          reservationIds: candidates.map(({ candidate }) => candidate.reservationId),
+          cutoff,
+        });
+        const ready = holds.shop
+          ? []
+          : candidates.filter(
+              ({ candidate }) => !holds.reservationIds.has(candidate.reservationId),
+            );
+        if (ready.length === 0) return { kind: 'held', held: candidates.length };
         const draft = buildShopSettlement({
           payoutDate,
           previousPayoutDate: await readPreviousPayoutDate(tx, shopId),
@@ -100,15 +136,17 @@ export async function runSettlementBatch(
           mode: input.mode,
         });
         await insertShopSettlement(tx, { shopId, draft, now: input.now });
-        return draft;
+        return { kind: 'saved', draft, held: candidates.length - ready.length };
       });
-      if (!saved) {
+      if (outcome.kind === 'already') {
         result.skipped += 1;
         continue;
       }
+      result.held += outcome.held;
+      if (outcome.kind === 'held') continue;
       result.shops += 1;
-      result.items += saved.itemCount;
-      if (saved.status === 'paid') result.zeroPayouts += 1;
+      result.items += outcome.draft.itemCount;
+      if (outcome.draft.status === 'paid') result.zeroPayouts += 1;
     } catch (error) {
       // 같은 때 다른 묶기가 먼저 저장했다(같은 기간·같은 거래). 다시 묶지 않는다
       const constraint = violatedConstraint(error);

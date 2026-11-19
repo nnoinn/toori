@@ -302,11 +302,20 @@ describe('settlementBaseAmount: 기준 금액', () => {
     ).toBe(11_728);
   });
 
+  it('위약금 비율은 0~100(정수)이다: 0이면 기준 금액 0원, 100이면 판매가 전부', () => {
+    expect(settlementBaseAmount({ kind: 'penalty', salePrice: 45_000, penaltyRate: 0 })).toBe(0);
+    expect(settlementBaseAmount({ kind: 'penalty', salePrice: 45_000, penaltyRate: 100 })).toBe(
+      45_000,
+    );
+  });
+
   it.each([
     ['판매가가 소수', { kind: 'sale', salePrice: 100.5 }],
     ['판매가 0', { kind: 'sale', salePrice: 0 }],
     ['위약금 비율 없음', { kind: 'penalty', salePrice: 10_000 }],
     ['위약금 비율 100 초과', { kind: 'penalty', salePrice: 10_000, penaltyRate: 101 }],
+    ['위약금 비율이 음수', { kind: 'penalty', salePrice: 10_000, penaltyRate: -1 }],
+    ['판매가가 음수', { kind: 'sale', salePrice: -45_000 }],
     ['합의 후 취소에 비율 없음', { kind: 'agreed_cancel', salePrice: 10_000 }],
   ] as const)('%s → 에러', (_, input) => {
     expect(() => settlementBaseAmount(input as never)).toThrow(RangeError);
@@ -353,10 +362,19 @@ describe('calcSettlementFees: 수수료·정산액', () => {
     expect(at(33_333, 2.55)).toBe(849);
   });
 
-  it('결제 수수료율이 정해지지 않았으면(null) 정산을 확정할 수 없어 에러', () => {
+  it('결제 수수료율이 정해지지 않았으면(null) 정산을 확정할 수 없어 에러(비율 모양 오류가 아니라 "아직 정해지지 않음")', () => {
     expect(() =>
       calcSettlementFees({ baseAmount: 45_000, discountRate: 10, paymentFeeRate: null }),
-    ).toThrow();
+    ).toThrow(/아직 정해지지 않아서/);
+  });
+
+  it('결제 수수료율은 100%까지 받고(기준 금액 0원도 된다) 100%를 넘으면 에러', () => {
+    const at = (paymentFeeRate: number, baseAmount = 45_000) =>
+      calcSettlementFees({ baseAmount, discountRate: 10, paymentFeeRate, mode: 'launch' });
+    expect(at(100).paymentFee).toBe(45_000);
+    expect(at(3, 0)).toMatchObject({ paymentFee: 0, payoutAmount: 0 });
+    expect(() => at(100.01)).toThrow(RangeError);
+    expect(() => at(101)).toThrow(RangeError);
   });
 
   it.each([
@@ -364,6 +382,7 @@ describe('calcSettlementFees: 수수료·정산액', () => {
     ['음수 비율', { paymentFeeRate: -1 }],
     ['선택지에 없는 할인율', { discountRate: 15 }],
     ['기준 금액이 소수', { baseAmount: 100.5 }],
+    ['기준 금액이 음수', { baseAmount: -1 }],
   ])('%s → 에러', (_, change) => {
     expect(() =>
       calcSettlementFees({
@@ -423,8 +442,47 @@ describe('allocatePenalties: 원장님 귀책 패널티 떼기', () => {
     });
   });
 
+  it('다 걷은 패널티(걷은 금액 = 패널티)는 에러 없이 건너뛴다', () => {
+    expect(allocatePenalties(10_000, [penalty('p1', 1, 5_000, 5_000)])).toEqual({
+      collections: [],
+      payoutAfter: 10_000,
+      outstanding: [],
+    });
+  });
+
+  it('정산액·패널티가 음수면 에러', () => {
+    expect(() => allocatePenalties(-1, [])).toThrow(RangeError);
+    expect(() => allocatePenalties(10_000, [penalty('p1', 1, -5_000)])).toThrow(RangeError);
+  });
+
   it('걷은 금액이 패널티보다 크거나 금액이 소수면 에러', () => {
     expect(() => allocatePenalties(10_000, [penalty('p1', 1, 5_000, 6_000)])).toThrow(RangeError);
     expect(() => allocatePenalties(100.5, [])).toThrow(RangeError);
   });
+});
+
+describe('calcTuriShare: 투리 몫 입력 확인', () => {
+  const fees = calcSettlementFees({
+    baseAmount: 45_000,
+    discountRate: 10,
+    paymentFeeRate: 3,
+    mode: 'launch',
+  });
+  const base = { fees, paidAmount: 45_000, refundAmount: 0, pgFee: 1_000, pgFeeVat: 100 };
+
+  it('환불액이 결제액과 같으면(전액 환불) 카드에 남은 돈이 0원이고, 결제액보다 크면 에러', () => {
+    expect(calcTuriShare({ ...base, refundAmount: 45_000, pgFee: 0, pgFeeVat: 0 })).toMatchObject({
+      cardRemaining: 0,
+      pgHeld: 0,
+    });
+    expect(() => calcTuriShare({ ...base, refundAmount: 45_001 })).toThrow(RangeError);
+  });
+
+  it.each(['paidAmount', 'refundAmount', 'pgFee', 'pgFeeVat'])(
+    '%s가 음수거나 소수면 에러',
+    (name) => {
+      expect(() => calcTuriShare({ ...base, [name]: -1 })).toThrow(RangeError);
+      expect(() => calcTuriShare({ ...base, [name]: 1.5 })).toThrow(RangeError);
+    },
+  );
 });

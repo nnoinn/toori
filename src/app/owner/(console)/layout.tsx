@@ -1,13 +1,22 @@
 import { Suspense } from 'react';
 
+import { NotificationToaster } from '@/components/ui/notification-toast';
 import { OwnerNav } from '@/components/ui/owner-nav';
 import { getDb } from '@/db';
 import { getCurrentAccount } from '@/server/auth';
 import { readShopReviewStatus } from '@/server/shops/review-store';
 
+import {
+  OWNER_NOTIFICATION_ACCOUNT,
+  OWNER_NOTIFICATIONS_PATH,
+} from './notifications/owner-notifications';
+import { OwnerTopBar } from './owner-top-bar';
+
 // 원장님 화면 레이아웃(PC 기준, 폰에서는 위쪽 메뉴 버튼). 화면은 정민석 담당, 레이아웃 틀은 현동훈 담당(공통 UI).
 // 입점 승인 전이면 메뉴의 '매물 등록'을 잠근다(O7 ②, 연결 #13). 매물 등록 화면과 서버 함수도 따로 막는다.
 // 접근 보호: proxy가 1차로 막고, 이 레이아웃과 서버 함수에서 requireOwner()로 한 번 더 확인한다(강규민, 로드맵 W3).
+// OwnerTopBar: 본문 위 오른쪽 알림 종(#371). NotificationToaster: 원장님 화면을 보고 있을 때 새 알림을 화면 위 가운데에
+// 5초 동안 보여준다(화면 안내, #371). 원장님 모드일 때만 확인한다
 export default function OwnerLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col md:flex-row">
@@ -15,7 +24,14 @@ export default function OwnerLayout({ children }: Readonly<{ children: React.Rea
       <Suspense fallback={<OwnerNav />}>
         <OwnerNavWithReview />
       </Suspense>
-      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <OwnerTopBar />
+        {children}
+      </div>
+      <NotificationToaster
+        account={OWNER_NOTIFICATION_ACCOUNT}
+        inboxHref={OWNER_NOTIFICATIONS_PATH}
+      />
     </div>
   );
 }

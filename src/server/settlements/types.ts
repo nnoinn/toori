@@ -6,7 +6,7 @@ import type { SettlementItemKind, SettlementStatus } from '@/db/schema/settlemen
 /**
  * 거래 하나의 정산 상태
  * - scheduled: 지급 예정(payoutDate에 지급). 이의제기 접수 기한이 지나면 그 뒤 첫 목요일에 묶인다
- * - held: 이의제기 중이라 보류. 결론이 나면 돌아오는 지급일에 들어간다(payoutDate는 null)
+ * - held: 이의제기 중이거나 운영자가 확인 중(정산 보류, #373 ②)이라 보류. 결론이 나거나 풀리면 돌아오는 지급일에 들어간다(payoutDate는 null)
  * - pending: 묶였고 지급 요청 전 / requested: PG에 지급 요청함 / paid: 지급 완료 / failed: 지급 실패(재요청 예정)
  * - no_payout: 원장님 사정 취소·무효처럼 정산할 금액이 없는 줄(합계에 넣지 않는다)
  */
@@ -61,8 +61,11 @@ export type SettlementItemView = {
   ownerPenalty: { amount: number; remaining: number } | null;
   /** 이 시각까지 이의제기가 없으면 정산이 확정된다(이의제기 접수 기한) */
   disputeDeadlineAt: string;
-  /** 보류 중(held)이면 그 이유. 예: 이의제기 중(11/15 접수) */
-  hold: { reason: 'dispute'; receivedAt: string } | null;
+  /**
+   * 보류 중(held)이면 그 이유. 이의제기 중(dispute)은 접수 시각과 같이 준다(예: 11/15 접수).
+   * 운영자 확인 중(admin, #373 ②)은 사유·날짜 없이 이유만 준다(원장님에게 보류 사유를 숨긴다, 11/15 nnoinn). 둘 다면 이의제기
+   */
+  hold: { reason: 'dispute'; receivedAt: string } | { reason: 'admin' } | null;
   status: SettlementItemStatus;
   /** 지급일(예정일 포함). 보류·정산할 금액이 없는 줄은 null */
   payoutDate: string | null;
@@ -82,7 +85,7 @@ export type SettlementList = {
     /** 플랫폼 수수료 + VAT + 결제 수수료 + VAT */
     feeAmount: number | null;
     payoutAmount: number | null;
-    /** 이의제기 중 보류 건수 */
+    /** 보류 건수(이의제기 중·운영자 확인 중) */
     heldCount: number;
   };
   /** 기간과 상관없이 다음에 지급될 묶음(지급 예정·지급 전·지급 요청). 없으면 null */
@@ -138,7 +141,7 @@ export type SettlementStatement = SettlementStatementSummary & {
 export type SettlementStatementList = {
   /** 지급일이 기간 안인 정산서. 지급일이 늦은 것부터. 아직 묶이지 않은 지급 예정도 같은 모양이다 */
   statements: SettlementStatementSummary[];
-  /** 이의제기로 보류 중인 거래(기간과 상관없이). 결론이 나면 그다음 지급일에 들어간다 */
+  /** 보류 중인 거래(이의제기 중·운영자 확인 중, 기간과 상관없이). 결론이 나거나 풀리면 그다음 지급일에 들어간다 */
   held: {
     count: number;
     baseAmount: number;
