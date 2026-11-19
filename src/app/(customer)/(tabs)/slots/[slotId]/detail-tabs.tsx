@@ -15,17 +15,27 @@ const CLICK_LOCK_MS = 1000;
  */
 export function DetailTabs({ tabs }: { tabs: DetailTab[] }) {
   const [active, setActive] = useState(tabs[0]?.id ?? '');
-  const lockedUntil = useRef(0);
+  // 탭을 누른 뒤 CLICK_LOCK_MS 동안 true. 그동안은 스크롤로 표시를 바꾸지 않는다
+  const locked = useRef(false);
+  const unlockTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     const sections = tabs
       .map((tab) => document.getElementById(tab.id))
       .filter((el): el is HTMLElement => el !== null);
-    const locked = () => Date.now() < lockedUntil.current;
-    // 탭 줄 바로 아래 띠(화면 위쪽)에 걸친 칸을 지금 보는 칸으로 본다
+    const last = tabs.at(-1);
+    // 맨 아래까지 내렸으면 마지막 탭(아래 칸이 짧아 위쪽 띠까지 못 올라와도)
+    function showLastIfAtBottom() {
+      const atBottom =
+        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      if (atBottom && last) setActive(last.id);
+      return atBottom;
+    }
+    // 탭 줄 바로 아래 띠(화면 위쪽)에 걸친 칸을 지금 보는 칸으로 본다.
+    // 이 알림은 스크롤 뒤에 따로 오므로, 맨 아래면 여기서도 마지막 탭으로 둔다
     const observer = new IntersectionObserver(
       (entries) => {
-        if (locked()) return;
+        if (locked.current || showLastIfAtBottom()) return;
         const visible = entries.filter((entry) => entry.isIntersecting);
         if (visible.length > 0) setActive(visible[0].target.id);
       },
@@ -33,11 +43,8 @@ export function DetailTabs({ tabs }: { tabs: DetailTab[] }) {
     );
     for (const section of sections) observer.observe(section);
     function handleScroll() {
-      if (locked()) return;
-      const atBottom =
-        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
-      const last = tabs.at(-1);
-      if (atBottom && last) setActive(last.id);
+      if (locked.current) return;
+      showLastIfAtBottom();
     }
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
@@ -46,8 +53,15 @@ export function DetailTabs({ tabs }: { tabs: DetailTab[] }) {
     };
   }, [tabs]);
 
+  // 떠날 때 남은 타이머를 지운다
+  useEffect(() => () => clearTimeout(unlockTimer.current), []);
+
   function select(id: string) {
-    lockedUntil.current = Date.now() + CLICK_LOCK_MS;
+    locked.current = true;
+    clearTimeout(unlockTimer.current);
+    unlockTimer.current = setTimeout(() => {
+      locked.current = false;
+    }, CLICK_LOCK_MS);
     setActive(id);
   }
 
