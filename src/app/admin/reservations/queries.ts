@@ -375,8 +375,7 @@ export async function selectSlotDetail(db: DbReader, slotId: string): Promise<Sl
     })
     .from(slots)
     .innerJoin(shops, eq(shops.id, slots.shopId))
-    // 임시: 일부러 틀리게 ② — 목록처럼 결제 없이 비운 시간대 칸을 뺀다
-    .where(and(eq(slots.id, slotId), ownerListedSlot()));
+    .where(eq(slots.id, slotId));
   if (!row) return null;
 
   const [reservationRows, actionRows] = await Promise.all([
@@ -400,13 +399,7 @@ export async function selectSlotDetail(db: DbReader, slotId: string): Promise<Sl
       })
       .from(adminActions)
       .leftJoin(adminProfiles, eq(adminProfiles.userId, adminActions.adminId))
-      // 임시: 일부러 틀리게 ① — 다른 대상 종류(reservation) 기록도 넣는다
-      .where(
-        and(
-          or(eq(adminActions.targetType, 'slot'), eq(adminActions.targetType, 'reservation')),
-          eq(adminActions.targetId, slotId),
-        ),
-      )
+      .where(and(eq(adminActions.targetType, 'slot'), eq(adminActions.targetId, slotId)))
       .orderBy(desc(adminActions.createdAt), asc(adminActions.id)),
   ]);
 
