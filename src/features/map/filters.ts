@@ -150,6 +150,20 @@ export function selectMinDiscount(
   return { ...filters, minDiscount };
 }
 
+/**
+ * 목록 위 빠른 고르기 칩의 할인율("30% 이상", 11/18 정찬형). 할인율 선택지(정책값 DISCOUNT_RATE_OPTIONS) 중 하나라
+ * 선택지가 바뀌어 30이 없어지면 타입 검사에서 걸린다
+ */
+export const QUICK_MIN_DISCOUNT: DiscountRate = 30;
+
+/** "30% 이상" 칩: 이미 30% 이상이면 전체로, 아니면(전체·다른 할인율) 30% 이상으로. 다른 필터는 그대로 */
+export function toggleQuickDiscount(filters: HomeFilters): HomeFilters {
+  return selectMinDiscount(
+    filters,
+    filters.minDiscount === QUICK_MIN_DISCOUNT ? null : QUICK_MIN_DISCOUNT,
+  );
+}
+
 /** 필터 버튼에 보여줄 고른 개수(업종 1 + 고른 버튼 수 + 할인율 1) */
 export function countActiveFilters(filters: HomeFilters): number {
   return (

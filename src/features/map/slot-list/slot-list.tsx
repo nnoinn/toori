@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from 'cn';
 
@@ -9,6 +9,8 @@ import { SlotCard } from '@/components/ui/slot-card';
 import { ErrorState, LoadingList } from '@/components/ui/state';
 
 import { formatDistance } from './distance';
+import { ShopGroupBlock } from './shop-group';
+import { groupByShop } from './shop-groups';
 import { applySortToSearch, SLOT_SORTS, type SlotSort } from './sort';
 import { type ListItem, listItemKey } from './types';
 import { WindowCard } from './window-card';
@@ -78,7 +80,10 @@ export function SortTabs({ sort }: { sort: SlotSort }) {
   );
 }
 
-/** 매물 카드 목록 (J4, C-204). 시간대 매물(#308)은 시간대 카드로 섞여 있다. 끝에 닿으면 다음 20개를 부른다(D8) */
+/**
+ * 매물 카드 목록 (J4, C-204). 시간대 매물(#308)은 시간대 카드로 섞여 있다. 끝에 닿으면 다음 20개를 부른다(D8).
+ * 거리순(기본)은 같은 샵 매물이 붙어 오므로 샵별로 묶어 보여준다(11/18 정찬형). 할인율순·임박순·찜한 샵 매물은 매물 한 줄씩이다
+ */
 export function SlotList({
   items,
   serverNow,
@@ -93,6 +98,18 @@ export function SlotList({
   columns = 'page',
 }: SlotListProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
+  // 펼친 샵 묶음(샵 id)
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  const grouped = sort === 'near';
+
+  function toggleGroup(shopId: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(shopId)) next.delete(shopId);
+      else next.add(shopId);
+      return next;
+    });
+  }
   const onLoadMoreRef = useRef(onLoadMore);
 
   useEffect(() => {
@@ -130,6 +147,21 @@ export function SlotList({
         />
       ) : items.length === 0 ? (
         empty
+      ) : grouped ? (
+        <div className={FRAME_CLASS[columns]}>
+          <ul className="-mb-px [&>li]:border-b">
+            {groupByShop(items).map((group, index) => (
+              <li key={`${group.shopId}:${index}`}>
+                <ShopGroupBlock
+                  group={group}
+                  serverNow={serverNow}
+                  expanded={expanded.has(group.shopId)}
+                  onToggle={() => toggleGroup(group.shopId)}
+                />
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : (
         <div className={FRAME_CLASS[columns]}>
           <ul className="-mb-px [&>li]:border-b">
