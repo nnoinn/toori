@@ -29,6 +29,7 @@ const slotColumns = {
   startAt: slots.startAt,
   endAt: slots.endAt,
   publishAt: slots.publishAt,
+  createdAt: slots.createdAt,
   menuName: slots.menuName,
   listPrice: slots.listPrice,
   salePrice: slots.salePrice,
@@ -64,6 +65,7 @@ function toDashboardSlot(row: SlotRow): DashboardSlot {
     startAt: row.startAt.toISOString(),
     endAt: row.endAt.toISOString(),
     publishAt: row.publishAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
     holdExpiresAt: row.holdExpiresAt?.toISOString() ?? null,
   };
 }
@@ -136,6 +138,7 @@ export async function selectDashboardWindows(
       startAt: slotWindows.startAt,
       endAt: slotWindows.endAt,
       publishAt: slotWindows.publishAt,
+      createdAt: slotWindows.createdAt,
       status: slotWindows.status,
       closeReason: slotWindows.closeReason,
       newCustomerOnly: slotWindows.newCustomerOnly,
@@ -172,6 +175,7 @@ export async function selectDashboardWindows(
       startAt: row.startAt.toISOString(),
       endAt: row.endAt.toISOString(),
       publishAt: row.publishAt.toISOString(),
+      createdAt: row.createdAt.toISOString(),
       state: windowStatus({
         // status는 DB 제약(slot_windows_status_check)으로 세 값만 들어간다
         status: row.status as SlotWindowStatus,

@@ -33,7 +33,7 @@ const AMOUNT_COLUMN = 'w-28 shrink-0 text-right';
 const STATUS_COLUMN = 'w-32 shrink-0 text-right';
 const ROW_GAP = 'flex items-center gap-3 px-4';
 
-/** 거래 목록. 처리·취소 시각이 늦은 것부터(함수가 준 순서 그대로) */
+/** 거래 목록. 받은 순서 그대로(화면이 고른 정렬로 놓아서 넘긴다, 기본 처리·취소 최신 순) */
 export function SettlementItemList({
   items,
   now,

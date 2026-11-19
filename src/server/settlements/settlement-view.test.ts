@@ -47,6 +47,7 @@ function row(extra: Partial<SettlementRow> = {}): SettlementRow {
     couponUsed: false,
     hasOpenDispute: false,
     openDisputeReceivedAt: null,
+    hasAdminHold: false,
     ownerPenalty: null,
     item: null,
     ...extra,
@@ -138,6 +139,32 @@ describe('toSettlementItemView: 아직 묶지 않은 거래', () => {
       payoutDate: null,
       hold: { reason: 'dispute', receivedAt: received.toISOString() },
     });
+  });
+
+  it('운영자 정산 보류(#373 ②)면 보류이고 지급일이 없으며, 원장님에게는 사유·날짜 없이 이유만 준다. 이의제기도 있으면 이의제기', () => {
+    const options = { now: NOW, paymentFeeRate: null };
+    const held = toSettlementItemView(row({ hasAdminHold: true }), options);
+    expect(held).toMatchObject({ status: 'held', payoutDate: null });
+    expect(held?.hold).toEqual({ reason: 'admin' });
+    const received = kst('2026-11-16 10:00');
+    expect(
+      toSettlementItemView(
+        row({ hasAdminHold: true, hasOpenDispute: true, openDisputeReceivedAt: received }),
+        options,
+      )?.hold,
+    ).toEqual({ reason: 'dispute', receivedAt: received.toISOString() });
+  });
+
+  it('묶인 거래와 원장님 사정 취소는 운영자 보류가 있어도 보류로 보이지 않는다(묶이기 전만 멈춘다, 11/15 nnoinn)', () => {
+    const options = { now: NOW, paymentFeeRate: null };
+    const ownerCancel = toSettlementItemView(
+      cancelledRow('owner_fault', null, { hasAdminHold: true }),
+      options,
+    );
+    expect(ownerCancel).toMatchObject({ status: 'no_payout', hold: null });
+    const bundled = toSettlementItemView(row({ hasAdminHold: true, item: settled() }), options);
+    expect(bundled).toMatchObject({ hold: null });
+    expect(bundled?.status).not.toBe('held');
   });
 
   it('고객 취소는 시작 몇 시간 전에 취소했는지 시간 단위로 버려서 주고, 합의 후 취소는 주지 않는다', () => {

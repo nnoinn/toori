@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
-import { ExternalLink } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronRight, ExternalLink } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,7 +19,8 @@ export const metadata: Metadata = { title: '내 계정' };
 const PAGE_PATH = '/owner/account';
 
 // 원장님 내 계정 (#307, O12 원장님 알림 받기 S-404). 고객 화면의 '내 정보'처럼 계정과 설정을 한곳에서 다룬다.
-// 로그인 계정, 이 기기 푸시 알림(기기에 소리·배너로 뜨는 알림, #371 11/13 이름), 고객센터(카카오톡 채널), 로그아웃.
+// 로그인 계정, 계정 이력(#374, 메뉴에 두지 않고 여기서 들어간다), 이 기기 푸시 알림(기기에 소리·배너로 뜨는 알림,
+// #371 11/13 이름), 고객센터(카카오톡 채널), 로그아웃.
 // 계정 바꾸기 버튼은 두지 않는다(11/10 nnoinn): 같은 메일이어도 고객·원장님 계정은 별개라서,
 // 다른 계정으로 가려면 로그아웃한 뒤 로그인 화면에서 고른다. PC 기준
 export default function OwnerAccountPage() {
@@ -52,6 +54,23 @@ async function AccountContent() {
             원장님 계정으로 들어와 있어요. 같은 메일의 고객 계정은 따로예요. 고객으로 쓰려면
             로그아웃한 뒤 로그인 화면에서 고객을 골라 주세요.
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>계정 이력</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            입점·매물·예약·취소·정산처럼 내 샵에서 있었던 일을 최신 순으로 봐요.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Button asChild variant="outline">
+            <Link href="/owner/account/history">
+              계정 이력 보기
+              <ChevronRight aria-hidden />
+            </Link>
+          </Button>
         </CardContent>
       </Card>
 

@@ -10,17 +10,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
 import { formatBusinessNumber } from '@/lib/business-number';
-import { formatKst } from '@/lib/time';
+import { getRequestNow } from '@/lib/request-time';
+import { formatEndTime, formatKst } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
 import { getBusinessDocUrl } from '@/server/storage/upload';
 import { bankName, categoryLabel } from '@/server/policy';
 
+import { lookupHref } from '../../reservations/format';
 import { ShopCancelStatsView } from '../cancel-stats';
 import { selectShopCancelStats } from '../cancel-stats-queries';
 import { labelPgSellerStatus, labelReviewAction } from '../format';
 import { selectShopForReview, type ShopReviewDetail } from '../queries';
+import { SlotControlAction } from '../slot-control-actions';
+import { selectShopSlotControl, type ShopSlotControl } from '../slot-control-queries';
 import { StatusBadge } from '../status-badge';
 import { BusinessEdit } from './business-edit';
 import { ReviewActions } from './review-actions';
@@ -59,6 +63,11 @@ async function ReviewDetail({ params }: { params: Params }) {
   });
   // 비공개 버킷이라 5분 동안만 열리는 주소를 화면을 열 때마다 새로 받는다(#116)
   const doc = await getBusinessDocUrl(shopId);
+  // 입점 승인된 샵만 매물을 올리므로 그때만 매물 관리 칸을 보여 준다(#373 ④)
+  const control =
+    detail.status === 'approved'
+      ? await selectShopSlotControl(db, shopId, await getRequestNow())
+      : null;
   // 입점 승인된 샵만 예약을 받으므로 그때만 취소 기록을 본다
   const cancelStats = detail.status === 'approved' ? await selectShopCancelStats(db, shopId) : null;
 
@@ -153,6 +162,12 @@ async function ReviewDetail({ params }: { params: Params }) {
         </Section>
       </div>
 
+      {control ? (
+        <Section title="매물 관리">
+          <SlotControlPanel shopId={detail.shopId} shopName={detail.shop.name} control={control} />
+        </Section>
+      ) : null}
+
       {cancelStats ? (
         <Section title="취소 기록">
           <ShopCancelStatsView stats={cancelStats} />
@@ -176,6 +191,70 @@ async function ReviewDetail({ params }: { params: Params }) {
           </ul>
         )}
       </Section>
+    </div>
+  );
+}
+
+/**
+ * 매물 관리 칸(#373 ④). 새 매물 게시를 멈추고 다시 열며, 지금 올라와 있는 시간대 매물을 강제 마감한다.
+ * 한 시술 매물은 매물·예약 > 매물 목록에서 강제 마감한다
+ */
+function SlotControlPanel({
+  shopId,
+  shopName,
+  control,
+}: {
+  shopId: string;
+  shopName: string;
+  control: ShopSlotControl;
+}) {
+  return (
+    <div className="flex flex-col gap-4 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <p className="font-medium">새 매물 등록: {control.pause ? '멈춤' : '올릴 수 있어요'}</p>
+          {control.pause ? (
+            <p className="break-all text-muted-foreground">
+              {formatKst(control.pause.pausedAt)}부터 · 사유: {control.pause.reason}
+            </p>
+          ) : (
+            <p className="text-muted-foreground">
+              멈추면 새 매물·시간대 매물을 올릴 수 없어요. 이미 올린 매물과 예약은 그대로예요.
+            </p>
+          )}
+        </div>
+        <SlotControlAction
+          target={control.pause ? { kind: 'resume', shopId } : { kind: 'pause', shopId }}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <p className="font-medium">올라와 있는 시간대 매물 {control.openWindows.length}개</p>
+        {control.openWindows.length === 0 ? null : (
+          <ul className="flex flex-col divide-y">
+            {control.openWindows.map((window) => (
+              <li
+                key={window.windowId}
+                className="flex flex-wrap items-center justify-between gap-2 py-2"
+              >
+                <span>
+                  {formatKst(window.startAt)}~{formatEndTime(window.startAt, window.endAt)}
+                </span>
+                <SlotControlAction
+                  target={{ kind: 'close_window', windowId: window.windowId }}
+                  size="sm"
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+        <Link
+          href={lookupHref({ tab: 'slots', query: shopName })}
+          className="w-fit text-primary hover:underline"
+        >
+          이 샵의 한 시술 매물 보기(강제 마감)
+        </Link>
+      </div>
     </div>
   );
 }
