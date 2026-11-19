@@ -4,7 +4,7 @@
 // - 종류: 이용 완료 sale, 노쇼 no_show, 고객 취소 penalty, 합의 후 취소 agreed_cancel
 // - 정산 줄이 없는 거래(기준 금액 0): 원장님 귀책 취소, 운영자 취소(admin_exception 환불이 있는 예약), 자동 취소
 // - 묶는 때: 이의제기 접수 기한이 지났고 확인 중(open) 이의제기가 없으면, 기한이 지난 뒤 첫 지급일(payout-date.ts)
-// - 이의제기 중이면 보류이고, 결론이 나면 돌아오는 지급일에 들어간다
+// - 이의제기 중이거나 운영자가 정산 보류를 걸었으면(#373 ②, 거래나 샵 전체) 보류이고, 결론이 나거나 풀리면 돌아오는 지급일에 들어간다
 
 import type { SettlementItemKind } from '@/db/schema/settlements';
 import type { CancelActor } from '@/db/schema/payments';
@@ -56,8 +56,26 @@ function settleReadyAt(target: DisputeTarget): Date {
   return deadline;
 }
 
-/** 아직 묶지 않은 거래의 지급 일정: 이의제기 중 보류(held) 또는 지급 예정일(scheduled) */
-export type SettleSchedule = { status: 'held' } | { status: 'scheduled'; payoutDate: string };
+/** 보류 이유: 이의제기 중(dispute), 운영자 정산 보류(admin, #373 ②). 둘 다면 이의제기 */
+export type SettleHoldReason = 'dispute' | 'admin';
+
+/** 아직 묶지 않은 거래의 지급 일정: 보류(held) 또는 지급 예정일(scheduled) */
+export type SettleSchedule =
+  { status: 'held'; reason: SettleHoldReason } | { status: 'scheduled'; payoutDate: string };
+
+/** 지금 보류 중인 거래인지 */
+type HoldState = {
+  /** 확인 중(open) 이의제기가 있다 */
+  hasOpenDispute: boolean;
+  /** 그 거래나 그 샵에 풀리지 않은 운영자 정산 보류가 있다(hold-conditions.ts) */
+  hasAdminHold: boolean;
+};
+
+function holdReasonOf(input: HoldState): SettleHoldReason | null {
+  if (input.hasOpenDispute) return 'dispute';
+  if (input.hasAdminHold) return 'admin';
+  return null;
+}
 
 /**
  * 아직 묶지 않은 거래의 지급 일정. 이의제기 접수 기한과 지금 중 늦은 때가 지난 첫 지급일이다.
@@ -65,22 +83,23 @@ export type SettleSchedule = { status: 'held' } | { status: 'scheduled'; payoutD
  */
 export function settlementSchedule(
   target: DisputeTarget,
-  input: { hasOpenDispute: boolean; now: Date },
+  input: HoldState & { now: Date },
 ): SettleSchedule {
   const readyAt = settleReadyAt(target);
-  if (input.hasOpenDispute) return { status: 'held' };
+  const reason = holdReasonOf(input);
+  if (reason) return { status: 'held', reason };
   const from = readyAt.getTime() > input.now.getTime() ? readyAt : input.now;
   return { status: 'scheduled', payoutDate: payoutDateFor(from) };
 }
 
 /**
- * 지급일 묶기(cutoff = 지급일 0시)에 들어갈 거래인지: 확인 중 이의제기가 없고, 이의제기 접수 기한이 cutoff까지 지났다.
+ * 지급일 묶기(cutoff = 지급일 0시)에 들어갈 거래인지: 확인 중 이의제기와 운영자 정산 보류가 없고, 이의제기 접수 기한이 cutoff까지 지났다.
  * 기한이 cutoff와 같아도 들어간다(기한 시각부터는 접수할 수 없다)
  */
 export function isReadyToSettle(
   target: DisputeTarget,
-  input: { hasOpenDispute: boolean; cutoff: Date },
+  input: HoldState & { cutoff: Date },
 ): boolean {
-  if (input.hasOpenDispute) return false;
+  if (holdReasonOf(input)) return false;
   return settleReadyAt(target).getTime() <= input.cutoff.getTime();
 }

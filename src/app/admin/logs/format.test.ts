@@ -101,12 +101,33 @@ describe('이름표와 대상', () => {
     expect(labelOf(TARGET_TYPE_LABELS, 'refund')).toBe('환불');
     // 원장님 대신 방문·노쇼 처리(#373 ③). 노쇼 되돌리기는 이의제기 결론과 같은 visit.override
     expect(labelOf(ACTION_LABELS, 'visit.record')).toBe('방문·노쇼 대신 처리');
+    expect(labelOf(ACTION_LABELS, 'settlement.hold')).toBe('정산 보류');
+    expect(labelOf(ACTION_LABELS, 'settlement.release')).toBe('정산 보류 풀기');
+    expect(labelOf(ACTION_LABELS, 'shop.publish_pause')).toBe('게시 멈춤');
+    expect(labelOf(ACTION_LABELS, 'shop.publish_resume')).toBe('게시 다시 열기');
+    expect(labelOf(ACTION_LABELS, 'slot.force_close')).toBe('운영자 마감');
+    expect(labelOf(TARGET_TYPE_LABELS, 'slot')).toBe('매물');
+    expect(labelOf(TARGET_TYPE_LABELS, 'slot_window')).toBe('시간대 매물');
     expect(labelOf(ACTION_LABELS, 'shop.new_thing')).toBe('shop.new_thing');
     expect(labelOf(ACTION_LABELS, 'constructor')).toBe('constructor');
   });
 
   it('대상 종류마다 이름을 고르고(이의제기는 그 예약번호, 정산은 샵 이름과 지급일), 목록·지운 대상은 null', () => {
     expect(targetLabel('shop', { ...NONE, shopName: '샘플 헤어' })).toBe('샘플 헤어');
+    // 운영자 마감한 매물·시간대 매물(#373 ④): 샵 이름과 시작 시각(한국 시간)
+    const start = new Date('2026-11-05T06:00:00.000Z');
+    expect(
+      targetLabel('slot', {
+        ...NONE,
+        slotShopName: '샘플 헤어',
+        slotMenuName: '커트',
+        slotStartAt: start,
+      }),
+    ).toMatch(/^샘플 헤어 커트 .*15:00/);
+    expect(
+      targetLabel('slot_window', { ...NONE, windowShopName: '샘플 헤어', windowStartAt: start }),
+    ).toMatch(/^샘플 헤어 .*15:00 시간대$/);
+    expect(targetLabel('slot', NONE)).toBeNull();
     expect(targetLabel('reservation', { ...NONE, reservationCode: 'AB12CD34' })).toBe('AB12CD34');
     expect(targetLabel('dispute', { ...NONE, disputeReservationCode: 'AB12CD34' })).toBe(
       'AB12CD34',

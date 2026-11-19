@@ -3,7 +3,7 @@
 
 import 'server-only';
 
-import { and, asc, desc, eq, isNull, lt, not, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, lt, not, notExists, or, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import {
@@ -11,14 +11,17 @@ import {
   ownerPenalties,
   penaltyCollections,
   reservations,
+  settlementHolds,
   settlementItems,
   settlements,
+  shops,
   slots,
 } from '@/db/schema';
 import { disputeHandledSince, hasOpenDispute } from '@/server/disputes/conditions';
 
 import type { ShopSettlementDraft } from './batch-rules';
 import type { OutstandingPenalty } from './calc-settlement';
+import { adminHoldReleasedSince, hasAdminHold } from './hold-conditions';
 import {
   cancelRefund,
   cancelRefundJoin,
@@ -33,17 +36,23 @@ type Db = Pick<ReturnType<typeof getDb>, 'select' | 'insert' | 'update'>;
 /** 묶기 후보 하나: 아직 정산 줄이 없는 끝난 예약과 정산 규칙에 필요한 값 */
 export type BatchCandidate = SettleTarget & {
   shopId: string;
+  reservationId: string;
   orderId: string;
   salePrice: number;
   discountRate: number;
   couponAmount: number;
   hasOpenDispute: boolean;
+  /**
+   * 운영자 정산 보류(#373 ②): 그 거래나 그 샵에 지금 풀리지 않은 보류가 있거나, 보류가 cutoff(지급일 0시) 뒤에 풀렸다
+   * (그 지급일 기준 시각에는 아직 보류 중이었다. 풀리면 돌아오는 지급일, 이의제기 결론과 같은 규칙)
+   */
+  hasAdminHold: boolean;
 };
 
 /**
  * 묶기 후보: 모든 샵의 정산할 수 있는 끝난 예약(settleableReservation: 이용 완료이거나 끝난 고객 취소·합의 후 취소) 중
  * 아직 정산 줄이 없고, 방문·노쇼 처리나 취소가 cutoff 전이고, cutoff 뒤에 결론이 난 이의제기가 없는 것.
- * 기한·보류는 부른 쪽이 정산 규칙으로 한 번 더 고른다(SQL과 규칙이 같은 조건이라 규칙에서 빠지는 줄은 없어야 한다)
+ * 기한·보류(이의제기·운영자 정산 보류)는 부른 쪽이 정산 규칙으로 고른다
  */
 export async function readBatchCandidates(
   db: Pick<ReturnType<typeof getDb>, 'select'>,
@@ -52,6 +61,7 @@ export async function readBatchCandidates(
   const rows = await db
     .select({
       shopId: slots.shopId,
+      reservationId: reservations.id,
       orderId: reservations.orderId,
       // 정산 규칙에 넘길 칸은 원장님 정산 내역과 같은 조각(#394 리뷰 1번)
       ...settleTargetColumns,
@@ -59,6 +69,7 @@ export async function readBatchCandidates(
       discountRate: slots.discountRate,
       couponAmount: orders.couponAmount,
       hasOpenDispute: sql<boolean>`${hasOpenDispute(reservations.id)}`,
+      hasAdminHold: sql<boolean>`(${hasAdminHold(reservations.id, slots.shopId)} or ${adminHoldReleasedSince(reservations.id, slots.shopId, input.cutoff)})`,
     })
     .from(reservations)
     .innerJoin(slots, eq(slots.id, reservations.slotId))
@@ -84,6 +95,49 @@ export async function readBatchCandidates(
     .orderBy(asc(slots.shopId), asc(reservations.id));
 
   return rows.map(narrowSettleTarget);
+}
+
+/**
+ * 샵 하나를 묶기 전에 그 샵 줄을 잠근다(트랜잭션 안에서 부른다). 정산 보류를 거는 함수(hold-store.ts)도 같은 샵 줄을 잠가서,
+ * 묶는 동안 걸린 보류는 묶기가 끝난 뒤에 걸리고(그때는 "이미 묶임"), 먼저 걸린 보류는 아래 readHeldReservationIds가 본다
+ */
+export async function lockShopForBatch(
+  tx: Pick<ReturnType<typeof getDb>, 'select'>,
+  shopId: string,
+): Promise<void> {
+  await tx.select({ id: shops.id }).from(shops).where(eq(shops.id, shopId)).for('share');
+}
+
+/**
+ * 샵을 잠근 뒤 다시 읽는 운영자 정산 보류(후보를 읽은 뒤에 걸린 보류까지). 샵 전체 보류면 shop: true,
+ * 아니면 보류 중인 거래 id. cutoff(지급일 0시) 뒤에 풀린 보류도 그 지급일에는 보류로 본다(readBatchCandidates와 같다)
+ */
+export async function readHeldReservationIds(
+  tx: Pick<ReturnType<typeof getDb>, 'select'>,
+  input: { shopId: string; reservationIds: readonly string[]; cutoff: Date },
+): Promise<{ shop: boolean; reservationIds: Set<string> }> {
+  const target =
+    input.reservationIds.length > 0
+      ? or(
+          eq(settlementHolds.shopId, input.shopId),
+          inArray(settlementHolds.reservationId, [...input.reservationIds]),
+        )
+      : eq(settlementHolds.shopId, input.shopId);
+  const rows = await tx
+    .select({ shopId: settlementHolds.shopId, reservationId: settlementHolds.reservationId })
+    .from(settlementHolds)
+    .where(
+      and(
+        target,
+        or(isNull(settlementHolds.releasedAt), gte(settlementHolds.releasedAt, input.cutoff)),
+      ),
+    );
+  return {
+    shop: rows.some((row) => row.shopId !== null),
+    reservationIds: new Set(
+      rows.flatMap((row) => (row.reservationId === null ? [] : [row.reservationId])),
+    ),
+  };
 }
 
 /** 그 샵의 직전 정산 지급일(가장 늦은 period_end). 없으면 null(첫 정산) */

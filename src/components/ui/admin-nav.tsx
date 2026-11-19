@@ -7,6 +7,7 @@ import {
   ClipboardList,
   MessageSquareWarning,
   ScrollText,
+  Timer,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -28,6 +29,7 @@ export function AdminNav() {
         { href: '/admin/payment-issues', label: '결제·환불 확인', icon: CircleAlert },
         { href: '/admin/notifications', label: '알림 확인', icon: BellRing },
         { href: '/admin/settlements', label: '정산', icon: Wallet },
+        { href: '/admin/jobs', label: '예약 작업', icon: Timer },
         { href: '/admin/logs', label: '운영자 기록', icon: ScrollText },
       ]}
     />

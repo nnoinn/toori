@@ -49,6 +49,7 @@ function row(extra: Partial<SettlementRow> = {}): SettlementRow {
     couponUsed: false,
     hasOpenDispute: false,
     openDisputeReceivedAt: null,
+    hasAdminHold: false,
     ownerPenalty: null,
     item: null,
     ...extra,
@@ -314,6 +315,23 @@ describe('buildStatementList: 정산서 목록', () => {
     expect(list.held.items.map((item) => item.reservationId)).toEqual(['held']);
     expect(list.payoutAccount).toEqual({ bankName: '국민은행', accountLast4: '1234' });
     expect(list.serverNow).toBe(NOW.toISOString());
+  });
+
+  it('운영자 정산 보류(#373 ②) 거래도 지급 예정 정산서에서 빠지고 보류 거래에 모인다', () => {
+    const list = buildStatementList({
+      stored: [],
+      unpaidItems: views([row(), row({ reservationId: 'admin-held', hasAdminHold: true })]),
+      lastPayoutDate: '2026-11-12',
+      penalties: [],
+      payoutAccount: null,
+      period: { from: '2026-11-01', to: '2026-11-30' },
+      now: NOW,
+    });
+    expect(list.statements).toMatchObject([{ payoutDate: '2026-11-19', counts: { sale: 1 } }]);
+    expect(list.held.count).toBe(1);
+    expect(list.held.items).toMatchObject([
+      { reservationId: 'admin-held', status: 'held', hold: { reason: 'admin' } },
+    ]);
   });
 });
 
