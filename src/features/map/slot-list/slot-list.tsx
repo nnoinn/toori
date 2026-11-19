@@ -147,38 +147,7 @@ export function SlotList({
           <ul className="-mb-px [&>li]:border-b">
             {items.map((item) => (
               <li key={listItemKey(item)}>
-                {item.kind === 'slot' ? (
-                  <SlotCard
-                    layout="list"
-                    href={`/slots/${item.slotId}`}
-                    imageUrl={item.imageUrl}
-                    shopName={item.shopName}
-                    category={item.category}
-                    menuName={item.menuName}
-                    startAt={item.startAt}
-                    serverNow={serverNow}
-                    listPrice={item.listPrice}
-                    salePrice={item.salePrice}
-                    discountRate={item.discountRate}
-                    badges={item.badges}
-                    distanceText={formatDistance(item.distanceMeters)}
-                  />
-                ) : (
-                  <WindowCard
-                    href={`/windows/${item.windowId}`}
-                    imageUrl={item.imageUrl}
-                    shopName={item.shopName}
-                    category={item.category}
-                    firstMenuName={item.firstMenuName}
-                    menuCount={item.menuCount}
-                    startAt={item.startAt}
-                    endAt={item.endAt}
-                    maxDiscountRate={item.maxDiscountRate}
-                    minSalePrice={item.minSalePrice}
-                    badges={item.badges}
-                    distanceText={formatDistance(item.distanceMeters)}
-                  />
-                )}
+                <ListItemRow item={item} serverNow={serverNow} />
               </li>
             ))}
           </ul>
@@ -190,5 +159,44 @@ export function SlotList({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * 목록 한 줄(매물이면 SlotCard, 시간대면 WindowCard). 왼쪽 글 + 오른쪽 사진. 줄 사이 선은 감싸는 쪽(ul)이 긋는다.
+ * 매물 목록·찜한 샵 매물·고객 홈(로비)의 매물 칸이 같이 쓴다
+ */
+export function ListItemRow({ item, serverNow }: { item: ListItem; serverNow: string }) {
+  return item.kind === 'slot' ? (
+    <SlotCard
+      layout="list"
+      href={`/slots/${item.slotId}`}
+      imageUrl={item.imageUrl}
+      shopName={item.shopName}
+      category={item.category}
+      menuName={item.menuName}
+      startAt={item.startAt}
+      serverNow={serverNow}
+      listPrice={item.listPrice}
+      salePrice={item.salePrice}
+      discountRate={item.discountRate}
+      badges={item.badges}
+      distanceText={formatDistance(item.distanceMeters)}
+    />
+  ) : (
+    <WindowCard
+      href={`/windows/${item.windowId}`}
+      imageUrl={item.imageUrl}
+      shopName={item.shopName}
+      category={item.category}
+      firstMenuName={item.firstMenuName}
+      menuCount={item.menuCount}
+      startAt={item.startAt}
+      endAt={item.endAt}
+      maxDiscountRate={item.maxDiscountRate}
+      minSalePrice={item.minSalePrice}
+      badges={item.badges}
+      distanceText={formatDistance(item.distanceMeters)}
+    />
   );
 }
