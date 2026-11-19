@@ -56,6 +56,12 @@ async function adminHoldOf(tx: TestTx, shopId: string) {
   return Object.fromEntries(rows.map((row) => [row.reservationId, row.hasAdminHold]));
 }
 
+/** 원장님 정산 내역이 읽는 보류 사유 코드(#489). 보류가 없으면 null */
+async function adminHoldCodeOf(tx: TestTx, shopId: string) {
+  const rows = await readShopSettlementRows(tx, { shopId, unpaidOnly: true });
+  return Object.fromEntries(rows.map((row) => [row.reservationId, row.adminHoldCode]));
+}
+
 describeDb('운영자 정산 보류 (실제 DB)', () => {
   afterAll(closeTestDb);
 
@@ -71,6 +77,7 @@ describeDb('운영자 정산 보류 (실제 DB)', () => {
         reservationId,
         adminId,
         reason: '계좌 확인 필요',
+        code: 'payout_info_check',
         now: NOW,
       });
       expect(held).toMatchObject({ ok: true, data: { heldAt: NOW.toISOString() } });
@@ -79,6 +86,7 @@ describeDb('운영자 정산 보류 (실제 DB)', () => {
         reservationId,
         shopId: null,
         reason: '계좌 확인 필요',
+        reasonCode: 'payout_info_check',
         heldBy: adminId,
         heldAt: NOW,
         releasedAt: null,
@@ -89,7 +97,13 @@ describeDb('운영자 정산 보류 (실제 DB)', () => {
       });
 
       expect(
-        await holdReservationInTx(tx, { reservationId, adminId, reason: '다시', now: NOW }),
+        await holdReservationInTx(tx, {
+          reservationId,
+          adminId,
+          reason: '다시',
+          code: 'other',
+          now: NOW,
+        }),
       ).toMatchObject({ error: { code: 'ALREADY_HELD' } });
 
       const release = (holdId: string) =>
@@ -117,7 +131,13 @@ describeDb('운영자 정산 보류 (실제 DB)', () => {
       ]);
       // 지난 보류는 남기고 새로 걸 수 있다
       expect(
-        await holdReservationInTx(tx, { reservationId, adminId, reason: '다시 확인', now: LATER }),
+        await holdReservationInTx(tx, {
+          reservationId,
+          adminId,
+          reason: '다시 확인',
+          code: 'user_inquiry',
+          now: LATER,
+        }),
       ).toMatchObject({ ok: true });
       expect(
         await tx
@@ -134,7 +154,13 @@ describeDb('운영자 정산 보류 (실제 DB)', () => {
       const shop = await createTestShop(tx, { status: 'approved' });
       const { customerId } = await createTestCustomer(tx);
       const hold = (reservationId: string) =>
-        holdReservationInTx(tx, { reservationId, adminId, reason: '확인', now: NOW });
+        holdReservationInTx(tx, {
+          reservationId,
+          adminId,
+          reason: '확인',
+          code: 'other',
+          now: NOW,
+        });
 
       expect(await hold(crypto.randomUUID())).toMatchObject({
         error: { code: 'RESERVATION_NOT_FOUND' },
@@ -217,7 +243,13 @@ describeDb('운영자 정산 보류 (실제 DB)', () => {
         const b = await visited(tx, shop, '10:00', '11:00');
         const elsewhere = await visited(tx, otherShop, '09:00', '10:00');
         const holdShop = (shopId: string) =>
-          holdShopInTx(tx, { shopId, adminId, reason: '사업자 정보 확인', now: NOW });
+          holdShopInTx(tx, {
+            shopId,
+            adminId,
+            reason: '사업자 정보 확인',
+            code: 'user_inquiry',
+            now: NOW,
+          });
 
         const held = await holdShop(shop.shopId);
         expect(held).toMatchObject({ ok: true });
@@ -225,6 +257,7 @@ describeDb('운영자 정산 보류 (실제 DB)', () => {
         expect(await holdRow(tx, held.data.holdId)).toMatchObject({
           reservationId: null,
           shopId: shop.shopId,
+          reasonCode: 'user_inquiry',
         });
         expect(await adminHoldOf(tx, shop.shopId)).toEqual({
           [a.reservation.id]: true,
@@ -255,6 +288,57 @@ describeDb('운영자 정산 보류 (실제 DB)', () => {
           'settlement.hold',
           'settlement.release',
         ]);
+      });
+    });
+
+    it('원장님 정산 내역은 고른 사유 코드(#489)를 읽고, 거래 보류와 샵 전체 보류가 같이 있으면 거래 보류의 코드다. 풀리면 null', async () => {
+      await withRollback(async (tx) => {
+        const adminId = await createTestUser(tx);
+        const shop = await createTestShop(tx, { status: 'approved' });
+        const a = await visited(tx, shop, '09:00', '10:00');
+        const b = await visited(tx, shop, '10:00', '11:00');
+        const c = await visited(tx, shop, '11:00', '12:00');
+        const reservationHold = await holdReservationInTx(tx, {
+          reservationId: a.reservation.id,
+          adminId,
+          reason: '결제 내역 확인',
+          code: 'payment_check',
+          now: NOW,
+        });
+        expect(reservationHold).toMatchObject({ ok: true });
+        expect(await adminHoldCodeOf(tx, shop.shopId)).toEqual({
+          [a.reservation.id]: 'payment_check',
+          [b.reservation.id]: null,
+          [c.reservation.id]: null,
+        });
+
+        // 샵 전체 보류를 나중에 걸어도 거래 보류가 있는 거래는 거래 보류의 코드
+        const shopHold = await holdShopInTx(tx, {
+          shopId: shop.shopId,
+          adminId,
+          reason: '문의 확인',
+          code: 'user_inquiry',
+          now: LATER,
+        });
+        expect(shopHold).toMatchObject({ ok: true });
+        expect(await adminHoldCodeOf(tx, shop.shopId)).toEqual({
+          [a.reservation.id]: 'payment_check',
+          [b.reservation.id]: 'user_inquiry',
+          [c.reservation.id]: 'user_inquiry',
+        });
+
+        if (!reservationHold.ok) return;
+        await releaseHoldInTx(tx, {
+          holdId: reservationHold.data.holdId,
+          adminId,
+          memo: '확인함',
+          now: LATER,
+        });
+        expect(await adminHoldCodeOf(tx, shop.shopId)).toEqual({
+          [a.reservation.id]: 'user_inquiry',
+          [b.reservation.id]: 'user_inquiry',
+          [c.reservation.id]: 'user_inquiry',
+        });
       });
     });
   });

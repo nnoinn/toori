@@ -10,7 +10,7 @@ import { menus, owners, shopImages, shops, slots, slotWindowMenus, slotWindows }
 import type { BusinessHours } from '@/db/schema/shops';
 import type { SlotCloseReason } from '@/db/schema/slots';
 import { newCustomerOnlyVisible } from '@/server/customers';
-import type { ServiceType, ShopCategory } from '@/server/policy';
+import type { AdminCloseCode, ServiceType, ShopCategory } from '@/server/policy';
 import { customerVisibleShop } from '@/server/shops/visibility';
 
 import { shopInArea, staleWindowHold, type WindowArea } from './conditions';
@@ -423,14 +423,26 @@ export type KeptSlotRow = {
  */
 export async function closeWindow(
   tx: Pick<ReturnType<typeof getDb>, 'select' | 'update'>,
-  input: { shopId: string; windowId: string; reason: SlotCloseReason; now: Date },
+  input: {
+    shopId: string;
+    windowId: string;
+    reason: SlotCloseReason;
+    /** 운영자 마감(reason admin)일 때 원장님에게 보여 줄 사유 코드(#489). 그 밖에는 넘기지 않는다 */
+    adminCloseCode?: AdminCloseCode;
+    now: Date;
+  },
 ): Promise<
   | { ok: true; closedAt: Date; keptSlots: KeptSlotRow[] }
   | { ok: false; code: 'WINDOW_NOT_FOUND' | 'WINDOW_CLOSED' }
 > {
   const [closed] = await tx
     .update(slotWindows)
-    .set({ status: 'closed', closeReason: input.reason, closedAt: input.now })
+    .set({
+      status: 'closed',
+      closeReason: input.reason,
+      adminCloseCode: input.adminCloseCode ?? null,
+      closedAt: input.now,
+    })
     .where(
       and(
         eq(slotWindows.id, input.windowId),
