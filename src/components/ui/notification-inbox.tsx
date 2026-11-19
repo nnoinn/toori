@@ -27,7 +27,8 @@ import { EmptyState, ErrorState } from './state';
 // 알림함 목록 (#371). 원장님 알림함(/owner/notifications, 11/17 정민석)이 쓰고, 고객 알림함과 같은 동작이다.
 // 최근 90일, 최신 순 20개씩, 아래 [더 보기]. 안 읽은 알림은 초록 점과 굵은 제목.
 // 줄을 누르면 읽음으로 바꾸고 바로 그 화면(예약 상세 등)으로 간다(읽음 처리가 실패해도 이동한다).
-// 제목 줄과 바깥 틀은 화면마다 다르게 그리게 frame으로 받는다(원장님은 OwnerPage 틀). 화면에 다시 들어올 때마다 새로 불러온다
+// 제목 줄과 바깥 틀은 화면마다 다르게 그리게 frame으로 받는다(원장님은 OwnerPage 틀). 화면에 다시 들어올 때마다 새로 불러온다.
+// 고객 알림함(/notifications)도 이 부품을 쓴다(11/20 정찬형). 폰에서는 버튼을 누르기 쉽게 40px 높이로 둔다
 
 type Inbox = {
   items: MyNotification[];
@@ -166,7 +167,7 @@ export function NotificationInbox({ account, emptyHelp, frame }: NotificationInb
       <Button
         type="button"
         variant="ghost"
-        className="text-muted-foreground"
+        className="text-muted-foreground max-md:h-10"
         disabled={inbox.unread === 0 || marking}
         onClick={markAll}
       >
@@ -187,7 +188,7 @@ export function NotificationInbox({ account, emptyHelp, frame }: NotificationInb
         <ErrorState
           description={state.message}
           action={
-            <Button type="button" variant="outline" onClick={retry}>
+            <Button type="button" variant="outline" className="max-md:h-10" onClick={retry}>
               {TEXTS.RETRY}
             </Button>
           }
