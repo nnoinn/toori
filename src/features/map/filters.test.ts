@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  QUICK_MIN_DISCOUNT,
+  toggleQuickDiscount,
   applyFiltersToSearch,
   countActiveFilters,
   EMPTY_FILTERS,
@@ -173,5 +175,23 @@ describe('할인율 "N% 이상"', () => {
 
   it('할인율을 고르면 필터 개수는 1만 늘어난다', () => {
     expect(countActiveFilters({ ...EMPTY_FILTERS, minDiscount: 30 })).toBe(1);
+  });
+});
+
+describe('빠른 고르기 칩 "30% 이상"(11/18 정찬형)', () => {
+  it('할인율 선택지(정책값) 중 하나다', () => {
+    expect(QUICK_MIN_DISCOUNT).toBe(30);
+    expect(MIN_DISCOUNT_OPTIONS.map((option) => option.rate)).toContain(QUICK_MIN_DISCOUNT);
+  });
+
+  it('누르면 30% 이상, 다시 누르면 전체. 다른 필터는 그대로', () => {
+    const base = { ...EMPTY_FILTERS, category: 'hair' as const };
+    const on = toggleQuickDiscount(base);
+    expect(on).toEqual({ ...base, minDiscount: 30 });
+    expect(toggleQuickDiscount(on)).toEqual({ ...base, minDiscount: null });
+  });
+
+  it('필터에서 다른 할인율(40% 이상)을 골라 둔 상태면 30% 이상으로 바꾼다', () => {
+    expect(toggleQuickDiscount({ ...EMPTY_FILTERS, minDiscount: 40 }).minDiscount).toBe(30);
   });
 });
