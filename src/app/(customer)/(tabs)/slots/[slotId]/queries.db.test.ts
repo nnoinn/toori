@@ -96,7 +96,7 @@ describeDb('매물 상세 조회', () => {
     });
   });
 
-  it('신규 고객 전용은 그 샵 이력이 있는 고객에게만 null', async () => {
+  it('신규 고객 전용은 그 샵 이력이 있는 고객에게만 null, 보이는 고객에게도 배지는 없다(#459)', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
       const visited = await createTestCustomer(tx);
@@ -105,7 +105,8 @@ describeDb('매물 상세 조회', () => {
       const slot = await insertSlot(tx, shop, '10:00', '11:00', { newCustomerOnly: true });
 
       expect(await detail(tx, slot.id, visited.customerId)).toBeNull();
-      expect((await detail(tx, slot.id, fresh.customerId))?.badges).toEqual(['newCustomerOnly']);
+      // 신규 고객에게는 보이지만 고객 화면에는 신규 고객 전용 배지를 보여 주지 않는다(11/16 nnoinn, #459)
+      expect((await detail(tx, slot.id, fresh.customerId))?.badges).toEqual([]);
       expect(await detail(tx, slot.id, null)).not.toBeNull();
     });
   });
