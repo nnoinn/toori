@@ -13,6 +13,7 @@ import { formatDuration } from '@/lib/format';
 import { getRequestNow } from '@/lib/request-time';
 import { formatKst, formatKstTime } from '@/lib/time';
 import { ensureOwnerPage } from '@/server/auth';
+import { PUBLISH_PAUSED_MESSAGE, readPublishPausedAt } from '@/server/shops';
 import { calcSalePrice, serviceTypeLabel } from '@/server/policy';
 import { readShopReviewStatus } from '@/server/shops/review-store';
 
@@ -40,7 +41,7 @@ export default function SlotRelistPage({ params }: { params: Params }) {
   );
 }
 
-/** 입점 승인 → 그 샵의 취소 매물 → 재등록할 수 있는지 → 등록 확인을 차례로 보고, 되면 새 매물 미리보기를 보여준다 */
+/** 입점 승인 → 게시 멈춤 → 그 샵의 취소 매물 → 재등록할 수 있는지 → 등록 확인을 차례로 보고, 되면 새 매물 미리보기를 보여준다 */
 async function RelistContent({ params }: { params: Params }) {
   const { slotId } = await params;
   // 모양이 틀린 id는 로그인 뒤 돌아올 주소에 넣지 않고 대시보드로 돌아오게 한다
@@ -52,6 +53,10 @@ async function RelistContent({ params }: { params: Params }) {
   const review = await readShopReviewStatus(db, auth.shopId);
   if (review && review.status !== 'approved') {
     return <CannotRelist message="입점 승인 후에 재등록할 수 있어요" />;
+  }
+  // 운영자가 새 매물 게시를 멈춘 샵(#373 ④, #472). 매물 등록도 막혀서 [매물 등록하기]는 두지 않는다
+  if (await readPublishPausedAt(auth.shopId, db)) {
+    return <CannotRelist message={PUBLISH_PAUSED_MESSAGE} />;
   }
 
   const now = await getRequestNow();

@@ -3,6 +3,7 @@
 // 매물 수정·마감·재등록 서버 함수 (O10 S-206, O13 S-408). 대시보드의 [마감], 수정 화면(slots/[slotId]/edit),
 // 재등록 화면(slots/[slotId]/relist)에서 부른다.
 // 수정은 등록(new/actions.ts)과 같은 순서다: ①② 고르면 checkSlotEdit로 확인, ③까지 고르면 updateSlot으로 저장.
+// 운영자가 새 매물 게시를 멈춘 샵(#373 ④)은 재등록만 막는다(#472). 이미 올린 매물의 수정·마감은 그대로 할 수 있다(11/15 nnoinn 결정 3).
 
 import { refresh } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -10,6 +11,7 @@ import { redirect } from 'next/navigation';
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { ok, type Result } from '@/lib/result';
+import { assertShopCanPublish } from '@/server/shops';
 
 import { relistSlotInDb } from './relist-store';
 import { requireApprovedOwner } from './require-approved-owner';
@@ -78,6 +80,9 @@ export async function updateSlot(
 export async function relistSlot(shopId: string, slotId: string): Promise<Result<SavedSlot>> {
   const auth = await requireApprovedOwner(shopId);
   if (!auth.ok) return auth;
+  // 재등록도 새 매물을 올리는 것이라 게시를 멈춘 샵이면 막는다
+  const publishable = await assertShopCanPublish(shopId);
+  if (!publishable.ok) return publishable;
 
   const relisted = await relistSlotInDb(
     getDb(),
