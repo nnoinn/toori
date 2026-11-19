@@ -21,13 +21,5 @@ export type AdminActionRow = {
 
 /** 처리 기록 한 줄을 넣는다 */
 export async function recordAdminAction(db: DbWriter, row: AdminActionRow): Promise<void> {
-  // 임시: 일부러 틀리게 ② — 기록을 따로 savepoint로 남기고 실패는 무시한다(바꾼 것만 남는다). 확인 뒤 되돌린다
-  const savepoint = db as unknown as {
-    transaction: (run: (t: DbWriter) => Promise<void>) => Promise<void>;
-  };
-  await savepoint
-    .transaction(async (t) => {
-      await t.insert(adminActions).values(row);
-    })
-    .catch(() => undefined);
+  await db.insert(adminActions).values(row);
 }
