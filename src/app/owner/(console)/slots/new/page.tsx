@@ -8,6 +8,7 @@ import { EmptyState, ErrorState, LoadingCards } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { ensureOwnerPage } from '@/server/auth';
+import { PUBLISH_PAUSED_MESSAGE, readPublishPausedAt } from '@/server/shops';
 import { SHOP_STATUS_LABELS } from '@/server/shops/status';
 import { getShopReviewStatus } from '@/server/shops/review';
 import { getLastWindowSettings } from '@/server/slot-windows/actions';
@@ -34,7 +35,7 @@ export default function SlotCreatePage() {
   );
 }
 
-/** 입점 승인 → 메뉴가 있는지 차례로 보고 3탭 화면을 연다. 막히면 무엇을 먼저 해야 하는지 안내한다 */
+/** 입점 승인 → 게시 멈춤 → 메뉴가 있는지 차례로 보고 3탭 화면을 연다. 막히면 무엇을 먼저 해야 하는지 안내한다 */
 async function SlotCreateContent() {
   // 로그인하지 않았으면 로그인 화면, 원장님 가입 전이면 /owner/join 으로 보낸다
   const auth = await ensureOwnerPage(PAGE_PATH);
@@ -55,6 +56,24 @@ async function SlotCreateContent() {
           action={
             <Button asChild variant="outline">
               <Link href="/owner/settings">매장 설정으로</Link>
+            </Button>
+          }
+        />
+      </Card>
+    );
+  }
+
+  // 운영자가 새 매물 게시를 멈춘 샵(#373 ④, #472)은 한 시술·시간대 매물 모두 올릴 수 없다. 서버 함수도 따로 막는다.
+  // 운영자가 적은 사유는 보여 주지 않는다(알림과 같은 제목, 서버 함수와 같은 문구)
+  if (await readPublishPausedAt(auth.shopId)) {
+    return (
+      <Card>
+        <EmptyState
+          title="새 매물 등록이 잠시 멈췄어요"
+          description={PUBLISH_PAUSED_MESSAGE}
+          action={
+            <Button asChild variant="outline">
+              <Link href="/owner">대시보드로</Link>
             </Button>
           }
         />
