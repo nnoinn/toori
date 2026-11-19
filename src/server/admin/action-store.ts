@@ -21,5 +21,9 @@ export type AdminActionRow = {
 
 /** 처리 기록 한 줄을 넣는다 */
 export async function recordAdminAction(db: DbWriter, row: AdminActionRow): Promise<void> {
-  await db.insert(adminActions).values(row);
+  // 임시: 일부러 틀리게(기록 실패를 삼킨다). 확인 뒤 되돌린다
+  await db
+    .insert(adminActions)
+    .values(row)
+    .catch(() => undefined);
 }
