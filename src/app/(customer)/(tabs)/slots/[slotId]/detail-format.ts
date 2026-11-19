@@ -3,6 +3,7 @@
 import { z } from 'zod';
 
 import { withNextDayMark } from '@/lib/time';
+import type { ListItem } from '@/features/map/slot-list/types';
 
 const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'] as const;
 
@@ -127,4 +128,18 @@ export function refundPolicyNotes(ownerFaultCouponAmount: number) {
     ],
     after: `원장님 사정으로 취소되면 전액 환불하고 ${ownerFaultCouponAmount.toLocaleString('ko-KR')}원 쿠폰을 드려요.`,
   };
+}
+
+/** 매물 상세 "이 샵의 다른 매물"에 보여주는 수(11/18 회의 피드백 5번) */
+export const OTHER_SLOT_COUNT = 5;
+
+/** 이 샵의 다른 매물: 지금 보는 매물은 빼고, 받은 순서(시작이 가까운 순) 그대로 앞에서 count개. 시간대 매물도 넣는다 */
+export function otherShopItems(
+  items: readonly ListItem[],
+  currentSlotId: string,
+  count: number = OTHER_SLOT_COUNT,
+): ListItem[] {
+  return items
+    .filter((item) => item.kind !== 'slot' || item.slotId !== currentSlotId)
+    .slice(0, count);
 }
