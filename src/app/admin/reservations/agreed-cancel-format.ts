@@ -52,8 +52,7 @@ export function agreedCancelViews(
   now: Date,
 ): AgreedCancelView[] {
   return requests.map((request) => {
-    const status =
-      now && reservation ? request.status : currentRequestStatus(request, reservation, now);
+    const status = currentRequestStatus(request, reservation, now);
     return {
       requestId: request.requestId,
       status,
