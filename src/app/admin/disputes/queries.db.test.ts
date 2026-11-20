@@ -13,7 +13,7 @@ import {
   type TestShop,
 } from '../../../../tests/db/fixtures';
 import { closeTestDb, describeDb, type TestTx, withRollback } from '../../../../tests/db/test-db';
-import { selectDisputeDetail, selectDisputes } from './queries';
+import { selectDisputeDetail, selectDisputes, selectOpenDisputeSummary } from './queries';
 
 const unique = (prefix: string) => `${prefix}${crypto.randomUUID().slice(0, 8)}`;
 const at = (day: number, hm: string) => new Date(`2026-11-0${day}T${hm}:00+09:00`);
@@ -173,6 +173,34 @@ describeDb('운영자 이의제기 조회 (실제 DB)', () => {
         handledByName: '결론 운영자',
       });
       expect(await selectDisputeDetail(tx, crypto.randomUUID())).toBeNull();
+    });
+  });
+
+  it('운영자 첫 화면: 확인 중인 이의제기만 세고, 그중 가장 오래된 접수 시각을 준다', async () => {
+    await withRollback(async (tx) => {
+      // 다른 테스트의 이의제기가 같은 DB에 있을 수 있어서 건수는 넣기 전과의 차이로 보고,
+      // 가장 오래된 접수는 다른 테스트보다 훨씬 이른 시각으로 넣어 본다
+      const before = await selectOpenDisputeSummary(tx);
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const adminId = await createTestUser(tx);
+      const oldest = new Date('2001-01-02T09:00:00+09:00');
+      await addDispute(tx, shop, '09:00', '10:00', { receivedAt: oldest });
+      await addDispute(tx, shop, '10:00', '11:00', {
+        receivedAt: new Date('2001-01-03T09:00:00+09:00'),
+      });
+      // 결론이 난 이의제기는 더 오래됐어도 세지 않는다
+      await addDispute(tx, shop, '11:00', '12:00', {
+        receivedAt: new Date('2001-01-01T09:00:00+09:00'),
+        status: 'resolved',
+        outcome: 'no_change',
+        handledBy: adminId,
+        handledAt: at(3, '09:00'),
+      });
+
+      expect(await selectOpenDisputeSummary(tx)).toEqual({
+        count: before.count + 2,
+        oldestReceivedAt: oldest,
+      });
     });
   });
 });
