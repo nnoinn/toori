@@ -22,7 +22,7 @@ export function couponState(
   now: Date,
 ): CouponState {
   if (coupon.usedOrderId !== null) return 'used';
-  return coupon.expiresAt.getTime() <= now.getTime() ? 'expired' : 'usable';
+  return coupon.expiresAt.getTime() < now.getTime() ? 'expired' : 'usable';
 }
 
 /** 쓴 쿠폰을 돌려받은 이유. 돌려주는 곳은 원장님 사정 취소(X-207)와 무효(A-108) 둘뿐이다 */
@@ -42,8 +42,8 @@ export function couponReturnReason(use: {
   cancelActor: CancelActor | null;
   voidedAt: Date | null;
 }): CouponReturnReason | null {
-  if (use.cancelActor === 'owner_fault') return 'owner_fault';
   if (use.voidedAt) return 'void';
+  if (use.cancelActor === 'owner_fault') return 'owner_fault';
   return null;
 }
 
@@ -94,7 +94,7 @@ export function customerCouponViews(
       usedAt: state === 'used' ? coupon.usedAt : null,
       // 지금 쓴 주문이 아닌 예약은 돌려받은 것이다(고객 취소·합의 후 취소는 돌려주지 않아서 쓴 주문이 그대로 남는다)
       returns: coupon.uses
-        .filter((use) => use.orderId !== coupon.usedOrderId)
+        .filter((use) => use.orderId !== null)
         .map((use) => ({
           ...toRef(use),
           label: COUPON_RETURN_LABELS[couponReturnReason(use) ?? 'unknown'],

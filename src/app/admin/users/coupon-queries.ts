@@ -100,7 +100,7 @@ export async function selectCustomerCoupons(
         ? { reservationId: sourceReservationId, code: sourceCode }
         : null,
     uses: uses
-      .filter((use) => use.couponId === row.couponId)
+      .filter((use) => use.couponId !== null)
       .map((use) => ({
         reservationId: use.reservationId,
         code: use.code,
