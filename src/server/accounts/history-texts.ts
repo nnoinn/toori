@@ -1,6 +1,7 @@
 // 계정 이력(#374) 화면 문구. 원장님 계정 이력(정민석)과 운영자 [이력 보기]가 같이 써서, 문구는 여기 한 곳에서만 고친다.
 // 화면과 서버 어디서나 가져올 수 있다. 시각 자체(줄 앞 "2026-11-12 21:50")는 화면이 formatKstDateTime으로 쓴다.
 
+import type { CouponReason } from '@/db/schema/refunds';
 import { formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';
 import { bankName } from '@/server/policy/banks';
@@ -86,7 +87,8 @@ const CONSENTS: Record<string, string> = {
   interest_alert: '관심 동네·찜한 샵 새 매물 알림',
 };
 
-const COUPON_REASONS: Record<string, string> = {
+/** 쿠폰 받은 이유 이름. 운영자 고객 상세의 쿠폰 칸도 같은 이름을 쓴다 */
+export const COUPON_REASON_LABELS: Record<CouponReason, string> = {
   owner_fault_compensation: '원장님 사정 취소 보상',
 };
 
@@ -205,7 +207,7 @@ export function historyText(
         ]),
       );
     case 'coupon_issued':
-      return text('쿠폰 받음', join([won, label(COUPON_REASONS, event.reason)]));
+      return text('쿠폰 받음', join([won, label(COUPON_REASON_LABELS, event.reason)]));
     case 'coupon_used':
       return text('쿠폰 사용', won);
     case 'dispute_filed':
