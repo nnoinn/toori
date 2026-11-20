@@ -107,6 +107,7 @@ export async function countActiveHolds(db: Db): Promise<{ reservations: number; 
       reservations: count(settlementHolds.reservationId),
       shops: count(settlementHolds.shopId),
     })
-    .from(settlementHolds);
+    .from(settlementHolds)
+    .where(isNull(settlementHolds.releasedAt));
   return { reservations: row?.reservations ?? 0, shops: row?.shops ?? 0 };
 }

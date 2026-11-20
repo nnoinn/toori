@@ -95,7 +95,7 @@ export async function selectPublishPausedShops(
     .select({ shopId: shops.id, name: shops.name, pausedAt: shops.publishPausedAt })
     .from(shops)
     .where(paused)
-    .orderBy(desc(shops.publishPausedAt), asc(shops.id))
+    .orderBy(asc(shops.publishPausedAt), asc(shops.id))
     .limit(limit);
   const [totalRow] = await db.select({ n: count() }).from(shops).where(paused);
   return {
