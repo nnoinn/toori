@@ -7,7 +7,12 @@ import { adminActions, payoutAccounts } from '@/db/schema';
 
 import { createTestShop, createTestUser } from '../../../../tests/db/fixtures';
 import { closeTestDb, describeDb, withRollback } from '../../../../tests/db/test-db';
-import { countPendingShops, selectShopForReview, selectShopsForReview } from './queries';
+import {
+  countPendingShops,
+  selectPublishPausedShops,
+  selectShopForReview,
+  selectShopsForReview,
+} from './queries';
 
 const at = (iso: string) => new Date(iso);
 
@@ -143,6 +148,36 @@ describeDb('입점 심사 조회 (실제 DB)', () => {
       const shop = await createTestShop(tx);
       expect((await selectShopForReview(tx, shop.shopId))?.payout).toBeNull();
       expect(await selectShopForReview(tx, crypto.randomUUID())).toBeNull();
+    });
+  });
+
+  it('운영자 첫 화면: 게시를 멈춘 샵만 오래 멈춘 샵부터 limit곳 읽고, 전체 수도 준다', async () => {
+    await withRollback(async (tx) => {
+      // 다른 테스트의 샵이 같은 DB에 있을 수 있어서 전체 수는 넣기 전과의 차이로 보고,
+      // 멈춘 시각은 다른 테스트보다 훨씬 이르게 넣어 내 샵이 앞에 오게 한다
+      const before = await selectPublishPausedShops(tx, 3);
+      const paused = (iso: string, name: string) =>
+        createTestShop(tx, {
+          status: 'approved',
+          name,
+          publishPausedAt: at(iso),
+          publishPausedReason: '운영자 확인',
+        });
+      const third = await paused('2001-01-03T00:00:00Z', '셋째로 멈춘 샵');
+      const first = await paused('2001-01-01T00:00:00Z', '처음 멈춘 샵');
+      await paused('2001-01-04T00:00:00Z', '넷째로 멈춘 샵');
+      const second = await paused('2001-01-02T00:00:00Z', '둘째로 멈춘 샵');
+      // 멈추지 않은 샵은 읽지 않는다
+      await createTestShop(tx, { status: 'approved', name: '열린 샵' });
+
+      expect(await selectPublishPausedShops(tx, 3)).toEqual({
+        total: before.total + 4,
+        shops: [
+          { shopId: first.shopId, name: '처음 멈춘 샵', pausedAt: at('2001-01-01T00:00:00Z') },
+          { shopId: second.shopId, name: '둘째로 멈춘 샵', pausedAt: at('2001-01-02T00:00:00Z') },
+          { shopId: third.shopId, name: '셋째로 멈춘 샵', pausedAt: at('2001-01-03T00:00:00Z') },
+        ],
+      });
     });
   });
 });

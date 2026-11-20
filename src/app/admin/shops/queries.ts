@@ -4,7 +4,7 @@
 
 import 'server-only';
 
-import { and, asc, count, desc, eq, type SQL, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, isNotNull, type SQL, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { adminActions, owners, payoutAccounts, shops, type ShopStatus } from '@/db/schema';
@@ -72,6 +72,37 @@ export async function selectShopsForReview(
 export async function countPendingShops(db: DbReader): Promise<number> {
   const [row] = await db.select({ n: count() }).from(shops).where(eq(shops.status, 'pending'));
   return row?.n ?? 0;
+}
+
+/** 운영자 첫 화면의 게시 멈춘 샵 카드 */
+export type PublishPausedShops = {
+  /** 게시를 멈춘 샵 전체 수 */
+  total: number;
+  /** 오래 멈춘 샵부터 limit곳 */
+  shops: { shopId: string; name: string; pausedAt: Date }[];
+};
+
+/**
+ * 운영자가 새 매물 게시를 멈춘 샵(#373 ④). 따로 모아 보는 화면이 없어서 첫 화면에서 보여 주고, 샵 상세에서 다시 연다.
+ * 오래 멈춘 샵부터 limit곳과 전체 수
+ */
+export async function selectPublishPausedShops(
+  db: DbReader,
+  limit: number,
+): Promise<PublishPausedShops> {
+  const paused = isNotNull(shops.publishPausedAt);
+  const rows = await db
+    .select({ shopId: shops.id, name: shops.name, pausedAt: shops.publishPausedAt })
+    .from(shops)
+    .where(paused)
+    .orderBy(asc(shops.publishPausedAt), asc(shops.id))
+    .limit(limit);
+  const [totalRow] = await db.select({ n: count() }).from(shops).where(paused);
+  return {
+    total: totalRow?.n ?? 0,
+    // 위 조건으로 멈춘 시각이 있는 샵만 온다
+    shops: rows.map((row) => ({ ...row, pausedAt: row.pausedAt as Date })),
+  };
 }
 
 export type ShopReviewDetail = {
