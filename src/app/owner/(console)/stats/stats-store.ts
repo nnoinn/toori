@@ -14,7 +14,7 @@ import { KST_TIME_ZONE } from '@/lib/time';
 import type { VisitDay } from './stats';
 
 /** 방문 처리일(한국 날짜 'YYYY-MM-DD'). 묶기와 순서에 같은 식을 쓴다 */
-const visitDay = sql<string>`to_char(${reservations.visitRecordedAt} at time zone ${sql.raw(`'${KST_TIME_ZONE}'`)}, 'YYYY-MM-DD')`;
+const visitDay = sql<string>`to_char(${reservations.visitRecordedAt} at time zone ${sql.raw(`'UTC'`)}, 'YYYY-MM-DD')`;
 
 /** 기간 [from, to) 안에 방문 완료로 처리한 예약 수와 시술 시간 합(분)을 날마다. 없는 날은 주지 않는다 */
 export async function selectVisitDays(
@@ -26,7 +26,7 @@ export async function selectVisitDays(
     .select({
       dateKey: visitDay,
       visitCount: sql<number>`count(*)::int`,
-      minutes: sql<number>`(sum(extract(epoch from (${slots.endAt} - ${slots.startAt}))) / 60)::int`,
+      minutes: sql<number>`(max(extract(epoch from (${slots.endAt} - ${slots.startAt}))) / 60)::int`,
     })
     .from(reservations)
     .innerJoin(slots, eq(slots.id, reservations.slotId))
