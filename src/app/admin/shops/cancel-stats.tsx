@@ -12,7 +12,7 @@ import {
 
 import { labelHoursBefore } from '../reservations/format';
 import type { ShopCancelStats } from './cancel-stats-queries';
-import { AGREED_REQUEST_STATUS_LABELS } from './format';
+import { AGREED_REQUEST_STATUS_LABELS, agreedCancelReasonText } from './format';
 
 export function ShopCancelStatsView({ stats }: { stats: ShopCancelStats }) {
   const { ownerFault, agreed } = stats;
@@ -97,8 +97,7 @@ export function ShopCancelStatsView({ stats }: { stats: ShopCancelStats }) {
                   </Link>
                   <span>{formatKst(row.requestedAt)} 요청</span>
                   <span className="break-all">
-                    {AGREED_CANCEL_REASON_LABELS[row.reason]}
-                    {row.reason === 'other' && row.reasonText ? `(${row.reasonText})` : null}
+                    {agreedCancelReasonText(row.reason, row.reasonText)}
                   </span>
                   <span className="text-muted-foreground">
                     {AGREED_REQUEST_STATUS_LABELS[row.status]}
