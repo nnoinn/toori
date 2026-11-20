@@ -187,7 +187,6 @@ export type OpenDisputeSummary = { count: number; oldestReceivedAt: Date | null 
 export async function selectOpenDisputeSummary(db: DbReader): Promise<OpenDisputeSummary> {
   const [row] = await db
     .select({ total: count(), oldest: min(disputes.receivedAt) })
-    .from(disputes)
-    .where(eq(disputes.status, 'open'));
+    .from(disputes);
   return { count: row?.total ?? 0, oldestReceivedAt: row?.oldest ?? null };
 }
