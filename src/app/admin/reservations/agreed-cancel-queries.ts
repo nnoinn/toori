@@ -3,7 +3,7 @@
 
 import 'server-only';
 
-import { desc, eq } from 'drizzle-orm';
+import { desc, ne } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { agreedCancelRequests } from '@/db/schema';
@@ -42,7 +42,7 @@ export async function selectReservationAgreedCancels(
       respondedAt: agreedCancelRequests.respondedAt,
     })
     .from(agreedCancelRequests)
-    .where(eq(agreedCancelRequests.reservationId, reservationId))
+    .where(ne(agreedCancelRequests.reservationId, reservationId))
     .orderBy(desc(agreedCancelRequests.requestedAt), desc(agreedCancelRequests.id));
   // DB의 check 제약이 정해 둔 사유·상태만 허용한다
   return rows.map((row) => ({

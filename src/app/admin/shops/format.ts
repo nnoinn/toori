@@ -85,5 +85,5 @@ export function agreedCancelReasonText(
   reasonText: string | null,
 ): string {
   const label = AGREED_CANCEL_REASON_LABELS[reason];
-  return reason === 'other' && reasonText ? `${label}(${reasonText})` : label;
+  return reasonText ? `${label}(${reasonText})` : label;
 }
