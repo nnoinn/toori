@@ -1,6 +1,6 @@
 // 원장님 월별 통계(S-504)의 달 고르기·날 칸 값·문구. 기준은 11/20 정민석 결정:
 // 살린 시간은 방문 완료 시술 시간 합, 추가 수입은 수수료를 뗀 정산액 합(패널티 떼기 전, 수수료율 전에는 [미정]),
-// 거래는 처리·취소일(한국 날짜)에 놓고 날 칸을 누르면 그날 거래 내역
+// 거래는 처리·취소일(한국 날짜)에 놓고 날 칸을 누르면 그날 거래 내역, 방문 완료는 서비스 이름 칩으로
 
 import { describe, expect, it } from 'vitest';
 
@@ -12,6 +12,7 @@ import {
   kstMonthBounds,
   resolveStatsMonth,
   savedTimeText,
+  serviceChipText,
   statsHref,
   statsPayoutCaption,
   statsPayoutText,
@@ -48,27 +49,33 @@ describe('보는 달', () => {
 });
 
 describe('날 칸 값', () => {
-  it('거래는 처리·취소 시각의 한국 날짜에 종류별로 세고, 칩은 이용 완료·노쇼·고객 취소 순', () => {
+  it('거래는 처리·취소 시각의 한국 날짜에 놓고, 방문 완료는 서비스 이름별로 그날 먼저 처리한 순서, 나머지는 노쇼·고객 취소 순 종류별로', () => {
+    // 정산 내역처럼 늦은 것부터 넘긴다
     const days = buildStatsDays(
       [
-        { kind: 'penalty', occurredAt: '2026-11-01T03:00:00.000Z' },
-        { kind: 'sale', occurredAt: '2026-11-01T05:00:00.000Z' },
-        { kind: 'sale', occurredAt: '2026-11-01T06:00:00.000Z' },
-        { kind: 'no_show', occurredAt: '2026-11-01T07:00:00.000Z' },
         // 한국 시간 11/2 0시 30분(UTC로는 11/1)
-        { kind: 'owner_cancel', occurredAt: '2026-11-01T15:30:00.000Z' },
+        { kind: 'owner_cancel', occurredAt: '2026-11-01T15:30:00.000Z', menuName: '디자인 펌' },
+        { kind: 'no_show', occurredAt: '2026-11-01T07:00:00.000Z', menuName: '여성 커트' },
+        { kind: 'sale', occurredAt: '2026-11-01T06:30:00.000Z', menuName: '전체 염색' },
+        { kind: 'sale', occurredAt: '2026-11-01T06:00:00.000Z', menuName: '여성 커트' },
+        { kind: 'sale', occurredAt: '2026-11-01T05:00:00.000Z', menuName: '여성 커트' },
+        { kind: 'penalty', occurredAt: '2026-11-01T03:00:00.000Z', menuName: '디자인 펌' },
       ],
-      [{ dateKey: '2026-11-01', visitCount: 2, minutes: 150 }],
+      [{ dateKey: '2026-11-01', visitCount: 3, minutes: 240 }],
     );
     expect(days.get('2026-11-01')).toEqual({
+      services: [
+        { menuName: '여성 커트', count: 2 },
+        { menuName: '전체 염색', count: 1 },
+      ],
       kinds: [
-        { kind: 'sale', count: 2 },
         { kind: 'no_show', count: 1 },
         { kind: 'penalty', count: 1 },
       ],
-      minutes: 150,
+      minutes: 240,
     });
     expect(days.get('2026-11-02')).toEqual({
+      services: [],
       kinds: [{ kind: 'owner_cancel', count: 1 }],
       minutes: 0,
     });
@@ -77,8 +84,13 @@ describe('날 칸 값', () => {
 
   it('거래를 못 읽어도 방문한 날은 살린 시간만으로 칸이 생긴다', () => {
     expect(buildStatsDays([], [{ dateKey: '2026-11-03', visitCount: 1, minutes: 60 }])).toEqual(
-      new Map([['2026-11-03', { kinds: [], minutes: 60 }]]),
+      new Map([['2026-11-03', { services: [], kinds: [], minutes: 60 }]]),
     );
+  });
+
+  it('서비스 칩은 한 번이면 이름만, 여러 번이면 "(건수)"를 붙인다', () => {
+    expect(serviceChipText({ menuName: '남성 커트', count: 1 })).toBe('남성 커트');
+    expect(serviceChipText({ menuName: '여성 커트', count: 2 })).toBe('여성 커트 (2)');
   });
 
   it('달 합계는 날마다 더한 값', () => {

@@ -1,5 +1,6 @@
 // 원장님 월별 통계(S-504) 계산과 문구. 화면과 서버 어디서나 가져올 수 있다. 정한 것(11/20 정민석):
-// - 왼쪽 메뉴 [통계](/owner/stats?month=YYYY-MM). 달력 날 칸마다 그날 거래 종류별 건수와 그날 살린 시간
+// - 왼쪽 메뉴 [통계](/owner/stats?month=YYYY-MM). 달력 날 칸마다 그날 거래와 그날 살린 시간.
+//   방문 완료한 거래는 "이용 완료" 대신 서비스(메뉴) 이름을 초록 칩으로, 나머지(노쇼·고객 취소 등)는 종류별 건수로
 // - 살린 시간: 방문 완료로 처리한 예약의 시술 시간(매물 시작~끝) 합. 노쇼·취소·무효는 빈 시간을 채운 게 아니라서 뺀다
 // - 추가 수입: 정산 내역(getSettlementItems)의 그 달 정산액 합. 수수료를 뗀 뒤, 원장님 사정 취소 패널티는 떼기 전이라
 //   정산 화면 "이 기간 합계"의 정산액과 같다. 결제 수수료율이 정해지기 전에는 [미정]
@@ -20,11 +21,18 @@ import {
 /** 그날 방문 완료 예약 수와 시술 시간 합(분). dateKey는 방문 처리일(한국 날짜) */
 export type VisitDay = { dateKey: string; visitCount: number; minutes: number };
 
-/** 달력 날 칸 하나: 거래 종류별 건수(칩 순서대로)와 살린 시간(분) */
+/** 달력 날 칸 하나 */
 export type StatsDay = {
-  kinds: { kind: SettlementItemViewKind; count: number }[];
+  /** 방문 완료한 서비스(메뉴 이름)별 건수. 그날 먼저 방문 완료로 처리한 서비스부터 */
+  services: { menuName: string; count: number }[];
+  /** 방문 완료 밖의 거래 종류별 건수(칩 순서대로) */
+  kinds: { kind: StatsKind; count: number }[];
+  /** 살린 시간(분) */
   minutes: number;
 };
+
+/** 날 칸에 종류 이름으로 보여 주는 거래(방문 완료 sale은 서비스 이름으로 보여 준다) */
+export type StatsKind = Exclude<SettlementItemViewKind, 'sale'>;
 
 /** 그 달 정산 내역 합계 중 통계에 쓰는 것(정산할 금액이 있는 거래 수, 정산액 합, 아직 떼지 못한 패널티). 못 읽으면 null */
 export type StatsPayout = {
@@ -33,9 +41,8 @@ export type StatsPayout = {
   outstandingPenalty: number;
 } | null;
 
-/** 날 칸의 칩 순서. 받은 돈이 생긴 거래부터, 정산할 금액이 없는 거래는 뒤로 */
-export const STATS_KIND_ORDER: readonly SettlementItemViewKind[] = [
-  'sale',
+/** 서비스 칩 다음 종류 칩 순서. 받은 돈이 생긴 거래부터, 정산할 금액이 없는 거래는 뒤로 */
+export const STATS_KIND_ORDER: readonly StatsKind[] = [
   'no_show',
   'penalty',
   'agreed_cancel',
@@ -73,17 +80,24 @@ export function kstMonthBounds(month: string): { from: Date; to: Date } {
 
 /**
  * 날 칸 값. 거래는 처리·취소 시각(occurredAt)의 한국 날짜에, 살린 시간은 방문 처리일에 놓는다.
- * 거래도 방문도 없는 날은 넣지 않는다
+ * 방문 완료(sale)는 서비스 이름별로, 나머지는 종류별로 센다. 거래도 방문도 없는 날은 넣지 않는다
  */
 export function buildStatsDays(
-  items: readonly Pick<SettlementItemView, 'kind' | 'occurredAt'>[],
+  items: readonly Pick<SettlementItemView, 'kind' | 'occurredAt' | 'menuName'>[],
   visits: readonly VisitDay[],
 ): Map<string, StatsDay> {
-  const counts = new Map<string, Map<SettlementItemViewKind, number>>();
-  for (const item of items) {
+  type Counts = { services: Map<string, number>; kinds: Map<StatsKind, number> };
+  const counts = new Map<string, Counts>();
+  // 정산 내역은 늦은 것부터 오므로, 서비스 칩이 그날 먼저 처리한 순서가 되게 이른 것부터 센다
+  const ordered = [...items].sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt));
+  for (const item of ordered) {
     const dateKey = kstDateKey(new Date(item.occurredAt));
-    const day = counts.get(dateKey) ?? new Map<SettlementItemViewKind, number>();
-    day.set(item.kind, (day.get(item.kind) ?? 0) + 1);
+    const day = counts.get(dateKey) ?? { services: new Map(), kinds: new Map() };
+    if (item.kind === 'sale') {
+      day.services.set(item.menuName, (day.services.get(item.menuName) ?? 0) + 1);
+    } else {
+      day.kinds.set(item.kind, (day.kinds.get(item.kind) ?? 0) + 1);
+    }
     counts.set(dateKey, day);
   }
   const minutes = new Map(visits.map((visit) => [visit.dateKey, visit.minutes]));
@@ -91,14 +105,20 @@ export function buildStatsDays(
   for (const dateKey of new Set([...counts.keys(), ...minutes.keys()])) {
     const day = counts.get(dateKey);
     days.set(dateKey, {
+      services: [...(day?.services ?? [])].map(([menuName, count]) => ({ menuName, count })),
       kinds: STATS_KIND_ORDER.flatMap((kind) => {
-        const count = day?.get(kind) ?? 0;
+        const count = day?.kinds.get(kind) ?? 0;
         return count > 0 ? [{ kind, count }] : [];
       }),
       minutes: minutes.get(dateKey) ?? 0,
     });
   }
   return days;
+}
+
+/** 서비스 칩 글자. 한 번이면 이름만, 여러 번이면 "여성 커트 (2)" */
+export function serviceChipText(service: { menuName: string; count: number }): string {
+  return service.count > 1 ? `${service.menuName} (${service.count})` : service.menuName;
 }
 
 /** 그 달 방문 완료 합계 */
