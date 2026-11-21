@@ -8,6 +8,7 @@ import { formatWon } from '@/lib/format';
 import { formatEndTime, formatKst } from '@/lib/time';
 
 import type { MyReservationListItem } from './queries';
+import { showsNoShow, VOID_BADGE } from './void-texts';
 
 /**
  * [내 예약] 목록의 예약 하나 = 흰 카드 하나(#359 2번). 카드 어디를 눌러도 예약 상세로 간다.
@@ -42,7 +43,9 @@ export function ReservationCard({
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className="truncate">{item.shopName}</span>
-            {item.noShow ? <Badge variant="destructive">노쇼</Badge> : null}
+            {/* 운영자가 무효로 처리한 예약(A-108, #528). 노쇼였어도 무효면 노쇼 배지는 숨긴다 */}
+            {item.voided ? <Badge variant="outline">{VOID_BADGE}</Badge> : null}
+            {showsNoShow(item) ? <Badge variant="destructive">노쇼</Badge> : null}
             {visitPending ? <Badge variant="secondary">방문 확인 중</Badge> : null}
             {/* 원장님 요청에 답할 곳은 예약 상세 맨 위의 요청 카드(#359 3번) */}
             {item.agreedCancelPending ? (
