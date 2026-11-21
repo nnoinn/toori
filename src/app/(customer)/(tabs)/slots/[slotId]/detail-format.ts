@@ -17,7 +17,7 @@ const businessHourSchema = z.union([
 export type BusinessHourRow = { weekday: number; label: string; text: string };
 
 /**
- * 영업시간을 월~일 순서의 7줄로. 원장님이 입력하지 않은 요일은 "정보 없음".
+ * 영업시간을 일~토 순서의 7줄로(캘린더처럼, 원장님 영업시간 표와 같은 순서. 11/15 nnoinn, #437). 원장님이 입력하지 않은 요일은 "정보 없음".
  * 모양이 틀린 줄은 버린다. 한 줄도 없으면 null(화면에서 영업시간 칸을 숨긴다).
  * 영업시간 규칙(11/11, 기술 가이드 7장): 닫는 시각이 여는 시각보다 이르면 다음 날 새벽까지라 닫는 시각에 (익일)을 붙이고
  * ("18:00 ~ 02:00(익일)", 자정 마감은 "18:00 ~ 00:00(익일)", 11/12 점검 1-6), 둘이 같으면 24시간 영업
@@ -32,8 +32,8 @@ export function formatBusinessHours(raw: unknown): BusinessHourRow[] | null {
     byWeekday.set(row.weekday, 'closed' in row ? '휴무' : hoursText(row.open, row.close));
   }
   if (byWeekday.size === 0) return null;
-  // 월요일부터 보여준다
-  return [1, 2, 3, 4, 5, 6, 0].map((weekday) => ({
+  // 일요일(0)부터 토요일(6)까지 보여준다
+  return [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({
     weekday,
     label: WEEKDAY_LABELS[weekday],
     text: byWeekday.get(weekday) ?? '정보 없음',
