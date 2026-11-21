@@ -493,6 +493,7 @@ describeDb('목요일 정산 묶기 (실제 DB)', () => {
     const inHeldShop = await done(heldShop, '09:00', '10:00', '11:00');
     const hold = (target: Partial<typeof settlementHolds.$inferInsert>) => ({
       reason: '계좌 확인 필요',
+      reasonCode: 'payout_info_check',
       heldBy: adminId,
       heldAt: kst('2026-11-02', '10:00'),
       ...target,
