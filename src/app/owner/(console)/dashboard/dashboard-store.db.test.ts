@@ -221,6 +221,42 @@ describeDb('원장님 대시보드 조회 (실제 DB)', () => {
     });
   });
 
+  it('운영자 마감이면 원장님에게 보여 줄 사유 코드를 같이 주고, 원장님이 마감했으면 null(#489, #499)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx);
+      await tx.insert(slots).values([
+        testSlot(shop, '09:00', '10:00', {
+          status: 'closed',
+          closeReason: 'admin',
+          adminCloseCode: 'listing_mismatch',
+        }),
+        testSlot(shop, '10:00', '11:00', { status: 'closed', closeReason: 'mistake' }),
+        testSlot(shop, '11:00', '12:00'),
+      ]);
+      await addWindow(tx, shop, '2026-11-01 13:00', '2026-11-01 15:00', {
+        status: 'closed',
+        closeReason: 'admin',
+        adminCloseCode: 'user_inquiry',
+      });
+      await addWindow(tx, shop, '2026-11-01 16:00', '2026-11-01 18:00', {
+        status: 'closed',
+        closeReason: 'mistake',
+      });
+
+      const slotRows = await selectDashboardSlots(tx, shop.shopId, from);
+      expect(slotRows.map((row) => [row.closeReason, row.adminCloseCode])).toEqual([
+        ['admin', 'listing_mismatch'],
+        ['mistake', null],
+        [null, null],
+      ]);
+      const windowRows = await selectDashboardWindows(tx, shop.shopId, from, from);
+      expect(windowRows.map((row) => [row.closeReason, row.adminCloseCode])).toEqual([
+        ['admin', 'user_inquiry'],
+        ['mistake', null],
+      ]);
+    });
+  });
+
   it('매물·시간대의 등록 시각을 같이 읽는다(등록 최신 순 정렬, #358 5번)', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx);
