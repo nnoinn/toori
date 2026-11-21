@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { EMPTY_OWNER_JOIN_FORM, type OwnerJoinForm, validateOwnerJoin } from './owner-join';
+import {
+  EMPTY_OWNER_JOIN_FORM,
+  OWNER_AGREEMENT_ITEMS,
+  OWNER_JOIN_FIELD_ORDER,
+  type OwnerJoinForm,
+  validateOwnerJoin,
+} from './owner-join';
 
 const TODAY = '2026-10-29';
 
@@ -123,5 +129,36 @@ describe('원장님 가입 입력 검사 (S-101·S-107)', () => {
   it('글자 수를 넘으면 막는다', () => {
     expect(errorsOf({ ownerName: '가'.repeat(21) })).toHaveProperty('ownerName');
     expect(errorsOf({ shopName: '가'.repeat(41) })).toHaveProperty('shopName');
+  });
+
+  it('상세 주소는 100자까지 받고, 도로명 주소는 앞뒤 빈칸을 뺀다', () => {
+    expect(errorsOf({ addressDetail: 'a'.repeat(100) })).toEqual({});
+    expect(errorsOf({ addressDetail: 'a'.repeat(101) })).toEqual({
+      addressDetail: '100자 이하로 입력해 주세요',
+    });
+    const result = validateOwnerJoin(
+      { ...filled, roadAddress: '  경기 안산시 단원구 화랑로 387  ' },
+      TODAY,
+    );
+    expect(result.ok && result.data.shop.roadAddress).toBe('경기 안산시 단원구 화랑로 387');
+  });
+});
+
+describe('가입 화면의 처음 상태와 칸 순서', () => {
+  it('필수 약관 3개는 처음에 모두 꺼져 있다(미리 체크하지 않는다)', () => {
+    expect(OWNER_AGREEMENT_ITEMS.map((item) => item.key)).toEqual([
+      'supplier',
+      'privacy',
+      'payoutInfo',
+    ]);
+    expect(EMPTY_OWNER_JOIN_FORM.agreements).toEqual({
+      supplier: false,
+      privacy: false,
+      payoutInfo: false,
+    });
+  });
+
+  it('처음 오류 칸을 찾는 순서에 입력 칸이 모두 한 번씩 있다', () => {
+    expect([...OWNER_JOIN_FIELD_ORDER].sort()).toEqual(Object.keys(EMPTY_OWNER_JOIN_FORM).sort());
   });
 });
