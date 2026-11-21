@@ -189,7 +189,7 @@ export async function selectShopCancelStats(
     byStatus[status] += row.count;
     if (status === 'agreed') agreedByReason[row.reason as AgreedCancelReason] += row.count;
   }
-  for (const row of agreedWaiting) byStatus[row.status as AgreedCancelRequestStatus] += 1;
+  for (const row of agreedWaiting) byStatus[nowStatus(row, now)] += 1;
 
   return {
     ownerFault: {
@@ -220,7 +220,7 @@ export async function selectShopCancelStats(
         requestedAt: row.requestedAt,
         reason: row.reason as AgreedCancelReason,
         reasonText: row.reasonText,
-        status: nowStatus({ ...row, reservationStatus: 'confirmed', visitResult: null }, now),
+        status: nowStatus(row, now),
       })),
     },
   };
