@@ -7,6 +7,7 @@ import { REFUND_ERRORS } from '@/server/refunds/errors';
 import {
   AGREED_CANCEL_CONFIRM_LABEL,
   AGREED_CANCEL_REASON_CHIPS,
+  agreedCancelDeadlineText,
   agreedCancelFailIsFinal,
   agreedCancelFailShowsNewState,
   agreedCancelOutcomes,
@@ -79,6 +80,34 @@ describe('원장님 합의 후 취소 요청 (S-410)', () => {
     expect(agreedCancelStatusText('expired', 8750).title).toContain(
       `${AGREED_CANCEL_RESPONSE_HOURS}시간 안에`,
     );
+  });
+
+  it('상태 문구의 제목은 상태마다 다르다(기다리는 중·거절·끝남)', () => {
+    expect(agreedCancelStatusText('requested', 8750)).toEqual({
+      title: '손님 동의를 기다리는 중이에요',
+      body: expect.stringContaining(`${AGREED_CANCEL_RESPONSE_HOURS}시간 안에 답하지 않으면`),
+    });
+    expect(agreedCancelStatusText('declined', 8750).title).toBe('손님이 동의하지 않았어요');
+    expect(agreedCancelStatusText('closed', 8750)).toEqual({
+      title: '요청이 끝났어요',
+      body: '손님이 답하기 전에 예약이 취소됐거나 방문·노쇼로 처리됐어요.',
+    });
+  });
+
+  it('기타 내용은 딱 100자까지 받고, 기타가 아닌 사유나 내용 없는 기타는 사유 이름만', () => {
+    const longest = 'a'.repeat(AGREED_CANCEL_REASON_TEXT_MAX);
+    expect(canSubmitAgreedCancel({ reason: 'other', reasonText: longest, confirmed: true })).toBe(
+      true,
+    );
+    // 기타가 아닌 사유에 적힌 내용은 보여주지 않는다
+    expect(agreedCancelReasonText('style_mismatch', '적은 내용')).toBe(
+      '사유: 원하는 시술이 예약한 서비스와 달라요',
+    );
+    expect(agreedCancelReasonText('other', null)).toBe('사유: 기타');
+  });
+
+  it('답을 기다리는 동안의 기한은 한국 시각', () => {
+    expect(agreedCancelDeadlineText('2026-11-02T05:00:00.000Z')).toBe('11/2(월) 14:00까지');
   });
 
   it('실패: 다른 요청이 생겼거나 예약이 바뀌었으면 화면을 다시 받고 버튼을 잠근다', () => {

@@ -7,6 +7,7 @@ import {
   formatDateKey,
   hoursBeforeText,
   minusWon,
+  monthLabel,
   monthRange,
   payoutAccountText,
   periodHrefValue,
@@ -42,6 +43,15 @@ describe('정산 내역 문구 (O15, S-502)', () => {
         baseAmount: 22500,
       }),
     ).toBe('판매가 45,000원 × 50% = 22,500원');
+    // 비율 기록이 없으면 식 없이 기준 금액만
+    expect(
+      baseAmountFormula({
+        kind: 'penalty',
+        salePrice: 45000,
+        penaltyRate: null,
+        baseAmount: 13500,
+      }),
+    ).toBe('13,500원');
   });
 
   it('기준 금액 식: 이용 완료·노쇼는 판매가 그대로, 원장님 사정 취소·무효는 정산할 금액이 없다', () => {
@@ -303,6 +313,29 @@ describe('정산 내역 기간 (O15, S-502)', () => {
     });
   });
 
+  it('시작일·끝일 중 하나라도 비거나 날짜 모양이 아니면 그 기간으로 보지 않고 month 값의 달', () => {
+    const now = new Date('2026-11-14T03:00:00.000Z');
+    const october = { kind: 'month', month: '2026-10' };
+    for (const range of [
+      { to: '2026-11-14' },
+      { from: '2026-09-01', to: '2026-11-14x' },
+      { from: 'x2026-09-01', to: '2026-11-14' },
+      { from: '2026-09-01T00', to: '2026-11-14' },
+      { from: '2026-09-01', to: 'x2026-11-14' },
+    ]) {
+      expect(resolveSettlementPeriod({ month: '2026-10', ...range }, now)).toMatchObject(october);
+    }
+  });
+
+  it('month 값은 YYYY-MM 모양의 1~12월만 받는다', () => {
+    const now = new Date('2026-11-14T03:00:00.000Z');
+    expect(resolveSettlementPeriod({ month: '2026-09' }, now)).toMatchObject({ month: '2026-09' });
+    for (const month of ['2026-00', '2026-13', '2026-10x', 'x2026-10']) {
+      expect(resolveSettlementPeriod({ month }, now)).toMatchObject({ month: '2026-11' });
+    }
+    expect(monthLabel('2026-09')).toBe('2026년 9월');
+  });
+
   it('주소와 기간 이름', () => {
     expect(settlementsHref({ month: '2026-11' })).toBe('/owner/settlements?month=2026-11');
     expect(settlementsHref({ from: '2026-09-01', to: '2026-11-14' })).toBe(
@@ -338,6 +371,14 @@ describe('거래 내역 정렬 (#358 5번, 11/18 정민석)', () => {
   it('서비스 일시 순(목록 첫 칸): 서비스 일시가 같으면 처리·취소 시각도 같은 방향으로', () => {
     expect(names(sortSettlementItems(items, 'start_desc'))).toBe('DBAC');
     expect(names(sortSettlementItems(items, 'start_asc'))).toBe('CABD');
+  });
+
+  it('받은 순서가 달라도 결과는 같다(같은 시각끼리도 둘째 기준으로 정한다)', () => {
+    const reversed = [...items].reverse();
+    expect(names(sortSettlementItems(reversed, 'occurred_desc'))).toBe('ADCB');
+    expect(names(sortSettlementItems(reversed, 'occurred_asc'))).toBe('BCDA');
+    expect(names(sortSettlementItems(reversed, 'start_desc'))).toBe('DBAC');
+    expect(names(sortSettlementItems(reversed, 'start_asc'))).toBe('CABD');
   });
 
   it('순서만 바꾸고 받은 목록은 그대로 둔다', () => {

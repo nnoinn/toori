@@ -114,6 +114,26 @@ describe('시간대 매물 ① 시간표 (#308)', () => {
     const cells = dayCells('2026-11-26', hours, now, []);
     expect(cells[0].lock).toBeNull();
     expect(cells[1].lock).toBe('tooFar');
+    // 딱 14일 뒤(11/12 10:00 → 11/26 10:00)에 시작하는 칸은 올릴 수 있다
+    const exact = dayCells('2026-11-26', hours, kst('2026-11-12T10:00:00'), []);
+    expect(exact[0].lock).toBeNull();
+    expect(exact[1].lock).toBe('tooFar');
+  });
+
+  it('번호가 이어져도 시각이 끊긴 칸(전날 새벽과 그 날 영업 사이)은 다른 묶음', () => {
+    // 수 18:00 ~ 목 02:00, 목 20:00 ~ 금 01:00. 목 01:30 칸(3번)과 20:00 칸(4번)은 번호만 이어진다
+    const night: BusinessHours = [
+      { weekday: 3, open: '18:00', close: '02:00' },
+      { weekday: 4, open: '20:00', close: '01:00' },
+    ];
+    const cells = dayCells(THURSDAY, night, kst('2026-11-11T12:00:00'), []);
+    const ranges = selectedRanges(cells, new Set([3, 4]));
+    expect(ranges.map((range) => rangeLabel(range))).toEqual(['01:30~02:00', '20:00~20:30']);
+  });
+
+  it('30분 칸으로 맞추고 나서 남는 시간이 없는 구간은 시간표에서 뺀다', () => {
+    // 10:15 ~ 10:45는 안쪽 30분 칸으로 맞추면 10:30 ~ 10:30
+    expect(daySpans(THURSDAY, [{ weekday: 4, open: '10:15', close: '10:45' }])).toEqual([]);
   });
 
   it('하루 전체 시간표의 마지막 칸은 자정에 끝나고 "00:00(익일)"로 보인다', () => {
@@ -144,6 +164,13 @@ describe('시간대 매물 ① 시간표 (#308)', () => {
     expect(rangesSummary([])).toBeNull();
   });
 
+  it('고른 칸이 그 사이 잠겼으면(시간이 지나 지난 시각) 그 칸만 빼고 묶는다', () => {
+    // 지금 10:10이라 10:00 칸(0번)은 지난 시각이다
+    const cells = dayCells(THURSDAY, hours, now, []);
+    const ranges = selectedRanges(cells, new Set([0, 1, 2]));
+    expect(ranges.map((range) => rangeLabel(range))).toEqual(['10:30~11:30']);
+  });
+
   it('잠긴 칸 이유는 이어진 묶음의 첫 칸에만', () => {
     const busy = [{ start: kst('2026-11-12T12:00:00'), end: kst('2026-11-12T13:00:00') }];
     const cells = dayCells(THURSDAY, hours, now, busy);
@@ -157,5 +184,7 @@ describe('시간대 매물 ① 시간표 (#308)', () => {
       null,
       null,
     ]);
+    // 칸 밖 번호는 이유가 없다
+    expect(lockLabelAt(cells, cells.length)).toBeNull();
   });
 });
