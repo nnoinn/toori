@@ -110,7 +110,11 @@ describe('정산 내역 문구 (O15, S-502)', () => {
       }),
     ).toBe('이의제기로 보류');
     expect(
-      settlementStatusText({ status: 'held', payoutDate: null, hold: { reason: 'admin' } }),
+      settlementStatusText({
+        status: 'held',
+        payoutDate: null,
+        hold: { reason: 'admin', code: 'user_inquiry' },
+      }),
     ).toBe('운영자 확인으로 보류');
     // 함수는 보류 줄에 늘 이유를 주지만, 없으면 어느 쪽이라고 하지 않는다
     expect(settlementStatusText({ status: 'held', payoutDate: null, hold: null })).toBe('보류');
@@ -156,7 +160,7 @@ describe('정산 내역 문구 (O15, S-502)', () => {
         {
           status: 'held',
           disputeDeadlineAt: '2026-11-18T09:00:00.000Z',
-          hold: { reason: 'admin' },
+          hold: { reason: 'admin', code: 'user_inquiry' },
         },
         now,
       ),
