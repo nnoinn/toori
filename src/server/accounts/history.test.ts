@@ -196,7 +196,7 @@ describe('운영자 계정 이력 (AUTH-13)', () => {
         userId: 'customer-user',
         from: null,
         before: null,
-        kinds: ['coupon_issued', 'coupon_used'],
+        kinds: ['coupon_issued', 'coupon_used', 'coupon_returned'],
         take: 20,
       },
     ]);
