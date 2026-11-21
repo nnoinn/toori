@@ -8,13 +8,14 @@ import { EmptyState, ErrorState, LoadingCards } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { ensureOwnerPage } from '@/server/auth';
-import { PUBLISH_PAUSED_MESSAGE, readPublishPausedAt } from '@/server/shops';
+import { PUBLISH_PAUSED_MESSAGE, readPublishPause } from '@/server/shops';
 import { SHOP_STATUS_LABELS } from '@/server/shops/status';
 import { getShopReviewStatus } from '@/server/shops/review';
 import { getLastWindowSettings } from '@/server/slot-windows/actions';
 
 import { OwnerPage } from '../../owner-page';
 import { SlotForm } from '../slot-form';
+import { publishPauseNoticeLine } from '../publish-pause-notice';
 import { selectSlotFormData } from '../slot-form-data';
 import { WindowForm } from '../window/window-form';
 import { SlotCreateTabs } from './slot-create-tabs';
@@ -64,17 +65,22 @@ async function SlotCreateContent() {
   }
 
   // 운영자가 새 매물 게시를 멈춘 샵(#373 ④, #472)은 한 시술·시간대 매물 모두 올릴 수 없다. 서버 함수도 따로 막는다.
-  // 운영자가 적은 사유는 보여 주지 않는다(알림과 같은 제목, 서버 함수와 같은 문구)
-  if (await readPublishPausedAt(auth.shopId)) {
+  // 알림과 같은 제목, 서버 함수와 같은 문구, 그 아래에 운영자가 목록에서 고른 사유 한 줄(#499 ②). 운영자가 쓴 메모는 보여 주지 않는다
+  const pause = await readPublishPause(auth.shopId);
+  if (pause) {
+    const notice = publishPauseNoticeLine(pause);
     return (
       <Card>
         <EmptyState
           title="새 매물 등록이 잠시 멈췄어요"
           description={PUBLISH_PAUSED_MESSAGE}
           action={
-            <Button asChild variant="outline">
-              <Link href="/owner">대시보드로</Link>
-            </Button>
+            <div className="flex flex-col items-center gap-3">
+              {notice ? <p className="text-xs text-muted-foreground">{notice}</p> : null}
+              <Button asChild variant="outline">
+                <Link href="/owner">대시보드로</Link>
+              </Button>
+            </div>
           }
         />
       </Card>
