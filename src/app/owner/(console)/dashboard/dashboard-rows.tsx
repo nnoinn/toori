@@ -26,6 +26,7 @@ import { formatEndTime, formatKst } from '@/lib/time';
 import type { VisitResult } from '@/server/visits/types';
 
 import { VISIT_ACTIONS } from '../reservations/reservation-detail';
+import { adminNoticeLine } from '../admin-notice-line';
 import { canRelist } from '../slots/relist';
 import { SLOT_CLOSE_REASON_LABELS } from '../slots/slot-edit';
 import { SLOT_STATUS_STYLE } from '../status-style';
@@ -101,6 +102,11 @@ export function SlotRow({
         {status === 'closed' && slot.closeReason ? (
           <span className="text-xs text-muted-foreground">
             {SLOT_CLOSE_REASON_LABELS[slot.closeReason]}
+          </span>
+        ) : null}
+        {status === 'closed' && slot.adminCloseCode ? (
+          <span className="text-xs text-muted-foreground">
+            {adminNoticeLine(slot.adminCloseCode, 'close')}
           </span>
         ) : null}
         {slot.relistedSlotId ? (
@@ -238,6 +244,11 @@ export function WindowRow({
         {window.state === 'closed' && window.closeReason ? (
           <span className="text-xs text-muted-foreground">
             {SLOT_CLOSE_REASON_LABELS[window.closeReason]}
+          </span>
+        ) : null}
+        {window.state === 'closed' && window.adminCloseCode ? (
+          <span className="text-xs text-muted-foreground">
+            {adminNoticeLine(window.adminCloseCode, 'close')}
           </span>
         ) : null}
       </div>

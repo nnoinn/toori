@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  adminHoldNoticeLine,
   baseAmountFormula,
   disputeDeadlineText,
   feeRateLabel,
@@ -368,5 +369,36 @@ describe('거래 내역 정렬 (#358 5번, 11/18 정민석)', () => {
     expect(settlementsHref({ month: '2026-11' }, { view: 'statements', sort: 'start_desc' })).toBe(
       '/owner/settlements?month=2026-11',
     );
+  });
+});
+
+describe('운영자 정산 보류 사유 한 줄 (#489, #499)', () => {
+  it('운영자가 고른 사유와 다음에 할 일을 정책 문구 그대로', () => {
+    expect(adminHoldNoticeLine({ reason: 'admin', code: 'payout_info_check' })).toBe(
+      '사유: 정산 계좌·사업자 정보 확인이 필요해요 · 정산 계좌를 확인해 주세요',
+    );
+    expect(adminHoldNoticeLine({ reason: 'admin', code: 'other' })).toBe(
+      '사유: 기타 · 자세한 내용은 투리 카카오톡 채널로 안내해 드려요',
+    );
+  });
+
+  it('다음에 할 일이 "돌아오는 지급일에 들어가요"면 위 문장과 겹쳐서 사유만, 다음에 할 일이 없으면(원장님 요청) 사유만', () => {
+    expect(adminHoldNoticeLine({ reason: 'admin', code: 'user_inquiry' })).toBe(
+      '사유: 이용자 문의를 확인하고 있어요',
+    );
+    expect(adminHoldNoticeLine({ reason: 'admin', code: 'payment_check' })).toBe(
+      '사유: 결제·환불 내역을 확인하고 있어요',
+    );
+    expect(adminHoldNoticeLine({ reason: 'admin', code: 'owner_request' })).toBe(
+      '사유: 원장님이 요청하셨어요',
+    );
+  });
+
+  it('이의제기 보류나 보류가 아니면 없다', () => {
+    expect(
+      adminHoldNoticeLine({ reason: 'dispute', receivedAt: '2026-11-15T01:00:00.000Z' }),
+    ).toBeNull();
+    expect(adminHoldNoticeLine(null)).toBeNull();
+    expect(adminHoldNoticeLine(undefined)).toBeNull();
   });
 });
