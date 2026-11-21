@@ -51,12 +51,14 @@ const CANCEL_TITLES: Record<string, string> = {
   system: '자동 취소',
 };
 
+/** 환불 사유. 쿠폰 돌려받은 사유(원장님 사정 취소·무효)도 같은 코드라 이 이름을 쓴다 */
 const REFUND_REASONS: Record<string, string> = {
   customer_cancel: '고객 취소',
   owner_fault: '원장님 사정 취소',
   agreed_cancel: '합의 후 취소',
   auto_cancel: '자동 취소',
   admin_exception: '운영자 환불',
+  void: '무효',
 };
 
 const AGREED_RESULTS: Record<string, string> = {
@@ -207,7 +209,16 @@ export function historyText(
     case 'coupon_issued':
       return text('쿠폰 받음', join([won, label(COUPON_REASONS, event.reason)]));
     case 'coupon_used':
-      return text('쿠폰 사용', won);
+      return text('쿠폰 사용', join([...reservationPart(event), won]));
+    case 'coupon_returned':
+      return text(
+        '쿠폰 돌려받음',
+        join([
+          event.reservationCode && `예약 ${event.reservationCode}`,
+          label(REFUND_REASONS, event.reason),
+          won,
+        ]),
+      );
     case 'dispute_filed':
       return text(
         '이의제기 접수',
