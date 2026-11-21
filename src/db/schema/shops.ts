@@ -4,6 +4,7 @@
 import { sql } from 'drizzle-orm';
 import { check, date, index, integer, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 
+import { PUBLISH_PAUSE_CODES } from '@/server/policy/admin-notice';
 import { SERVICE_TYPE_KEYS, SHOP_CATEGORY_KEYS } from '@/server/policy/catalog';
 
 import { owners, profiles } from './accounts';
@@ -72,17 +73,24 @@ export const shops = pgTable(
     // 운영자가 새 매물 게시를 멈춘 시각·사유(#373 ④, #433). 비어 있으면 게시할 수 있다.
     // 새 등록만 막고 이미 등록한 매물(게시예정 포함)은 그대로다. 누가 멈추고 풀었는지는 admin_actions에 남는다
     publishPausedAt: timestamptz(),
+    // 운영자가 쓴 사유(원장님에게 숨김)
     publishPausedReason: text(),
+    // 원장님에게 보여 줄 사유 코드(#489, 정책 PUBLISH_PAUSE_CODES). 0021 전에 멈춘 샵은 other
+    publishPausedCode: text(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     check('shops_category_check', inValues(t.category, SHOP_CATEGORY_KEYS)),
     check('shops_status_check', inValues(t.status, SHOP_STATUSES)),
-    // 멈춘 시각과 사유는 같이 채우고 같이 비운다
+    // 멈춘 시각·사유·사유 코드는 같이 채우고 같이 비운다
     check(
       'shops_publish_pause_check',
-      sql`(${t.publishPausedAt} is null) = (${t.publishPausedReason} is null)`,
+      sql`(${t.publishPausedAt} is null) = (${t.publishPausedReason} is null) and (${t.publishPausedAt} is null) = (${t.publishPausedCode} is null)`,
+    ),
+    check(
+      'shops_publish_paused_code_check',
+      sql`${t.publishPausedCode} is null or ${inValues(t.publishPausedCode, PUBLISH_PAUSE_CODES)}`,
     ),
     index('shops_location_idx').using('gist', t.location),
     index('shops_status_idx').on(t.status),
