@@ -96,7 +96,7 @@ async function ReviewDetail({
   const cancelPeriod = readCancelStatsSearch(await searchParams);
   const cancelRange = toCancelStatsRange(cancelPeriod);
   const cancelStats =
-    approved && cancelRange ? await selectShopCancelStats(db, shopId, cancelRange) : null;
+    approved && cancelRange ? await selectShopCancelStats(db, shopId, now, cancelRange) : null;
 
   return (
     <div className="flex flex-col gap-4">
