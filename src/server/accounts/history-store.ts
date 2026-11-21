@@ -582,7 +582,14 @@ export async function readCustomerHistory(
           .from(reservations)
           .innerJoin(orders, eq(orders.id, reservations.orderId))
           .innerJoin(slots, eq(slots.id, reservations.slotId))
-          .where(and(mine, isNotNull(orders.paidAt), within(orders.paidAt, range)))
+          .where(
+            and(
+              mine,
+              isNotNull(orders.couponId),
+              isNotNull(orders.paidAt),
+              within(orders.paidAt, range),
+            ),
+          )
           .orderBy(...newestFirst(orders.paidAt, reservations.id))
           .limit(range.take)
           .then((rows) =>
@@ -767,7 +774,7 @@ function readCouponReturned(
         and(
           usedCoupon,
           isNotNull(reservations.voidedAt),
-          or(isNull(reservations.cancelActor), ne(reservations.cancelActor, 'admin')),
+          or(isNull(reservations.cancelActor), ne(reservations.cancelActor, 'owner_fault')),
           within(reservations.voidedAt, range),
         ),
       )

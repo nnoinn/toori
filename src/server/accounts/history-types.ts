@@ -104,7 +104,7 @@ export const HISTORY_CATEGORY_KINDS = {
   ],
   settlement: ['payout_account_changed', 'settlement_paid'],
   account: ['signed_up', 'consent_agreed', 'consent_withdrawn'],
-  coupon: ['coupon_issued', 'coupon_used'],
+  coupon: ['coupon_issued', 'coupon_used', 'coupon_returned'],
   dispute: ['dispute_filed', 'dispute_resolved'],
 } as const satisfies Record<string, readonly AccountHistoryKind[]>;
 export type HistoryCategory = keyof typeof HISTORY_CATEGORY_KINDS;

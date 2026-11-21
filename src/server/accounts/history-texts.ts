@@ -58,6 +58,7 @@ const REFUND_REASONS: Record<string, string> = {
   agreed_cancel: '합의 후 취소',
   auto_cancel: '자동 취소',
   admin_exception: '운영자 환불',
+  void: '무효',
 };
 
 const AGREED_RESULTS: Record<string, string> = {
@@ -208,7 +209,7 @@ export function historyText(
     case 'coupon_issued':
       return text('쿠폰 받음', join([won, label(COUPON_REASONS, event.reason)]));
     case 'coupon_used':
-      return text('쿠폰 사용', won);
+      return text('쿠폰 사용', join([...reservationPart(event), won]));
     case 'coupon_returned':
       return text(
         '쿠폰 돌려받음',
