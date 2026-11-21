@@ -6,6 +6,7 @@
 
 import { formatWon } from '@/lib/format';
 import { formatKst, kstDateKey } from '@/lib/time';
+import { adminNoticeText } from '@/server/policy';
 import type {
   PayoutAccountView,
   SettlementItemStatus,
@@ -14,6 +15,8 @@ import type {
   SettlementStatementStatus,
   SettlementStatementSummary,
 } from '@/server/settlements/types';
+
+import { adminNoticeLine } from '../admin-notice-line';
 
 import { WEEKDAY_LABELS } from '../settings/shop/shop-profile';
 import { addDaysToKey, partsOfKey, weekdayOfKey } from '../slots/calendar-days';
@@ -133,6 +136,18 @@ export function disputeDeadlineText(
   return deadline.getTime() > now.getTime()
     ? `${formatKst(deadline)}까지 이의제기가 없으면 확정돼요.`
     : `${formatKst(deadline)}에 확정됐어요.`;
+}
+
+/** 정산 보류의 다음에 할 일 중 "확인이 끝나면 돌아오는 지급일에 들어가요". 위 문장(disputeDeadlineText)이 이미 말해서 사유 줄에는 쓰지 않는다 */
+const HOLD_PAYOUT_STEP = adminNoticeText('user_inquiry', 'settlement_hold').nextStep;
+
+/**
+ * 운영자 정산 보류(#373 ②)면 운영자가 고른 사유 한 줄(#489, #499). "운영자가 확인 중이에요" 바로 아래에 작은 글씨로 보여 준다.
+ * 예: "사유: 정산 계좌·사업자 정보 확인이 필요해요 · 정산 계좌를 확인해 주세요". 이의제기 보류나 보류가 아니면 null
+ */
+export function adminHoldNoticeLine(hold: SettlementItemView['hold'] | undefined): string | null {
+  if (hold?.reason !== 'admin') return null;
+  return adminNoticeLine(hold.code, 'settlement_hold', { omitNextStep: HOLD_PAYOUT_STEP });
 }
 
 // ── 정산서 (S-501) ────────────────────────────────────────────────────
