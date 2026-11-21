@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { selectShopSlotControl } from '@/app/admin/shops/slot-control-queries';
 import { adminActions, shops, slots, slotWindows } from '@/db/schema';
-import { assertShopCanPublish } from '@/server/shops/publish-pause';
+import { assertShopCanPublish, readPublishPause } from '@/server/shops/publish-pause';
 
 import {
   createTestCustomer,
@@ -84,23 +84,37 @@ describeDb('운영자 매물 관리 (실제 DB)', () => {
       const args = { shopId: shop.shopId, adminId, now: NOW };
 
       expect(await assertShopCanPublish(shop.shopId, tx)).toEqual({ ok: true, data: null });
-      expect(await pausePublishingInTx(tx, { ...args, reason: '신고 확인 중' })).toEqual({
+      expect(await readPublishPause(shop.shopId, tx)).toBeNull();
+      expect(
+        await pausePublishingInTx(tx, { ...args, reason: '신고 확인 중', code: 'user_inquiry' }),
+      ).toEqual({
         ok: true,
         data: { shopId: shop.shopId, pausedAt: NOW },
       });
       const [paused] = await tx
-        .select({ at: shops.publishPausedAt, reason: shops.publishPausedReason })
+        .select({
+          at: shops.publishPausedAt,
+          reason: shops.publishPausedReason,
+          code: shops.publishPausedCode,
+        })
         .from(shops)
         .where(eq(shops.id, shop.shopId));
-      expect(paused).toEqual({ at: NOW, reason: '신고 확인 중' });
+      expect(paused).toEqual({ at: NOW, reason: '신고 확인 중', code: 'user_inquiry' });
+      // 원장님 화면에는 운영자가 쓴 사유 없이 고른 사유 코드만(#489, #499)
+      expect(await readPublishPause(shop.shopId, tx)).toEqual({
+        pausedAt: NOW,
+        code: 'user_inquiry',
+      });
       expect(await assertShopCanPublish(shop.shopId, tx)).toMatchObject({
         ok: false,
         error: { code: 'PUBLISH_PAUSED' },
       });
       expect(await selectShopSlotControl(tx, shop.shopId, NOW)).toMatchObject({
-        pause: { pausedAt: NOW, reason: '신고 확인 중' },
+        pause: { pausedAt: NOW, reason: '신고 확인 중', code: 'user_inquiry' },
       });
-      expect(await pausePublishingInTx(tx, { ...args, reason: '다시' })).toMatchObject({
+      expect(
+        await pausePublishingInTx(tx, { ...args, reason: '다시', code: 'other' }),
+      ).toMatchObject({
         error: { code: 'ALREADY_PAUSED' },
       });
 
@@ -109,11 +123,23 @@ describeDb('운영자 매물 관리 (실제 DB)', () => {
       });
       expect(await assertShopCanPublish(shop.shopId, tx)).toEqual({ ok: true, data: null });
       expect(await selectShopSlotControl(tx, shop.shopId, NOW)).toMatchObject({ pause: null });
+      // 다시 열면 사유 코드도 같이 비운다
+      expect(await readPublishPause(shop.shopId, tx)).toBeNull();
+      const [resumed] = await tx
+        .select({ code: shops.publishPausedCode })
+        .from(shops)
+        .where(eq(shops.id, shop.shopId));
+      expect(resumed).toEqual({ code: null });
       expect(await resumePublishingInTx(tx, { ...args, reason: '다시' })).toMatchObject({
         error: { code: 'NOT_PAUSED' },
       });
       expect(
-        await pausePublishingInTx(tx, { ...args, shopId: crypto.randomUUID(), reason: '확인' }),
+        await pausePublishingInTx(tx, {
+          ...args,
+          shopId: crypto.randomUUID(),
+          reason: '확인',
+          code: 'other',
+        }),
       ).toMatchObject({ error: { code: 'SHOP_NOT_FOUND' } });
 
       expect(await actionsOn(tx, shop.shopId)).toEqual([
@@ -130,7 +156,13 @@ describeDb('운영자 매물 관리 (실제 DB)', () => {
         const shop = await createTestShop(tx, { status: 'approved' });
         const { customerId } = await createTestCustomer(tx);
         const close = (slotId: string) =>
-          forceCloseSlotInTx(tx, { slotId, adminId, reason: '가격이 실제와 다름', now: NOW });
+          forceCloseSlotInTx(tx, {
+            slotId,
+            adminId,
+            reason: '가격이 실제와 다름',
+            code: 'listing_mismatch',
+            now: NOW,
+          });
 
         const published = await insertSlot(tx, shop, '09:00', '10:00');
         const scheduled = await insertSlot(tx, shop, '10:00', '11:00', {
@@ -160,11 +192,17 @@ describeDb('운영자 매물 관리 (실제 DB)', () => {
           .select({
             status: slots.status,
             closeReason: slots.closeReason,
+            adminCloseCode: slots.adminCloseCode,
             closedAt: slots.closedAt,
           })
           .from(slots)
           .where(eq(slots.id, published));
-        expect(closed).toEqual({ status: 'closed', closeReason: 'admin', closedAt: NOW });
+        expect(closed).toEqual({
+          status: 'closed',
+          closeReason: 'admin',
+          adminCloseCode: 'listing_mismatch',
+          closedAt: NOW,
+        });
         expect(await close(scheduled)).toMatchObject({ ok: true });
 
         expect(await close(onHold)).toMatchObject({ error: { code: 'SLOT_ON_HOLD' } });
@@ -201,6 +239,7 @@ describeDb('운영자 매물 관리 (실제 DB)', () => {
             windowId: id,
             adminId,
             reason: '영업 안 하는 시간',
+            code: 'owner_request',
             now: NOW,
           });
 
@@ -214,10 +253,18 @@ describeDb('운영자 매물 관리 (실제 DB)', () => {
         expect(result).toMatchObject({ ok: true, data: { windowId, closedAt: NOW } });
         expect(result.ok && result.data.keptSlots.map((slot) => slot.slotId)).toEqual([kept]);
         const [row] = await tx
-          .select({ status: slotWindows.status, closeReason: slotWindows.closeReason })
+          .select({
+            status: slotWindows.status,
+            closeReason: slotWindows.closeReason,
+            adminCloseCode: slotWindows.adminCloseCode,
+          })
           .from(slotWindows)
           .where(eq(slotWindows.id, windowId));
-        expect(row).toEqual({ status: 'closed', closeReason: 'admin' });
+        expect(row).toEqual({
+          status: 'closed',
+          closeReason: 'admin',
+          adminCloseCode: 'owner_request',
+        });
         expect(
           (await selectShopSlotControl(tx, shop.shopId, NOW))?.openWindows.map(
             (open) => open.windowId,

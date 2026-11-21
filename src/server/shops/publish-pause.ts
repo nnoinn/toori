@@ -1,6 +1,7 @@
 // 샵의 새 매물 게시 멈춤 확인 (#373 ④, #433, 11/15 nnoinn 결정 3). 서버에서만 부른다.
 // 운영자가 멈추면(shops.publish_paused_at) 그 샵은 새 매물·시간대 매물을 올릴 수 없다. 이미 올린 매물과 예약은 그대로다.
 // 원장님에게는 운영자가 적은 사유를 보이지 않는다(11/16 강규민 결정: 정산 보류처럼 숨기고 카카오톡 채널로 안내).
+// 대신 운영자가 목록에서 고른 사유 코드(#489)는 보여 준다(readPublishPause, 문구는 adminNoticeText(code, 'publish_pause')).
 // 매물을 새로 만드는 서버 함수가 입점 승인 확인(assertShopApproved) 다음에 부른다: 시간대 등록(createSlotWindows),
 // 한 시술 등록·재등록(정민석 slots/new/actions.ts·relist, 연결 Issue로 부탁)
 
@@ -11,6 +12,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { shops } from '@/db/schema';
 import { fail, ok, type Result } from '@/lib/result';
+import { type PublishPauseCode, toAdminNoticeCode } from '@/server/policy/admin-notice';
 
 import { PUBLISH_PAUSED_MESSAGE } from './publish-pause-message';
 
@@ -24,6 +26,23 @@ export async function readPublishPausedAt(
     .from(shops)
     .where(eq(shops.id, shopId));
   return row?.pausedAt ?? null;
+}
+
+/**
+ * 그 샵의 게시 멈춤과 원장님에게 보여 줄 사유 코드(#489, #499). 멈추지 않았거나 없는 샵이면 null.
+ * 원장님 화면이 매물 등록이 막힐 때 안내 옆에 사유를 보여 줄 때 쓴다
+ */
+export async function readPublishPause(
+  shopId: string,
+  db: Pick<ReturnType<typeof getDb>, 'select'> = getDb(),
+): Promise<{ pausedAt: Date; code: PublishPauseCode } | null> {
+  const [row] = await db
+    .select({ pausedAt: shops.publishPausedAt, code: shops.publishPausedCode })
+    .from(shops)
+    .where(eq(shops.id, shopId));
+  if (!row?.pausedAt) return null;
+  // 멈춘 시각과 코드는 같이 채워진다(shops_publish_pause_check)
+  return { pausedAt: row.pausedAt, code: toAdminNoticeCode('publish_pause', row.code) };
 }
 
 /**

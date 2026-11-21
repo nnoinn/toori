@@ -48,6 +48,7 @@ function row(extra: Partial<SettlementRow> = {}): SettlementRow {
     hasOpenDispute: false,
     openDisputeReceivedAt: null,
     hasAdminHold: false,
+    adminHoldCode: null,
     ownerPenalty: null,
     item: null,
     ...extra,
@@ -141,11 +142,19 @@ describe('toSettlementItemView: 아직 묶지 않은 거래', () => {
     });
   });
 
-  it('운영자 정산 보류(#373 ②)면 보류이고 지급일이 없으며, 원장님에게는 사유·날짜 없이 이유만 준다. 이의제기도 있으면 이의제기', () => {
+  it('운영자 정산 보류(#373 ②)면 보류이고 지급일이 없으며, 원장님에게는 운영자가 쓴 사유·날짜 없이 고른 사유 코드(#489)만 준다. 이의제기도 있으면 이의제기', () => {
     const options = { now: NOW, paymentFeeRate: null };
-    const held = toSettlementItemView(row({ hasAdminHold: true }), options);
+    const held = toSettlementItemView(
+      row({ hasAdminHold: true, adminHoldCode: 'payout_info_check' }),
+      options,
+    );
     expect(held).toMatchObject({ status: 'held', payoutDate: null });
-    expect(held?.hold).toEqual({ reason: 'admin' });
+    expect(held?.hold).toEqual({ reason: 'admin', code: 'payout_info_check' });
+    // 코드가 비어 있으면 기타
+    expect(toSettlementItemView(row({ hasAdminHold: true }), options)?.hold).toEqual({
+      reason: 'admin',
+      code: 'other',
+    });
     const received = kst('2026-11-16 10:00');
     expect(
       toSettlementItemView(
