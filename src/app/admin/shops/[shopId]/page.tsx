@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { type ReactNode, Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -34,7 +34,7 @@ import {
 } from '../cancel-stats-period';
 import { selectShopCancelStats } from '../cancel-stats-queries';
 import { revealShopOwnerContact } from '../../users/contact-actions';
-import { ContactReveal } from '../../users/contact-reveal';
+import { ContactReveal, RevealButton, RevealedValue } from '../../users/contact-reveal';
 import { labelPgSellerStatus, labelReviewAction } from '../format';
 import { selectShopForReview, type ShopReviewDetail } from '../queries';
 import { SlotControlAction } from '../slot-control-actions';
@@ -157,14 +157,23 @@ async function ReviewDetail({
         </Section>
 
         <Section title="원장님">
-          <Fields
-            rows={[
-              ['이름', detail.owner.name],
-              // 연락처는 가려서 보여 주고, [번호 보기]를 누를 때만 서버에서 받아 온다(#360 4번)
-              ['연락처', maskPhone(detail.owner.phone)],
-            ]}
-          />
-          <ContactReveal reveal={revealShopOwnerContact.bind(null, detail.shopId)} />
+          {/* 연락처는 가려서 보여 주고, [번호 보기]를 누르면 같은 자리에 전체를 진하게 보여 준다(#360 4번) */}
+          <ContactReveal reveal={revealShopOwnerContact.bind(null, detail.shopId)}>
+            <Fields
+              rows={[
+                ['이름', detail.owner.name],
+                [
+                  '연락처',
+                  <RevealedValue
+                    key="phone"
+                    field="phone"
+                    masked={maskPhone(detail.owner.phone)}
+                  />,
+                ],
+              ]}
+            />
+            <RevealButton />
+          </ContactReveal>
           {/* 원장님 계정에서 일어난 일(입점·매물·예약·정산 계좌 등)을 시각 순으로(#374) */}
           <Link
             href={`/admin/users/owners/${detail.owner.id}/history`}
@@ -341,7 +350,7 @@ function Section({
   );
 }
 
-function Fields({ rows }: { rows: [string, string][] }) {
+function Fields({ rows }: { rows: [string, ReactNode][] }) {
   return (
     <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-2 text-sm">
       {rows.map(([label, value]) => (
