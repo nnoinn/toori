@@ -18,7 +18,7 @@ import { getSlotTimeFlags } from '@/server/policy';
 import type { SlotWindowDetail } from '@/server/slot-windows';
 import { holdWindowSlot } from '@/server/slot-windows/actions';
 
-import { formatDuration } from '../../slots/[slotId]/detail-format';
+import { formatDuration } from '@/lib/format';
 import { RefundPolicyDetails } from '../../slots/[slotId]/detail-parts';
 import { checkoutPath } from '../../slots/[slotId]/reserve-button';
 import { firstOpenMenuId, reserveHint, resolvePick } from './window-texts';

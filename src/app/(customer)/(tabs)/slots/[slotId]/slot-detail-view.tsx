@@ -8,7 +8,7 @@ import { ShopSlotRow } from '@/features/map/slot-list/shop-group';
 import type { ListItem } from '@/features/map/slot-list/types';
 import { formatKst } from '@/lib/time';
 
-import { formatDuration } from './detail-format';
+import { formatDuration } from '@/lib/format';
 import {
   DetailTop,
   RefundPolicyDetails,
