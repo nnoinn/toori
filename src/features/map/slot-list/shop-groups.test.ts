@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { GROUP_PREVIEW_COUNT, groupByShop, groupPreview, groupSummaryText } from './shop-groups';
+import {
+  GROUP_PREVIEW_COUNT,
+  groupByShop,
+  groupByShopInOrder,
+  groupPreview,
+  groupSummaryText,
+} from './shop-groups';
 import type { ListItem } from './types';
 
 // 거리순 목록 샵별 묶기(11/18 정찬형): 붙어 있는 같은 샵 줄을 한 묶음으로, 3개 넘으면 접기
@@ -46,7 +52,7 @@ describe('샵별 묶기', () => {
       window('w', 'b', 40),
       slot('3', 'b'),
     ]);
-    expect(groups.map((group) => [group.shopId, ids(group.items)])).toEqual([
+    expect(groups.map((group) => [group.shop.shopId, ids(group.items)])).toEqual([
       ['a', ['1', '2']],
       ['b', ['w', '3']],
     ]);
@@ -54,7 +60,7 @@ describe('샵별 묶기', () => {
 
   it('같은 샵이 떨어져서 다시 나오면 따로 묶는다', () => {
     const groups = groupByShop([slot('1', 'a'), slot('2', 'b'), slot('3', 'a')]);
-    expect(groups.map((group) => group.shopId)).toEqual(['a', 'b', 'a']);
+    expect(groups.map((group) => group.shop.shopId)).toEqual(['a', 'b', 'a']);
   });
 
   it('빈 목록은 묶음도 없다', () => {
@@ -74,5 +80,28 @@ describe('샵별 묶기', () => {
     expect(ids(folded.visible)).toEqual(['1', '2', '3']);
     expect(folded.hiddenCount).toBe(2);
     expect(groupPreview(five, true)).toEqual({ visible: five.items, hiddenCount: 0 });
+  });
+});
+
+// 찜한 샵(11/15 회의 3번): 매물이 있는 찜한 샵마다 한 묶음(매물 없는 샵은 숨김, 11/18)
+describe('찜한 샵 묶기', () => {
+  it('시작이 가까운 순으로 받은 매물을 샵마다 모으고, 샵은 가장 빠른 매물 순', () => {
+    // 매물은 시작이 가까운 순: c, a, c(시간대), a, b
+    const groups = groupByShopInOrder([
+      slot('1', 'c'),
+      slot('2', 'a'),
+      window('w', 'c', 40),
+      slot('3', 'a'),
+      slot('4', 'b'),
+    ]);
+    expect(groups.map((group) => [group.shop.shopId, ids(group.items)])).toEqual([
+      ['c', ['1', 'w']],
+      ['a', ['2', '3']],
+      ['b', ['4']],
+    ]);
+  });
+
+  it('매물이 없으면 묶음도 없다(매물 없는 찜한 샵은 보여주지 않는다)', () => {
+    expect(groupByShopInOrder([])).toEqual([]);
   });
 });
