@@ -6,6 +6,7 @@ import {
   showsFullPhone,
   VISIT_ACTIONS,
   visitFailShowsNewState,
+  visitSummary,
 } from './reservation-detail';
 
 const startAt = new Date('2026-11-01T14:00:00+09:00');
@@ -56,5 +57,15 @@ describe('방문 완료·노쇼 처리 (O14, S-405·S-406)', () => {
     expect(visitFailShowsNewState('TOO_EARLY')).toBe(false);
     expect(visitFailShowsNewState('RESERVATION_NOT_FOUND')).toBe(false);
     expect(visitFailShowsNewState('UNAUTHENTICATED')).toBe(false);
+  });
+
+  it('확인 창의 예약 한 줄: 한국 시각·메뉴·예약번호(대시보드와 같은 문구)', () => {
+    expect(
+      visitSummary({
+        startAt: new Date('2026-11-01T14:00:00+09:00'),
+        menuName: '커트',
+        code: 'AXLPLPSG',
+      }),
+    ).toBe('11/1(일) 14:00 커트 · 예약번호 AXLPLPSG');
   });
 });

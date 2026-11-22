@@ -1,5 +1,6 @@
 // 운영자 매물 관리(#373 ④, #433)의 DB 저장. 서버에서만 부른다. 순서와 권한은 admin.ts.
 // 모두 트랜잭션 안에서 부르고, 처리 기록(shop.publish_pause·shop.publish_resume·slot.force_close)을 같은 트랜잭션에 남긴다.
+// 멈춤·마감 때 고른, 원장님에게 보여 줄 사유 코드(#489)는 샵·매물·시간대 줄에 같이 저장한다(운영자가 쓴 사유는 처리 기록과 멈춤 사유 칸).
 // 바꾸는 조건을 저장 문장에 넣어서, 운영자 둘이 동시에 하거나 손님이 그 순간 [예약하기]를 눌러도 DB에서 한쪽만 된다(원장님 마감과 같다)
 
 import 'server-only';
@@ -11,6 +12,7 @@ import { shops, slots, slotWindows } from '@/db/schema';
 import { slotIsOnHold, slotStatusIs } from '@/features/slot-status/slot-status-sql';
 import { ok, type Result } from '@/lib/result';
 import { recordAdminAction } from '@/server/admin/action-store';
+import type { AdminCloseCode, PublishPauseCode } from '@/server/policy/admin-notice';
 import { closeWindow, type KeptSlotRow } from '@/server/slot-windows/store';
 
 import { adminSlotFail } from './admin-errors';
@@ -31,11 +33,15 @@ async function shopExists(tx: AdminSlotTx, shopId: string): Promise<boolean> {
  */
 export async function pausePublishingInTx(
   tx: AdminSlotTx,
-  input: AdminInput & { shopId: string },
+  input: AdminInput & { shopId: string; code: PublishPauseCode },
 ): Promise<Result<{ shopId: string; pausedAt: Date }>> {
   const [row] = await tx
     .update(shops)
-    .set({ publishPausedAt: input.now, publishPausedReason: input.reason })
+    .set({
+      publishPausedAt: input.now,
+      publishPausedReason: input.reason,
+      publishPausedCode: input.code,
+    })
     .where(and(eq(shops.id, input.shopId), isNull(shops.publishPausedAt)))
     .returning({ id: shops.id });
   if (!row) {
@@ -60,7 +66,7 @@ export async function resumePublishingInTx(
 ): Promise<Result<{ shopId: string; resumedAt: Date }>> {
   const [row] = await tx
     .update(shops)
-    .set({ publishPausedAt: null, publishPausedReason: null })
+    .set({ publishPausedAt: null, publishPausedReason: null, publishPausedCode: null })
     .where(and(eq(shops.id, input.shopId), isNotNull(shops.publishPausedAt)))
     .returning({ id: shops.id });
   if (!row) {
@@ -82,12 +88,12 @@ export async function resumePublishingInTx(
  */
 export async function forceCloseSlotInTx(
   tx: AdminSlotTx,
-  input: AdminInput & { slotId: string },
+  input: AdminInput & { slotId: string; code: AdminCloseCode },
 ): Promise<Result<{ slotId: string; closedAt: Date }>> {
   const { now } = input;
   const [row] = await tx
     .update(slots)
-    .set({ status: 'closed', closedAt: now, closeReason: 'admin' })
+    .set({ status: 'closed', closedAt: now, closeReason: 'admin', adminCloseCode: input.code })
     .where(
       and(
         eq(slots.id, input.slotId),
@@ -130,7 +136,7 @@ async function slotCloseProblem(tx: AdminSlotTx, slotId: string, now: Date) {
  */
 export async function forceCloseWindowInTx(
   tx: AdminSlotTx,
-  input: AdminInput & { windowId: string },
+  input: AdminInput & { windowId: string; code: AdminCloseCode },
 ): Promise<Result<{ windowId: string; closedAt: Date; keptSlots: KeptSlotRow[] }>> {
   const [window] = await tx
     .select({ shopId: slotWindows.shopId })
@@ -141,6 +147,7 @@ export async function forceCloseWindowInTx(
     shopId: window.shopId,
     windowId: input.windowId,
     reason: 'admin',
+    adminCloseCode: input.code,
     now: input.now,
   });
   if (!closed.ok) return adminSlotFail(closed.code);

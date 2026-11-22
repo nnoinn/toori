@@ -150,13 +150,16 @@ erDiagram
 | business_registration_number | text | 사업자등록번호(숫자 10자리) |
 | opened_on | date | 개업일자 |
 | business_doc_path | text | 사업자등록증 사진 위치(비공개 버킷 `business-docs`) |
+| nts_check | text, null | 국세청 사업자등록 진위확인 결과(#208): verified(맞음) / unavailable(국세청이 응답하지 않아 확인 못 함). 비어 있으면 확인 안 함(키가 없는 개발 환경, 이 기능 전 샵). 다름·휴폐업이면 저장하지 않아서 그 값은 없다 |
+| nts_checked_at | timestamptz, null | 마지막으로 국세청에 확인한 시각. nts_check와 같이 채우고 같이 비운다 |
 | status | text, 기본 `pending` | 입점 상태: `pending`(승인 대기) / `approved`(승인) / `rejected`(반려) |
 | rejection_reason | text, null | 반려 사유. 원장님에게 보여준다 |
 | applied_at | timestamptz | 입점 신청(다시 신청 포함) 시각 |
 | reviewed_at | timestamptz, null | |
 | reviewed_by | uuid, null → profiles | 처리한 관리자 |
 | publish_paused_at | timestamptz, null | 운영자가 새 매물 게시를 멈춘 시각(#373 ④, #433). 비어 있으면 게시할 수 있다. 새 등록(매물·시간대 매물)만 막고 이미 등록한 매물(게시예정 포함)은 그대로다(11/15 nnoinn). 누가 멈추고 풀었는지는 `admin_actions`(`shop.publish_pause`·`shop.publish_resume`) |
-| publish_paused_reason | text, null | 멈춘 사유. check: 멈춘 시각과 같이 채우고 같이 비운다 |
+| publish_paused_reason | text, null | 멈춘 사유(운영자만 본다). check: 멈춘 시각과 같이 채우고 같이 비운다 |
+| publish_paused_code | text, null | 원장님에게 보여 줄 사유 코드(#489): `user_inquiry` / `shop_info_check` / `owner_request` / `other`. 사유 이름과 다음에 할 일은 정책 `adminNoticeText`. check: 멈춘 시각·사유와 같이 채우고 같이 비운다. 0021 전에 멈춘 샵은 `other` |
 | created_at, updated_at | timestamptz | |
 
 판매자 정보(전자상거래법 통신판매중개자 의무): 고객이 결제하기 전에 상호·대표자명·주소·전화번호·사업자등록번호를 보여준다. 통신판매업 신고번호는 받지 않는다(10/13, 중개자가 확인·제공할 항목이 아니고 신고 면제인 원장님이 많다). 전자우편은 원장님 로그인 이메일(`profiles.email`)을 쓴다.
@@ -262,7 +265,8 @@ erDiagram
 | hold_customer_id | uuid, null → customers | 10분 홀딩한 고객 |
 | hold_expires_at | timestamptz, null | 홀딩 만료 시각 |
 | closed_at | timestamptz, null | 원장님이 직접 마감한 시각 |
-| close_reason | text, null | `other_channel`(다른 곳 예약) / `mistake`(잘못 올림) / `other`(기타) / `hold_released`(결제 없이 홀딩 끝남: 손님이 시간대 안에 만든 칸을 결제 없이 비움. 원장님이 고르는 사유가 아니고, 원장님 대시보드·예약 현황·운영자 목록·통계에서는 뺀다, #308 ④) / `admin`(운영자 마감: 운영자가 문제 매물을 강제 마감. 원장님이 고르는 사유가 아니다. 사유는 `admin_actions` `slot.force_close`에 남는다, #373 ④ #433) |
+| close_reason | text, null | `other_channel`(다른 곳 예약) / `mistake`(잘못 올림) / `other`(기타) / `hold_released`(결제 없이 홀딩 끝남: 손님이 시간대 안에 만든 칸을 결제 없이 비움. 원장님이 고르는 사유가 아니고, 원장님 대시보드·예약 현황·운영자 목록·통계에서는 뺀다, #308 ④) / `admin`(운영자 마감: 운영자가 문제 매물을 강제 마감. 원장님이 고르는 사유가 아니다. 운영자가 쓴 사유는 `admin_actions` `slot.force_close`에 남는다, #373 ④ #433) |
+| admin_close_code | text, null | 운영자 마감일 때 원장님에게 보여 줄 사유 코드(#489): `listing_mismatch` / `user_inquiry` / `owner_request` / `other`. check: `close_reason`이 `admin`일 때만, 그때는 꼭 채운다. 0021 전 운영자 마감은 `other` |
 | relisted_from_slot_id | uuid, null → slots | 재등록(S-408)으로 만든 매물이면 원래 매물 |
 | window_id | uuid, null → slot_windows | 시간대 매물 안에서 고객이 [예약하기]로 만든 매물이면 그 시간대(#308). 한 시술 매물은 비어 있다 |
 | created_by | uuid → profiles | 등록한 사람 |
@@ -307,6 +311,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | new_customer_only | boolean, 기본 false | 시간대 전체에 켠다. 안에서 만든 매물도 같은 값 |
 | closed_at | timestamptz, null | 원장님이 직접 마감한 시각 |
 | close_reason | text, null | 매물과 같은 사유(`other_channel` / `mistake` / `other` / `hold_released` / `admin`) |
+| admin_close_code | text, null | 매물과 같다(운영자 마감일 때 원장님에게 보여 줄 사유 코드, #489) |
 | created_by | uuid → profiles | 올린 사람 |
 | created_at, updated_at | timestamptz | |
 
@@ -562,7 +567,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 
 ### settlement_holds — 정산 보류 (#373 ②, #433)
 
-이의제기가 아닌 이유(예: 원장님 계좌 확인 필요)로 거래 하나나 샵 전체의 정산을 운영자가 멈추고 푼다. 아직 정산에 묶이지 않은 거래·샵만 멈추고(이미 묶인 정산은 지급 요청 A-105에서 막는다), 정산 묶기는 풀리지 않은 보류가 있는 거래·샵을 뺀다. 원장님 화면에는 "운영자 확인 중"만 보이고 사유는 숨긴다(11/15 nnoinn). 지난 보류도 지우지 않고 남기고, 운영자 처리 기록(`settlement.hold`·`settlement.release`)에도 같이 남긴다.
+이의제기가 아닌 이유(예: 원장님 계좌 확인 필요)로 거래 하나나 샵 전체의 정산을 운영자가 멈추고 푼다. 아직 정산에 묶이지 않은 거래·샵만 멈추고(이미 묶인 정산은 지급 요청 A-105에서 막는다), 정산 묶기는 풀리지 않은 보류가 있는 거래·샵을 뺀다. 원장님 화면에는 "운영자 확인 중"과 운영자가 목록에서 고른 사유(`reason_code`, #489)만 보이고, 운영자가 쓴 사유는 숨긴다(11/15 nnoinn, 11/17 #489). 지난 보류도 지우지 않고 남기고, 운영자 처리 기록(`settlement.hold`·`settlement.release`)에도 같이 남긴다.
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
@@ -570,6 +575,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | reservation_id | uuid, null → reservations | 거래 하나를 멈출 때 |
 | shop_id | uuid, null → shops | 샵 전체를 멈출 때. check: 거래와 샵 중 하나만 채운다 |
 | reason | text | 보류 사유(운영자만 본다) |
+| reason_code | text | 원장님에게 보여 줄 사유 코드(#489): `user_inquiry` / `payment_check` / `payout_info_check` / `owner_request` / `other`. 거래 보류와 샵 전체 보류가 같이 있으면 원장님에게는 거래 보류의 코드를 보여 준다. 0021 전에 건 보류는 `other` |
 | held_by | uuid → profiles | 건 운영자 |
 | held_at | timestamptz | 건 시각 |
 | released_by | uuid, null → profiles | 푼 운영자 |
@@ -721,8 +727,9 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | slot_window_menus | unique(window_id, menu_id), check: discount_rate 10~50, duration_minutes > 0 | 한 시간대에 같은 메뉴 한 번 |
 | location_use_logs | (created_at) | 6개월 지난 기록 정리 |
 | cron_runs | (job, started_at desc), check: 끝난 시각 ⇔ 성공 여부 | 작업마다 최근 실행 보기, 30일 지난 기록 지우기(#433) |
-| settlement_holds | unique(reservation_id) where released_at is null, unique(shop_id) where released_at is null, check: 거래·샵 중 하나, 푼 운영자·시각·메모 같이 | 풀리지 않은 보류는 대상마다 하나, 정산 묶기가 보류 중인 거래·샵 찾기(#433) |
-| shops (게시 멈춤) | check: publish_paused_at ⇔ publish_paused_reason | 멈춘 시각과 사유를 같이(#433) |
+| settlement_holds | unique(reservation_id) where released_at is null, unique(shop_id) where released_at is null, check: 거래·샵 중 하나, 푼 운영자·시각·메모 같이, reason_code는 정산 보류 코드만 | 풀리지 않은 보류는 대상마다 하나, 정산 묶기가 보류 중인 거래·샵 찾기(#433), 원장님에게 보여 줄 사유(#489) |
+| shops (게시 멈춤) | check: publish_paused_at ⇔ publish_paused_reason ⇔ publish_paused_code, publish_paused_code는 게시 멈춤 코드만 | 멈춘 시각·사유·사유 코드를 같이(#433, #489) |
+| slots·slot_windows (운영자 마감) | check: close_reason = admin ⇔ admin_close_code 있음, admin_close_code는 운영자 마감 코드만 | 운영자 마감에만 원장님에게 보여 줄 사유(#489) |
 | admin_access_logs | (created_at), (admin_id, created_at), UPDATE·DELETE·TRUNCATE 막는 트리거 | 보관 기간 확인, 운영자별 월 1회 점검, 기록 위·변조 방지 |
 | admin_actions | UPDATE·DELETE·TRUNCATE 막는 트리거 | 작업 기록 위·변조 방지(#372) |
 | admin_profiles | DELETE·TRUNCATE 막는 트리거 | 그만둔 운영자도 기록에 이름 남기기(#372) |
@@ -784,3 +791,4 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | 2026-11-16 | 원장님 귀책 취소(X-207, #419, 11/15 nnoinn 승인): 취소 환불 하나 조건(`refunds_cancel_unique`)에 `owner_fault`를 넣고, 보상 쿠폰은 원인 예약 하나에 한 장(`coupons_compensation_unique`)으로 막는다. 칸은 더하지 않는다. 마이그레이션 0018 |
 | 2026-11-17 | 예약 무효(A-108, #423, 11/15 nnoinn 승인): `refunds.reason`에 `void`, 무효 환불은 예약 하나에 하나(`refunds_void_unique`), `reservations.voided_at`(무효 시각)을 더한다. 진행 중 환불은 이유와 상관없이 예약 하나에 하나(`refunds_requested_unique`)로 막는다. 마이그레이션 0019 |
 | 2026-11-16 | 운영자 문제 대처 DB(#373 ②④⑥, #433, 11/15 nnoinn 승인): 예약 작업 실행 기록 `cron_runs`(30일 보관), 정산 보류 `settlement_holds`(묶이기 전 거래·샵만, 원장님에게는 사유를 숨김), `shops.publish_paused_at`·`publish_paused_reason`(새 등록만 막는다), `slots`·`slot_windows`의 `close_reason`에 `admin`(운영자 마감). 마이그레이션 0020 |
+| 2026-11-18 | 원장님에게 보여 줄 운영자 사유 코드(#489, 11/17 nnoinn 결정·11/18 승인): `settlement_holds.reason_code`(필수), `shops.publish_paused_code`(멈춘 시각·사유와 같이), `slots`·`slot_windows.admin_close_code`(운영자 마감일 때만). 쓰는 곳마다 고를 수 있는 코드만 받고(정책 `src/server/policy/admin-notice.ts`), 운영자가 쓴 사유·메모 칸은 그대로 원장님에게 숨긴다. 지금 있는 보류·멈춤·운영자 마감은 `other`로 채운다. 마이그레이션 0021 |

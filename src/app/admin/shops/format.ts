@@ -2,6 +2,11 @@
 
 import type { AgreedCancelRequestStatus } from '@/db/schema/refunds';
 import type { PgSellerStatus } from '@/db/schema/shops';
+import { formatKstDateTime } from '@/lib/time';
+import {
+  AGREED_CANCEL_REASON_LABELS,
+  type AgreedCancelReason,
+} from '@/server/refunds/agreed-cancel-types';
 
 import type { ReviewFilter } from './queries';
 
@@ -63,7 +68,7 @@ export function labelReviewAction(action: string): string {
   return REVIEW_ACTION_LABELS[action] ?? action;
 }
 
-/** 합의 후 취소 요청의 결과 이름(운영자 샵 상세 '취소 기록') */
+/** 합의 후 취소 요청의 결과 이름(운영자 샵 상세 '취소 기록', 예약 상세 '합의 후 취소 요청') */
 export const AGREED_REQUEST_STATUS_LABELS: Record<AgreedCancelRequestStatus, string> = {
   requested: '손님 답 기다림',
   agreed: '손님 동의(취소됨)',
@@ -71,3 +76,26 @@ export const AGREED_REQUEST_STATUS_LABELS: Record<AgreedCancelRequestStatus, str
   expired: '24시간 안에 답이 없어 끝남',
   closed: '답하기 전에 끝남',
 };
+
+/**
+ * 합의 후 취소 사유 표시(운영자 샵 상세 '취소 기록', 예약 상세 '합의 후 취소 요청').
+ * 기타면 원장님이 적은 내용을 괄호로 붙인다. 예: "기타(손님이 일정이 바뀌었대요)"
+ */
+export function agreedCancelReasonText(
+  reason: AgreedCancelReason,
+  reasonText: string | null,
+): string {
+  const label = AGREED_CANCEL_REASON_LABELS[reason];
+  return reason === 'other' && reasonText ? `${label}(${reasonText})` : label;
+}
+
+/**
+ * 입점 심사의 국세청 진위확인 결과(#208). 맞음·확인 못 함은 확인한 시각을 붙인다.
+ * 비어 있으면 확인 안 함(국세청 키가 없는 개발 환경에서 신청했거나 이 기능 전에 신청한 샵)
+ */
+export function ntsCheckText(check: string | null, checkedAt: Date | null): string {
+  const at = checkedAt ? ` · ${formatKstDateTime(checkedAt)} 확인` : '';
+  if (check === 'verified') return `국세청 정보와 맞음${at}`;
+  if (check === 'unavailable') return `확인 못 함(국세청이 응답하지 않았어요)${at}`;
+  return '확인 안 함';
+}

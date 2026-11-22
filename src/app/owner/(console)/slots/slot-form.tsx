@@ -4,6 +4,7 @@
 // [다음]을 누르면 서버가 다시 확인한다. [등록하기]를 누르면 서버가 ①②③을 다시 검증하고 저장한다.
 // 매물 수정(O10, S-206)도 이 화면을 쓴다(edit). 지금 값을 채워서 열고(서버 확인이 되면 ③부터, #23 B2),
 // 고치는 매물 자신은 겹침으로 보지 않는다.
+// 새로 올릴 때는 맨 위 "지난 매물로 빠르게 올리기"(S-207 매물 복제)를 누르면 ①③ 값을 채우고 ② 시간부터 연다.
 // 이 파일은 고른 값과 단계 이동·확인·저장을 맡고, 단계 버튼과 ①②③ 카드는 slot-form-steps.tsx,
 // 저장 완료 카드는 slot-saved-card.tsx가 그린다.
 
@@ -17,6 +18,7 @@ import type { DiscountRate } from '@/server/policy';
 import { previewSettlement } from '@/server/settlements';
 
 import { checkSlotEdit, updateSlot } from './actions';
+import { useFreshAfterLeave } from './fresh-after-leave';
 import { checkSlotDraft, createSlot } from './new/actions';
 import {
   canOpenStep,
@@ -28,6 +30,8 @@ import {
   type StepNumber,
   TimeStep,
 } from './slot-form-steps';
+import { SlotPresetPicker } from './slot-preset-picker';
+import type { SlotPreset } from './slot-presets';
 import { SavedCard, type SavedSummary } from './slot-saved-card';
 import {
   groupByKstDate,
@@ -61,15 +65,7 @@ export type SlotEditTarget = {
   problem: string | null;
 };
 
-/** 매물 등록·수정 3탭 화면. edit를 넘기면 수정이다 */
-export function SlotForm({
-  shopId,
-  nowIso,
-  businessHours,
-  menus,
-  busy,
-  edit,
-}: {
+type SlotFormProps = {
   shopId: string;
   nowIso: string;
   /** 샵 영업시간(O2). 입력하지 않은 요일은 24시간 다 보여준다 */
@@ -78,6 +74,31 @@ export function SlotForm({
   /** 같은 샵의 게시예정·게시중·예약됨 매물 시간(ISO). 수정이면 고치는 매물은 뺀다 */
   busy: { start: string; end: string }[];
   edit?: SlotEditTarget;
+  /** 지난 매물 구성(S-207). 새로 올릴 때만 쓴다 */
+  presets?: readonly SlotPreset[];
+};
+
+/**
+ * 매물 등록·수정 3탭 화면. edit를 넘기면 수정이다.
+ * 저장을 마치고 다른 화면에 갔다 돌아오면 완료 카드가 아니라 처음 상태로 연다(#534, fresh-after-leave.ts)
+ */
+export function SlotForm(props: SlotFormProps) {
+  const { generation, markSaved } = useFreshAfterLeave();
+  return <SlotFormBody key={generation} {...props} onSaved={markSaved} />;
+}
+
+function SlotFormBody({
+  shopId,
+  nowIso,
+  businessHours,
+  menus,
+  busy,
+  edit,
+  presets = [],
+  onSaved,
+}: SlotFormProps & {
+  /** 저장을 마쳤으면 true, 완료 카드에서 하나 더 올리기 시작하면 false */
+  onSaved: (saved: boolean) => void;
 }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const busyRanges = useMemo(
@@ -187,11 +208,26 @@ export function SlotForm({
         newCustomerOnly,
         publishAt: result.data.publishAt ? new Date(result.data.publishAt) : null,
       });
+      onSaved(true);
     });
+  }
+
+  /**
+   * 지난 매물 구성을 고른다(S-207). 서비스·할인율·신규 고객 전용을 채우고 ② 시간부터 연다.
+   * 메뉴가 바뀌면 소요 시간이 달라지므로 고른 시각은 다시 고른다(고른 날짜는 둔다)
+   */
+  function choosePreset(preset: SlotPreset) {
+    setMenuId(preset.menuId);
+    setDiscountRate(preset.discountRate);
+    setNewCustomerOnly(preset.newCustomerOnly);
+    setStartIso(null);
+    setMessage(null);
+    setStep(2);
   }
 
   /** 완료 카드에서 하나 더 올리기. 고른 메뉴는 남기고 시각·할인율부터 다시 고른다 */
   function startOver() {
+    onSaved(false);
     setSaved(null);
     setStartIso(null);
     setDiscountRate(null);
@@ -208,6 +244,15 @@ export function SlotForm({
 
   return (
     <div className="flex flex-col gap-4">
+      {!edit && presets.length > 0 ? (
+        <SlotPresetPicker
+          presets={presets}
+          menus={menus}
+          chosen={{ menuId, discountRate, newCustomerOnly }}
+          disabled={pending}
+          onChoose={choosePreset}
+        />
+      ) : null}
       <StepNav step={step} done={stepDone} pending={pending} onGoTo={goTo} />
 
       {step === 1 ? <MenuStep menus={menus} menuId={menuId} onChoose={chooseMenu} /> : null}

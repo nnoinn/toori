@@ -18,12 +18,13 @@ import {
   slots,
 } from '@/db/schema';
 import type { ReservationStatus, VisitResult } from '@/db/schema/payments';
-import type { AgreedCancelRequestStatus } from '@/db/schema/refunds';
+import type { AgreedCancelRequestStatus, RefundReason } from '@/db/schema/refunds';
 import type { Result } from '@/lib/result';
 import { fail, ok } from '@/lib/result';
 import { getRequestNow } from '@/lib/request-time';
 import { requireCustomer } from '@/server/auth';
 
+import type { MyRefund } from './[reservationId]/refund-history';
 import { hasPendingAgreedCancel } from './agreed-cancel-badge';
 import { statusOfTab, type ReservationTab } from './reservation-tabs';
 
@@ -39,6 +40,8 @@ export type MyReservationItem = {
   /** 실제 결제액 */
   amount: number;
   noShow: boolean;
+  /** 운영자가 무효로 처리한 예약(A-108). 탭은 상태대로이고 "무효" 이름표를 붙인다(#528) */
+  voided: boolean;
   /** 취소 시각(ISO). 취소 탭에서만 */
   cancelledAt: string | null;
 };
@@ -84,13 +87,8 @@ export type MyReservationDetail = MyReservationItem & {
     /** ISO */
     paidAt: string | null;
   };
-  refund: {
-    refundAmount: number;
-    penaltyAmount: number;
-    penaltyRate: number;
-    /** ISO */
-    processedAt: string;
-  } | null;
+  /** 끝난 환불들(처리 순). 고객 취소로 일부 돌려받은 뒤 무효가 되면 두 건이다(VOID-02) */
+  refunds: MyRefund[];
 };
 
 const iso = (date: Date | null) => (date ? date.toISOString() : null);
@@ -116,6 +114,7 @@ export async function selectMyReservations(
       status: reservations.status,
       visitResult: reservations.visitResult,
       cancelledAt: reservations.cancelledAt,
+      voidedAt: reservations.voidedAt,
       requestStatus: latestRequestColumn(agreedCancelRequests.status).mapWith(
         agreedCancelRequests.status,
       ),
@@ -144,6 +143,7 @@ export async function selectMyReservations(
     endAt: row.endAt.toISOString(),
     amount: row.amount,
     noShow: row.visitResult === 'no_show',
+    voided: row.voidedAt !== null,
     cancelledAt: iso(row.cancelledAt),
     agreedCancelPending: hasPendingAgreedCancel(
       row.requestStatus && row.requestExpiresAt
@@ -175,6 +175,7 @@ export async function selectMyReservationDetail(
       status: reservations.status,
       visitResult: reservations.visitResult,
       cancelledAt: reservations.cancelledAt,
+      voidedAt: reservations.voidedAt,
       shopId: shops.id,
       shopName: shops.name,
       roadAddress: shops.roadAddress,
@@ -201,9 +202,10 @@ export async function selectMyReservationDetail(
     .limit(1);
   if (!row) return null;
 
-  // 환불은 예약 하나에 보통 하나다. 여러 개면 가장 최근 것. 진행 중(requested)인 기록은 아직 환불 내역이 아니다
-  const [refund] = await db
+  // 환불은 예약 하나에 보통 하나지만, 고객 취소 뒤 무효면 두 건이다(처리 순으로 모두). 진행 중(requested)인 기록은 아직 환불 내역이 아니다
+  const refundRows = await db
     .select({
+      reason: refunds.reason,
       refundAmount: refunds.refundAmount,
       penaltyAmount: refunds.penaltyAmount,
       penaltyRate: refunds.penaltyRate,
@@ -211,8 +213,7 @@ export async function selectMyReservationDetail(
     })
     .from(refunds)
     .where(and(eq(refunds.reservationId, row.reservationId), eq(refunds.status, 'done')))
-    .orderBy(desc(refunds.processedAt))
-    .limit(1);
+    .orderBy(asc(refunds.processedAt), asc(refunds.id));
 
   return {
     reservationId: row.reservationId,
@@ -223,6 +224,7 @@ export async function selectMyReservationDetail(
     startAt: row.startAt.toISOString(),
     amount: row.amount,
     noShow: row.visitResult === 'no_show',
+    voided: row.voidedAt !== null,
     cancelledAt: iso(row.cancelledAt),
     shop: {
       shopId: row.shopId,
@@ -241,14 +243,21 @@ export async function selectMyReservationDetail(
       amount: row.amount,
       paidAt: iso(row.paidAt),
     },
-    refund: refund?.processedAt
-      ? {
-          refundAmount: refund.refundAmount,
-          penaltyAmount: refund.penaltyAmount,
-          penaltyRate: refund.penaltyRate,
-          processedAt: refund.processedAt.toISOString(),
-        }
-      : null,
+    // 끝난(done) 환불은 DB 검사 조건상 처리 시각이 있다
+    refunds: refundRows.flatMap((refund) =>
+      refund.processedAt
+        ? [
+            {
+              // DB 검사 조건이 정해진 값만 허용한다
+              reason: refund.reason as RefundReason,
+              refundAmount: refund.refundAmount,
+              penaltyAmount: refund.penaltyAmount,
+              penaltyRate: refund.penaltyRate,
+              processedAt: refund.processedAt.toISOString(),
+            },
+          ]
+        : [],
+    ),
   };
 }
 

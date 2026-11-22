@@ -15,6 +15,7 @@ import type { SlotCloseReason, SlotStatus, SlotWindowStatus } from '@/db/schema/
 import { windowStatus } from '@/server/slot-windows';
 import { readOccupiedRanges, readWindowMenus } from '@/server/slot-windows/store';
 import { ownerListedSlot } from '@/server/slots/visibility';
+import { type AdminCloseCode, toAdminNoticeCode } from '@/server/policy';
 
 import type { DashboardSlot, DashboardWindow, KeptSlotSummary } from './dashboard';
 
@@ -38,6 +39,7 @@ const slotColumns = {
   holdCustomerId: slots.holdCustomerId,
   holdExpiresAt: slots.holdExpiresAt,
   closeReason: slots.closeReason,
+  adminCloseCode: slots.adminCloseCode,
   windowId: slots.windowId,
   reservationId: reservations.id,
   reservationCode: reservations.code,
@@ -53,6 +55,17 @@ type SlotRow = {
     : (typeof slots.$inferSelect)[Exclude<K, JoinedKey>];
 };
 
+/**
+ * 운영자 마감이면 원장님에게 보여 줄 사유 코드(#489, #499). DB check가 운영자 마감일 때만 목록 안의 코드를 받아서
+ * 보통 그대로이고, 혹시 목록 밖이면 기타(other)로 본다(toAdminNoticeCode). 운영자 마감이 아니면 null
+ */
+function adminCloseCodeOf(row: {
+  closeReason: string | null;
+  adminCloseCode: string | null;
+}): AdminCloseCode | null {
+  return row.closeReason === 'admin' ? toAdminNoticeCode('close', row.adminCloseCode) : null;
+}
+
 /** DB 줄을 대시보드 값(DashboardSlot)으로: 시각은 ISO 문자열로 바꾸고 상태·마감 사유 타입을 좁힌다 */
 function toDashboardSlot(row: SlotRow): DashboardSlot {
   return {
@@ -62,6 +75,7 @@ function toDashboardSlot(row: SlotRow): DashboardSlot {
     status: row.status as SlotStatus,
     // 마감 사유는 DB 제약(slots_close_reason_check)으로 SLOT_CLOSE_REASONS 값만 들어간다
     closeReason: row.closeReason as SlotCloseReason | null,
+    adminCloseCode: adminCloseCodeOf(row),
     startAt: row.startAt.toISOString(),
     endAt: row.endAt.toISOString(),
     publishAt: row.publishAt.toISOString(),
@@ -141,6 +155,7 @@ export async function selectDashboardWindows(
       createdAt: slotWindows.createdAt,
       status: slotWindows.status,
       closeReason: slotWindows.closeReason,
+      adminCloseCode: slotWindows.adminCloseCode,
       newCustomerOnly: slotWindows.newCustomerOnly,
     })
     .from(slotWindows)
@@ -186,6 +201,7 @@ export async function selectDashboardWindows(
         now,
       }),
       closeReason: row.closeReason as SlotCloseReason | null,
+      adminCloseCode: adminCloseCodeOf(row),
       newCustomerOnly: row.newCustomerOnly,
       menus: menus.map((menu) => ({
         menuId: menu.menuId,

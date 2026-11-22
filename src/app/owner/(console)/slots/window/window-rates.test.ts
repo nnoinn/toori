@@ -50,6 +50,26 @@ describe('planWindowRates', () => {
       ]),
     ).toEqual(changed);
   });
+
+  it('서비스 종류 수가 같아도 같은 서비스를 두 번 보내거나 다른 서비스로 바꿔 보내면 받지 않는다', () => {
+    const other = '00000000-0000-4000-8000-000000000003';
+    const changed = { ok: false, problem: 'MENUS_CHANGED' };
+    // 서비스는 커트·펌 둘 다 있지만 커트를 두 번 보냈다
+    expect(
+      planWindowRates(current, [
+        { menuId: CUT, discountRate: 30 },
+        { menuId: PERM, discountRate: 30 },
+        { menuId: CUT, discountRate: 40 },
+      ]),
+    ).toEqual(changed);
+    // 두 개를 보냈지만 펌 대신 시간대에 없는 서비스다
+    expect(
+      planWindowRates(current, [
+        { menuId: CUT, discountRate: 30 },
+        { menuId: other, discountRate: 30 },
+      ]),
+    ).toEqual(changed);
+  });
 });
 
 describe('windowRatesSchema', () => {

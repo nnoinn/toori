@@ -11,6 +11,7 @@ import { z } from 'zod';
 import type { SettlementItemKind, SettlementStatus } from '@/db/schema/settlements';
 import { hoursUntil, kstToUtc } from '@/lib/time';
 import { disputeDeadline } from '@/server/disputes/rules';
+import { ADMIN_NOTICE_FALLBACK_CODE, type SettlementHoldCode } from '@/server/policy/admin-notice';
 
 import { calcSettlementFees, settlementBaseAmount } from './calc-settlement';
 import {
@@ -51,6 +52,8 @@ export type SettlementRow = SettleTarget & {
   openDisputeReceivedAt: Date | null;
   /** 그 거래나 그 샵에 풀리지 않은 운영자 정산 보류가 있다(#373 ②) */
   hasAdminHold: boolean;
+  /** 그 보류에서 고른, 원장님에게 보여 줄 사유 코드(#489). 보류가 없으면 null */
+  adminHoldCode: SettlementHoldCode | null;
   /** 원장님 귀책 취소 패널티(그 예약 것). 없으면 null */
   ownerPenalty: { amount: number; collectedAmount: number } | null;
   /** 이미 묶였으면 그 정산 줄 */
@@ -181,19 +184,25 @@ export function toSettlementItemView(
     paymentFeeVat: known ? fees.paymentFeeVat : null,
     payoutAmount: known ? fees.payoutAmount : null,
     ownerPenalty: null,
-    hold: holdOf(schedule, row.openDisputeReceivedAt),
+    hold: holdOf(schedule, row.openDisputeReceivedAt, row.adminHoldCode),
     status: schedule.status,
     payoutDate: schedule.status === 'scheduled' ? schedule.payoutDate : null,
   };
 }
 
-/** 보류 이유. 운영자 보류는 사유를 원장님에게 보이지 않아서 이유만 준다(11/15 nnoinn) */
+/**
+ * 보류 이유. 운영자 보류는 운영자가 쓴 사유를 숨기고, 목록에서 고른 사유 코드만 준다(11/15 nnoinn, #489).
+ * 코드가 없으면 기타(other)로 준다
+ */
 function holdOf(
   schedule: SettleSchedule,
   openDisputeReceivedAt: Date | null,
+  adminHoldCode: SettlementHoldCode | null,
 ): SettlementItemView['hold'] {
   if (schedule.status !== 'held') return null;
-  if (schedule.reason === 'admin') return { reason: 'admin' };
+  if (schedule.reason === 'admin') {
+    return { reason: 'admin', code: adminHoldCode ?? ADMIN_NOTICE_FALLBACK_CODE };
+  }
   return openDisputeReceivedAt
     ? { reason: 'dispute', receivedAt: openDisputeReceivedAt.toISOString() }
     : null;
