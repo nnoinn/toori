@@ -1,6 +1,7 @@
 // 계정 이력(#374) 화면 문구. 원장님 계정 이력(정민석)과 운영자 [이력 보기]가 같이 써서, 문구는 여기 한 곳에서만 고친다.
 // 화면과 서버 어디서나 가져올 수 있다. 시각 자체(줄 앞 "2026-11-12 21:50")는 화면이 formatKstDateTime으로 쓴다.
 
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { CouponReason } from '@/db/schema/refunds';
 import { formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';
@@ -105,7 +106,7 @@ function join(parts: readonly (string | null | false)[]): string | null {
 
 function reservationPart(event: AccountHistoryEvent): (string | null)[] {
   return [
-    event.reservationCode ? `예약 ${event.reservationCode}` : null,
+    event.reservationCode ? `예약 ${formatReservationCode(event.reservationCode)}` : null,
     event.menuName,
     event.startAt ? formatKst(new Date(event.startAt)) : null,
   ];
@@ -184,7 +185,7 @@ export function historyText(
       return text(
         '합의 후 취소 결과',
         join([
-          event.reservationCode && `예약 ${event.reservationCode}`,
+          event.reservationCode && `예약 ${formatReservationCode(event.reservationCode)}`,
           label(AGREED_RESULTS, event.result),
         ]),
       );
@@ -203,7 +204,7 @@ export function historyText(
       return text(
         '환불',
         join([
-          event.reservationCode && `예약 ${event.reservationCode}`,
+          event.reservationCode && `예약 ${formatReservationCode(event.reservationCode)}`,
           label(REFUND_REASONS, event.reason),
           won,
         ]),
@@ -216,7 +217,7 @@ export function historyText(
       return text(
         '쿠폰 돌려받음',
         join([
-          event.reservationCode && `예약 ${event.reservationCode}`,
+          event.reservationCode && `예약 ${formatReservationCode(event.reservationCode)}`,
           label(REFUND_REASONS, event.reason),
           won,
         ]),
@@ -225,7 +226,7 @@ export function historyText(
       return text(
         '이의제기 접수',
         join([
-          event.reservationCode && `예약 ${event.reservationCode}`,
+          event.reservationCode && `예약 ${formatReservationCode(event.reservationCode)}`,
           label(DISPUTE_TYPES, event.reason),
         ]),
       );
@@ -233,7 +234,7 @@ export function historyText(
       return text(
         '이의제기 결론',
         join([
-          event.reservationCode && `예약 ${event.reservationCode}`,
+          event.reservationCode && `예약 ${formatReservationCode(event.reservationCode)}`,
           label(DISPUTE_OUTCOMES, event.result),
         ]),
       );
