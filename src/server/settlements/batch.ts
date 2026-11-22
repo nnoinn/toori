@@ -85,7 +85,7 @@ export async function runSettlementBatch(
   for (const candidate of await readBatchCandidates(db, { cutoff })) {
     const kind = settlementKindOf(candidate);
     if (!kind) continue;
-    const holds = { hasOpenDispute: candidate.hasOpenDispute, cutoff };
+    const holds = { hasOpenDispute: false, cutoff };
     if (!isReadyToSettle(candidate, { ...holds, hasAdminHold: candidate.hasAdminHold })) {
       // 운영자 보류만 아니면 묶였을 거래는 따로 센다(예약 작업 기록에 남는다)
       if (candidate.hasAdminHold && isReadyToSettle(candidate, { ...holds, hasAdminHold: false })) {
