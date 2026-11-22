@@ -1,6 +1,12 @@
 // 매물·예약 조회 화면 표시 모양 (A-103, W18).
 
-import { SLOT_STATUSES, type SlotStatus } from '@/db/schema/slots';
+import { type SlotCloseReason, SLOT_STATUSES, type SlotStatus } from '@/db/schema/slots';
+import {
+  getSlotStatus,
+  isSlotOnHold,
+  type SlotHoldInput,
+  type SlotStatusInput,
+} from '@/features/slot-status/slot-status';
 
 /** 목록 탭. 주소 ?tab= 값 */
 export const LOOKUP_TABS = ['reservations', 'slots'] as const;
@@ -135,4 +141,57 @@ export function labelHoursBefore(hours: number | null): string {
   if (hours === null) return '-';
   if (hours < 0) return `시작 ${(-hours).toFixed(1)}시간 뒤`;
   return `${hours.toFixed(1)}시간 전`;
+}
+
+/** 매물 상세 주소(11/19 운영자 화면 피드백). 매물·예약 메뉴 아래에 둬서 왼쪽 메뉴가 그대로 켜진다 */
+export function slotDetailHref(slotId: string): string {
+  return `/admin/reservations/slots/${slotId}`;
+}
+
+const SLOT_CLOSE_REASON_LABELS: Record<SlotCloseReason, string> = {
+  other_channel: '다른 곳 예약',
+  mistake: '잘못 올림',
+  other: '기타',
+  hold_released: '결제 없이 홀딩 끝남',
+  admin: '운영자 마감',
+};
+
+/** 매물 마감 사유. 앞의 셋은 원장님이 고른 것이다(S-206) */
+export function labelSlotCloseReason(reason: string | null): string {
+  if (!reason) return '-';
+  return SLOT_CLOSE_REASON_LABELS[reason as SlotCloseReason] ?? reason;
+}
+
+/** 매물을 올린 방식 */
+export type SlotOrigin = 'single' | 'window' | 'relist';
+
+export const SLOT_ORIGIN_LABELS: Record<SlotOrigin, string> = {
+  single: '한 시술 매물',
+  window: '시간대 매물에서 손님이 고른 칸',
+  relist: '취소된 매물을 재등록',
+};
+
+/** 시간대 안에서 손님이 만든 칸이면 window, 취소된 매물을 다시 올린 것이면 relist, 아니면 single */
+export function slotOrigin(slot: {
+  windowId: string | null;
+  relistedFromSlotId: string | null;
+}): SlotOrigin {
+  if (slot.windowId) return 'window';
+  return slot.relistedFromSlotId ? 'relist' : 'single';
+}
+
+/**
+ * 운영자가 강제 마감할 수 있는 매물(#373 ④): 지금 판매 전(게시예정·게시중)이고 손님이 결제 중이 아니며,
+ * 시간대 안에서 손님이 만든 칸이 아님(그때는 그 시간대를 마감한다). 버튼을 보일지만 정하고, 막는 것은 서버가 다시 본다
+ */
+export function canForceCloseSlot(
+  slot: SlotStatusInput & SlotHoldInput & { windowId: string | null },
+  now: Date,
+): boolean {
+  const status = getSlotStatus(slot, now);
+  return (
+    (status === 'scheduled' || status === 'published') &&
+    !isSlotOnHold(slot, now) &&
+    slot.windowId === null
+  );
 }

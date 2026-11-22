@@ -65,6 +65,9 @@ describeDb('원장님 가입 저장 (실제 DB)', () => {
         businessDocPath: `users/${userId}/doc.jpg`,
         rejectionReason: null,
         reviewedAt: null,
+        // 국세청 진위확인(#208)을 넘기지 않으면 확인 안 함(비움)
+        ntsCheck: null,
+        ntsCheckedAt: null,
       });
       expect(shop.appliedAt).toBeInstanceOf(Date);
       expect(shop.location.lat).toBeCloseTo(TEST_LOCATION.lat, 6);
@@ -83,6 +86,29 @@ describeDb('원장님 가입 저장 (실제 DB)', () => {
       expect(
         (await ownerTerms(tx, userId)).map((row) => `${row.accountType}:${row.termsType}`).sort(),
       ).toEqual(['owner:privacy', 'owner:supplier']);
+    });
+  });
+
+  it('국세청 진위확인 결과와 시각을 샵에 남기고, 결과만 있고 시각이 없으면 DB가 막는다(#208)', async () => {
+    await withRollback(async (tx) => {
+      const userId = await createTestUser(tx);
+      const checkedAt = new Date('2026-11-22T05:30:00Z');
+      const base = newOwner(userId);
+      const saved = await saveOwnerAccount(tx, {
+        ...base,
+        shop: { ...base.shop, ntsCheck: 'unavailable', ntsCheckedAt: checkedAt },
+      });
+      const [shop] = await tx
+        .select()
+        .from(shops)
+        .where(eq(shops.id, saved?.shopId ?? ''));
+      expect(shop).toMatchObject({ ntsCheck: 'unavailable', ntsCheckedAt: checkedAt });
+
+      await expect(
+        tx.transaction((inner) =>
+          inner.update(shops).set({ ntsCheckedAt: null }).where(eq(shops.id, shop.id)),
+        ),
+      ).rejects.toThrow();
     });
   });
 

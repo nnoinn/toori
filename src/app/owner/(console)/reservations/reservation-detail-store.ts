@@ -1,6 +1,7 @@
 // 원장님 예약 상세 조회 (DB, O11, S-403). 이 화면에서만 쓰는 서버 코드라 화면 폴더에 둔다.
 // 그 샵 매물의 예약만 읽는다(X-102). 다른 샵 예약이나 모양이 틀린 id는 없는 예약과 같게 null이다.
 // 예약자 연락처를 읽으니 값을 로그에 남기지 않는다.
+// 이의제기(S-407)는 접수 시각·상태·결론만 읽고, 손님이 고른 종류·쓴 내용과 운영자 결론 메모는 읽지 않는다.
 
 import 'server-only';
 
@@ -11,11 +12,15 @@ import { getDb } from '@/db';
 import {
   type CancelActor,
   customers,
+  type DisputeOutcome,
+  disputes,
   type ReservationStatus,
   reservations,
   slots,
   type VisitResult,
 } from '@/db/schema';
+
+import type { OwnerReservationDispute } from './reservation-dispute';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select'>;
 
@@ -47,6 +52,8 @@ export type OwnerReservation = {
   customerName: string;
   /** 예약 전에 꼭 받지만 W11 전 시드 예약은 비어 있을 수 있다 */
   customerPhone: string | null;
+  /** 그 예약의 이의제기(S-407). 없으면 null */
+  dispute: OwnerReservationDispute | null;
 };
 
 /** 그 샵 매물의 예약 한 건과 예약자 이름·휴대폰. 없거나 다른 샵 예약이거나 id 모양이 틀리면 null */
@@ -78,17 +85,53 @@ export async function selectOwnerReservation(
       newCustomerOnly: slots.newCustomerOnly,
       customerName: customers.name,
       customerPhone: customers.phone,
+      disputeStatus: disputes.status,
+      disputeOutcome: disputes.outcome,
+      disputeReceivedAt: disputes.receivedAt,
+      disputeHandledAt: disputes.handledAt,
     })
     .from(reservations)
     .innerJoin(slots, eq(slots.id, reservations.slotId))
     .innerJoin(customers, eq(customers.id, reservations.customerId))
+    // 한 예약에 이의제기는 하나라(disputes_reservation_id_unique) 줄이 늘지 않는다
+    .leftJoin(disputes, eq(disputes.reservationId, reservations.id))
     .where(and(eq(reservations.id, reservationId), eq(slots.shopId, shopId)));
   if (!row) return null;
+  const { disputeStatus, disputeOutcome, disputeReceivedAt, disputeHandledAt, ...rest } = row;
   return {
-    ...row,
+    ...rest,
     // 세 값은 DB 제약(reservations_*_check)으로 정해진 값만 들어간다
     status: row.status as ReservationStatus,
     visitResult: row.visitResult as VisitResult | null,
     cancelActor: row.cancelActor as CancelActor | null,
+    dispute: toOwnerDispute({
+      status: disputeStatus,
+      outcome: disputeOutcome,
+      receivedAt: disputeReceivedAt,
+      handledAt: disputeHandledAt,
+    }),
   };
+}
+
+/**
+ * 이의제기 칸을 원장님에게 보여줄 값으로. 이의제기가 없으면(left join) null.
+ * 결론(resolved)이면 결론 종류가 꼭 있다(disputes_outcome_status_check)
+ */
+function toOwnerDispute(row: {
+  status: string | null;
+  outcome: string | null;
+  receivedAt: Date | null;
+  handledAt: Date | null;
+}): OwnerReservationDispute | null {
+  if (row.status === null || row.receivedAt === null) return null;
+  if (row.status === 'resolved' && row.outcome !== null) {
+    return {
+      status: 'resolved',
+      receivedAt: row.receivedAt,
+      // 결론 종류는 DB 제약(disputes_outcome_check)으로 정해진 값만 들어간다
+      outcome: row.outcome as DisputeOutcome,
+      handledAt: row.handledAt,
+    };
+  }
+  return { status: 'open', receivedAt: row.receivedAt };
 }

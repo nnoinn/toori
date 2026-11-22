@@ -1,5 +1,5 @@
 // 계정 이력(#374) 화면 주소 값 읽기와 주소 만들기. 계산만 한다(화면과 테스트가 같이 쓴다).
-// 원장님 계정 이력(/owner/account/history, 11/18 정민석)이 쓰고, 운영자 [이력 보기](src/app/admin/users/history-query.ts)와 같은 규칙이다.
+// 원장님 계정 이력(/owner/account/history, 11/18 정민석)과 운영자 [이력 보기](11/22부터 같은 파일)가 같이 쓴다.
 // 주소 예: /owner/account/history?from=2026-11-01&to=2026-11-14&kind=cancel&page=2
 // from·to는 한국 날짜(둘 다 그날 포함), kind는 종류 묶음, page는 1부터. 모두 없어도 된다.
 

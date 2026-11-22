@@ -12,8 +12,8 @@ import { adminAccessLogs } from '@/db/schema';
 type DbWriter = Pick<ReturnType<typeof getDb>, 'insert'>;
 
 export type AdminAccess = {
-  /** view: 상세 보기, search: 목록·검색 */
-  action: 'view' | 'search';
+  /** view: 상세 보기, search: 목록·검색, contact_reveal: 가린 연락처를 [번호 보기]로 봄(#360 4번) */
+  action: 'view' | 'search' | 'contact_reveal';
   /** 목록·검색이면 list */
   targetType: 'customer' | 'owner' | 'shop' | 'reservation' | 'dispute' | 'settlement' | 'list';
   /** 상세면 대상 id */

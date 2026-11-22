@@ -27,9 +27,12 @@ describe('getSlotStatus', () => {
 describe('isSlotOnHold', () => {
   const expiresAt = at('2026-11-01T10:10:00');
 
-  it('홀딩한 고객이 없으면 홀딩 중이 아니다', () => {
+  it('홀딩한 고객이 없으면 홀딩 중이 아니다(만료 시각만 남아 있어도)', () => {
     expect(
       isSlotOnHold({ holdCustomerId: null, holdExpiresAt: null }, at('2026-11-01T10:00:00')),
+    ).toBe(false);
+    expect(
+      isSlotOnHold({ holdCustomerId: null, holdExpiresAt: expiresAt }, at('2026-11-01T10:00:00')),
     ).toBe(false);
   });
 

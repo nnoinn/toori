@@ -10,6 +10,8 @@ export const SETTLEMENT_HOLD_ERRORS = {
   HOLD_NOT_FOUND: '정산 보류를 찾을 수 없어요',
   /** 사유(보류)·메모(풀기)가 빈칸(공백만 포함) */
   REASON_REQUIRED: '사유를 적어 주세요',
+  /** 원장님에게 보여 줄 사유를 목록에서 고르지 않았거나 정산 보류에 없는 사유(#489) */
+  CODE_REQUIRED: '원장님에게 보여 줄 사유를 골라 주세요',
   /** 사유가 상한을 넘음(화면은 그 전에 입력을 멈춘다) */
   REASON_TOO_LONG: `사유는 ${ADMIN_REASON_LIMIT.toLocaleString('ko-KR')}자까지 쓸 수 있어요`,
   /** 원장님 사정 취소·자동 취소·운영자 취소처럼 정산 줄이 생기지 않는 예약 */

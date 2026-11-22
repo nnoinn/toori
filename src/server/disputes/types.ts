@@ -4,7 +4,7 @@ import type { DisputeOutcome, DisputeStatus, DisputeType } from '@/db/schema/adm
 
 /**
  * 내 예약 상세의 이의제기 칸. 화면은 시각을 비교하지 않고 이 값으로 고른다(#299).
- * - not_open: 아직 받기 전(예정 예약의 서비스 시작 전). 버튼을 숨긴다
+ * - not_open: 받지 않는 때(예정 예약의 서비스 시작 전, 무효가 된 예약 A-108). 칸을 그리지 않는다
  * - open: 접수할 수 있다
  * - submitted: 이미 접수했다(내용은 dispute)
  * - closed: 접수 기한이 지났다. 버튼 대신 카카오톡 채널 안내

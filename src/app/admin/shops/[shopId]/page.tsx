@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { type ReactNode, Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -12,11 +12,12 @@ import { getDb } from '@/db';
 import { formatBusinessNumber } from '@/lib/business-number';
 import { getRequestNow } from '@/lib/request-time';
 import { formatEndTime, formatKst, kstDateKey } from '@/lib/time';
+import { maskPhone } from '@/lib/phone';
 import { cn } from '@/lib/utils';
 import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
 import { getBusinessDocUrl } from '@/server/storage/upload';
-import { bankName, categoryLabel } from '@/server/policy';
+import { adminNoticeText, bankName, categoryLabel } from '@/server/policy';
 
 import { lookupHref } from '../../reservations/format';
 import {
@@ -32,7 +33,9 @@ import {
   toCancelStatsRange,
 } from '../cancel-stats-period';
 import { selectShopCancelStats } from '../cancel-stats-queries';
-import { labelPgSellerStatus, labelReviewAction } from '../format';
+import { revealShopOwnerContact } from '../../users/contact-actions';
+import { ContactReveal, RevealButton, RevealedValue } from '../../users/contact-reveal';
+import { labelPgSellerStatus, labelReviewAction, ntsCheckText } from '../format';
 import { selectShopForReview, type ShopReviewDetail } from '../queries';
 import { SlotControlAction } from '../slot-control-actions';
 import { selectShopSlotControl, type ShopSlotControl } from '../slot-control-queries';
@@ -131,6 +134,7 @@ async function ReviewDetail({
               ['대표자', detail.business.representativeName],
               ['사업자등록번호', formatBusinessNumber(detail.business.businessRegistrationNumber)],
               ['개업일자', detail.business.openedOn],
+              ['국세청 확인', ntsCheckText(detail.business.ntsCheck, detail.business.ntsCheckedAt)],
             ]}
           />
           {doc.ok ? (
@@ -154,12 +158,23 @@ async function ReviewDetail({
         </Section>
 
         <Section title="원장님">
-          <Fields
-            rows={[
-              ['이름', detail.owner.name],
-              ['연락처', detail.owner.phone],
-            ]}
-          />
+          {/* 연락처는 가려서 보여 주고, [번호 보기]를 누르면 같은 자리에 전체를 진하게 보여 준다(#360 4번) */}
+          <ContactReveal reveal={revealShopOwnerContact.bind(null, detail.shopId)}>
+            <Fields
+              rows={[
+                ['이름', detail.owner.name],
+                [
+                  '연락처',
+                  <RevealedValue
+                    key="phone"
+                    field="phone"
+                    masked={maskPhone(detail.owner.phone)}
+                  />,
+                ],
+              ]}
+            />
+            <RevealButton />
+          </ContactReveal>
           {/* 원장님 계정에서 일어난 일(입점·매물·예약·정산 계좌 등)을 시각 순으로(#374) */}
           <Link
             href={`/admin/users/owners/${detail.owner.id}/history`}
@@ -256,7 +271,9 @@ function SlotControlPanel({
           <p className="font-medium">새 매물 등록: {control.pause ? '멈춤' : '올릴 수 있어요'}</p>
           {control.pause ? (
             <p className="break-all text-muted-foreground">
-              {formatKst(control.pause.pausedAt)}부터 · 사유: {control.pause.reason}
+              {formatKst(control.pause.pausedAt)}부터 · 원장님에게 보이는 사유:{' '}
+              {adminNoticeText(control.pause.code, 'publish_pause').label} · 운영자 메모:{' '}
+              {control.pause.reason}
             </p>
           ) : (
             <p className="text-muted-foreground">
@@ -334,7 +351,7 @@ function Section({
   );
 }
 
-function Fields({ rows }: { rows: [string, string][] }) {
+function Fields({ rows }: { rows: [string, ReactNode][] }) {
   return (
     <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-2 text-sm">
       {rows.map(([label, value]) => (

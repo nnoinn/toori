@@ -17,7 +17,7 @@ import {
 import { labelHoursBefore } from '../reservations/format';
 import { type CancelStatsPeriod, cancelStatsHref } from './cancel-stats-period';
 import type { ShopCancelStats } from './cancel-stats-queries';
-import { AGREED_REQUEST_STATUS_LABELS } from './format';
+import { AGREED_REQUEST_STATUS_LABELS, agreedCancelReasonText } from './format';
 
 /** 샵 상세에서 취소 기록 칸의 자리. 기간을 고르면 화면이 이 칸으로 돌아온다 */
 export const CANCEL_STATS_ANCHOR = 'cancel-stats';
@@ -182,8 +182,7 @@ export function ShopCancelStatsView({ stats }: { stats: ShopCancelStats }) {
                   </Link>
                   <span>{formatKst(row.requestedAt)} 요청</span>
                   <span className="break-all">
-                    {AGREED_CANCEL_REASON_LABELS[row.reason]}
-                    {row.reason === 'other' && row.reasonText ? `(${row.reasonText})` : null}
+                    {agreedCancelReasonText(row.reason, row.reasonText)}
                   </span>
                   <span className="text-muted-foreground">
                     {AGREED_REQUEST_STATUS_LABELS[row.status]}

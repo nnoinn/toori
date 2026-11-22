@@ -12,6 +12,12 @@ import { fail, type ResultError } from '@/lib/result';
 import { requireShopOwner } from '@/server/auth';
 import { SHOP_REVIEW_ERRORS } from '@/server/shops';
 import { resubmitShop } from '@/server/shops/review-store';
+import {
+  checkBusinessWithNts,
+  ntsBlockError,
+  ntsFieldsChanged,
+  ntsRecord,
+} from '@/server/shops/nts';
 import { assertBusinessDocPath } from '@/server/storage';
 import { kstDateKey } from '@/lib/time';
 
@@ -66,11 +72,24 @@ export async function saveBusinessInfo(
     }
   }
 
+  // 번호·개업일자·대표자 이름을 바꾸면 국세청에 다시 확인한다(#208). 다름·휴폐업이면 저장하지 않는다
+  let nts: ReturnType<typeof ntsRecord> | null = null;
+  if (ntsFieldsChanged(checked.data, current)) {
+    const check = await checkBusinessWithNts({
+      businessNumber: checked.data.businessRegistrationNumber,
+      openedOn: checked.data.openedOn,
+      representativeName: checked.data.representativeName,
+    });
+    const blocked = ntsBlockError(check);
+    if (blocked) return blocked;
+    nts = ntsRecord(check, await getRequestNow());
+  }
+
   // 실패하면 tx.rollback()으로 사업자 정보 저장까지 되돌리고, 이유는 failure에 남긴다
   let failure = null as ResultError | null;
   try {
     await db.transaction(async (tx) => {
-      if (!(await updateBusinessInfo(tx, shopId, checked.data))) {
+      if (!(await updateBusinessInfo(tx, shopId, { ...checked.data, ...(nts ?? {}) }))) {
         failure = LOCKED;
         tx.rollback();
         return;

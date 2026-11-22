@@ -1,14 +1,23 @@
 // 원장님 예약 상세의 카드들 (O11, S-403). 서버에서 그리는 부품이라 상태가 없다.
-// 안내 상자(ViewNotice), 예약자(BookerCard), 서비스(ServiceCard), 기록(HistoryCard).
+// 안내 상자(ViewNotice, DisputeNotice), 예약자(BookerCard), 서비스(ServiceCard), 기록(HistoryCard).
 // 예약을 읽고 배치하는 것은 page.tsx가 맡는다.
 
-import { CalendarX2, ClipboardCheck, Lock } from 'lucide-react';
+import {
+  CalendarX2,
+  ClipboardCheck,
+  ExternalLink,
+  Lock,
+  MessageSquareCheck,
+  MessageSquareWarning,
+} from 'lucide-react';
 import { cn } from 'cn';
 
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Price } from '@/components/ui/price';
 import { SlotBadges } from '@/components/ui/slot-badge';
 import { formatDuration, formatWon } from '@/lib/format';
+import { KAKAO_CHANNEL_URL } from '@/lib/site';
 import { formatKst } from '@/lib/time';
 
 import { maskPhone } from '@/lib/phone';
@@ -21,6 +30,7 @@ import {
   showsFullPhone,
 } from '../reservation-detail';
 import type { OwnerReservation } from '../reservation-detail-store';
+import { disputeNotice, type OwnerReservationDispute } from '../reservation-dispute';
 
 /** 시작 전에는 다른 채널에서 시간 막기(D16), 시작이 지났으면 방문·노쇼 처리 안내, 처리한 뒤에는 바꿀 수 없다는 안내 */
 export function ViewNotice({ view }: { view: Exclude<ReservationView, 'cancelled'> }) {
@@ -46,16 +56,42 @@ export function ViewNotice({ view }: { view: Exclude<ReservationView, 'cancelled
   );
 }
 
-/** 아이콘 + 굵은 제목 + 흐린 설명 상자. warning이면 처리할 일이 있다는 뜻으로 노란 바탕 */
+/**
+ * 손님이 이의제기한 예약(S-407). 접수한 때·확인 상태·결론만 보여주고 손님이 쓴 내용은 보여주지 않는다.
+ * 원장님이 할 일은 없어서 노란 바탕을 쓰지 않는다. 문의는 투리 카카오톡 채널로 받는다(#20 R9)
+ */
+export function DisputeNotice({ dispute }: { dispute: OwnerReservationDispute }) {
+  const { title, description } = disputeNotice(dispute);
+  return (
+    <NoticeBox
+      icon={dispute.status === 'open' ? MessageSquareWarning : MessageSquareCheck}
+      title={title}
+      action={
+        <Button asChild variant="outline" size="sm">
+          <a href={KAKAO_CHANNEL_URL} target="_blank" rel="noopener noreferrer">
+            카카오톡 채널 열기
+            <ExternalLink aria-hidden />
+          </a>
+        </Button>
+      }
+    >
+      {description}
+    </NoticeBox>
+  );
+}
+
+/** 아이콘 + 굵은 제목 + 흐린 설명 상자. warning이면 처리할 일이 있다는 뜻으로 노란 바탕. action은 설명 아래 버튼 */
 function NoticeBox({
   icon: Icon,
   title,
   warning = false,
+  action = null,
   children,
 }: {
   icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
   title: string;
   warning?: boolean;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -69,6 +105,7 @@ function NoticeBox({
       <div className="flex flex-col gap-0.5">
         <p className="font-semibold">{title}</p>
         <p className="text-muted-foreground">{children}</p>
+        {action ? <div className="mt-2">{action}</div> : null}
       </div>
     </div>
   );
@@ -155,8 +192,9 @@ export function ServiceCard({ reservation }: { reservation: OwnerReservation }) 
   );
 }
 
-/** 예약 확정·방문 처리·취소 시각. 있는 기록만 보여준다 */
+/** 예약 확정·방문 처리·취소·이의제기 접수와 확인 끝 시각. 있는 기록만 보여준다 */
 export function HistoryCard({ reservation }: { reservation: OwnerReservation }) {
+  const { dispute } = reservation;
   return (
     <Card>
       <CardHeader>
@@ -183,6 +221,18 @@ export function HistoryCard({ reservation }: { reservation: OwnerReservation }) 
                   ? ` · ${CANCEL_ACTOR_LABELS[reservation.cancelActor]}`
                   : null}
               </dd>
+            </>
+          ) : null}
+          {dispute ? (
+            <>
+              <dt className="text-muted-foreground">이의제기 접수</dt>
+              <dd>{formatKst(dispute.receivedAt)}</dd>
+            </>
+          ) : null}
+          {dispute?.status === 'resolved' && dispute.handledAt ? (
+            <>
+              <dt className="text-muted-foreground">이의제기 확인 끝</dt>
+              <dd>{formatKst(dispute.handledAt)}</dd>
             </>
           ) : null}
         </dl>

@@ -43,7 +43,7 @@ export type WindowListItem = {
   minSalePrice: number;
   imageUrl: string | null;
   distanceMeters: number | null;
-  /** 가장 빠른 시작이 임박이면 imminent, 신규 고객 전용이면 newCustomerOnly(badges.ts windowBadges) */
+  /** 가장 빠른 시작이 임박이면 imminent(badges.ts windowBadges). 신규 고객 전용 배지는 붙이지 않는다(#459) */
   badges: SlotBadgeKind[];
 };
 
