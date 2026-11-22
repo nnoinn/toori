@@ -104,6 +104,8 @@ function ChannelLink() {
 function DisputeForm({ view }: { view: DisputeView }) {
   const router = useRouter();
   const contentId = useId();
+  // 화면마다 라디오 묶음 이름을 따로 둔다(숨겨 둔 다른 예약 화면과 섞이지 않게)
+  const typeGroup = useId();
   const contentRef = useRef<HTMLTextAreaElement>(null);
   const [open, setOpen] = useState(false);
   // 고를 수 있는 종류가 하나뿐이면 골라 둔다
@@ -202,7 +204,7 @@ function DisputeForm({ view }: { view: DisputeView }) {
                   <label key={option} className="flex items-center gap-2 text-sm max-md:min-h-10">
                     <input
                       type="radio"
-                      name="dispute-type"
+                      name={typeGroup}
                       className="size-4 accent-primary"
                       checked={type === option}
                       onChange={() => setType(option)}

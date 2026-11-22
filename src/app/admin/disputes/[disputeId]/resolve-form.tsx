@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useId, useState, useTransition } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -38,6 +38,8 @@ export function ResolveForm({
   options: OutcomeOption[];
 }) {
   const [outcome, setOutcome] = useState<DisputeOutcome | null>(null);
+  // 화면마다 라디오 묶음 이름을 따로 둔다(숨겨 둔 다른 이의제기 화면과 섞이지 않게)
+  const outcomeGroup = useId();
   const [memo, setMemo] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -73,7 +75,7 @@ export function ResolveForm({
             >
               <input
                 type="radio"
-                name="outcome"
+                name={outcomeGroup}
                 value={option.value}
                 checked={outcome === option.value}
                 disabled={disabled}

@@ -1,5 +1,7 @@
 'use client';
 
+import { useId } from 'react';
+
 import type { MyCoupon } from '@/server/coupons';
 
 import { COUPON_NOT_APPLICABLE_NOTE, COUPON_SELECT_NOTES, couponOptionLabel } from './coupon-texts';
@@ -23,6 +25,8 @@ export function CouponPicker({
   message: string | null;
   onSelect: (couponId: string | null) => void;
 }) {
+  // 결제 화면을 여러 개 열어 두면(Cache Components가 지난 화면을 숨겨 둠) 같은 이름의 라디오가 한 묶음이 되지 않게 화면마다 이름을 따로 둔다
+  const groupName = useId();
   if (coupons.length === 0) return null;
   return (
     <section className="flex flex-col gap-2" aria-label="쿠폰">
@@ -31,7 +35,7 @@ export function CouponPicker({
         <label className="flex items-center gap-3 text-sm">
           <input
             type="radio"
-            name="coupon"
+            name={groupName}
             className="size-4 shrink-0 accent-primary"
             checked={selectedId === null}
             onChange={() => onSelect(null)}
@@ -49,7 +53,7 @@ export function CouponPicker({
           >
             <input
               type="radio"
-              name="coupon"
+              name={groupName}
               className="mt-0.5 size-4 shrink-0 accent-primary"
               checked={selectedId === coupon.couponId}
               disabled={!coupon.applicable}

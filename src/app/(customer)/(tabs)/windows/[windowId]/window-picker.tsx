@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect, useState, useTransition } from 'react';
+import { useId, useLayoutEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { unstable_rethrow, useRouter } from 'next/navigation';
 import { Clock } from 'lucide-react';
@@ -43,6 +43,9 @@ export function WindowPicker({ window }: { window: SlotWindowDetail }) {
   }));
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<ReserveError | null>(null);
+  // 라디오 묶음 이름은 화면마다 따로 둔다. 다른 시간대 상세를 숨겨 둔 채로(Cache Components) 같은 이름을 쓰면 두 화면의 라디오가
+  // 한 묶음이 되어, 고른 서비스는 바뀌어도 버튼이 선택된 것으로 보이지 않았다(11/22 nnoinn 손 점검)
+  const radioGroup = useId();
   // 상세를 떠나면 Next.js가 이 화면을 숨겨 두었다가 그대로 다시 보여준다(Activity). 지난 실패 문구는 떠날 때 지운다
   useLayoutEffect(() => () => setError(null), []);
 
@@ -146,7 +149,7 @@ export function WindowPicker({ window }: { window: SlotWindowDetail }) {
                   <span className="flex items-center gap-2 font-medium">
                     <input
                       type="radio"
-                      name="window-menu"
+                      name={`${radioGroup}-menu`}
                       className="size-4 accent-primary"
                       checked={pick.menuId === item.menuId}
                       disabled={closed || pending}
@@ -172,12 +175,15 @@ export function WindowPicker({ window }: { window: SlotWindowDetail }) {
                     지금 고를 수 있는 시각이 없어요
                   </span>
                 ) : null}
+                {/* 원장님이 쓴 서비스 설명(S-106). 고른 서비스 칸 안에 보여서 어느 서비스의 설명인지 헷갈리지 않게 한다(11/22 손 점검) */}
+                {menu?.menuId === item.menuId && item.description ? (
+                  <span className="pt-1 pl-6 text-sm whitespace-pre-line text-muted-foreground">
+                    {item.description}
+                  </span>
+                ) : null}
               </label>
             );
           })}
-          {menu?.description ? (
-            <p className="text-sm whitespace-pre-line text-muted-foreground">{menu.description}</p>
-          ) : null}
         </fieldset>
 
         {menu && menu.starts.length > 0 ? (
@@ -195,7 +201,7 @@ export function WindowPicker({ window }: { window: SlotWindowDetail }) {
                 >
                   <input
                     type="radio"
-                    name="window-start"
+                    name={`${radioGroup}-start`}
                     className="sr-only"
                     checked={start?.startAt === item.startAt}
                     disabled={pending}
