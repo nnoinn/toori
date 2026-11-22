@@ -122,6 +122,7 @@ async function clearSeedData(sql, userIds) {
   await sql`delete from disputes where reservation_id in (${seedReservations()})`;
   // 11/22: 그 뒤에 생긴 표도 시드 예약·샵을 가리킬 수 있다(팀원이 시드 샵으로 시험한 합의 후 취소 요청·정산 보류·계좌 변경 기록)
   await sql`delete from agreed_cancel_requests where reservation_id in (${seedReservations()})`;
+  await sql`delete from settlement_holds where reservation_id in (${seedReservations()}) or shop_id in (${seedShops()})`;
   await sql`delete from penalty_collections where penalty_id in (${seedPenalties()}) or settlement_id in (select id from settlements where shop_id in (${seedShops()}))`;
   await sql`delete from owner_penalties where id in (${seedPenalties()})`;
   await sql`delete from settlement_items where shop_id in (${seedShops()}) or order_id in (${seedOrders()})`;
@@ -343,7 +344,7 @@ export async function seedDevData(sql, { now, userIds }) {
           start_at: start,
           end_at: end,
           publish_at: publishAt,
-          status: 'published',
+          status: publishAt <= now ? 'published' : 'scheduled',
           new_customer_only: false,
           created_by: ownerUserId,
         });
@@ -456,7 +457,7 @@ function sampleSettlementRows(base, entries, shopIdByKey) {
       const baseAmount =
         kind === 'penalty' ? Math.floor((sale * booking.refund.penalty_rate) / 100) : sale;
       const paymentFee = Math.floor((baseAmount * SETTLEMENT_SAMPLE_FEE_RATE) / 100);
-      const paymentFeeVat = Math.ceil(paymentFee / 10);
+      const paymentFeeVat = Math.floor(paymentFee / 10);
       return {
         shop_id: shopId,
         order_id: booking.order.id,
