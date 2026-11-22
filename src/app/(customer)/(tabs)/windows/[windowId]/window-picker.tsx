@@ -175,12 +175,15 @@ export function WindowPicker({ window }: { window: SlotWindowDetail }) {
                     지금 고를 수 있는 시각이 없어요
                   </span>
                 ) : null}
+                {/* 원장님이 쓴 서비스 설명(S-106). 고른 서비스 칸 안에 보여서 어느 서비스의 설명인지 헷갈리지 않게 한다(11/22 손 점검) */}
+                {menu?.menuId === item.menuId && item.description ? (
+                  <span className="pt-1 pl-6 text-sm whitespace-pre-line text-muted-foreground">
+                    {item.description}
+                  </span>
+                ) : null}
               </label>
             );
           })}
-          {menu?.description ? (
-            <p className="text-sm whitespace-pre-line text-muted-foreground">{menu.description}</p>
-          ) : null}
         </fieldset>
 
         {menu && menu.starts.length > 0 ? (
