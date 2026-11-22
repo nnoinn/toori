@@ -162,6 +162,7 @@ describeDb('입점 심사 조회 (실제 DB)', () => {
           name,
           publishPausedAt: at(iso),
           publishPausedReason: '운영자 확인',
+          publishPausedCode: 'shop_info_check',
         });
       const third = await paused('2001-01-03T00:00:00Z', '셋째로 멈춘 샵');
       const first = await paused('2001-01-01T00:00:00Z', '처음 멈춘 샵');

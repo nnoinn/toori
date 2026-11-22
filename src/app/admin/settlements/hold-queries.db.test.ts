@@ -147,12 +147,14 @@ describeDb('운영자 정산 보류 화면 읽기 (실제 DB)', () => {
         {
           reservationId: first.reservation.id,
           reason: '확인',
+          reasonCode: 'user_inquiry',
           heldBy: adminId,
           heldAt: at('09:00'),
         },
         {
           reservationId: second.reservation.id,
           reason: '확인',
+          reasonCode: 'user_inquiry',
           heldBy: adminId,
           heldAt: at('09:10'),
         },
@@ -160,6 +162,7 @@ describeDb('운영자 정산 보류 화면 읽기 (실제 DB)', () => {
         {
           reservationId: released.reservation.id,
           reason: '확인',
+          reasonCode: 'user_inquiry',
           heldBy: adminId,
           heldAt: at('09:20'),
           releasedBy: adminId,
@@ -169,13 +172,20 @@ describeDb('운영자 정산 보류 화면 읽기 (실제 DB)', () => {
         {
           shopId: shopB.shopId,
           reason: '지난 확인',
+          reasonCode: 'user_inquiry',
           heldBy: adminId,
           heldAt: at('08:00'),
           releasedBy: adminId,
           releasedAt: at('08:30'),
           releaseMemo: '확인함',
         },
-        { shopId: shopA.shopId, reason: '사업자 정보 확인', heldBy: adminId, heldAt: at('11:00') },
+        {
+          shopId: shopA.shopId,
+          reason: '사업자 정보 확인',
+          reasonCode: 'payout_info_check',
+          heldBy: adminId,
+          heldAt: at('11:00'),
+        },
       ]);
 
       expect(await countActiveHolds(tx)).toEqual({
