@@ -19,7 +19,8 @@ jobs:
   mutation:
     name: mutation
     runs-on: ubuntu-24.04
-    # 검사 파일이 68개로 늘어 11/21 주간 실행이 60분 제한에 걸렸다(11/22). 공개 레포라 Actions 시간은 무료다
+    # 검사 파일이 68개로 늘어 한 번에 1시간 넘게 걸린다. 공개 레포라 Actions 시간은 무료다.
+    # 11/21·11/22 실행은 시간 제한이 아니라 러너 메모리·CPU 부족("lost communication")으로 멈췄다(stryker.config.mjs의 concurrency·maxTestRunnerReuse)
     timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
