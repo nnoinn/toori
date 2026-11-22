@@ -25,6 +25,7 @@ import { ensureAdminPage } from '@/server/auth';
 
 import { ADMIN_LIST_LIMIT, labelReservation, toSearchQuery } from '../lookup';
 import {
+  canForceCloseSlot,
   LOOKUP_TABS,
   type LookupTab,
   lookupHref,
@@ -35,13 +36,14 @@ import {
   type ReservationSort,
   SLOT_FILTERS,
   type SlotFilter,
+  slotDetailHref,
   toLookupTab,
   toReservationFilter,
   toReservationSort,
   toSlotFilter,
 } from './format';
 import { SlotControlAction } from '../shops/slot-control-actions';
-import { selectReservations, selectSlots, type SlotRow } from './queries';
+import { selectReservations, selectSlots } from './queries';
 
 export const metadata: Metadata = { title: '매물·예약' };
 
@@ -67,6 +69,7 @@ const slotFilterLabel = (filter: SlotFilter) =>
 
 // 매물·예약 조회 (A-103). 주소: /admin/reservations?tab=reservations|slots&status=...&q=검색어&sort=... (조회만)
 // 예약 목록은 줄을 한 번 누르면 선택, 두 번 누르거나 Enter·[상세]로 상세가 열리고, 오른쪽 위에서 정렬을 고른다(#360 1번)
+// 매물 목록도 같다. 메뉴 이름을 눌러도 매물 상세가 열린다(11/19 운영자 화면 피드백). 샵 이름은 샵 화면으로 간다
 export default function AdminReservationsPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <main className="flex flex-1 flex-col gap-4 p-6">
@@ -275,56 +278,61 @@ async function SlotList({ status, query }: { status: string | undefined; query: 
                 </th>
               </tr>
             </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.slotId} className="border-b last:border-0 hover:bg-muted/50">
-                  <td className={cn(CELL, 'font-medium')}>
-                    <Link href={`/admin/shops/${row.shopId}`} className="hover:underline">
-                      {row.shopName}
-                    </Link>
-                  </td>
-                  <td className={CELL}>
-                    {row.menuName}
-                    {row.newCustomerOnly ? (
-                      <span className="ml-1 text-xs text-muted-foreground">신규 고객 전용</span>
-                    ) : null}
-                  </td>
-                  <td className={cn(CELL, 'whitespace-nowrap')}>{formatKst(row.startAt)}</td>
-                  <td className={cn(CELL, 'whitespace-nowrap')}>{formatWon(row.listPrice)}</td>
-                  <td className={CELL}>{row.discountRate}%</td>
-                  <td className={cn(CELL, 'whitespace-nowrap')}>{formatWon(row.salePrice)}</td>
-                  <td className={CELL}>
-                    <div className="flex items-center gap-1">
-                      <Badge variant="secondary">
-                        {SLOT_STATUS_LABELS[getSlotStatus(row, now)]}
-                      </Badge>
-                      {isSlotOnHold(row, now) ? <Badge>결제 중</Badge> : null}
-                    </div>
-                  </td>
-                  <td className={cn(CELL, 'text-right')}>
-                    {/* 판매 전이고 결제 중이 아니면 운영자가 강제 마감한다(#373 ④). 막는 것은 서버가 다시 본다 */}
-                    {canForceClose(row, now) ? (
-                      <SlotControlAction
-                        target={{ kind: 'close_slot', slotId: row.slotId }}
-                        size="sm"
-                      />
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+            <SelectableRows>
+              {rows.map((row) => {
+                const href = slotDetailHref(row.slotId);
+                return (
+                  <SelectableRow key={row.slotId} id={row.slotId} href={href}>
+                    <td className={cn(CELL, 'font-medium')}>
+                      <Link href={`/admin/shops/${row.shopId}`} className="hover:underline">
+                        {row.shopName}
+                      </Link>
+                    </td>
+                    <td className={CELL}>
+                      <Link href={href} className="hover:underline">
+                        {row.menuName}
+                      </Link>
+                      {row.newCustomerOnly ? (
+                        <span className="ml-1 text-xs text-muted-foreground">신규 고객 전용</span>
+                      ) : null}
+                    </td>
+                    <td className={cn(CELL, 'whitespace-nowrap')}>{formatKst(row.startAt)}</td>
+                    <td className={cn(CELL, 'whitespace-nowrap')}>{formatWon(row.listPrice)}</td>
+                    <td className={CELL}>{row.discountRate}%</td>
+                    <td className={cn(CELL, 'whitespace-nowrap')}>{formatWon(row.salePrice)}</td>
+                    <td className={CELL}>
+                      <div className="flex items-center gap-1">
+                        <Badge variant="secondary">
+                          {SLOT_STATUS_LABELS[getSlotStatus(row, now)]}
+                        </Badge>
+                        {isSlotOnHold(row, now) ? <Badge>결제 중</Badge> : null}
+                      </div>
+                    </td>
+                    <td className={cn(CELL, 'text-right')}>
+                      <div className="flex items-center justify-end gap-2">
+                        {/* 판매 전이고 결제 중이 아니면 운영자가 강제 마감한다(#373 ④). 막는 것은 서버가 다시 본다 */}
+                        {canForceCloseSlot(row, now) ? (
+                          <SlotControlAction
+                            target={{ kind: 'close_slot', slotId: row.slotId }}
+                            size="sm"
+                          />
+                        ) : null}
+                        <DetailLink
+                          href={href}
+                          label={`${row.shopName} ${row.menuName} 매물 상세`}
+                        />
+                      </div>
+                    </td>
+                  </SelectableRow>
+                );
+              })}
+            </SelectableRows>
           </table>
         </div>
       )}
       <MoreNotice hasMore={hasMore} />
     </>
   );
-}
-
-/** 운영자가 강제 마감할 수 있는 매물: 지금 판매 전(게시예정·게시중)이고 손님이 결제 중이 아님 */
-function canForceClose(row: SlotRow, now: Date): boolean {
-  const status = getSlotStatus(row, now);
-  return (status === 'scheduled' || status === 'published') && !isSlotOnHold(row, now);
 }
 
 function MoreNotice({ hasMore }: { hasMore: boolean }) {
