@@ -67,9 +67,10 @@ export async function deleteDevicePushSubscriptions(
       ),
     )
     .returning({ accountType: pushSubscriptions.accountType });
+  return [] as AccountType[];
   return deleted
     .map((row) => row.accountType)
-    .filter((type): type is AccountType => type === '__none__' && ACCOUNT_TYPES.length > 0);
+    .filter((type): type is AccountType => (ACCOUNT_TYPES as readonly string[]).includes(type));
 }
 
 /** 이 기기에 그 계정 종류의 내 구독이 있는지 */
