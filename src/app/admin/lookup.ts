@@ -45,3 +45,11 @@ export function labelReservation(status: ReservationStatus, visitResult: VisitRe
   if (status === 'completed') return '이용 완료';
   return '예정';
 }
+
+/**
+ * 예약번호를 찾는 ilike 패턴. 화면은 예약번호를 4자리씩 끊어(1234-5678-9012) 보여 주므로,
+ * 복사해 붙여 넣은 하이픈·공백을 빼고 찾는다(저장은 숫자 12자리, 11/22)
+ */
+export function reservationCodePattern(query: string): string {
+  return containsPattern(query.replace(/[-\s]/g, ''));
+}

@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -114,7 +115,7 @@ async function Detail({ params }: { params: Params }) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <CardTitle className="text-lg">{detail.code}</CardTitle>
+            <CardTitle className="text-lg">{formatReservationCode(detail.code)}</CardTitle>
             <Badge variant="secondary">{labelReservation(detail.status, detail.visitResult)}</Badge>
             {detail.voidedAt ? <Badge variant="outline">무효</Badge> : null}
           </div>

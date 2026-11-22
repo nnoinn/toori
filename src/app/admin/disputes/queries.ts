@@ -24,7 +24,13 @@ import {
   type VisitResult,
 } from '@/db/schema';
 
-import { ADMIN_LIST_LIMIT, containsPattern, type ListResult, toListResult } from '../lookup';
+import {
+  ADMIN_LIST_LIMIT,
+  containsPattern,
+  type ListResult,
+  reservationCodePattern,
+  toListResult,
+} from '../lookup';
 import { defaultDisputeSort, type DisputeFilter, type DisputeSort } from './format';
 
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
@@ -84,7 +90,7 @@ export async function selectDisputes(
         input.filter === 'all' ? undefined : eq(disputes.status, input.filter),
         input.query
           ? or(
-              ilike(reservations.code, pattern),
+              ilike(reservations.code, reservationCodePattern(input.query)),
               ilike(shops.name, pattern),
               ilike(customers.name, pattern),
               ilike(customers.nickname, pattern),

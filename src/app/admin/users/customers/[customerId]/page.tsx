@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -123,7 +124,9 @@ async function Detail({ params }: { params: Params }) {
                 <tbody>
                   {detail.reservations.map((row) => (
                     <tr key={row.reservationId} className="border-b last:border-0">
-                      <td className="py-2 pr-4 whitespace-nowrap">{row.code}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">
+                        {formatReservationCode(row.code)}
+                      </td>
                       <td className="py-2 pr-4">{row.shopName}</td>
                       <td className="py-2 pr-4">{row.menuName}</td>
                       <td className="py-2 pr-4 whitespace-nowrap">{formatKst(row.startAt)}</td>
