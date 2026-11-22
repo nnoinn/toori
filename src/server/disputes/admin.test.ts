@@ -63,6 +63,7 @@ const VISITED: DisputeTarget & { dispute: DisputeRecord | null } = {
   visitResult: 'visited',
   visitRecordedAt: kst('2026-11-11 19:00'),
   cancelledAt: null,
+  voidedAt: null,
   dispute: null,
 };
 const CONTENT = '카카오톡 채널로 받은 내용: 시술이 약속과 달랐어요';
