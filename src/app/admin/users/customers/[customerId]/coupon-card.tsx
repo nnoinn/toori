@@ -11,7 +11,7 @@ import {
   type CustomerCouponView,
   usableCouponSummary,
 } from '../../coupon-format';
-import { historyHref } from '../../history-query';
+import { accountHistoryHref } from '@/components/ui/account-history-query';
 
 const STATE_BADGE: Record<CouponState, 'default' | 'secondary' | 'outline'> = {
   usable: 'default',
@@ -46,7 +46,7 @@ export function CouponCard({
         <CardTitle>쿠폰</CardTitle>
         <CardAction>
           <Link
-            href={historyHref(`/admin/users/customers/${customerId}/history`, {
+            href={accountHistoryHref(`/admin/users/customers/${customerId}/history`, {
               category: 'coupon',
             })}
             className="text-sm text-muted-foreground hover:underline"
