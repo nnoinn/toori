@@ -7,9 +7,9 @@
 //   select-none으로 글자가 선택되지 않는다. 포인터를 잡아 두고(setPointerCapture) 손가락 아래 칸은 elementFromPoint로 찾는다
 // - 키보드: 위·아래 화살표로 칸을 옮기고, Space·Enter로 켜고 끈다. Shift를 누른 채 누르면 마지막에 누른 칸부터 범위를 켠다
 // - 잠긴 칸(지난 시각, 14일 밖, 이미 올린 매물·시간대)은 회색 막대로 이유를 적고, 끌어도 켜지지 않는다
-// 모양은 매장 설정 영업시간 표(settings/shop/business-hours-table.tsx)와 같다(11/22 정민석): 칸 묶음마다 둥근 카드,
-// 30분 사이는 연한 점선·1시간 사이는 실선, 왼쪽 시각은 묶음 위·아래 끝과 정각만, 고른 시간은 연한 초록 막대 안에 시각을 적는다.
-// 칸 높이는 30분 28px로 영업시간 표(14px)보다 커서 끌기 쉽고, 끄는 동안 바로 칠한다(점선 미리보기는 쓰지 않는다).
+// 모양(11/22 정민석): 칸 묶음마다 둥근 카드(영업시간 표처럼 30분 사이는 연한 점선, 1시간 사이는 실선)이고, 고른 시간은
+// 진한 초록 둥근 막대 안에 묶음 시간(예: 13:00~18:00)을 적는다. 색과 왼쪽 시각(30분마다, 정각은 진하게)은 예전 그대로다.
+// 칸 높이는 30분 28px이고, 끄는 동안 바로 칠한다(점선 미리보기는 쓰지 않는다).
 // 칸이 24개(12시간)보다 많으면(영업시간을 입력하지 않은 요일, 긴 새벽 영업) 두 줄로 나눠 한눈에 보이게 한다.
 // 새벽까지 여는 샵(11/11 nnoinn)은 전날에서 이어진 새벽 칸과 그 날 영업 칸 사이를 띄우고, 다음 날 새벽 칸 위에 날짜를 적는다.
 
@@ -25,7 +25,6 @@ import {
   paintCells,
   rangeLabel,
   segmentBars,
-  segmentTimeMarks,
   type TimetableBar,
   timetableSegments,
   type WindowCell,
@@ -147,7 +146,7 @@ export function WindowTimetable({
       <div
         role="group"
         aria-label="시간표"
-        className="grid touch-none items-start gap-x-4 pt-2 pb-2 select-none"
+        className="grid touch-none items-start gap-x-4 select-none"
         style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -168,30 +167,35 @@ export function WindowTimetable({
                     <p
                       aria-hidden
                       className={cn(
-                        'pb-2.5 pl-[3.25rem] text-xs font-medium text-muted-foreground',
-                        order > 0 && 'pt-4',
+                        'pb-1 pl-[3.25rem] text-xs font-medium text-muted-foreground',
+                        order > 0 && 'pt-3',
                       )}
                     >
                       익일 · {dateKeyLabel(addDaysToKey(dateKey, 1))}
                     </p>
                   ) : order > 0 ? (
-                    <div aria-hidden className="h-5" />
+                    <div aria-hidden className="h-3" />
                   ) : null}
                   <div className="grid grid-cols-[3.25rem_1fr]">
-                    {/* 왼쪽 시각: 덩어리 위·아래 끝과 정각. 줄 높이에 맞춰 줄 위에 걸친다 */}
-                    <div aria-hidden className="relative" style={{ height: count * CELL_PX }}>
-                      {segmentTimeMarks(cells, segment).map((mark) => (
-                        <span
-                          key={mark.at}
-                          className={cn(
-                            'absolute right-2 text-[11px] leading-3 tabular-nums',
-                            mark.onHour ? 'font-medium text-foreground' : 'text-muted-foreground',
-                          )}
-                          style={{ top: mark.at * CELL_PX - 6 }}
-                        >
-                          {mark.text}
-                        </span>
-                      ))}
+                    {/* 왼쪽 시각: 30분마다, 정각은 진하게 */}
+                    <div aria-hidden className="flex flex-col">
+                      {Array.from({ length: count }, (_, offset) => {
+                        const time = formatKstTime(cells[segment.first + offset].start);
+                        return (
+                          <span
+                            key={offset}
+                            className={cn(
+                              'pr-2 text-right text-xs leading-7 tabular-nums',
+                              time.endsWith(':00')
+                                ? 'font-medium text-foreground'
+                                : 'text-muted-foreground',
+                            )}
+                            style={{ height: CELL_PX }}
+                          >
+                            {time}
+                          </span>
+                        );
+                      })}
                     </div>
                     <div className="relative flex flex-col overflow-hidden rounded-[14px] border bg-card">
                       {Array.from({ length: count }, (_, offset) => {
@@ -238,7 +242,7 @@ export function WindowTimetable({
 
       <div aria-hidden className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <span className="size-3.5 rounded-[5px] bg-primary/30" />
+          <span className="size-3.5 rounded-[5px] bg-primary" />
           고른 시간
         </span>
         <span className="flex items-center gap-1.5">
@@ -250,33 +254,20 @@ export function WindowTimetable({
   );
 }
 
-/**
- * 고른 시간(연한 초록)과 잠긴 시간(회색) 막대. 영업시간 표의 영업 막대와 같은 모양이다.
- * 고른 시간이 1시간 이상이면 시작과 "~ 끝"을 두 줄로, 30분이면 한 줄로 적는다
- */
+/** 고른 시간(진한 초록)과 잠긴 시간(회색) 둥근 막대. 막대 첫 줄에 묶음 시간이나 잠긴 이유를 적는다 */
 function Bar({ bar }: { bar: TimetableBar }) {
-  const [first, second] = bar.lines;
-  const twoLines = bar.kind === 'selected' && second !== undefined && bar.cells >= 2;
   return (
     <div
       aria-hidden
       className={cn(
-        'pointer-events-none absolute inset-x-1 overflow-hidden rounded-[10px] px-2 text-center text-[11px] tabular-nums',
+        'pointer-events-none absolute inset-x-1 truncate rounded-[10px] px-2 text-left text-xs leading-6 tabular-nums',
         bar.kind === 'selected'
-          ? 'bg-primary/30 font-semibold text-accent-foreground'
-          : 'bg-muted font-medium text-muted-foreground',
-        twoLines ? 'py-1.5 leading-snug' : 'truncate leading-6',
+          ? 'bg-primary font-semibold text-primary-foreground'
+          : 'bg-muted text-muted-foreground',
       )}
       style={{ top: bar.from * CELL_PX + 2, height: bar.cells * CELL_PX - 4 }}
     >
-      {twoLines ? (
-        <>
-          {first}
-          <span className="block text-[10.5px] font-medium">~ {second}</span>
-        </>
-      ) : (
-        bar.lines.join('~')
-      )}
+      {bar.label}
     </div>
   );
 }
