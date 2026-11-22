@@ -1,11 +1,12 @@
 // 서비스 워커(PWA). 웹 푸시 받기(W16, #131). 등록은 알림을 켤 때 한다(src/features/push/subscribe-push.ts).
-// 보내는 내용은 src/server/notifications/notify.ts가 정한다: { title, body, url, account }
+// 보내는 내용은 src/server/notifications/notify.ts가 정한다: { id, title, body, url, account }
 // 한 기기에서 고객·원장님 알림을 모두 받는다. 지금 들어와 있지 않은 계정의 알림은 흑백 아이콘과 제목 앞 계정 이름으로 가르고,
 // 누르면 로그인 화면을 거쳐 그 알림의 화면으로 간다(기술 가이드 7장 "한 기기의 알림", docs/brand.md).
-// 지금 계정의 알림이면 지금 쓰고 있는 투리 창(앞에 보이고 포커스가 있는 창)의 화면 안내(src/components/ui/notification-toast.tsx)에
-// 먼저 전해서 바로 띄운다. 다른 앱을 보는 중이면 창이 화면에 보여도 기기 알림을 띄운다.
-// 화면 안내가 띄웠다고 답하고 크롬 계열이면 기기 알림을 생략한다(두 번 뜨지 않게, #371). 사파리는 푸시마다 기기 알림을
-// 띄워야 해서(어기면 푸시가 끊길 수 있다) 늘 띄우고, 답이 없으면(화면 안내가 없는 화면, 응답 지연) 기기 알림을 띄운다.
+// 지금 계정의 알림이면 열려 있는 투리 창의 화면 안내(src/components/ui/notification-toast.tsx)에 모두 전한다. 창마다 바로 새 알림을
+// 물어서 알림 종의 숫자를 바꾸고, 화면에 보이는 창은 화면 안내를 띄운다(1분 확인을 기다리지 않게, 11/22 손 점검).
+// 지금 쓰고 있는 창(앞에 보이고 포커스가 있는 창)이 그 알림을 띄웠다고 답하고 크롬 계열이면 기기 알림을 생략한다(두 번 뜨지 않게, #371).
+// 다른 앱을 보는 중이면 창이 화면에 보여도 기기 알림을 띄운다. 사파리는 푸시마다 기기 알림을 띄워야 해서(어기면 푸시가 끊길 수 있다)
+// 늘 띄우고, 답이 없으면(화면 안내가 없는 화면, 응답 지연) 기기 알림을 띄운다.
 
 const ICON = '/brand/app-icon/toori-app-icon-light-192.png';
 const OTHER_ACCOUNT_ICON = '/brand/app-icon/toori-app-icon-gray-192.png';
@@ -54,18 +55,22 @@ function canSkipNotification() {
 }
 
 /**
- * 지금 쓰고 있는 투리 창(앞에 보이고 포커스가 있는 창)에 새 알림이 왔다고 전한다. 그 계정의 화면 안내가 있는 창은 서버에
- * 새 알림을 묻고 답한다. 띄웠다고(shown) 답하면 true. 쓰고 있는 창이 없거나, 아니라고 답하거나, 기다리는 시간이 지나면 false.
- * 다른 앱을 보는 중이면 크롬 창이 화면에 보여도(visible) 포커스가 없어서 묻지 않는다(사람이 보지 않는 화면 안내만 뜨지 않게)
+ * 열려 있는 투리 창에 모두 새 알림(id)이 왔다고 전한다. 그 계정의 화면 안내가 있는 창은 서버에 새 알림을 물어서 종의 숫자를 바꾸고,
+ * 화면에 보이면 화면 안내를 띄운다. 지금 쓰고 있는 창(앞에 보이고 포커스가 있는 창)에는 답을 받을 포트를 같이 보내서 그 알림을
+ * 띄웠는지 묻는다. 띄웠다고(shown) 답하면 true. 쓰고 있는 창이 없거나, 아니라고 답하거나, 기다리는 시간이 지나면 false.
+ * 다른 앱을 보는 중이면 창이 화면에 보여도(visible) 포커스가 없어서 묻지 않는다(그 창은 화면 안내를 띄우고 기기 알림도 뜬다)
  */
-async function askToast(account) {
+async function tellWindows(account, id) {
   const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  const visible = windows.filter(
+  const watching = windows.filter(
     (client) => client.visibilityState === 'visible' && client.focused === true,
   );
-  if (visible.length === 0) return false;
+  for (const client of windows) {
+    if (!watching.includes(client)) client.postMessage({ type: PUSH_TOAST_MESSAGE, account, id });
+  }
+  if (watching.length === 0) return false;
   return new Promise((resolve) => {
-    let waiting = visible.length;
+    let waiting = watching.length;
     const channels = [];
     const finish = (shown) => {
       clearTimeout(timer);
@@ -73,25 +78,25 @@ async function askToast(account) {
       resolve(shown);
     };
     const timer = setTimeout(() => finish(false), TOAST_ANSWER_MS);
-    for (const client of visible) {
+    for (const client of watching) {
       const channel = new MessageChannel();
       channels.push(channel);
       channel.port1.onmessage = (message) => {
         if (message.data?.shown === true) finish(true);
         else if (--waiting === 0) finish(false);
       };
-      client.postMessage({ type: PUSH_TOAST_MESSAGE, account }, [channel.port2]);
+      client.postMessage({ type: PUSH_TOAST_MESSAGE, account, id }, [channel.port2]);
     }
   });
 }
 
 // 푸시를 받으면 기기 알림을 보여준다(브라우저 규칙). 내용을 읽지 못해도 보여준다.
-// 크롬 계열에서 지금 계정의 화면 안내가 이미 띄웠으면 생략한다(사이트 창이 앞에 보이면 생략해도 된다)
+// 크롬 계열에서 지금 쓰고 있는 창의 화면 안내가 이미 띄웠으면 생략한다(사이트 창이 앞에 보이면 생략해도 된다)
 async function showPush(event) {
-  const { title = '새 알림이 있어요', body, url = '/', account } = readPush(event);
+  const { id, title = '새 알림이 있어요', body, url = '/', account } = readPush(event);
   const isCurrent = !account || (await currentAccount()) === account;
   if (account && isCurrent) {
-    const toasted = await askToast(account);
+    const toasted = await tellWindows(account, id);
     if (toasted && canSkipNotification()) return;
   }
   await self.registration.showNotification(

@@ -1,4 +1,5 @@
-// 화면 안내(#371) 규칙: 무엇을 띄우는지(처음 보는 것, 안 읽은 것, 2분 안), 이미 본 알림을 어떻게 기억하는지.
+// 화면 안내(#371) 규칙: 무엇을 띄우는지(처음 보는 것, 안 읽은 것, 2분 안), 이미 본 알림을 어떻게 기억하는지,
+// 서비스 워커의 새 알림 메시지에 무엇을 하고 "띄웠다"고 언제 답하는지(11/22 손 점검: 열린 창 모두에 바로).
 
 import { describe, expect, it } from 'vitest';
 
@@ -8,9 +9,11 @@ import {
   parseSeen,
   pickToastItems,
   pushToastAction,
+  pushToastId,
   rememberSeen,
   TOAST_MAX_AGE_MS,
   TOAST_SEEN_LIMIT,
+  toastedPush,
 } from './notification-toast-rules';
 
 const SERVER_NOW = '2026-11-16T03:00:00.000Z';
@@ -69,30 +72,54 @@ describe('화면 안내 규칙', () => {
   });
 });
 
-describe('pushToastAction: 서비스 워커의 푸시 메시지 (#371)', () => {
-  const customer = { account: 'customer' as const, watching: true };
+describe('pushToastAction: 서비스 워커의 새 알림 메시지 (#371)', () => {
+  const message = { type: PUSH_TOAST_MESSAGE, account: 'customer', id: 'n-1' };
+  const watching = { account: 'customer' as const, visible: true, focused: true };
 
-  it('이 계정의 푸시이고 이 화면을 쓰고 있으면(보이고 포커스) 바로 묻는다(ask)', () => {
-    expect(pushToastAction({ type: PUSH_TOAST_MESSAGE, account: 'customer' }, customer)).toBe(
-      'ask',
-    );
+  it('이 계정의 알림이고 이 화면을 쓰고 있으면(보이고 포커스) 바로 묻고 띄웠는지 답한다(ask)', () => {
+    expect(pushToastAction(message, watching)).toBe('ask');
   });
 
-  it('다른 계정의 푸시이거나 이 화면을 쓰고 있지 않으면(다른 앱·다른 탭) 띄우지 않는다고 답한다(decline): 서비스 워커가 기기 알림을 띄운다', () => {
-    expect(pushToastAction({ type: PUSH_TOAST_MESSAGE, account: 'owner' }, customer)).toBe(
+  it('화면은 보이지만 다른 앱·다른 창을 보는 중이면 바로 묻고 띄우되, 기기 알림도 뜨게 아니라고 답한다(show)', () => {
+    expect(pushToastAction(message, { ...watching, focused: false })).toBe('show');
+  });
+
+  it('다른 계정의 알림이거나 화면이 보이지 않으면(다른 탭, 내린 창) 묻지 않고 아니라고 답한다(decline)', () => {
+    expect(pushToastAction({ ...message, account: 'owner' }, watching)).toBe('decline');
+    expect(pushToastAction(message, { ...watching, visible: false })).toBe('decline');
+    expect(pushToastAction(message, { ...watching, visible: false, focused: false })).toBe(
       'decline',
     );
-    expect(
-      pushToastAction(
-        { type: PUSH_TOAST_MESSAGE, account: 'customer' },
-        { ...customer, watching: false },
-      ),
-    ).toBe('decline');
   });
 
-  it('푸시 메시지가 아니면 아무것도 하지 않는다(ignore)', () => {
-    expect(pushToastAction({ type: 'other', account: 'customer' }, customer)).toBe('ignore');
-    expect(pushToastAction(null, customer)).toBe('ignore');
-    expect(pushToastAction('toori:push-toast', customer)).toBe('ignore');
+  it('새 알림 메시지가 아니면 아무것도 하지 않는다(ignore)', () => {
+    expect(pushToastAction({ ...message, type: 'other' }, watching)).toBe('ignore');
+    expect(pushToastAction(null, watching)).toBe('ignore');
+    expect(pushToastAction('toori:push-toast', watching)).toBe('ignore');
+  });
+
+  it('같이 온 알림 id를 읽는다. 없거나 모양이 틀리면(예전 푸시) null', () => {
+    expect(pushToastId(message)).toBe('n-1');
+    expect(pushToastId({ ...message, id: undefined })).toBeNull();
+    expect(pushToastId({ ...message, id: '' })).toBeNull();
+    expect(pushToastId({ ...message, id: 3 })).toBeNull();
+    expect(pushToastId(null)).toBeNull();
+  });
+});
+
+describe('toastedPush: 서비스 워커에 "띄웠다"고 답할지 (#371)', () => {
+  it('그 알림을 이번에 띄웠거나 이 탭이 이미 띄웠으면 띄웠다고 답한다(기기 알림을 생략한다)', () => {
+    expect(toastedPush('n-1', { fresh: [item('n-1', 1)], toasted: new Set() })).toBe(true);
+    expect(toastedPush('n-1', { fresh: [], toasted: new Set(['n-1']) })).toBe(true);
+  });
+
+  it('그 알림을 띄우지 않았으면(알림함에 아직 없음, 읽음, 오래됨, 다른 알림만 띄움) 아니라고 답한다(기기 알림이 뜬다)', () => {
+    expect(toastedPush('n-1', { fresh: [], toasted: new Set() })).toBe(false);
+    expect(toastedPush('n-1', { fresh: [item('n-2', 1)], toasted: new Set(['n-3']) })).toBe(false);
+  });
+
+  it('알림 id를 모르면(예전 푸시) 이번에 띄운 알림이 있을 때만 띄웠다고 답한다', () => {
+    expect(toastedPush(null, { fresh: [item('n-2', 1)], toasted: new Set() })).toBe(true);
+    expect(toastedPush(null, { fresh: [], toasted: new Set(['n-1']) })).toBe(false);
   });
 });
