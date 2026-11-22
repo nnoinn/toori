@@ -86,7 +86,6 @@ export async function finishCancel(
       requestId: request.reservationId,
       result: 'agreed',
     });
-    notifyReservationCancelled(db, request.reservationId, { by: 'customer', now });
   } else {
     // 고객 취소: 원장님에게 재등록 안내(S-400)
     notifyReservationCancelled(db, request.reservationId, { by: 'customer', now });

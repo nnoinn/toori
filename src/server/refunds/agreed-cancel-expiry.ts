@@ -25,7 +25,7 @@ export async function sweepAgreedCancelRequests(
   let failed = 0;
   for (const item of expired) {
     try {
-      await sendAgreedCancelResult(db, { ...item, result: 'declined' });
+      await sendAgreedCancelResult(db, { ...item, result: 'expired' });
     } catch (error) {
       failed += 1;
       console.error(
