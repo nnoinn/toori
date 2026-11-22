@@ -3,4 +3,3 @@
 ALTER TABLE "shops" ADD COLUMN "nts_check" text;--> statement-breakpoint
 ALTER TABLE "shops" ADD COLUMN "nts_checked_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "shops" ADD CONSTRAINT "shops_nts_check_check" CHECK ("shops"."nts_check" is null or "shops"."nts_check" in ('verified', 'unavailable'));--> statement-breakpoint
-ALTER TABLE "shops" ADD CONSTRAINT "shops_nts_checked_at_check" CHECK (("shops"."nts_check" is null) = ("shops"."nts_checked_at" is null));
