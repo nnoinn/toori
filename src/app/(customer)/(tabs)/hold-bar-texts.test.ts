@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   HOLD_BAR_LABEL,
+  HOLD_CHIP,
   HOLD_RELEASE_CONFIRM,
   holdBarStartText,
   holdBarTitle,
@@ -29,6 +30,17 @@ describe('결제 중 매물 막대 문구', () => {
       title: '결제를 그만둘까요?',
       description: '이 매물을 다른 고객이 예약할 수 있게 돼요.',
       keep: '계속 결제하기',
+      release: '그만두기',
+    });
+  });
+});
+
+describe('결제 중 칩·알약 문구(11/23 nnoinn 시안 A)', () => {
+  it('칩·알약 글자와 칩을 누르면 뜨는 상자의 안내·단추', () => {
+    expect(HOLD_CHIP).toEqual({
+      label: '결제 중',
+      note: '시간 안에 결제하지 않으면 다른 고객이 예약할 수 있어요',
+      continue: '결제 이어서 하기',
       release: '그만두기',
     });
   });
