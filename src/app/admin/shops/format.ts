@@ -2,6 +2,10 @@
 
 import type { AgreedCancelRequestStatus } from '@/db/schema/refunds';
 import type { PgSellerStatus } from '@/db/schema/shops';
+import {
+  AGREED_CANCEL_REASON_LABELS,
+  type AgreedCancelReason,
+} from '@/server/refunds/agreed-cancel-types';
 
 import type { ReviewFilter } from './queries';
 
@@ -63,7 +67,7 @@ export function labelReviewAction(action: string): string {
   return REVIEW_ACTION_LABELS[action] ?? action;
 }
 
-/** 합의 후 취소 요청의 결과 이름(운영자 샵 상세 '취소 기록') */
+/** 합의 후 취소 요청의 결과 이름(운영자 샵 상세 '취소 기록', 예약 상세 '합의 후 취소 요청') */
 export const AGREED_REQUEST_STATUS_LABELS: Record<AgreedCancelRequestStatus, string> = {
   requested: '손님 답 기다림',
   agreed: '손님 동의(취소됨)',
@@ -71,3 +75,15 @@ export const AGREED_REQUEST_STATUS_LABELS: Record<AgreedCancelRequestStatus, str
   expired: '24시간 안에 답이 없어 끝남',
   closed: '답하기 전에 끝남',
 };
+
+/**
+ * 합의 후 취소 사유 표시(운영자 샵 상세 '취소 기록', 예약 상세 '합의 후 취소 요청').
+ * 기타면 원장님이 적은 내용을 괄호로 붙인다. 예: "기타(손님이 일정이 바뀌었대요)"
+ */
+export function agreedCancelReasonText(
+  reason: AgreedCancelReason,
+  reasonText: string | null,
+): string {
+  const label = AGREED_CANCEL_REASON_LABELS[reason];
+  return reason === 'other' && reasonText ? `${label}(${reasonText})` : label;
+}

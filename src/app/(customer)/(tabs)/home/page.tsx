@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
+import { AccountNotificationBell } from '@/components/ui/account-notification-bell';
 import { Logo } from '@/components/ui/logo';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState, LoadingList } from '@/components/ui/state';
@@ -31,7 +32,10 @@ import {
   LobbyTiles,
 } from './lobby-parts';
 import { favoriteSummaryText, LOBBY_ROW_COUNT, sortedListHref, withoutShown } from './lobby-rules';
-import { CustomerNotificationBell } from '../customer-notification-bell';
+import {
+  CUSTOMER_NOTIFICATION_ACCOUNT,
+  NOTIFICATIONS_PATH,
+} from '../notifications/notification-rules';
 
 export const metadata: Metadata = { title: '홈' };
 
@@ -46,7 +50,11 @@ export default function CustomerHomePage() {
       {/* 폰의 알림 종은 이 화면 위 오른쪽에만 둔다(#371, 11/15 nnoinn). PC는 위쪽 메뉴의 로고·종을 쓴다 */}
       <div className="flex items-center justify-between md:hidden">
         <Logo />
-        <CustomerNotificationBell className="-mr-2" />
+        <AccountNotificationBell
+          account={CUSTOMER_NOTIFICATION_ACCOUNT}
+          href={NOTIFICATIONS_PATH}
+          className="-mr-2"
+        />
       </div>
       <Suspense fallback={<LobbyFallback />}>
         <LobbyContent />

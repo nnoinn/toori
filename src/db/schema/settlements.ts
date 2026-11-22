@@ -17,6 +17,8 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+import { SETTLEMENT_HOLD_CODES } from '@/server/policy/admin-notice';
+
 import { profiles } from './accounts';
 import { orders, reservations } from './payments';
 import { shops } from './shops';
@@ -108,8 +110,9 @@ export const settlementItems = pgTable(
 
 /**
  * 정산 보류 (#373 ②, #433). 이의제기가 아닌 이유(예: 원장님 계좌 확인 필요)로 거래 하나나 샵 전체의 정산을 멈추고 푼다.
- * 아직 묶이지 않은 거래·샵만 멈춘다(이미 묶인 정산은 지급 요청 A-105에서 막는다, 11/15). 원장님 화면에는 "운영자 확인 중"만 보이고
- * 사유는 숨긴다. 지난 보류도 지우지 않고 남기고, 운영자 처리 기록(settlement.hold·settlement.release)에도 같이 남긴다
+ * 아직 묶이지 않은 거래·샵만 멈춘다(이미 묶인 정산은 지급 요청 A-105에서 막는다, 11/15). 원장님 화면에는 "운영자 확인 중"과
+ * 운영자가 목록에서 고른 사유(reason_code, #489)만 보이고, 운영자가 쓴 사유(reason)는 숨긴다.
+ * 지난 보류도 지우지 않고 남기고, 운영자 처리 기록(settlement.hold·settlement.release)에도 같이 남긴다
  */
 export const settlementHolds = pgTable(
   'settlement_holds',
@@ -119,7 +122,10 @@ export const settlementHolds = pgTable(
     reservationId: uuid().references((): AnyPgColumn => reservations.id),
     // 샵 전체를 멈출 때
     shopId: uuid().references(() => shops.id),
+    // 운영자가 쓴 사유(원장님에게 숨김)
     reason: text().notNull(),
+    // 원장님에게 보여 줄 사유 코드(#489, 정책 SETTLEMENT_HOLD_CODES). 0021 전에 건 보류는 other
+    reasonCode: text().notNull(),
     heldBy: uuid()
       .notNull()
       .references(() => profiles.id),
@@ -140,6 +146,7 @@ export const settlementHolds = pgTable(
       'settlement_holds_release_check',
       sql`(${t.releasedAt} is null) = (${t.releasedBy} is null) and (${t.releasedAt} is null) = (${t.releaseMemo} is null)`,
     ),
+    check('settlement_holds_reason_code_check', inValues(t.reasonCode, SETTLEMENT_HOLD_CODES)),
     // 풀리지 않은 보류는 거래마다, 샵마다 하나. 정산 묶기가 보류 중인 거래·샵을 찾을 때도 쓴다
     uniqueIndex('settlement_holds_reservation_active_unique')
       .on(t.reservationId)

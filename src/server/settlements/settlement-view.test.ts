@@ -48,6 +48,7 @@ function row(extra: Partial<SettlementRow> = {}): SettlementRow {
     hasOpenDispute: false,
     openDisputeReceivedAt: null,
     hasAdminHold: false,
+    adminHoldCode: null,
     ownerPenalty: null,
     item: null,
     ...extra,
@@ -141,11 +142,19 @@ describe('toSettlementItemView: 아직 묶지 않은 거래', () => {
     });
   });
 
-  it('운영자 정산 보류(#373 ②)면 보류이고 지급일이 없으며, 원장님에게는 사유·날짜 없이 이유만 준다. 이의제기도 있으면 이의제기', () => {
+  it('운영자 정산 보류(#373 ②)면 보류이고 지급일이 없으며, 원장님에게는 운영자가 쓴 사유·날짜 없이 고른 사유 코드(#489)만 준다. 이의제기도 있으면 이의제기', () => {
     const options = { now: NOW, paymentFeeRate: null };
-    const held = toSettlementItemView(row({ hasAdminHold: true }), options);
+    const held = toSettlementItemView(
+      row({ hasAdminHold: true, adminHoldCode: 'payout_info_check' }),
+      options,
+    );
     expect(held).toMatchObject({ status: 'held', payoutDate: null });
-    expect(held?.hold).toEqual({ reason: 'admin' });
+    expect(held?.hold).toEqual({ reason: 'admin', code: 'payout_info_check' });
+    // 코드가 비어 있으면 기타
+    expect(toSettlementItemView(row({ hasAdminHold: true }), options)?.hold).toEqual({
+      reason: 'admin',
+      code: 'other',
+    });
     const received = kst('2026-11-16 10:00');
     expect(
       toSettlementItemView(
@@ -196,6 +205,22 @@ describe('toSettlementItemView: 아직 묶지 않은 거래', () => {
     ['환불이 끝나지 않은 고객 취소', cancelledRow('customer', null)],
   ])('%s는 정산 내역에 없다', (_, target) => {
     expect(toSettlementItemView(target, { now: NOW, paymentFeeRate: null })).toBeNull();
+  });
+});
+
+describe('toSettlementItemView: 정산 내역에 없는 예약', () => {
+  it('예정 예약과 처리·취소 시각이 없는 예약은 줄이 없다(null)', () => {
+    const options = { now: NOW, paymentFeeRate: DOC_PAYMENT_FEE_RATE };
+    expect(
+      toSettlementItemView(
+        row({ status: 'confirmed', visitResult: null, visitRecordedAt: null }),
+        options,
+      ),
+    ).toBeNull();
+    expect(toSettlementItemView(row({ visitRecordedAt: null }), options)).toBeNull();
+    expect(
+      toSettlementItemView(cancelledRow('customer', 30, { cancelledAt: null }), options),
+    ).toBeNull();
   });
 });
 
@@ -293,6 +318,23 @@ describe('toSettlementItemView: 목요일에 묶인 거래', () => {
     });
   });
 
+  it('묶인 합의 후 취소는 위약금 비율(50)을 보여 주고, 묶인 이용 완료·합의 후 취소는 시작 몇 시간 전을 주지 않는다', () => {
+    const options = { now: NOW, paymentFeeRate: DOC_PAYMENT_FEE_RATE };
+    expect(toSettlementItemView(row({ item: settled() }), options)).toMatchObject({
+      kind: 'sale',
+      penaltyRate: null,
+      hoursBeforeStart: null,
+    });
+    expect(
+      toSettlementItemView(
+        cancelledRow('agreed', 50, {
+          item: settled({ kind: 'agreed_cancel', baseAmount: 22_500, payoutAmount: 21_758 }),
+        }),
+        options,
+      ),
+    ).toMatchObject({ kind: 'agreed_cancel', penaltyRate: 50, hoursBeforeStart: null });
+  });
+
   it('묶음이 없으면 지급 전이고 지급일이 없다', () => {
     const view = toSettlementItemView(row({ item: settled({ settlement: null }) }), {
       now: NOW,
@@ -337,6 +379,52 @@ describe('buildSettlementList: 합계와 다음 지급', () => {
     expect(list.serverNow).toBe(NOW.toISOString());
   });
 
+  it('정산 내역에 없는 예약(예정 예약)은 목록과 다음 지급에서 빼고, 보류 건수는 보류만 센다', () => {
+    const confirmed = row({
+      reservationId: 'confirmed',
+      status: 'confirmed',
+      visitResult: null,
+      visitRecordedAt: null,
+    });
+    const list = buildSettlementList({
+      rows: [
+        confirmed,
+        row({ reservationId: 'visit' }),
+        cancelledRow('customer', 30, { reservationId: 'cancel' }),
+        row({
+          reservationId: 'held',
+          visitRecordedAt: kst('2026-11-15 17:00'),
+          hasOpenDispute: true,
+        }),
+      ],
+      unpaidRows: [confirmed, row({ reservationId: 'visit' })],
+      outstandingPenalty: 0,
+      now: NOW,
+      paymentFeeRate: DOC_PAYMENT_FEE_RATE,
+    });
+    expect(list.items.map((item) => item.reservationId)).toEqual(['held', 'visit', 'cancel']);
+    expect(list.summary).toMatchObject({ count: 3, heldCount: 1 });
+    expect(list.nextPayout).toEqual({ date: '2026-11-19', count: 1, payoutAmount: 43_515 });
+  });
+
+  it('수수료 합계는 플랫폼 수수료와 그 VAT, 결제 수수료와 그 VAT를 더한다(법인 전환 뒤 묶인 줄)', () => {
+    const list = buildSettlementList({
+      rows: [
+        row({
+          item: settled({ feeRate: 10, feeAmount: 4_500, feeVat: 450, payoutAmount: 38_565 }),
+        }),
+      ],
+      unpaidRows: [],
+      outstandingPenalty: 0,
+      now: NOW,
+      paymentFeeRate: DOC_PAYMENT_FEE_RATE,
+    });
+    expect(list.summary).toMatchObject({
+      feeAmount: 4_500 + 450 + 1_350 + 135,
+      payoutAmount: 38_565,
+    });
+  });
+
   it('결제 수수료율을 모르는 거래가 있으면 수수료·정산액 합계는 비운다', () => {
     const list = buildSettlementList({
       rows: [row({ item: settled() }), row({ reservationId: 'later' })],
@@ -364,6 +452,10 @@ describe('buildSettlementList: 합계와 다음 지급', () => {
           reservationId: 'requested',
           item: settled({ settlement: { status: 'requested', payoutDate: '2026-11-19' } }),
         }),
+        row({
+          reservationId: 'pending',
+          item: settled({ settlement: { status: 'pending', payoutDate: '2026-11-19' } }),
+        }),
         row({ reservationId: 'held', hasOpenDispute: true }),
         row({
           reservationId: 'failed',
@@ -374,7 +466,8 @@ describe('buildSettlementList: 합계와 다음 지급', () => {
       now: NOW,
       paymentFeeRate: DOC_PAYMENT_FEE_RATE,
     });
-    expect(list.nextPayout).toEqual({ date: '2026-11-19', count: 2, payoutAmount: 87_030 });
+    // 지급 예정(this-week)·지급 요청(requested)·지급 전(pending) 세 건
+    expect(list.nextPayout).toEqual({ date: '2026-11-19', count: 3, payoutAmount: 130_545 });
   });
 
   it('지급할 거래가 없으면 다음 지급은 null', () => {

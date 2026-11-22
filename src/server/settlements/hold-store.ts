@@ -13,6 +13,7 @@ import type { getDb } from '@/db';
 import { reservations, settlementHolds, settlementItems, shops, slots } from '@/db/schema';
 import { ok, type Result } from '@/lib/result';
 import { recordAdminAction } from '@/server/admin/action-store';
+import type { SettlementHoldCode } from '@/server/policy/admin-notice';
 
 import { settlementHoldFail } from './hold-errors';
 import { settlementKindOf } from './settle-rules';
@@ -46,7 +47,13 @@ async function lockShopForHold(tx: Tx, shopId: string): Promise<boolean> {
  */
 export async function holdReservationInTx(
   tx: Tx,
-  input: { reservationId: string; adminId: string; reason: string; now: Date },
+  input: {
+    reservationId: string;
+    adminId: string;
+    reason: string;
+    code: SettlementHoldCode;
+    now: Date;
+  },
 ): Promise<Result<HeldSettlement>> {
   const [found] = await tx
     .select({
@@ -90,7 +97,7 @@ export async function holdReservationInTx(
 /** 샵 전체의 정산 보류. 아직 묶이지 않은 그 샵 거래가 모두 멈춘다(이미 묶인 정산은 그대로) */
 export async function holdShopInTx(
   tx: Tx,
-  input: { shopId: string; adminId: string; reason: string; now: Date },
+  input: { shopId: string; adminId: string; reason: string; code: SettlementHoldCode; now: Date },
 ): Promise<Result<HeldSettlement>> {
   if (!(await lockShopForHold(tx, input.shopId))) return settlementHoldFail('SHOP_NOT_FOUND');
   if (await hasActiveHold(tx, eq(settlementHolds.shopId, input.shopId))) {
@@ -156,6 +163,7 @@ async function insertHold(
     shopId: string | null;
     adminId: string;
     reason: string;
+    code: SettlementHoldCode;
     now: Date;
   },
 ): Promise<HeldSettlement> {
@@ -165,6 +173,7 @@ async function insertHold(
       reservationId: input.reservationId,
       shopId: input.shopId,
       reason: input.reason,
+      reasonCode: input.code,
       heldBy: input.adminId,
       heldAt: input.now,
     })

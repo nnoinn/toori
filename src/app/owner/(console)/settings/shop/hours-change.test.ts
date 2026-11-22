@@ -190,6 +190,42 @@ describe('hoursChangeImpact', () => {
       }),
     ).toEqual({ close: [], kept: [] });
   });
+
+  it('끝 시각이 바로 지금인 예약 매물과 시간대는 끝난 것으로 보고, 1분 전에는 묻는다', () => {
+    const input = {
+      slots: [slot('2026-11-18 11:00', '2026-11-18 12:00', { status: 'reserved' })],
+      windows: [window('2026-11-18 10:00', '2026-11-18 12:00')],
+      before: EVERY_DAY,
+      after: WED_CLOSED,
+    };
+    expect(hoursChangeImpact({ ...input, now: kst('2026-11-18 12:00') })).toEqual({
+      close: [],
+      kept: [],
+    });
+    expect(ids(hoursChangeImpact({ ...input, now: kst('2026-11-18 11:59') }))).toEqual({
+      close: ['w 2026-11-18 10:00'],
+      kept: ['2026-11-18 11:00 reserved'],
+    });
+  });
+
+  it('시간대 매물 이름: 서비스가 하나면 그 이름, 여럿이면 "외 N개", 없으면 "시간대 매물"', () => {
+    const impact = hoursChangeImpact({
+      slots: [],
+      windows: [
+        window('2026-11-18 10:00', '2026-11-18 11:00', ['커트']),
+        window('2026-11-18 12:00', '2026-11-18 13:00', ['커트', '펌', '염색']),
+        window('2026-11-18 14:00', '2026-11-18 15:00', []),
+      ],
+      before: EVERY_DAY,
+      after: WED_CLOSED,
+      now,
+    });
+    expect(impact.close.map((row) => row.label)).toEqual([
+      '시간대 매물 · 커트',
+      '시간대 매물 · 커트 외 2개',
+      '시간대 매물',
+    ]);
+  });
 });
 
 describe('sameHours', () => {

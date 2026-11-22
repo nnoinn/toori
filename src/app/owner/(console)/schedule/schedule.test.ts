@@ -156,6 +156,40 @@ describe('칸 놓기', () => {
       '200-260': [0, 1],
     });
   });
+
+  it('묶음이 끝나는 시각에 바로 시작하는 칸은 새 묶음이라 폭을 다 쓴다', () => {
+    expect(lanesOf(assignLanes([at(0, 60), at(30, 90), at(90, 150)]))).toEqual({
+      '0-60': [0, 2],
+      '30-90': [1, 2],
+      '90-150': [0, 1],
+    });
+  });
+
+  it('긴 칸이 묶음 끝을 정한다: 안쪽 짧은 칸이 먼저 끝나도 긴 칸과 겹치는 칸은 같은 묶음', () => {
+    // 10:00~14:00 안에 11:00~12:00, 그 뒤 13:00~15:00은 10:00~14:00과 겹친다
+    expect(lanesOf(assignLanes([at(600, 840), at(660, 720), at(780, 900)]))).toEqual({
+      '600-840': [0, 2],
+      '660-720': [1, 2],
+      '780-900': [1, 2],
+    });
+  });
+
+  it('같은 시각에 시작하면 먼저 끝나는 칸이 왼쪽 줄', () => {
+    expect(lanesOf(assignLanes([at(0, 120), at(0, 60)]))).toEqual({
+      '0-60': [0, 2],
+      '0-120': [1, 2],
+    });
+  });
+
+  it('보는 날 열에 놓은 칸도 겹치면 나란히 놓는다', () => {
+    const first = block('2026-11-15T10:00:00+09:00', '2026-11-15T11:00:00+09:00');
+    const second = block('2026-11-15T10:30:00+09:00', '2026-11-15T11:30:00+09:00');
+    const placed = placeByDay([first, second], [TODAY]).get(TODAY) ?? [];
+    expect(placed.map(({ top, lane, lanes }) => [top, lane, lanes])).toEqual([
+      [600, 0, 2],
+      [630, 1, 2],
+    ]);
+  });
 });
 
 describe('verticalRange', () => {
@@ -169,6 +203,8 @@ describe('verticalRange', () => {
   it('영업시간도 칸도 없으면 09:00~21:00', () => {
     expect(verticalRange(['2026-11-16'], HOURS, [])).toEqual(DEFAULT_MINUTE_RANGE);
     expect(verticalRange([TODAY], [], [])).toEqual(DEFAULT_MINUTE_RANGE);
+    // 09:00 = 540분, 21:00 = 1260분
+    expect(DEFAULT_MINUTE_RANGE).toEqual({ start: 540, end: 1260 });
   });
 
   it('보는 날들의 영업시간을 덮고, 새벽까지 여는 날은 다음 날 새벽까지', () => {

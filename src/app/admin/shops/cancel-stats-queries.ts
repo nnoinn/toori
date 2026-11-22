@@ -1,15 +1,18 @@
 // 운영자 샵 상세의 '취소 기록' 칸(X-207·X-208 핵심 규칙: 샵별 원장님 귀책 취소 횟수·시작 몇 시간 전, 합의 후 취소 횟수·사유). 서버에서만 부른다.
 // 기록은 이미 쌓인다: 원장님 귀책 취소는 예약(cancel_actor owner_fault, hours_before_start_at_cancel)과 패널티(owner_penalties),
-// 합의 후 취소는 요청 표(agreed_cancel_requests, 사유·결과). 여기서는 샵마다 세고 최근 것을 읽기만 한다
+// 합의 후 취소는 요청 표(agreed_cancel_requests, 사유·결과). 여기서는 샵마다 세고 최근 것을 읽기만 한다.
+// 기간(#486)을 고르면 원장님 사정 취소는 취소한 시각, 합의 후 취소는 요청한 시각이 그 안인 것만 센다(최근 10건도 그 안에서)
 
 import 'server-only';
 
-import { and, count, desc, eq, sql } from 'drizzle-orm';
+import { and, type AnyColumn, count, desc, eq, gte, lt, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { agreedCancelRequests, ownerPenalties, reservations, slots } from '@/db/schema';
 import type { AgreedCancelRequestStatus } from '@/db/schema/refunds';
 import type { AgreedCancelReason } from '@/server/refunds/agreed-cancel-types';
+
+import type { CancelStatsRange } from './cancel-stats-period';
 
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 
@@ -50,20 +53,38 @@ export type ShopCancelStats = {
   };
 };
 
-const ownerFaultOfShop = (shopId: string) =>
-  and(eq(slots.shopId, shopId), eq(reservations.cancelActor, 'owner_fault'));
+/** 전체 기간 */
+const ALL_TIME: CancelStatsRange = { from: null, before: null };
 
-/** 샵의 원장님 귀책 취소와 합의 후 취소 요청 기록 */
+/** 그 시각이 고른 기간 안(from 이후 포함, before 전) */
+const within = (column: AnyColumn, range: CancelStatsRange) =>
+  and(
+    range.from ? gte(column, range.from) : undefined,
+    range.before ? lt(column, range.before) : undefined,
+  );
+
+const ownerFaultOfShop = (shopId: string, range: CancelStatsRange) =>
+  and(
+    eq(slots.shopId, shopId),
+    eq(reservations.cancelActor, 'owner_fault'),
+    within(reservations.cancelledAt, range),
+  );
+
+const agreedOfShop = (shopId: string, range: CancelStatsRange) =>
+  and(eq(slots.shopId, shopId), within(agreedCancelRequests.requestedAt, range));
+
+/** 샵의 원장님 귀책 취소와 합의 후 취소 요청 기록. 기간을 주지 않으면 전체 기간 */
 export async function selectShopCancelStats(
   db: DbReader,
   shopId: string,
+  range: CancelStatsRange = ALL_TIME,
 ): Promise<ShopCancelStats> {
   const [ownerFaultCount, ownerFaultRecent, agreedCounts, agreedRecent] = await Promise.all([
     db
       .select({ count: count() })
       .from(reservations)
       .innerJoin(slots, eq(slots.id, reservations.slotId))
-      .where(ownerFaultOfShop(shopId)),
+      .where(ownerFaultOfShop(shopId, range)),
     db
       .select({
         reservationId: reservations.id,
@@ -78,7 +99,7 @@ export async function selectShopCancelStats(
       .from(reservations)
       .innerJoin(slots, eq(slots.id, reservations.slotId))
       .leftJoin(ownerPenalties, eq(ownerPenalties.reservationId, reservations.id))
-      .where(ownerFaultOfShop(shopId))
+      .where(ownerFaultOfShop(shopId, range))
       .orderBy(desc(reservations.cancelledAt))
       .limit(SHOP_CANCEL_RECENT_LIMIT),
     db
@@ -90,7 +111,7 @@ export async function selectShopCancelStats(
       .from(agreedCancelRequests)
       .innerJoin(reservations, eq(reservations.id, agreedCancelRequests.reservationId))
       .innerJoin(slots, eq(slots.id, reservations.slotId))
-      .where(eq(slots.shopId, shopId))
+      .where(agreedOfShop(shopId, range))
       .groupBy(agreedCancelRequests.status, agreedCancelRequests.reason),
     db
       .select({
@@ -105,7 +126,7 @@ export async function selectShopCancelStats(
       .from(agreedCancelRequests)
       .innerJoin(reservations, eq(reservations.id, agreedCancelRequests.reservationId))
       .innerJoin(slots, eq(slots.id, reservations.slotId))
-      .where(eq(slots.shopId, shopId))
+      .where(agreedOfShop(shopId, range))
       .orderBy(desc(agreedCancelRequests.requestedAt))
       .limit(SHOP_CANCEL_RECENT_LIMIT),
   ]);

@@ -1,10 +1,12 @@
 // 매물·예약 조회(A-103)를 실제 DB(TEST_DATABASE_URL이 있을 때만)로 확인한다.
-// 상태 거르기, 확인 필요, 검색, 계산한 매물 상태, 예약 상세를 본다. 시드와 섞이지 않게 내가 만든 줄만 비교한다.
+// 상태 거르기, 확인 필요, 검색, 계산한 매물 상태, 예약 상세, 매물 상세를 본다. 시드와 섞이지 않게 내가 만든 줄만 비교한다.
 
 import { eq } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
 import {
+  adminActions,
+  adminProfiles,
   customers,
   disputes,
   refunds,
@@ -19,10 +21,16 @@ import {
   createTestCustomer,
   createTestReservation,
   createTestShop,
+  createTestUser,
   testSlot,
 } from '../../../../tests/db/fixtures';
 import { closeTestDb, describeDb, withRollback } from '../../../../tests/db/test-db';
-import { selectReservationDetail, selectReservations, selectSlots } from './queries';
+import {
+  selectReservationDetail,
+  selectReservations,
+  selectSlotDetail,
+  selectSlots,
+} from './queries';
 
 const unique = (prefix: string) => `${prefix}${crypto.randomUUID().slice(0, 8)}`;
 /** testSlot의 시작(2026-11-01)보다 앞 */
@@ -422,6 +430,129 @@ describeDb('매물·예약 조회 (실제 DB)', () => {
       expect((await selectReservationDetail(tx, other.reservation.id))?.settlementBundled).toBe(
         false,
       );
+    });
+  });
+
+  it('매물 상세는 매물 내용·샵·이 매물의 예약·이 매물의 운영자 처리 기록(최근 것부터)을 읽고, 없는 매물은 null(11/19 피드백)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const { customerId } = await createTestCustomer(tx);
+      const made = await createTestReservation(tx, shop, customerId, '10:00', '11:00', 'confirmed');
+      const other = await createTestReservation(
+        tx,
+        shop,
+        customerId,
+        '11:00',
+        '12:00',
+        'confirmed',
+      );
+      const named = await createTestUser(tx);
+      const unnamed = await createTestUser(tx);
+      await tx.insert(adminProfiles).values({ userId: named, name: unique('운영자') });
+      const at = (hm: string) => new Date(`2026-10-31T${hm}:00+09:00`);
+      const action = (
+        adminId: string,
+        targetType: string,
+        targetId: string,
+        memo: string,
+        createdAt: Date,
+      ) => ({ adminId, action: 'slot.force_close', targetType, targetId, memo, createdAt });
+      await tx.insert(adminActions).values([
+        action(named, 'slot', made.slot.id, '먼저 남긴 기록', at('09:00')),
+        action(unnamed, 'slot', made.slot.id, '나중에 남긴 기록', at('10:00')),
+        // 다른 매물, 같은 id의 다른 대상 종류는 넣지 않는다
+        action(named, 'slot', other.slot.id, '다른 매물', at('11:00')),
+        action(named, 'reservation', made.slot.id, '다른 대상 종류', at('12:00')),
+      ]);
+
+      const detail = await selectSlotDetail(tx, made.slot.id);
+      expect(detail).toMatchObject({
+        slotId: made.slot.id,
+        shopId: shop.shopId,
+        menuName: made.slot.menuName,
+        serviceType: made.slot.serviceType,
+        startAt: made.slot.startAt,
+        endAt: made.slot.endAt,
+        durationMinutes: 60,
+        listPrice: made.slot.listPrice,
+        discountRate: made.slot.discountRate,
+        salePrice: made.slot.salePrice,
+        status: 'reserved',
+        windowId: null,
+        relistedFromSlotId: null,
+        closedAt: null,
+        closeReason: null,
+      });
+      expect(detail?.reservations).toEqual([
+        {
+          reservationId: made.reservation.id,
+          code: made.reservation.code,
+          status: 'confirmed',
+          visitResult: null,
+          bookedAt: made.reservation.createdAt,
+        },
+      ]);
+      const [named_] = await tx
+        .select({ name: adminProfiles.name })
+        .from(adminProfiles)
+        .where(eq(adminProfiles.userId, named));
+      expect(detail?.adminActions).toEqual([
+        { action: 'slot.force_close', memo: '나중에 남긴 기록', at: at('10:00'), adminName: null },
+        {
+          action: 'slot.force_close',
+          memo: '먼저 남긴 기록',
+          at: at('09:00'),
+          adminName: named_.name,
+        },
+      ]);
+      expect(await selectSlotDetail(tx, crypto.randomUUID())).toBeNull();
+    });
+  });
+
+  it('매물 상세는 목록에서 빼는 매물(결제 없이 비운 시간대 칸)과 재등록 매물도 주소로 읽는다', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const [window] = await tx
+        .insert(slotWindows)
+        .values({
+          shopId: shop.shopId,
+          startAt: new Date('2026-11-01T13:00:00+09:00'),
+          endAt: new Date('2026-11-01T18:00:00+09:00'),
+          publishAt: new Date('2026-10-30T10:00:00+09:00'),
+          status: 'published',
+          createdBy: shop.createdBy,
+        })
+        .returning({ id: slotWindows.id });
+      const closedAt = new Date('2026-10-31T10:10:00+09:00');
+      const [released, original] = await tx
+        .insert(slots)
+        .values([
+          testSlot(shop, '13:00', '14:00', {
+            windowId: window.id,
+            status: 'closed',
+            closedAt,
+            closeReason: 'hold_released',
+          }),
+          testSlot(shop, '09:00', '10:00', { status: 'cancelled' }),
+        ])
+        .returning();
+      const [relisted] = await tx
+        .insert(slots)
+        .values(testSlot(shop, '09:00', '10:00', { relistedFromSlotId: original.id }))
+        .returning();
+
+      expect(await selectSlotDetail(tx, released.id)).toMatchObject({
+        windowId: window.id,
+        status: 'closed',
+        closedAt,
+        closeReason: 'hold_released',
+        reservations: [],
+        adminActions: [],
+      });
+      expect(await selectSlotDetail(tx, relisted.id)).toMatchObject({
+        relistedFromSlotId: original.id,
+        windowId: null,
+      });
     });
   });
 });
