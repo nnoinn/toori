@@ -18,8 +18,23 @@ import * as schema from './schema';
  */
 const CLIENT_OPTIONS = { prepare: false, max_pipeline: 0 };
 
-function createDb(url: string) {
-  return drizzle(postgres(url, CLIENT_OPTIONS), { schema, casing: 'snake_case' });
+/**
+ * 트랜잭션용 접속 설정(#538, 11/22). max_pipeline 0인 접속에서는 postgres.js가 트랜잭션(sql.begin)에 연결을 잡아 두지 못해
+ * 모든 트랜잭션이 UNSAFE_TRANSACTION으로 실패했다(connection.js의 execute가 sent.length < max_pipeline일 때만 onexecute로
+ * 연결을 잡는다). 그래서 트랜잭션만 이 접속으로 연다. 트랜잭션 밖의 조회는 위 접속만 써서 겹쳐 보내지 않고, 트랜잭션 안에서는
+ * 풀러가 서버 연결 하나를 붙잡아 두므로 다른 조회와 섞이지 않는다. 빠지지 않게 index.test.ts와 index.db.test.ts가 지킨다
+ */
+const TRANSACTION_CLIENT_OPTIONS = { prepare: false, max_pipeline: 1 };
+
+/** 서버 DB 접속. 조회는 위 조회용 접속으로, 트랜잭션(db.transaction은 client.begin을 부른다)은 트랜잭션용 접속으로 연다 */
+export function createDb(url: string) {
+  const client = postgres(url, CLIENT_OPTIONS);
+  const transactionClient = postgres(url, TRANSACTION_CLIENT_OPTIONS);
+  client.begin = transactionClient.begin;
+  return Object.assign(drizzle(client, { schema, casing: 'snake_case' }), {
+    /** 트랜잭션용 접속(설정 확인과 테스트에서 닫을 때 쓴다) */
+    $transactionClient: transactionClient,
+  });
 }
 
 let db: ReturnType<typeof createDb> | undefined;
