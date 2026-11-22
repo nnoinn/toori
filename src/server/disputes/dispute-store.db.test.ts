@@ -48,6 +48,7 @@ describeDb('이의제기 접수 저장 (실제 DB)', () => {
           visitResult: 'no_show',
           visitRecordedAt: recordedAt,
           cancelledAt: null,
+          voidedAt: null,
           dispute: null,
         });
       }
