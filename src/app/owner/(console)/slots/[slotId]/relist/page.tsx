@@ -13,12 +13,13 @@ import { formatDuration } from '@/lib/format';
 import { getRequestNow } from '@/lib/request-time';
 import { formatKst, formatKstTime } from '@/lib/time';
 import { ensureOwnerPage } from '@/server/auth';
-import { PUBLISH_PAUSED_MESSAGE, readPublishPausedAt } from '@/server/shops';
+import { PUBLISH_PAUSED_MESSAGE, readPublishPause } from '@/server/shops';
 import { calcSalePrice, serviceTypeLabel } from '@/server/policy';
 import { readShopReviewStatus } from '@/server/shops/review-store';
 
 import { OwnerPage } from '../../../owner-page';
 import { validateSlotDraft } from '../../slot-draft-store';
+import { publishPauseNoticeLine } from '../../publish-pause-notice';
 import { RELIST_MESSAGES, relistDraftMessage, relistProblem } from '../../relist';
 import { relistInput, selectSlotForRelist } from '../../relist-store';
 import { RelistActions } from './relist-actions';
@@ -55,8 +56,10 @@ async function RelistContent({ params }: { params: Params }) {
     return <CannotRelist message="입점 승인 후에 재등록할 수 있어요" />;
   }
   // 운영자가 새 매물 게시를 멈춘 샵(#373 ④, #472). 매물 등록도 막혀서 [매물 등록하기]는 두지 않는다
-  if (await readPublishPausedAt(auth.shopId, db)) {
-    return <CannotRelist message={PUBLISH_PAUSED_MESSAGE} />;
+  // 그 아래에 운영자가 목록에서 고른 사유 한 줄(#499 ②)
+  const pause = await readPublishPause(auth.shopId, db);
+  if (pause) {
+    return <CannotRelist message={PUBLISH_PAUSED_MESSAGE} notice={publishPauseNoticeLine(pause)} />;
   }
 
   const now = await getRequestNow();
@@ -123,23 +126,37 @@ async function RelistContent({ params }: { params: Params }) {
   );
 }
 
-/** 재등록할 수 없을 때. 메뉴·시간 문제면 매물 등록으로 새로 올릴 수 있게 버튼을 같이 둔다 */
-function CannotRelist({ message, newSlot = false }: { message: string; newSlot?: boolean }) {
+/**
+ * 재등록할 수 없을 때. 메뉴·시간 문제면 매물 등록으로 새로 올릴 수 있게 버튼을 같이 둔다.
+ * notice는 이유 아래 작은 글씨 한 줄(게시 멈춤이면 운영자가 고른 사유, #499 ②)
+ */
+function CannotRelist({
+  message,
+  newSlot = false,
+  notice = null,
+}: {
+  message: string;
+  newSlot?: boolean;
+  notice?: string | null;
+}) {
   return (
     <Card>
       <EmptyState
         title="재등록할 수 없어요"
         description={message}
         action={
-          <div className="flex gap-2">
-            <Button asChild variant="outline">
-              <Link href="/owner">대시보드로</Link>
-            </Button>
-            {newSlot ? (
-              <Button asChild>
-                <Link href="/owner/slots/new">매물 등록하기</Link>
+          <div className="flex flex-col items-center gap-3">
+            {notice ? <p className="text-xs text-muted-foreground">{notice}</p> : null}
+            <div className="flex gap-2">
+              <Button asChild variant="outline">
+                <Link href="/owner">대시보드로</Link>
               </Button>
-            ) : null}
+              {newSlot ? (
+                <Button asChild>
+                  <Link href="/owner/slots/new">매물 등록하기</Link>
+                </Button>
+              ) : null}
+            </div>
           </div>
         }
       />
