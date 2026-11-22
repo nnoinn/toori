@@ -5,12 +5,14 @@
 
 import 'server-only';
 
-import { and, eq, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import {
+  adminActions,
   agreedCancelRequests,
   coupons,
+  disputes,
   orders,
   refunds,
   reservations,
@@ -22,6 +24,9 @@ import { hoursUntil } from '@/lib/time';
 import { recordAdminAction } from '@/server/admin/action-store';
 
 import { voidBlockReason } from './void-rules';
+
+/** 무효가 끝나 이의제기 결론을 '무효'로 기록할 때의 결론 메모(운영자 이의제기 상세에 보인다) */
+export const VOID_DISPUTE_RESULT = '예약을 무효로 처리해서 결론을 무효로 기록했어요';
 
 type Db = ReturnType<typeof getDb>;
 type DbReader = Pick<Db, 'select'>;
@@ -266,6 +271,32 @@ export async function finishVoid(
         eq(agreedCancelRequests.status, 'requested'),
       ),
     );
+
+  // 확인 중인 이의제기가 있으면 결론을 '무효'로 기록한다(이의제기 결론 연결, 11/22). 결론을 기록한 운영자는 무효를 시작한
+  // 운영자다(이번에 바로 끝내면 record, 진행 중 기록이 있으면 그 처리 기록 reservation.void)
+  const [startedBy] = input.record
+    ? [{ adminId: input.record.adminId }]
+    : await tx
+        .select({ adminId: adminActions.adminId })
+        .from(adminActions)
+        .where(
+          and(
+            eq(adminActions.action, 'reservation.void'),
+            eq(adminActions.targetId, input.reservationId),
+          ),
+        )
+        .orderBy(desc(adminActions.createdAt))
+        .limit(1);
+  await tx
+    .update(disputes)
+    .set({
+      status: 'resolved',
+      outcome: 'voided',
+      result: VOID_DISPUTE_RESULT,
+      handledBy: startedBy?.adminId ?? null,
+      handledAt: input.now,
+    })
+    .where(and(eq(disputes.reservationId, input.reservationId), eq(disputes.status, 'open')));
 
   // 아직 묶이지 않은 정산 줄은 지운다(무효는 기준 금액 0). 묶인 줄은 지우지 않고 알린다(시작할 때 막지만 정산 묶기와 겹친 경우)
   await tx

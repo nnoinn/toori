@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 
 import { cn } from '@/lib/utils';
 
-import { NATIVE_SELECT_CLASS } from './native-select';
+import { NativeSelect } from './native-select';
 
 export type SortOption = {
   value: string;
@@ -41,12 +41,11 @@ export function SortSelect({
         {label}
       </label>
       {/* 고르자마자 칸에 보이도록 기본값만 주고(key로 다시 그림), 새 목록이 오면 그 정렬로 다시 맞춘다 */}
-      <select
+      <NativeSelect
         key={value}
         id={id}
         defaultValue={value}
         aria-busy={pending || undefined}
-        className={NATIVE_SELECT_CLASS}
         onChange={(event) => {
           const next = options.find((option) => option.value === event.target.value);
           if (next) startTransition(() => router.push(next.href));
@@ -57,7 +56,7 @@ export function SortSelect({
             {option.label}
           </option>
         ))}
-      </select>
+      </NativeSelect>
     </div>
   );
 }

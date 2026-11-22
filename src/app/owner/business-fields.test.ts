@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { validateBusinessInput, validatePayoutInput } from './business-fields';
+import {
+  ACCOUNT_NUMBER_INPUT,
+  validateBusinessInput,
+  validatePayoutInput,
+} from './business-fields';
 
 const TODAY = '2026-10-30';
 const business = {
@@ -39,6 +43,37 @@ describe('사업자 정보 검사 (S-101, D3)', () => {
     expect(wrong.ok === false && wrong.fieldErrors.businessRegistrationNumber).toBe(
       '사업자등록번호를 다시 확인해 주세요',
     );
+    // 11자리도 자릿수 안내다(앞 10자리만 보고 검증번호를 따지지 않는다)
+    const long = validateBusinessInput(
+      { ...business, businessRegistrationNumber: '123-45-678911' },
+      TODAY,
+    );
+    expect(long.ok === false && long.fieldErrors.businessRegistrationNumber).toBe(
+      '사업자등록번호 10자리를 입력해 주세요(예: 123-45-67890)',
+    );
+  });
+
+  it('개업일자는 YYYY-MM-DD 모양만 받는다(앞뒤에 다른 글자가 붙으면 다시 고르게)', () => {
+    for (const openedOn of ['2025-01-01T00:00', 'x2025-01-01']) {
+      const result = validateBusinessInput({ ...business, openedOn }, TODAY);
+      expect(result.ok === false && result.fieldErrors.openedOn).toBe('개업일자를 골라 주세요');
+    }
+  });
+
+  it('상호는 40자, 대표자명은 20자까지 받는다', () => {
+    const longest = validateBusinessInput(
+      { ...business, businessName: '가'.repeat(40), representativeName: '나'.repeat(20) },
+      TODAY,
+    );
+    expect(longest.ok).toBe(true);
+    const over = validateBusinessInput(
+      { ...business, businessName: '가'.repeat(41), representativeName: '나'.repeat(21) },
+      TODAY,
+    );
+    expect(over.ok === false && over.fieldErrors).toEqual({
+      businessName: '40자 이하로 입력해 주세요',
+      representativeName: '20자 이하로 입력해 주세요',
+    });
   });
 
   it('개업일자가 오늘 뒤면, 등록증이 없으면 막는다', () => {
@@ -76,6 +111,11 @@ describe('정산 계좌 검사 (S-107)', () => {
     ]);
     // 빈 칸 문구의 조사는 받침에 맞춘다("예금주을(를)"이 아니라)
     expect(result.ok === false && result.fieldErrors.accountHolder).toBe('예금주를 입력해 주세요');
+  });
+
+  it('계좌번호 입력칸은 숫자를 그대로 보여 주고 16자리까지 받는다', () => {
+    expect(ACCOUNT_NUMBER_INPUT.format('12345678901')).toBe('12345678901');
+    expect(ACCOUNT_NUMBER_INPUT.maxDigits('')).toBe(16);
   });
 
   it('빈 상호·대표자명 문구도 받침에 맞춘 조사', () => {

@@ -240,6 +240,66 @@ describe('끌고 난 칸 → 요일별 값 (#358)', () => {
     expect(rowOf(result.rows, WED)).toMatchObject({ open: '02:30', close: '20:00' });
     expect(rowOf(result.rows, 2)).toMatchObject({ open: '18:15', close: '02:15' });
   });
+
+  it('여는 시각이나 닫는 시각 하나만 30분 단위가 아니어도 그 요일을 잠근다', () => {
+    const rows = hours({
+      [MON]: ['10:15', '20:00'],
+      [2]: ['10:00', '20:15'],
+      [WED]: ['10:00', '20:00'],
+    });
+    expect(isOffStep(rowOf(rows, MON))).toBe(true);
+    expect(isOffStep(rowOf(rows, 2))).toBe(true);
+    expect(isOffStep(rowOf(rows, WED))).toBe(false);
+  });
+
+  it('잠긴 다음 날에도 전날 새벽 영업은 이어진다: 토 18:00 ~ 02:00 + 일 10:15 ~ 19:00', () => {
+    const rows = hours({ [SAT]: ['18:00', '02:00'], [SUN]: ['10:15', '19:00'] });
+    // 토 17:00~18:00 켜기 → 토 17:00 ~ 02:00. 일요일 새벽 칸은 잠겨 있지만 원래 새벽 그대로다
+    const earlier = drag(rows, [SAT, 34], [SAT, 35], true);
+    expect(rowOf(earlier.rows, SAT)).toMatchObject({ open: '17:00', close: '02:00' });
+    expect(rowOf(earlier.rows, SUN)).toMatchObject({ open: '10:15', close: '19:00' });
+    // 토 22~24시를 끄면 24:00까지 오지 않아 새벽도 없어진다
+    const shorter = drag(rows, [SAT, 44], [SAT, 47], false);
+    expect(rowOf(shorter.rows, SAT)).toMatchObject({ open: '18:00', close: '22:00' });
+    // 새벽 영업이 없던 전날을 잠긴 요일 앞에서 24:00까지 늘리면 자정 마감이다(잠긴 칸으로 이어지지 않는다)
+    const evening = hours({ [SAT]: ['10:00', '20:00'], [SUN]: ['10:15', '19:00'] });
+    const midnight = drag(evening, [SAT, 40], [SAT, 47], true);
+    expect(rowOf(midnight.rows, SAT)).toMatchObject({ open: '10:00', close: '00:00' });
+  });
+
+  it('전날 영업이 24:00까지 오지 않으면 다음 날 00:00부터 켠 칸은 그 요일 영업이다', () => {
+    const rows = hours({ [SAT]: ['18:00', '22:00'] });
+    const result = drag(rows, [SUN, 0], [SUN, 3], true);
+    expect(rowOf(result.rows, SAT)).toMatchObject({ open: '18:00', close: '22:00' });
+    expect(rowOf(result.rows, SUN)).toMatchObject({ closed: false, open: '00:00', close: '02:00' });
+  });
+
+  it('새벽 칸까지 합쳐 딱 24시간이면 전날 영업이고, 30분이라도 넘으면 그 요일 영업이다', () => {
+    const rows = hours({ [SAT]: ['12:00', '00:00'] });
+    // 일 00:00~12:00 켜기 → 토 12:00 ~ 12:00(24시간), 일요일은 비어 있던 그대로
+    const exact = drag(rows, [SUN, 0], [SUN, 23], true);
+    expect(rowOf(exact.rows, SAT)).toMatchObject({ open: '12:00', close: '12:00' });
+    expect(rowOf(exact.rows, SUN)).toEqual({ weekday: SUN, closed: false, open: '', close: '' });
+    // 일 00:00~12:30 켜기 → 토 12:00 ~ 00:00 그대로, 일 00:00 ~ 12:30
+    const over = drag(rows, [SUN, 0], [SUN, 24], true);
+    expect(rowOf(over.rows, SAT)).toMatchObject({ open: '12:00', close: '00:00' });
+    expect(rowOf(over.rows, SUN)).toMatchObject({ closed: false, open: '00:00', close: '12:30' });
+  });
+
+  it('새벽 영업하던 요일 칸을 모두 켜면 그 요일 24시간이고, 다음 날 새벽 칸은 지운다', () => {
+    const rows = hours({ [SAT]: ['18:00', '02:00'] });
+    const result = drag(rows, [SAT, 0], [SAT, 47], true);
+    expect(rowOf(result.rows, SAT)).toMatchObject({ closed: false, open: '00:00', close: '00:00' });
+    expect(rowOf(result.rows, SUN)).toEqual({ weekday: SUN, closed: false, open: '', close: '' });
+  });
+
+  it('새벽 영업이 24:00까지 오지 않게 되면 이어졌던 새벽 칸만 지우고, 바로 아래 다음 날 영업은 그대로다', () => {
+    // 토 18:00 ~ 02:00 바로 아래 일 02:00 ~ 10:00
+    const rows = hours({ [SAT]: ['18:00', '02:00'], [SUN]: ['02:00', '10:00'] });
+    const result = drag(rows, [SAT, 44], [SAT, 47], false);
+    expect(rowOf(result.rows, SAT)).toMatchObject({ open: '18:00', close: '22:00' });
+    expect(rowOf(result.rows, SUN)).toMatchObject({ closed: false, open: '02:00', close: '10:00' });
+  });
 });
 
 describe('표 그리기', () => {
@@ -262,6 +322,10 @@ describe('표 그리기', () => {
       { start: 1080, end: 1440, kind: 'open', title: '18:00', detail: '~ 00:00(익일)' },
     ]);
     expect(columnBars(rows, WED)).toEqual([]);
+    // 00:00에 열어도 24시간이 아니면 여는 시각과 닫는 시각
+    expect(columnBars(hours({ [THU]: ['00:00', '05:00'] }), THU)).toEqual([
+      { start: 0, end: 300, kind: 'open', title: '00:00', detail: '~ 05:00' },
+    ]);
   });
 
   it('요일 이름 아래 값', () => {
@@ -278,10 +342,12 @@ describe('표 그리기', () => {
     expect(daySummary(rowOf(rows, WED))).toEqual(['24시간']);
     expect(daySummary(rowOf(rows, THU))).toEqual(['시각을 다', '골라 주세요']);
     expect(daySummary(rowOf(rows, FRI))).toEqual(['비어 있음']);
+    // 줄이 없는 요일도 비어 있음
+    expect(daySummary(undefined)).toEqual(['비어 있음']);
   });
 
   it('요일 이름을 누르면 쉬는 날, 다시 누르면 원래 시각으로 돌아온다', () => {
-    const rows = hours({ [MON]: ['10:00', '20:00'] });
+    const rows = hours({ [MON]: ['10:00', '20:00'], [2]: ['11:00', '19:00'] });
     const closed = toggleClosed(rows, MON);
     expect(rowOf(closed, MON)).toEqual({
       weekday: MON,
@@ -290,6 +356,9 @@ describe('표 그리기', () => {
       close: '20:00',
     });
     expect(rowOf(toggleClosed(closed, MON), MON)).toEqual(rowOf(rows, MON));
+    // 누른 요일만 바뀌고 다른 요일(영업일·빈 요일)은 그대로다
+    const others = (list: HoursRow[]) => list.filter((row) => row.weekday !== MON);
+    expect(others(closed)).toEqual(others(rows));
   });
 
   it('칸 이름과 요일 목록', () => {

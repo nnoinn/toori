@@ -5,15 +5,34 @@ import { describe, expect, it } from 'vitest';
 
 import { SLOT_STATUSES } from '@/db/schema';
 import { isValidBusinessNumber } from '@/lib/business-number';
+import { buildShopSettlement } from '@/server/settlements/batch-rules';
 
 import { SLOT_TIME_STEP_MINUTES } from '../../scripts/dev-db.mjs';
-import { ROLLING_SLOTS, SEED_ACCOUNTS, SEED_SHOPS } from '../../scripts/seed-data.mjs';
-import { rollingStarts, salePrice, seedBusinessNumber, seedDevData } from '../../scripts/seed.mjs';
+import {
+  ROLLING_SLOTS,
+  SEED_ACCOUNTS,
+  SEED_SHOPS,
+  SETTLEMENT_SAMPLE_FEE_RATE,
+  SETTLEMENT_SAMPLES,
+  WINDOW_SAMPLES,
+} from '../../scripts/seed-data.mjs';
+import {
+  rollingStarts,
+  salePrice,
+  samplePayoutMidnight,
+  seedBusinessNumber,
+  seedDevData,
+  windowRanges,
+} from '../../scripts/seed.mjs';
 
 import { describeDb, withRollbackSql } from './test-db';
 
 const HOUR = 60 * 60 * 1000;
 const NOW = new Date('2026-11-01T05:03:00Z');
+
+/** 샵마다 매물 칸 모양이 달라서(상태·방문 결과가 없는 샵도 있다) 여러 샵의 매물을 같이 볼 때 쓰는 모양 */
+type SeedSlot = { menu: string; at: number; status?: string; visit?: string };
+const slotsOf = (shop: (typeof SEED_SHOPS)[number]) => shop.slots as readonly SeedSlot[];
 
 /** 테스트 DB의 auth.users에 시드 계정을 만든다(개발 DB에서는 Supabase 관리 기능이 만든다) */
 async function createSeedUsers(sql: postgres.TransactionSql) {
@@ -116,6 +135,52 @@ describe('계속 쓰는 시험 매물 시각 (11/2)', () => {
   });
 });
 
+describe('샘플 정산 지급일 (11/22)', () => {
+  const kstDate = (ms: number) => new Date(ms + 9 * HOUR).toISOString().slice(0, 10);
+
+  it('넣는 날 바로 전 목요일이 1, 그 전 목요일이 2다(목요일에 넣으면 7일 전이 1)', () => {
+    // NOW = 2026-11-01(일) 14:03 KST
+    expect(kstDate(samplePayoutMidnight(NOW.getTime(), 1))).toBe('2026-10-29');
+    expect(kstDate(samplePayoutMidnight(NOW.getTime(), 2))).toBe('2026-10-22');
+    const thursdayNoon = new Date('2026-11-05T03:00:00Z').getTime();
+    expect(kstDate(samplePayoutMidnight(thursdayNoon, 1))).toBe('2026-10-29');
+  });
+});
+
+describe('시간대 매물 샘플 시각 (11/22)', () => {
+  const step = SLOT_TIME_STEP_MINUTES * 60 * 1000;
+  const base = Math.floor(NOW.getTime() / step) * step;
+  const MINUTE = 60 * 1000;
+
+  it('같은 샵의 매물(위 매물·계속 쓰는 시험 매물)과 시간이 겹치지 않는다(겹치면 DB가 막는다)', () => {
+    for (const sample of WINDOW_SAMPLES) {
+      const shop = SEED_SHOPS.find((s) => s.key === sample.shop);
+      expect(shop).toBeDefined();
+      if (!shop) continue;
+      const minutesOf = (key: string) => shop.menus.find((m) => m.key === key)?.minutes ?? 0;
+      const longest = Math.max(...shop.menus.map((m) => m.minutes));
+      // 겹침을 막는 상태: 게시예정·게시중·예약됨
+      const busy = [
+        ...slotsOf(shop)
+          .filter((s) => ['scheduled', 'published', 'reserved'].includes(s.status ?? 'published'))
+          .map((s) => [base + s.at * HOUR, base + s.at * HOUR + minutesOf(s.menu) * MINUTE]),
+        ...rollingStarts(base, shop.hours).map((d) => [
+          d.getTime(),
+          d.getTime() + longest * MINUTE,
+        ]),
+      ];
+      const ranges = windowRanges(base, shop.hours, sample);
+      expect(ranges.length).toBeGreaterThan(0);
+      for (const { start, end } of ranges) {
+        expect(end.getTime()).toBeGreaterThan(start.getTime());
+        for (const [busyStart, busyEnd] of busy) {
+          expect(start.getTime() < busyEnd && busyStart < end.getTime()).toBe(false);
+        }
+      }
+    }
+  });
+});
+
 describeDb('시드 데이터 (실제 DB)', () => {
   it('DB 제약을 통과하고, 다시 넣어도 같은 수이며 시드가 아닌 데이터는 남긴다', async () => {
     await withRollbackSql(async (sql) => {
@@ -128,6 +193,40 @@ describeDb('시드 데이터 (실제 DB)', () => {
         slots: first.slots,
       });
 
+      // 예약자 이름은 닉네임과 다르다(원장님 화면에 이름이 보이는지 가려 보려고, #375)
+      const names = await sql<{ name: string; nickname: string }[]>`
+        select name, nickname from customers where user_id in ${sql(Object.values(userIds))}`;
+      expect(names.length).toBeGreaterThan(0);
+      expect(names.every((c) => c.name.startsWith('샘플') && c.name !== c.nickname)).toBe(true);
+
+      // 팀원이 시드 샵으로 시험하며 남긴 새 표의 줄도 다시 넣을 때 같이 지운다(11/22)
+      const [target] = await sql<{ reservation_id: string; shop_id: string }[]>`
+        select r.id as reservation_id, s.id as shop_id from reservations r
+        join slots sl on sl.id = r.slot_id join shops s on s.id = sl.shop_id
+        join owners ow on ow.id = s.owner_id
+        where ow.user_id = ${userIds['owner-a']} limit 1`;
+      await sql`insert into agreed_cancel_requests ${sql({
+        reservation_id: target.reservation_id,
+        requested_by: userIds['owner-a'],
+        reason: 'other',
+        status: 'requested',
+        requested_at: NOW,
+        expires_at: new Date(NOW.getTime() + 24 * HOUR),
+      })}`;
+      await sql`insert into settlement_holds ${sql({
+        shop_id: target.shop_id,
+        reason: '시험',
+        reason_code: 'other',
+        held_by: userIds['admin-a'],
+        held_at: NOW,
+      })}`;
+      await sql`insert into payout_account_changes ${sql({
+        shop_id: target.shop_id,
+        changed_by: userIds['owner-a'],
+        bank_code: '004',
+        account_last4: '0000',
+      })}`;
+
       const otherShopId = await createOtherShop(sql);
       const second = await seedDevData(sql, { now: new Date(NOW.getTime() + HOUR), userIds });
       expect(second).toEqual(first);
@@ -138,6 +237,157 @@ describeDb('시드 데이터 (실제 DB)', () => {
       });
       const [other] = await sql`select count(*)::int as n from shops where id = ${otherShopId}`;
       expect(other.n).toBe(1);
+      const [left] = await sql<{ agreed: number; holds: number; changes: number }[]>`
+        select
+          (select count(*)::int from agreed_cancel_requests where reservation_id = ${target.reservation_id}) as agreed,
+          (select count(*)::int from settlement_holds where shop_id = ${target.shop_id}) as holds,
+          (select count(*)::int from payout_account_changes where shop_id = ${target.shop_id}) as changes`;
+      expect(left).toEqual({ agreed: 0, holds: 0, changes: 0 });
+    });
+  });
+
+  it('시간대 매물: 바로 게시중인 것과 게시예정인 것이 있고, 서비스 할인가가 맞다 (#308, 11/22)', async () => {
+    await withRollbackSql(async (sql) => {
+      const userIds = await createSeedUsers(sql);
+      const result = await seedDevData(sql, { now: NOW, userIds });
+      const windows = await sql<{ id: string; status: string; publish_at: Date }[]>`
+        select w.id, w.status, w.publish_at from slot_windows w
+        join shops s on s.id = w.shop_id join owners ow on ow.id = s.owner_id
+        where ow.user_id in ${sql(Object.values(userIds))}`;
+      expect(windows).toHaveLength(result.windows);
+      expect(new Set(windows.map((w) => w.status))).toEqual(new Set(['published', 'scheduled']));
+      for (const w of windows) {
+        expect(w.status).toBe(w.publish_at <= NOW ? 'published' : 'scheduled');
+      }
+      const menus = await sql<{ list_price: number; discount_rate: number; sale_price: number }[]>`
+        select list_price, discount_rate, sale_price from slot_window_menus
+        where window_id in ${sql(windows.map((w) => w.id))}`;
+      expect(menus.length).toBeGreaterThanOrEqual(windows.length);
+      for (const m of menus) expect(m.sale_price).toBe(salePrice(m.list_price, m.discount_rate));
+    });
+  });
+
+  it('샘플 정산 묶음은 목요일 정산 묶기 계산과 금액·기간이 같다 (11/13 결정, 11/22)', async () => {
+    await withRollbackSql(async (sql) => {
+      const userIds = await createSeedUsers(sql);
+      const result = await seedDevData(sql, { now: NOW, userIds });
+      expect(result.settlements).toBe(SETTLEMENT_SAMPLES.length);
+      const settlements = await sql<
+        {
+          id: string;
+          shop_id: string;
+          period_start: string;
+          period_end: string;
+          item_count: number;
+          total_base_amount: number;
+          total_fee_amount: number;
+          penalty_deducted: number;
+          payout_amount: number;
+          status: string;
+        }[]
+      >`
+        select st.id, st.shop_id, st.period_start::text, st.period_end::text, st.item_count,
+          st.total_base_amount, st.total_fee_amount, st.penalty_deducted, st.payout_amount, st.status
+        from settlements st join shops s on s.id = st.shop_id join owners ow on ow.id = s.owner_id
+        where ow.user_id in ${sql(Object.values(userIds))}`;
+      expect(settlements.map((st) => st.status).sort()).toEqual(
+        SETTLEMENT_SAMPLES.map((sample) => sample.status).sort(),
+      );
+
+      for (const st of settlements) {
+        // 지급일은 목요일
+        const [year, month, day] = st.period_end.split('-').map(Number);
+        expect(new Date(Date.UTC(year, month - 1, day)).getUTCDay()).toBe(4);
+
+        const items = await sql<
+          {
+            order_id: string;
+            kind: string;
+            base_amount: number;
+            fee_rate: number;
+            fee_amount: number;
+            fee_vat: number;
+            payment_fee_rate: string;
+            payment_fee: number;
+            payment_fee_vat: number;
+            payout_amount: number;
+            sale_price: number;
+            discount_rate: number;
+            penalty_rate: number | null;
+            occurred_at: Date;
+          }[]
+        >`
+          select si.order_id, si.kind, si.base_amount, si.fee_rate, si.fee_amount, si.fee_vat,
+            si.payment_fee_rate, si.payment_fee, si.payment_fee_vat, si.payout_amount,
+            o.sale_price, sl.discount_rate, rf.penalty_rate,
+            coalesce(r.cancelled_at, r.visit_recorded_at) as occurred_at
+          from settlement_items si join orders o on o.id = si.order_id
+          join slots sl on sl.id = o.slot_id join reservations r on r.order_id = o.id
+          left join refunds rf on rf.reservation_id = r.id
+          where si.settlement_id = ${st.id}`;
+        const previous =
+          settlements
+            .filter((other) => other.shop_id === st.shop_id && other.period_end < st.period_end)
+            .map((other) => other.period_end)
+            .sort()
+            .at(-1) ?? null;
+        const draft = buildShopSettlement({
+          payoutDate: st.period_end,
+          previousPayoutDate: previous,
+          items: items.map((item) => ({
+            orderId: item.order_id,
+            kind:
+              item.kind === 'penalty'
+                ? { kind: 'penalty' as const, penaltyRate: item.penalty_rate ?? -1 }
+                : { kind: item.kind as 'sale' | 'no_show' },
+            salePrice: item.sale_price,
+            discountRate: item.discount_rate,
+            couponAmount: 0,
+            occurredAt: item.occurred_at,
+          })),
+          penalties: [],
+          paymentFeeRate: SETTLEMENT_SAMPLE_FEE_RATE,
+        });
+        expect({
+          periodStart: st.period_start,
+          itemCount: st.item_count,
+          totalBaseAmount: st.total_base_amount,
+          totalFeeAmount: st.total_fee_amount,
+          penaltyDeducted: st.penalty_deducted,
+          payoutAmount: st.payout_amount,
+        }).toEqual({
+          periodStart: draft.periodStart,
+          itemCount: draft.itemCount,
+          totalBaseAmount: draft.totalBaseAmount,
+          totalFeeAmount: draft.totalFeeAmount,
+          penaltyDeducted: draft.penaltyDeducted,
+          payoutAmount: draft.payoutAmount,
+        });
+        for (const expected of draft.items) {
+          const row = items.find((item) => item.order_id === expected.orderId);
+          expect({
+            kind: row?.kind,
+            baseAmount: row?.base_amount,
+            feeRate: row?.fee_rate,
+            feeAmount: row?.fee_amount,
+            feeVat: row?.fee_vat,
+            paymentFeeRate: Number(row?.payment_fee_rate),
+            paymentFee: row?.payment_fee,
+            paymentFeeVat: row?.payment_fee_vat,
+            payoutAmount: row?.payout_amount,
+          }).toEqual({
+            kind: expected.kind,
+            baseAmount: expected.baseAmount,
+            feeRate: expected.feeRate,
+            feeAmount: expected.feeAmount,
+            feeVat: expected.feeVat,
+            paymentFeeRate: expected.paymentFeeRate,
+            paymentFee: expected.paymentFee,
+            paymentFeeVat: expected.paymentFeeVat,
+            payoutAmount: expected.payoutAmount,
+          });
+        }
+      }
     });
   });
 
@@ -291,7 +541,13 @@ describeDb('시드 데이터 (실제 DB)', () => {
       expect((cancelled?.refund_amount ?? 0) + (cancelled?.penalty_amount ?? 0)).toBe(
         cancelled?.amount,
       );
-      expect(rows.filter((r) => r.visit_result === 'no_show')).toHaveLength(1);
+      // 노쇼: 원장님 A 샵 매물 하나 + 샘플 정산 거래
+      const noShows =
+        SEED_SHOPS.flatMap(slotsOf).filter((slot) => slot.visit === 'no_show').length +
+        SETTLEMENT_SAMPLES.flatMap((sample) => sample.items).filter(
+          (item) => item.result === 'no_show',
+        ).length;
+      expect(rows.filter((r) => r.visit_result === 'no_show')).toHaveLength(noShows);
     });
   });
 });

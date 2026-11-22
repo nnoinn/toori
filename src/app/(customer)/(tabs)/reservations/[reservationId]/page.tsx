@@ -21,12 +21,14 @@ import { formatDuration, kakaoDirectionsLink } from '../../slots/[slotId]/detail
 import { NO_SHOW_DISPUTE_NOTE, noShowRefundNote } from '../no-show-texts';
 import { getMyReservationDetail } from '../queries';
 import { isVisitPending, showsCancelSection, showsCheckInCard } from '../reservation-tabs';
+import { showsNoShow, VOID_BADGE, voidedNote } from '../void-texts';
 import { AgreedCancelCard } from './agreed-cancel-card';
 import { CancelReservation } from './cancel-reservation';
 import { CheckInCard } from './check-in-card';
 import { DetailCard } from './detail-card';
 import { DisputeSection } from './dispute-section';
 import { NO_SHOW_DISPUTE_BELOW } from './dispute-texts';
+import { refundHistory } from './refund-history';
 
 export const metadata: Metadata = { title: '예약 상세' };
 
@@ -36,7 +38,8 @@ const STATUS_LABEL = { confirmed: '예정', completed: '이용 완료', cancelle
 
 // 예약 상세 (J12, C-502). 본인 예약만 열린다. 예정 예약은 위쪽에 예약번호를 크게 보여 주는 '방문 확인' 칸이 있고(C-504),
 // 시작 전이면 맨 아래에서 취소할 수 있다(J13, C-503). 시작 뒤(취소된 예약은 취소된 뒤)에는 이의제기 칸이 있다(C-507).
-// 원장님이 합의 후 취소를 요청하고 답을 기다리는 동안에는 맨 위에 요청 카드가 있다(C-506)
+// 원장님이 합의 후 취소를 요청하고 답을 기다리는 동안에는 맨 위에 요청 카드가 있다(C-506).
+// 운영자가 무효로 처리한 예약(A-108)은 "무효" 이름표와 안내를 붙이고 노쇼 표시는 숨긴다(#528)
 export default function ReservationDetailPage({ params }: { params: Params }) {
   return (
     <main className="flex flex-1 flex-col md:mx-auto md:w-full md:max-w-3xl md:px-6 md:py-6">
@@ -67,6 +70,8 @@ async function DetailContent({ params }: { params: Params }) {
   const r = result.data;
   const visitPending = isVisitPending(r.status, r.startAt, now);
   const checkIn = showsCheckInCard(r.status);
+  const noShow = showsNoShow(r);
+  const refunds = refundHistory(r.refunds);
   const tel = r.shop.phone.replace(/[^\d+]/g, '');
   const [refundPreview, dispute, agreedCancel] = await Promise.all([
     showsCancelSection(r.status, r.startAt, now) ? previewRefund(r.reservationId) : null,
@@ -94,7 +99,8 @@ async function DetailContent({ params }: { params: Params }) {
           <Badge variant={r.status === 'cancelled' ? 'outline' : 'secondary'}>
             {STATUS_LABEL[r.status]}
           </Badge>
-          {r.noShow ? <Badge variant="destructive">노쇼</Badge> : null}
+          {r.voided ? <Badge variant="outline">{VOID_BADGE}</Badge> : null}
+          {noShow ? <Badge variant="destructive">노쇼</Badge> : null}
           {visitPending ? <Badge variant="secondary">방문 확인 중</Badge> : null}
           {/* 예정 예약은 아래 '방문 확인' 칸에 크게 나와서 여기서는 뺀다 */}
           {checkIn ? null : <span>예약번호 {formatReservationCode(r.code)}</span>}
@@ -104,8 +110,15 @@ async function DetailContent({ params }: { params: Params }) {
           <Clock className="size-4 text-muted-foreground" aria-hidden />
           {formatKst(new Date(r.startAt))} · {formatDuration(r.durationMinutes)}
         </p>
-        {/* 노쇼로 처리된 예약: 환불 안내와 잘못 처리됐을 때 알리는 곳(C-105) */}
-        {r.noShow ? (
+        {/* 무효 예약: 결제액(과 쓴 쿠폰)을 모두 돌려줬다는 안내. 이유는 적지 않는다(#528) */}
+        {r.voided ? (
+          <p className="flex items-start gap-2 rounded-lg bg-muted p-3 text-sm">
+            <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+            {voidedNote(r.payment)}
+          </p>
+        ) : null}
+        {/* 노쇼로 처리된 예약: 환불 안내와 잘못 처리됐을 때 알리는 곳(C-105). 무효면 숨긴다 */}
+        {noShow ? (
           <div className="flex items-start gap-2 rounded-lg bg-muted p-3 text-sm">
             <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
             <div className="flex flex-col gap-1">
@@ -175,17 +188,37 @@ async function DetailContent({ params }: { params: Params }) {
         </dl>
       </DetailCard>
 
-      {r.refund ? (
+      {/* 환불이 한 번이면 지금처럼, 고객 취소 뒤 무효처럼 두 번 이상이면 줄마다 이름과 돌려받은 금액 합계(#528) */}
+      {refunds ? (
         <DetailCard aria-label="환불 내역">
           <h3 className="font-semibold">환불 내역</h3>
-          <dl className="flex flex-col gap-1">
-            <Row label="환불 금액" value={<strong>{formatWon(r.refund.refundAmount)}</strong>} />
-            <Row
-              label="위약금"
-              value={`${formatWon(r.refund.penaltyAmount)} (${r.refund.penaltyRate}%)`}
-            />
-            <Row label="환불 처리" value={formatKst(new Date(r.refund.processedAt))} />
-          </dl>
+          <div className="flex flex-col divide-y">
+            {refunds.rows.map((row, i) => (
+              <div key={i} className="flex flex-col gap-1 py-2 first:pt-0 last:pb-0">
+                {row.label ? (
+                  <p className="text-xs font-medium text-muted-foreground">{row.label}</p>
+                ) : null}
+                <dl className="flex flex-col gap-1">
+                  <Row label="환불 금액" value={<strong>{formatWon(row.refundAmount)}</strong>} />
+                  {row.penalty ? (
+                    <Row
+                      label="위약금"
+                      value={`${formatWon(row.penalty.amount)} (${row.penalty.rate}%)`}
+                    />
+                  ) : null}
+                  <Row label="환불 처리" value={formatKst(new Date(row.processedAt))} />
+                </dl>
+              </div>
+            ))}
+            {refunds.total !== null ? (
+              <dl className="pt-2">
+                <Row
+                  label="돌려받은 금액 합계"
+                  value={<strong>{formatWon(refunds.total)}</strong>}
+                />
+              </dl>
+            ) : null}
+          </div>
         </DetailCard>
       ) : null}
 

@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { adminActions, payoutAccounts, shops } from '@/db/schema';
-import type { ShopStatus } from '@/db/schema/shops';
+import type { NtsCheckResult, ShopStatus } from '@/db/schema/shops';
 
 type Tx = Pick<ReturnType<typeof getDb>, 'select' | 'update' | 'insert'>;
 
@@ -67,7 +67,10 @@ export async function saveBusinessUpdate(
   input: {
     shopId: string;
     adminId: string;
-    values: Partial<BusinessValues>;
+    values: Partial<BusinessValues> & {
+      ntsCheck?: NtsCheckResult | null;
+      ntsCheckedAt?: Date | null;
+    };
     changed: readonly BusinessField[];
     reason: string;
   },

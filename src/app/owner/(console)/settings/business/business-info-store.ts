@@ -9,7 +9,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 
 import { getDb } from '@/db';
 import { shops } from '@/db/schema';
-import type { ShopStatus } from '@/db/schema/shops';
+import type { NtsCheckResult, ShopStatus } from '@/db/schema/shops';
 
 import type { BusinessInput } from '../../../business-fields';
 
@@ -48,7 +48,7 @@ export async function selectBusinessInfo(
 export async function updateBusinessInfo(
   db: Pick<Db, 'update'>,
   shopId: string,
-  values: BusinessInput,
+  values: BusinessInput & { ntsCheck?: NtsCheckResult | null; ntsCheckedAt?: Date | null },
 ): Promise<boolean> {
   const rows = await db
     .update(shops)

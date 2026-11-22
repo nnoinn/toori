@@ -84,6 +84,16 @@ describe('settlementKindOf: 정산 종류', () => {
     ['환불이 아직 끝나지 않은 고객 취소', cancelled('customer', null)],
     ['예정 예약', visited('2026-11-15 15:00', { status: 'confirmed', visitResult: null })],
     [
+      '환불 기록 값이 남은 예정 예약',
+      visited('2026-11-15 15:00', {
+        status: 'confirmed',
+        visitResult: null,
+        cancelActor: 'customer',
+        cancelPenaltyRate: 30,
+      }),
+    ],
+    ['처리 결과가 없는 이용 완료', visited('2026-11-15 15:00', { visitResult: null })],
+    [
       '운영자 취소 환불이 있는 이용 완료(포트원 콘솔에서 일부 취소)',
       visited('2026-11-15 15:00', { hasAdminRefund: true }),
     ],
