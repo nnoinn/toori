@@ -55,6 +55,11 @@ const config = {
     'src/app/owner/(console)/slots/slot-pricing.ts',
     'src/app/owner/(console)/slots/relist.ts',
     'src/app/owner/(console)/slots/window/window-cells.ts',
+    // 11/22: 월별 통계(S-504)·지난 매물로 빠르게 올리기(S-207)·이의제기 안내(S-407)·운영자 사유 한 줄(#499)
+    'src/app/owner/(console)/stats/stats.ts',
+    'src/app/owner/(console)/slots/slot-presets.ts',
+    'src/app/owner/(console)/reservations/reservation-dispute.ts',
+    'src/app/owner/(console)/admin-notice-line.ts',
     // 고객 화면 규칙(정찬형). 주소 폴더 [slotId] 같은 이름은 글롭에서 글자 묶음이 돼서 *로 쓴다
     'src/features/map/slot-list/badges.ts',
     'src/features/map/slot-list/merge.ts',
