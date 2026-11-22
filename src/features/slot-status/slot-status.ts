@@ -44,7 +44,7 @@ export function isSlotOnHold(slot: SlotHoldInput, now: Date): boolean {
   return (
     slot.holdCustomerId !== null &&
     slot.holdExpiresAt !== null &&
-    now.getTime() <= slot.holdExpiresAt.getTime()
+    now.getTime() < slot.holdExpiresAt.getTime()
   );
 }
 
