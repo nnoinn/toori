@@ -2,6 +2,7 @@
 
 import type { AgreedCancelRequestStatus } from '@/db/schema/refunds';
 import type { PgSellerStatus } from '@/db/schema/shops';
+import { formatKstDateTime } from '@/lib/time';
 import {
   AGREED_CANCEL_REASON_LABELS,
   type AgreedCancelReason,
@@ -86,4 +87,15 @@ export function agreedCancelReasonText(
 ): string {
   const label = AGREED_CANCEL_REASON_LABELS[reason];
   return reason === 'other' && reasonText ? `${label}(${reasonText})` : label;
+}
+
+/**
+ * 입점 심사의 국세청 진위확인 결과(#208). 맞음·확인 못 함은 확인한 시각을 붙인다.
+ * 비어 있으면 확인 안 함(국세청 키가 없는 개발 환경에서 신청했거나 이 기능 전에 신청한 샵)
+ */
+export function ntsCheckText(check: string | null, checkedAt: Date | null): string {
+  const at = checkedAt ? ` · ${formatKstDateTime(checkedAt)} 확인` : '';
+  if (check === 'verified') return `국세청 정보와 맞음${at}`;
+  if (check === 'unavailable') return `확인 못 함(국세청이 응답하지 않았어요)${at}`;
+  return '확인 안 함';
 }

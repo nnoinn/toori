@@ -17,6 +17,7 @@ import { fail, ok } from '@/lib/result';
 import { kstDateKey } from '@/lib/time';
 import { encryptAccountNumber } from '@/server/payouts/account-crypto';
 import { BANK_CODES, SHOP_CATEGORIES, type ShopCategory } from '@/server/policy';
+import { checkBusinessWithNts, ntsBlockError, ntsRecord } from '@/server/shops/nts';
 import { assertBusinessDocPath } from '@/server/storage';
 
 import { ACCOUNT_MODE_COOKIE, ACCOUNT_MODE_COOKIE_OPTIONS } from './account-mode';
@@ -111,7 +112,8 @@ export async function createOwnerAccount(
   if (!isValidBusinessNumber(shop.businessRegistrationNumber)) {
     return fail('INVALID_INPUT', '사업자등록번호를 다시 확인해 주세요');
   }
-  if (shop.openedOn > kstDateKey(await getRequestNow())) {
+  const now = await getRequestNow();
+  if (shop.openedOn > kstDateKey(now)) {
     return fail('INVALID_INPUT', '개업일자를 다시 확인해 주세요');
   }
 
@@ -122,6 +124,15 @@ export async function createOwnerAccount(
   if (!docPath.ok) return docPath;
   // 주소 변환(외부 API)을 부르기 전에 이미 가입했는지 먼저 본다. 동시에 두 번 눌러도 저장 단계에서 한 번만 된다
   if (await hasOwnerAccount(user.userId)) return fail('ALREADY_EXISTS', ALREADY_EXISTS_MESSAGE);
+
+  // 국세청 사업자등록 진위확인(#208). 다름·휴업·폐업이면 저장하지 않고, 국세청이 응답하지 않으면 막지 않고 '확인 못 함'으로 남긴다
+  const nts = await checkBusinessWithNts({
+    businessNumber: shop.businessRegistrationNumber,
+    openedOn: shop.openedOn,
+    representativeName: shop.representativeName,
+  });
+  const ntsBlocked = ntsBlockError(nts);
+  if (ntsBlocked) return ntsBlocked;
 
   const geo = await geocodeAddress(shop.roadAddress);
   if (!geo.ok) return geo;
@@ -146,6 +157,7 @@ export async function createOwnerAccount(
         businessRegistrationNumber: shop.businessRegistrationNumber,
         openedOn: shop.openedOn,
         businessDocPath: shop.businessDocPath,
+        ...ntsRecord(nts, now),
       },
       payout: {
         bankCode: payout.bankCode,

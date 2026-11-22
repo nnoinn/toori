@@ -35,7 +35,7 @@ import {
 import { selectShopCancelStats } from '../cancel-stats-queries';
 import { revealShopOwnerContact } from '../../users/contact-actions';
 import { ContactReveal, RevealButton, RevealedValue } from '../../users/contact-reveal';
-import { labelPgSellerStatus, labelReviewAction } from '../format';
+import { labelPgSellerStatus, labelReviewAction, ntsCheckText } from '../format';
 import { selectShopForReview, type ShopReviewDetail } from '../queries';
 import { SlotControlAction } from '../slot-control-actions';
 import { selectShopSlotControl, type ShopSlotControl } from '../slot-control-queries';
@@ -134,6 +134,7 @@ async function ReviewDetail({
               ['대표자', detail.business.representativeName],
               ['사업자등록번호', formatBusinessNumber(detail.business.businessRegistrationNumber)],
               ['개업일자', detail.business.openedOn],
+              ['국세청 확인', ntsCheckText(detail.business.ntsCheck, detail.business.ntsCheckedAt)],
             ]}
           />
           {doc.ok ? (
