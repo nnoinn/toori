@@ -8,6 +8,7 @@ import {
   defaultShopSort,
   labelPgSellerStatus,
   labelReviewAction,
+  ntsCheckText,
   shopsHref,
   toShopSort,
 } from './format';
@@ -67,5 +68,17 @@ describe('합의 후 취소 사유 표시 (X-208)', () => {
     expect(agreedCancelReasonText('customer_declined', '붙지 않는 내용')).toBe(
       '손님이 시술을 원하지 않아요',
     );
+  });
+});
+
+describe('국세청 진위확인 결과 표시 (#208)', () => {
+  const AT = new Date('2026-11-22T05:30:00Z');
+
+  it('맞음·확인 못 함은 확인한 시각을 붙이고, 비어 있으면 확인 안 함', () => {
+    expect(ntsCheckText('verified', AT)).toBe('국세청 정보와 맞음 · 2026-11-22 14:30 확인');
+    expect(ntsCheckText('unavailable', AT)).toBe(
+      '확인 못 함(국세청이 응답하지 않았어요) · 2026-11-22 14:30 확인',
+    );
+    expect(ntsCheckText(null, null)).toBe('확인 안 함');
   });
 });
