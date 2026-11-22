@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { type ReactNode, Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -9,7 +9,9 @@ import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
+import { maskEmail } from '@/lib/email';
 import { formatWon } from '@/lib/format';
+import { maskPhone } from '@/lib/phone';
 import { getRequestNow } from '@/lib/request-time';
 import { formatKst } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -20,6 +22,8 @@ import { labelReservation } from '../../../lookup';
 import { customerCouponViews } from '../../coupon-format';
 import { selectCustomerCoupons } from '../../coupon-queries';
 import { selectCustomerDetail } from '../../queries';
+import { revealCustomerContact } from '../../contact-actions';
+import { ContactReveal, RevealButton, RevealedValue } from '../../contact-reveal';
 import { CouponCard } from './coupon-card';
 
 export const metadata: Metadata = { title: '고객 정보' };
@@ -80,21 +84,33 @@ async function Detail({ params }: { params: Params }) {
           <CardTitle className="text-lg">{detail.name}</CardTitle>
         </CardHeader>
         <CardContent>
-          <Fields
-            rows={[
-              ['닉네임', detail.nickname],
-              ['이메일', detail.email],
-              ['휴대폰', detail.phone ?? '-'],
-              ['가입', formatKst(detail.createdAt)],
-              ['탈퇴', detail.withdrawnAt ? formatKst(detail.withdrawnAt) : '-'],
-              ['관심 동네·찜한 샵 새 매물 알림', labelConsent(detail.consents.interest_alert)],
-              ['이벤트·혜택 소식', labelConsent(detail.consents.marketing)],
-              [
-                '이용 기록',
-                `예약 ${detail.reservationCount}건 · 취소 ${detail.cancelCount}건 · 노쇼 ${detail.noShowCount}건`,
-              ],
-            ]}
-          />
+          {/* 연락처는 가려서 보여 주고, [번호 보기]를 누르면 같은 자리에 전체를 진하게 보여 준다(#360 4번) */}
+          <ContactReveal reveal={revealCustomerContact.bind(null, customerId)}>
+            <Fields
+              rows={[
+                ['닉네임', detail.nickname],
+                [
+                  '이메일',
+                  <RevealedValue key="email" field="email" masked={maskEmail(detail.email)} />,
+                ],
+                [
+                  '휴대폰',
+                  <RevealedValue key="phone" field="phone" masked={maskPhone(detail.phone)} />,
+                ],
+                ['가입', formatKst(detail.createdAt)],
+                ['탈퇴', detail.withdrawnAt ? formatKst(detail.withdrawnAt) : '-'],
+                ['관심 동네·찜한 샵 새 매물 알림', labelConsent(detail.consents.interest_alert)],
+                ['이벤트·혜택 소식', labelConsent(detail.consents.marketing)],
+                [
+                  '이용 기록',
+                  `예약 ${detail.reservationCount}건 · 취소 ${detail.cancelCount}건 · 노쇼 ${detail.noShowCount}건`,
+                ],
+              ]}
+            />
+            <div className="mt-3">
+              <RevealButton />
+            </div>
+          </ContactReveal>
         </CardContent>
       </Card>
 
@@ -143,7 +159,7 @@ async function Detail({ params }: { params: Params }) {
   );
 }
 
-function Fields({ rows }: { rows: [string, string][] }) {
+function Fields({ rows }: { rows: [string, ReactNode][] }) {
   return (
     <dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2 text-sm">
       {rows.map(([label, value]) => (
