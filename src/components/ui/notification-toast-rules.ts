@@ -1,4 +1,5 @@
-// 화면 안내(#371) 규칙. 1분마다 받은 새 알림 중 무엇을 띄울지, 이미 본 알림을 얼마나 기억할지. 화면(notification-toast.tsx)이 쓴다.
+// 화면 안내(#371) 규칙. 1분마다(푸시를 켠 기기는 푸시가 오자마자) 받은 새 알림 중 무엇을 띄울지, 이미 본 알림을 얼마나 기억할지,
+// 서비스 워커의 메시지에 무엇을 할지. 화면(notification-toast.tsx)이 쓴다.
 
 import {
   type MyNotification,
@@ -56,16 +57,38 @@ export function parseSeen(raw: string | null): string[] {
 }
 
 /**
- * 서비스 워커가 보낸 메시지(public/sw.js, #371)에 이 화면 안내가 할 일.
- * ask: 이 계정의 푸시이고 지금 이 화면을 쓰고 있어서(보이고 포커스가 있음) 바로 묻고 답한다 /
- * decline: 다른 계정이거나 이 화면을 쓰고 있지 않아 띄우지 않는다고 답한다(서비스 워커가 기기 알림을 띄운다) / ignore: 푸시 메시지가 아니다
+ * 서비스 워커가 보낸 새 알림 메시지(public/sw.js, #371)에 이 화면 안내가 할 일.
+ * ask: 이 계정의 알림이고 지금 이 화면을 쓰고 있어서(보이고 포커스가 있음) 바로 묻고, 그 알림을 띄웠는지 답한다 /
+ * show: 이 계정의 알림이고 화면은 보이지만 다른 앱·다른 창을 보는 중이다. 바로 묻고 띄우되 띄우지 않았다고 답한다(기기 알림도 뜬다) /
+ * decline: 다른 계정의 알림이거나 화면이 보이지 않아 띄우지 않는다고 답한다(화면을 다시 보면 그때 묻는다) / ignore: 새 알림 메시지가 아니다
  */
 export function pushToastAction(
   data: unknown,
-  input: { account: NotificationAccount; watching: boolean },
-): 'ask' | 'decline' | 'ignore' {
+  input: { account: NotificationAccount; visible: boolean; focused: boolean },
+): 'ask' | 'show' | 'decline' | 'ignore' {
   if (typeof data !== 'object' || data === null) return 'ignore';
   const message = data as { type?: unknown; account?: unknown };
   if (message.type !== PUSH_TOAST_MESSAGE) return 'ignore';
-  return message.account === input.account && input.watching ? 'ask' : 'decline';
+  if (message.account !== input.account || !input.visible) return 'decline';
+  return input.focused ? 'ask' : 'show';
+}
+
+/** 서비스 워커가 같이 보낸 알림 id(src/server/notifications/notify.ts). 없으면(예전 서비스 워커·예전 푸시) null */
+export function pushToastId(data: unknown): string | null {
+  if (typeof data !== 'object' || data === null) return null;
+  const { id } = data as { id?: unknown };
+  return typeof id === 'string' && id !== '' ? id : null;
+}
+
+/**
+ * 서비스 워커에 그 알림을 띄웠다고 답할지. 이번 확인에서 띄웠거나 이 탭이 이미 띄운 알림이면 true(그러면 기기 알림을 생략한다).
+ * 알림함에 아직 없거나 띄우지 않기로 한 알림(읽음, 오래됨)이면 false라서 기기 알림이 뜬다.
+ * id를 모르면(예전 푸시) 이번에 띄운 알림이 있을 때만 true
+ */
+export function toastedPush(
+  id: string | null,
+  input: { fresh: readonly MyNotification[]; toasted: ReadonlySet<string> },
+): boolean {
+  if (id === null) return input.fresh.length > 0;
+  return input.toasted.has(id) || input.fresh.some((item) => item.id === id);
 }

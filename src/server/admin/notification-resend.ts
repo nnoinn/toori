@@ -66,6 +66,7 @@ export async function resendNotification(input: {
   }
 
   const results = await sendToDevices(db, targets, {
+    id: notification.id,
     ...readNotificationPayload(notification.payload),
     accountType: notification.accountType,
   });
