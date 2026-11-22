@@ -10,19 +10,24 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
 import { formatWon } from '@/lib/format';
+import { getRequestNow } from '@/lib/request-time';
 import { formatKst } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage, type OptionalConsent } from '@/server/auth';
 
 import { labelReservation } from '../../../lookup';
+import { customerCouponViews } from '../../coupon-format';
+import { selectCustomerCoupons } from '../../coupon-queries';
 import { selectCustomerDetail } from '../../queries';
+import { CouponCard } from './coupon-card';
 
 export const metadata: Metadata = { title: '고객 정보' };
 
 type Params = Promise<{ customerId: string }>;
 
-// 고객 상세 (A-102). 주소: /admin/users/customers/[customerId]. 전체 번호와 이메일은 여기서만 보여준다(조회만)
+// 고객 상세 (A-102). 주소: /admin/users/customers/[customerId]. 전체 번호와 이메일은 여기서만 보여준다(조회만).
+// 쿠폰 칸(C-407)은 받은 쿠폰 전부와 쓴 예약·돌려받은 기록을 보여 준다
 export default function AdminCustomerPage({ params }: { params: Params }) {
   return (
     <main className="flex w-full max-w-4xl flex-1 flex-col gap-4 p-6">
@@ -47,7 +52,12 @@ async function Detail({ params }: { params: Params }) {
   const admin = await ensureAdminPage();
   const { customerId } = await params;
   if (!isUuid(customerId)) notFound();
-  const detail = await selectCustomerDetail(getDb(), customerId);
+  const db = getDb();
+  const [detail, coupons, now] = await Promise.all([
+    selectCustomerDetail(db, customerId),
+    selectCustomerCoupons(db, customerId),
+    getRequestNow(),
+  ]);
   if (!detail) notFound();
   await recordAdminAccess(admin.userId, {
     action: 'view',
@@ -87,6 +97,8 @@ async function Detail({ params }: { params: Params }) {
           />
         </CardContent>
       </Card>
+
+      <CouponCard customerId={customerId} coupons={customerCouponViews(coupons, now)} />
 
       <Card>
         <CardHeader>
@@ -148,6 +160,7 @@ function DetailSkeleton() {
   return (
     <div className="flex flex-col gap-4" aria-busy="true" aria-label="불러오는 중">
       <Skeleton className="h-48 w-full rounded-xl" />
+      <Skeleton className="h-32 w-full rounded-xl" />
       <Skeleton className="h-48 w-full rounded-xl" />
     </div>
   );
