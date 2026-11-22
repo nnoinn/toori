@@ -13,6 +13,7 @@ import {
 } from '../../../../tests/db/fixtures';
 import { closeTestDb, describeDb, withRollback } from '../../../../tests/db/test-db';
 import {
+  countActiveHolds,
   isShopHeld,
   selectActiveHolds,
   selectReservationHolds,
@@ -107,6 +108,90 @@ describeDb('운영자 정산 보류 화면 읽기 (실제 DB)', () => {
       expect(await isShopHeld(tx, shop.shopId)).toBe(true);
       expect(await isShopHeld(tx, quiet.shopId)).toBe(false);
       expect(await selectShopReservationHolds(tx, quiet.shopId)).toEqual([]);
+    });
+  });
+
+  it('운영자 첫 화면: 풀리지 않은 보류만 세고, 거래 보류 건수와 샵 전체 보류 곳 수를 따로 센다', async () => {
+    await withRollback(async (tx) => {
+      // 다른 테스트의 보류가 같은 DB에 있을 수 있어서 넣기 전과의 차이로 본다
+      const before = await countActiveHolds(tx);
+      const adminId = await createTestUser(tx);
+      const shopA = await createTestShop(tx, { status: 'approved' });
+      const shopB = await createTestShop(tx, { status: 'approved' });
+      const { customerId } = await createTestCustomer(tx);
+      const first = await createTestReservation(
+        tx,
+        shopA,
+        customerId,
+        '09:00',
+        '10:00',
+        'confirmed',
+      );
+      const second = await createTestReservation(
+        tx,
+        shopA,
+        customerId,
+        '10:00',
+        '11:00',
+        'confirmed',
+      );
+      const released = await createTestReservation(
+        tx,
+        shopB,
+        customerId,
+        '11:00',
+        '12:00',
+        'confirmed',
+      );
+      await tx.insert(settlementHolds).values([
+        {
+          reservationId: first.reservation.id,
+          reason: '확인',
+          reasonCode: 'user_inquiry',
+          heldBy: adminId,
+          heldAt: at('09:00'),
+        },
+        {
+          reservationId: second.reservation.id,
+          reason: '확인',
+          reasonCode: 'user_inquiry',
+          heldBy: adminId,
+          heldAt: at('09:10'),
+        },
+        // 풀린 거래 보류와 풀린 샵 보류는 세지 않는다
+        {
+          reservationId: released.reservation.id,
+          reason: '확인',
+          reasonCode: 'user_inquiry',
+          heldBy: adminId,
+          heldAt: at('09:20'),
+          releasedBy: adminId,
+          releasedAt: at('09:30'),
+          releaseMemo: '확인함',
+        },
+        {
+          shopId: shopB.shopId,
+          reason: '지난 확인',
+          reasonCode: 'user_inquiry',
+          heldBy: adminId,
+          heldAt: at('08:00'),
+          releasedBy: adminId,
+          releasedAt: at('08:30'),
+          releaseMemo: '확인함',
+        },
+        {
+          shopId: shopA.shopId,
+          reason: '사업자 정보 확인',
+          reasonCode: 'payout_info_check',
+          heldBy: adminId,
+          heldAt: at('11:00'),
+        },
+      ]);
+
+      expect(await countActiveHolds(tx)).toEqual({
+        reservations: before.reservations + 2,
+        shops: before.shops + 1,
+      });
     });
   });
 });
