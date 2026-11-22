@@ -12,6 +12,7 @@ import {
   type TestShop,
 } from '../../../../tests/db/fixtures';
 import { closeTestDb, describeDb, type TestTx, withRollback } from '../../../../tests/db/test-db';
+import { toCancelStatsRange } from './cancel-stats-period';
 import { selectShopCancelStats } from './cancel-stats-queries';
 
 const at = (day: number, hm: string) =>
@@ -153,6 +154,81 @@ describeDb('운영자 샵 취소 기록 (실제 DB)', () => {
           recent: [],
         },
       });
+    });
+  });
+  it('기간을 고르면(#486) 원장님 사정 취소는 취소한 시각, 합의 후 취소는 요청한 시각이 그 안인 것만 센다. 시작일 0시는 넣고 끝일은 하루를 다 넣는다', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const { customerId } = await createTestCustomer(tx);
+      const nov1 = new Date('2026-11-01T00:00:00+09:00');
+
+      // 10/30~10/31을 고른다: 10/29 23:59와 11/1 0시는 빠지고, 10/30 0시와 10/31 23:59는 들어간다
+      await ownerFault(tx, shop, customerId, '09:00', '10:00', at(29, '23:59'), 30);
+      const first = await ownerFault(tx, shop, customerId, '10:00', '11:00', at(30, '00:00'), 20);
+      const last = await ownerFault(tx, shop, customerId, '11:00', '12:00', at(31, '23:59'), 10);
+      await ownerFault(tx, shop, customerId, '12:00', '13:00', nov1, 5);
+
+      const booked = (start: string, end: string) =>
+        createTestReservation(tx, shop, customerId, start, end, 'confirmed');
+      const request = (
+        reservationId: string,
+        status: 'agreed' | 'declined',
+        requestedAt: Date,
+      ) => ({
+        reservationId,
+        requestedBy: shop.createdBy,
+        reason: 'style_mismatch' as const,
+        status,
+        requestedAt,
+        expiresAt: new Date(requestedAt.getTime() + 24 * HOUR_MS),
+        respondedAt: new Date(requestedAt.getTime() + HOUR_MS),
+      });
+      const a = await booked('14:00', '15:00');
+      const b = await booked('15:00', '16:00');
+      const c = await booked('16:00', '17:00');
+      const d = await booked('17:00', '18:00');
+      const [, inFirst, inLast] = await tx
+        .insert(agreedCancelRequests)
+        .values([
+          request(a.reservation.id, 'agreed', at(29, '23:59')),
+          request(b.reservation.id, 'agreed', at(30, '00:00')),
+          request(c.reservation.id, 'declined', at(31, '23:59')),
+          request(d.reservation.id, 'agreed', nov1),
+        ])
+        .returning({ id: agreedCancelRequests.id });
+
+      const range = toCancelStatsRange({ from: '2026-10-30', to: '2026-10-31' });
+      expect(range).not.toBeNull();
+      if (!range) return;
+      const stats = await selectShopCancelStats(tx, shop.shopId, range);
+      expect(stats.ownerFault.count).toBe(2);
+      expect(stats.ownerFault.recent.map((row) => row.reservationId)).toEqual([
+        last.reservation.id,
+        first.reservation.id,
+      ]);
+      expect(stats.agreed.byStatus).toEqual({
+        requested: 0,
+        agreed: 1,
+        declined: 1,
+        expired: 0,
+        closed: 0,
+      });
+      expect(stats.agreed.agreedByReason).toEqual({
+        style_mismatch: 1,
+        customer_declined: 0,
+        other: 0,
+      });
+      expect(stats.agreed.recent.map((row) => row.requestId)).toEqual([inLast.id, inFirst.id]);
+
+      // 시작일만·끝일만 고를 수도 있고, 기간이 없으면 전체 기간이다
+      const fromOnly = toCancelStatsRange({ from: '2026-10-31' });
+      const toOnly = toCancelStatsRange({ to: '2026-10-29' });
+      if (!fromOnly || !toOnly) return;
+      expect((await selectShopCancelStats(tx, shop.shopId, fromOnly)).ownerFault.count).toBe(2);
+      expect((await selectShopCancelStats(tx, shop.shopId, toOnly)).ownerFault.count).toBe(1);
+      const all = await selectShopCancelStats(tx, shop.shopId);
+      expect(all.ownerFault.count).toBe(4);
+      expect(all.agreed.byStatus.agreed + all.agreed.byStatus.declined).toBe(4);
     });
   });
 });

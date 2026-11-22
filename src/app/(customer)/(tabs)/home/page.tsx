@@ -2,7 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ChevronRight, Heart, List, Map as MapIcon } from 'lucide-react';
 
-import { CustomerNotificationBell } from '../customer-notification-bell';
+import { AccountNotificationBell } from '@/components/ui/account-notification-bell';
+
+import {
+  CUSTOMER_NOTIFICATION_ACCOUNT,
+  NOTIFICATIONS_PATH,
+} from '../notifications/notification-rules';
 
 export const metadata: Metadata = { title: '홈' };
 
@@ -42,7 +47,11 @@ export default function CustomerHomePage() {
           </p>
         </div>
         {/* 폰의 알림 종은 이 화면 위 오른쪽에만 둔다(#371, 11/15 nnoinn). PC는 위쪽 메뉴의 종을 쓴다 */}
-        <CustomerNotificationBell className="-mt-2 -mr-2 md:hidden" />
+        <AccountNotificationBell
+          account={CUSTOMER_NOTIFICATION_ACCOUNT}
+          href={NOTIFICATIONS_PATH}
+          className="-mt-2 -mr-2 md:hidden"
+        />
       </div>
       <ul className="grid gap-3 md:grid-cols-3">
         {WAYS.map(({ href, icon: Icon, title, description }) => (

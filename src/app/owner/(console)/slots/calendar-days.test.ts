@@ -54,5 +54,7 @@ describe('monthRangeLabel', () => {
     expect(monthRangeLabel('2026-11-09', '2026-11-23')).toBe('2026년 11월');
     expect(monthRangeLabel('2026-11-25', '2026-12-09')).toBe('2026년 11월 ~ 12월');
     expect(monthRangeLabel('2026-12-25', '2027-01-08')).toBe('2026년 12월 ~ 2027년 1월');
+    // 달 숫자가 같아도 해가 다르면 다른 달이다
+    expect(monthRangeLabel('2026-11-30', '2027-11-01')).toBe('2026년 11월 ~ 2027년 11월');
   });
 });

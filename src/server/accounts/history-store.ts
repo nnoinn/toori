@@ -20,6 +20,7 @@ import {
   isNull,
   lt,
   lte,
+  ne,
   or,
   type SQL,
   sql,
@@ -566,31 +567,44 @@ export async function readCustomerHistory(
             ),
           )
       : none(),
-    // 쿠폰 사용
+    // 쿠폰 사용(쿠폰을 쓴 예약마다, 결제 시각)
     wants(range, 'coupon_used')
       ? db
           .select({
-            id: coupons.id,
-            at: coupons.usedAt,
-            amount: coupons.amount,
+            id: reservations.id,
+            at: orders.paidAt,
+            amount: orders.couponAmount,
+            code: reservations.code,
+            menuName: slots.menuName,
+            startAt: slots.startAt,
             total: totalCount(),
           })
-          .from(coupons)
+          .from(reservations)
+          .innerJoin(orders, eq(orders.id, reservations.orderId))
+          .innerJoin(slots, eq(slots.id, reservations.slotId))
           .where(
             and(
-              eq(coupons.customerId, customerId),
-              isNotNull(coupons.usedAt),
-              within(coupons.usedAt, range),
+              mine,
+              isNotNull(orders.couponId),
+              isNotNull(orders.paidAt),
+              within(orders.paidAt, range),
             ),
           )
-          .orderBy(...newestFirst(coupons.usedAt, coupons.id))
+          .orderBy(...newestFirst(orders.paidAt, reservations.id))
           .limit(range.take)
           .then((rows) =>
             toList(rows, (row) =>
-              makeEvent('coupon_used', row.id, row.at as Date, { amount: row.amount }),
+              makeEvent('coupon_used', row.id, row.at as Date, {
+                reservationId: row.id,
+                reservationCode: row.code,
+                menuName: row.menuName,
+                startAt: row.startAt,
+                amount: row.amount,
+              }),
             ),
           )
       : none(),
+    ...readCouponReturned(db, mine, range),
     // 이의제기 접수(종류)
     wants(range, 'dispute_filed')
       ? db
@@ -697,6 +711,77 @@ function consentOf(userId: string) {
     eq(termsAgreements.accountType, 'customer'),
     inArray(termsAgreements.termsType, ['marketing', 'interest_alert']),
   );
+}
+
+/**
+ * 쿠폰 돌려받음(예약마다 한 번). 쿠폰을 돌려주는 곳은 원장님 사정 취소(X-207)와 무효(A-108) 둘뿐이다.
+ * - 원장님 사정 취소: 환불을 끝낸 시각(같은 트랜잭션에서 돌려주고 보상 쿠폰을 준다)
+ * - 무효: 무효로 한 시각. 원장님 사정 취소 뒤의 무효는 그때 이미 돌려줬으니 넣지 않는다
+ * reason은 환불 사유와 같은 코드(owner_fault·void)다. where는 고객 조건
+ */
+function readCouponReturned(
+  db: Db,
+  where: SQL,
+  range: HistoryReadRange,
+): [Promise<HistoryList>, Promise<HistoryList>] {
+  if (!wants(range, 'coupon_returned')) return [none(), none()];
+  const usedCoupon = and(where, isNotNull(orders.couponId));
+  const event = (
+    reason: 'owner_fault' | 'void',
+    row: { id: string; at: Date | null; amount: number; code: string },
+  ) =>
+    makeEvent('coupon_returned', row.id, row.at as Date, {
+      reservationId: row.id,
+      reservationCode: row.code,
+      amount: row.amount,
+      reason,
+    });
+  return [
+    db
+      .select({
+        id: reservations.id,
+        at: refunds.processedAt,
+        amount: orders.couponAmount,
+        code: reservations.code,
+        total: totalCount(),
+      })
+      .from(refunds)
+      .innerJoin(reservations, eq(reservations.id, refunds.reservationId))
+      .innerJoin(orders, eq(orders.id, reservations.orderId))
+      .where(
+        and(
+          usedCoupon,
+          eq(refunds.reason, 'owner_fault'),
+          eq(refunds.status, 'done'),
+          isNotNull(refunds.processedAt),
+          within(refunds.processedAt, range),
+        ),
+      )
+      .orderBy(...newestFirst(refunds.processedAt, reservations.id))
+      .limit(range.take)
+      .then((rows) => toList(rows, (row) => event('owner_fault', row))),
+    db
+      .select({
+        id: reservations.id,
+        at: reservations.voidedAt,
+        amount: orders.couponAmount,
+        code: reservations.code,
+        total: totalCount(),
+      })
+      .from(reservations)
+      .innerJoin(orders, eq(orders.id, reservations.orderId))
+      .where(
+        and(
+          usedCoupon,
+          isNotNull(reservations.voidedAt),
+          or(isNull(reservations.cancelActor), ne(reservations.cancelActor, 'owner_fault')),
+          within(reservations.voidedAt, range),
+        ),
+      )
+      .orderBy(...newestFirst(reservations.voidedAt, reservations.id))
+      .limit(range.take)
+      .then((rows) => toList(rows, (row) => event('void', row))),
+  ];
 }
 
 /** 예약 취소(누가 취소했는지, 위약금 비율, 시작 몇 시간 전). where는 샵이나 고객 조건 */

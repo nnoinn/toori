@@ -151,6 +151,8 @@ describe('이름표와 대상', () => {
     expect(targetHref('dispute', 'd-1')).toBe('/admin/disputes/d-1');
     expect(targetHref('customer', 'c-1')).toBe('/admin/users/customers/c-1');
     expect(targetHref('settlement', 'st-1')).toBe('/admin/settlements/st-1');
+    expect(targetHref('slot', 'sl-1')).toBe('/admin/reservations/slots/sl-1');
+    expect(targetHref('slot_window', 'w-1')).toBeNull();
     expect(targetHref('owner', 'o-1')).toBeNull();
     expect(targetHref('list', null)).toBeNull();
   });

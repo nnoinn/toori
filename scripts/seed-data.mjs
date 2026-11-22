@@ -1,6 +1,6 @@
 // 시드 데이터 내용 (연결 #3, #18·#22). 넣는 방법은 scripts/seed.mjs.
 // 매물 시각(at)은 시드를 넣는 시각 기준 몇 시간 뒤인지다(음수는 지난 시각). 언제 넣어도 같은 상태가 된다.
-// 계정·샵·메뉴·매물과 예약·결제·환불(W1b)을 채운다. 정산은 결제 수수료율이 정해진 뒤, 샵 사진은 O6 뒤에 더한다.
+// 계정·샵·메뉴·매물·시간대 매물과 예약·결제·환불(W1b), 샘플 정산 묶음을 채운다. 샵 사진은 O6 뒤에 더한다.
 // 샵·사람 이름은 실제 가게와 헷갈리지 않게 '샘플'로 시작하고, 전화·사업자 번호는 쓸 수 없는 번호(0000)로 둔다.
 
 /** 시드 계정 이메일 도메인. 이 도메인의 계정과 그 데이터만 시드로 보고 지우고 다시 넣는다 */
@@ -291,8 +291,9 @@ export const SEED_SHOPS = [
 /**
  * 고객 계정 (#18)
  * a: 이력 없음. 원장님 A 샵 매물 하나를 결제 중(홀딩)
- * b: 원장님 A 샵 이용 완료·노쇼 이력 있음 → A 샵의 신규 고객 전용 매물이 안 보여야 한다
+ * b: 원장님 A 샵 이용 완료·노쇼 이력 있음 → A 샵의 신규 고객 전용 매물이 안 보여야 한다. 샘플 정산 거래(SETTLEMENT_SAMPLES)도 모두 b의 예약이다
  * c: 예정·이용 완료·취소 예약이 하나씩(내 예약 탭)
+ * name은 예약자 이름(#375)이다. 원장님 화면에 닉네임이 아니라 이름이 보이는지 가려 볼 수 있게 닉네임과 다르게 둔다
  */
 /**
  * 계속 쓰는 시험 매물(11/2). 위 매물은 시드를 넣는 시각 기준이라 이틀쯤 지나면 대부분 지나간다.
@@ -308,10 +309,84 @@ export const ROLLING_SLOTS = {
   newOnlyEvery: 7,
 };
 
+/**
+ * 시간대 매물(#308, 11/22). 고객 목록·상세와 원장님 대시보드에서 시간대 매물을 볼 수 있게 몇 개 넣는다.
+ * at이 있으면 시드를 넣는 시각 기준 at시간 뒤부터 hours시간(바로 게시중)이다. rollingDays가 있으면 넣은 날(한국 날짜)로부터
+ * 그 날째의 from~to이고(쉬는 요일 제외) 게시예정이었다가 시작 48시간 전부터 게시중이 된다.
+ * 같은 샵의 매물과 시간이 겹치면 DB가 막는다. 그래서 at은 그 샵의 위 매물과 겹치지 않는 시각이고,
+ * rollingDays의 from은 계속 쓰는 시험 매물(11·15시 시작, 가장 긴 메뉴 150분)이 끝난 뒤다
+ */
+export const WINDOW_SAMPLES = [
+  {
+    shop: 'e',
+    at: 10,
+    hours: 3,
+    menus: [
+      { menu: 'gel', rate: 20 },
+      { menu: 'art', rate: 30 },
+    ],
+  },
+  {
+    shop: 'g',
+    at: 13,
+    hours: 3,
+    menus: [
+      { menu: 'cut', rate: 30 },
+      { menu: 'color', rate: 20 },
+    ],
+  },
+  {
+    shop: 'a',
+    rollingDays: [5, 6, 7, 8],
+    from: '17:30',
+    to: '19:00',
+    menus: [
+      { menu: 'cut', rate: 20 },
+      { menu: 'clinic', rate: 30 },
+    ],
+  },
+];
+
+/**
+ * 샘플 정산 묶음(11/13 결정, 11/22). 운영자 정산 관리(A-105)와 원장님 정산 내역·정산서(S-501) 화면 확인용이다.
+ * payout 1은 넣는 날 바로 전 목요일, 2는 그 전 목요일이 지급일이다(공휴일은 따지지 않는다). 거래(items)는 그 지급일 day일 전
+ * (한국 날짜) hour시에 시작한 매물이고 모두 고객 B의 예약이다. result: visited(이용 완료)·no_show(노쇼)·cancelled(시작
+ * cancelHours시간 전에 고객 취소 → 위약금). 이의제기 접수 기한(영업일 48시간)이 지급일 전에 지나도록 지급일 4~6일 전으로 둔다.
+ * 금액은 docs/settlement-examples.md의 임시 결제 수수료율 3.0%(VAT 별도)로 계산한다. 정책값 PAYMENT_FEE_RATE는 정해질 때까지 비워 둔다
+ */
+export const SETTLEMENT_SAMPLE_FEE_RATE = 3;
+export const SETTLEMENT_SAMPLES = [
+  {
+    shop: 'a',
+    payout: 2,
+    status: 'paid',
+    items: [
+      { menu: 'cut', rate: 20, day: 6, hour: 11, result: 'visited' },
+      { menu: 'perm', rate: 30, day: 5, hour: 15, result: 'cancelled', cancelHours: 30 },
+      { menu: 'clinic', rate: 10, day: 4, hour: 11, result: 'no_show' },
+    ],
+  },
+  {
+    shop: 'a',
+    payout: 1,
+    status: 'pending',
+    items: [
+      { menu: 'color', rate: 30, day: 6, hour: 15, result: 'visited' },
+      { menu: 'cut', rate: 40, day: 5, hour: 11, result: 'visited' },
+    ],
+  },
+  {
+    shop: 'd',
+    payout: 1,
+    status: 'failed',
+    items: [{ menu: 'color', rate: 20, day: 6, hour: 13, result: 'visited' }],
+  },
+];
+
 export const SEED_CUSTOMERS = [
-  { key: 'a', nickname: '샘플 고객 A' },
-  { key: 'b', nickname: '샘플 고객 B' },
-  { key: 'c', nickname: '샘플 고객 C' },
+  { key: 'a', nickname: '샘플 고객 A', name: '샘플 김하나' },
+  { key: 'b', nickname: '샘플 고객 B', name: '샘플 이두리' },
+  { key: 'c', nickname: '샘플 고객 C', name: '샘플 박세나' },
 ];
 
 /**

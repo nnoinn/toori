@@ -17,6 +17,7 @@ import type { SettlementItemView } from '@/server/settlements/types';
 import { SETTLEMENT_KIND_STYLE, SETTLEMENT_STATUS_TEXT_STYLE } from '../status-style';
 import {
   baseAmountFormula,
+  adminHoldNoticeLine,
   disputeDeadlineText,
   feeRateLabel,
   hoursBeforeText,
@@ -172,15 +173,17 @@ function CalcSection({ item }: { item: SettlementItemView }) {
   );
 }
 
-/** 지급: 상태(지급일), 이의제기 접수 기한 또는 보류 이유, 예약 상세로 가기 */
+/** 지급: 상태(지급일), 이의제기 접수 기한 또는 보류 이유(운영자 보류면 고른 사유 한 줄, #499), 예약 상세로 가기 */
 function PayoutSection({ item, now }: { item: SettlementItemView; now: Date }) {
   const deadline = disputeDeadlineText(item, now);
+  const adminNotice = adminHoldNoticeLine(item.hold);
   return (
     <Section title="지급">
       <p className={cn('font-medium', SETTLEMENT_STATUS_TEXT_STYLE[item.status])}>
         {settlementStatusText(item)}
       </p>
       {deadline ? <p className="text-muted-foreground">{deadline}</p> : null}
+      {adminNotice ? <p className="text-xs text-muted-foreground">{adminNotice}</p> : null}
       <div className="pt-1">
         <Button asChild variant="outline" size="sm">
           <Link href={`/owner/reservations/${item.reservationId}`}>예약 상세</Link>

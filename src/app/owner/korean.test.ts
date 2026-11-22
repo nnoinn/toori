@@ -16,6 +16,14 @@ describe('withObjectParticle (빈 칸 문구 조사)', () => {
     expect(withObjectParticle('Cut')).toBe('Cut을(를)');
     expect(withObjectParticle('펌 2')).toBe('펌 2을(를)');
     expect(withObjectParticle('')).toBe('을(를)');
+    // 한글보다 뒤 글자(이모지 등)로 끝나도 소리를 알 수 없다
+    expect(withObjectParticle('헤어💇')).toBe('헤어💇을(를)');
+  });
+
+  it('한글 음절의 처음(가)과 끝(힣)도 한글로 보고, 뒤 공백은 보지 않는다', () => {
+    expect(withObjectParticle('가')).toBe('가를');
+    expect(withObjectParticle('힣')).toBe('힣을');
+    expect(withObjectParticle('이름 ')).toBe('이름 을');
   });
 });
 

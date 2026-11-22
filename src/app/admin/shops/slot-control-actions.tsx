@@ -14,12 +14,15 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ADMIN_REASON_LIMIT } from '@/server/policy/admin';
+import type { AdminNoticeCode, AdminNoticeUse } from '@/server/policy/admin-notice';
 import {
   forceCloseSlot,
   forceCloseWindow,
   pauseShopPublishing,
   resumeShopPublishing,
 } from '@/server/slots/admin';
+
+import { AdminNoticeSelect } from '../admin-notice-select';
 
 export type SlotControlTarget =
   | { kind: 'pause'; shopId: string }
@@ -37,17 +40,20 @@ const TEXT: Record<
     placeholder: string;
     submit: string;
     destructive: boolean;
+    /** 원장님에게 보여 줄 사유를 고르는 곳(#489). 다시 열 때는 고르지 않는다 */
+    codeUse: AdminNoticeUse | null;
   }
 > = {
   pause: {
     button: '게시 멈추기',
     title: '이 샵의 새 매물 게시를 멈출까요?',
     description:
-      '다시 열 때까지 이 샵은 새 매물·시간대 매물을 올릴 수 없어요. 이미 올린 매물과 예약은 그대로예요. 원장님에게 알림이 가고, 사유는 원장님에게 보이지 않아요.',
-    label: '사유',
+      '다시 열 때까지 이 샵은 새 매물·시간대 매물을 올릴 수 없어요. 이미 올린 매물과 예약은 그대로예요. 원장님에게 알림이 가요. 고른 사유는 원장님에게 보이고, 메모는 보이지 않아요.',
+    label: '운영자 메모',
     placeholder: '예: 실제와 다른 매물 신고 확인 중',
     submit: '게시 멈추기',
     destructive: true,
+    codeUse: 'publish_pause',
   },
   resume: {
     button: '다시 열기',
@@ -57,30 +63,33 @@ const TEXT: Record<
     placeholder: '예: 확인 끝, 문제 없음',
     submit: '다시 열기',
     destructive: false,
+    codeUse: null,
   },
   close_slot: {
     button: '강제 마감',
     title: '이 매물을 운영자 마감으로 닫을까요?',
     description:
-      '고객 목록에서 바로 사라지고 되돌릴 수 없어요. 손님이 결제 중이면 마감되지 않아요. 원장님에게 알림이 가고, 사유는 원장님에게 보이지 않아요.',
-    label: '사유',
+      '고객 목록에서 바로 사라지고 되돌릴 수 없어요. 손님이 결제 중이면 마감되지 않아요. 원장님에게 알림이 가요. 고른 사유는 원장님에게 보이고, 메모는 보이지 않아요.',
+    label: '운영자 메모',
     placeholder: '예: 실제와 다른 가격으로 올림',
     submit: '강제 마감',
     destructive: true,
+    codeUse: 'close',
   },
   close_window: {
     button: '강제 마감',
     title: '이 시간대 매물을 운영자 마감으로 닫을까요?',
     description:
-      '남은 시간이 고객 목록에서 바로 사라지고 되돌릴 수 없어요. 결제가 끝난 예약은 그대로이고, 손님이 결제 중인 칸은 결제가 끝날 때까지 남아요. 원장님에게 알림이 가고, 사유는 원장님에게 보이지 않아요.',
-    label: '사유',
+      '남은 시간이 고객 목록에서 바로 사라지고 되돌릴 수 없어요. 결제가 끝난 예약은 그대로이고, 손님이 결제 중인 칸은 결제가 끝날 때까지 남아요. 원장님에게 알림이 가요. 고른 사유는 원장님에게 보이고, 메모는 보이지 않아요.',
+    label: '운영자 메모',
     placeholder: '예: 영업하지 않는 시간에 올림',
     submit: '강제 마감',
     destructive: true,
+    codeUse: 'close',
   },
 };
 
-// 운영자 매물 관리 버튼(#373 ④). 사유(다시 열 때는 메모, 필수)를 받고 확인 창에서 한 번 더 확인한다.
+// 운영자 매물 관리 버튼(#373 ④). 멈춤·마감은 원장님에게 보여 줄 사유(목록, #489)와 운영자 메모를, 다시 열 때는 메모를 받는다(모두 필수).
 // 성공하면 창을 닫고 화면을 새로 읽어 바뀐 상태를 보여 준다
 export function SlotControlAction({
   target,
@@ -94,19 +103,20 @@ export function SlotControlAction({
   const text = TEXT[target.kind];
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
+  const [code, setCode] = useState<AdminNoticeCode | ''>('');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function run() {
     switch (target.kind) {
       case 'pause':
-        return pauseShopPublishing({ shopId: target.shopId, reason });
+        return pauseShopPublishing({ shopId: target.shopId, reason, code });
       case 'resume':
         return resumeShopPublishing({ shopId: target.shopId, memo: reason });
       case 'close_slot':
-        return forceCloseSlot({ slotId: target.slotId, reason });
+        return forceCloseSlot({ slotId: target.slotId, reason, code });
       case 'close_window':
-        return forceCloseWindow({ windowId: target.windowId, reason });
+        return forceCloseWindow({ windowId: target.windowId, reason, code });
     }
   }
 
@@ -121,6 +131,7 @@ export function SlotControlAction({
         }
         setOpen(false);
         setReason('');
+        setCode('');
         router.refresh();
       } catch {
         setError('처리하지 못했어요. 잠시 후 다시 시도해 주세요.');
@@ -145,6 +156,9 @@ export function SlotControlAction({
             <DialogTitle>{text.title}</DialogTitle>
             <DialogDescription>{text.description}</DialogDescription>
           </DialogHeader>
+          {text.codeUse ? (
+            <AdminNoticeSelect use={text.codeUse} value={code} onChange={setCode} />
+          ) : null}
           <div className="flex flex-col gap-2">
             <Label htmlFor={reasonId}>{text.label}</Label>
             <Textarea
@@ -171,7 +185,7 @@ export function SlotControlAction({
             <Button
               variant={text.destructive ? 'destructive' : 'default'}
               onClick={submit}
-              disabled={pending || reason.trim() === ''}
+              disabled={pending || reason.trim() === '' || (text.codeUse !== null && code === '')}
             >
               {text.submit}
             </Button>

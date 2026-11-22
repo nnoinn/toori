@@ -6,6 +6,7 @@
 
 import type { SlotCloseReason } from '@/db/schema/slots';
 import { formatEndTime, formatKstTime, startOfKstDay } from '@/lib/time';
+import type { AdminCloseCode } from '@/server/policy';
 import {
   getSlotStatus,
   isSlotOnHold,
@@ -34,6 +35,8 @@ export type DashboardSlot = {
   holdExpiresAt: string | null;
   /** 원장님이 직접 마감했으면 사유(S-206) */
   closeReason: SlotCloseReason | null;
+  /** 운영자 마감(closeReason admin)이면 운영자가 고른 원장님에게 보여 줄 사유 코드(#489, #499). 그 밖에는 null */
+  adminCloseCode: AdminCloseCode | null;
   /** 시간대 매물 안에서 손님이 고른 서비스·시각으로 만든 매물이면 그 시간대(#308). 원장님이 올린 매물이면 null */
   windowId: string | null;
   /** 예약이 있는 매물(예약됨·완료·취소)이면 예약 id. 예약 상세(O11)로 간다 */
@@ -57,6 +60,8 @@ export type DashboardWindow = {
   state: WindowState;
   /** 원장님이 마감했으면 사유 */
   closeReason: SlotCloseReason | null;
+  /** 운영자 마감(closeReason admin)이면 운영자가 고른 원장님에게 보여 줄 사유 코드(#489, #499). 그 밖에는 null */
+  adminCloseCode: AdminCloseCode | null;
   newCustomerOnly: boolean;
   /** 올린 서비스(메뉴 순서)와 할인율. 정가·메뉴 id는 할인율 수정 창이 쓴다 */
   menus: { menuId: string; name: string; listPrice: number; discountRate: number }[];

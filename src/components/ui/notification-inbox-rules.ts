@@ -1,5 +1,5 @@
 // 알림함(#371) 공통 규칙과 문구. 알림함 목록(notification-inbox.tsx)과 계정 알림 종(account-notification-bell.tsx)이 쓴다.
-// 원장님 화면(11/17 정민석)이 쓰고, 고객 알림함(src/app/(customer)/(tabs)/notifications/)도 같은 규칙이라 나중에 이 부품으로 바꿀 수 있다.
+// 원장님 화면(11/17 정민석)과 고객 알림함(src/app/(customer)/(tabs)/notifications/, 11/20 정찬형)이 같이 쓴다.
 // 알림 모양(MyNotification)은 알림함 함수(@/server/notifications/inbox)의 모양 그대로다.
 
 import { safeNextPath } from '@/lib/safe-next';

@@ -4,6 +4,8 @@ import { z } from 'zod';
 
 import { formatKst, kstToUtc } from '@/lib/time';
 
+import { slotDetailHref } from '../reservations/format';
+
 /** 탭: 처리 기록(admin_actions) / 열람 기록(admin_access_logs). 주소 ?tab= 값 */
 export const LOG_TABS = ['actions', 'access'] as const;
 export type LogTab = (typeof LOG_TABS)[number];
@@ -134,6 +136,8 @@ export function targetHref(targetType: string, targetId: string | null): string 
       return `/admin/users/customers/${targetId}`;
     case 'settlement':
       return `/admin/settlements/${targetId}`;
+    case 'slot':
+      return slotDetailHref(targetId);
     default:
       return null;
   }
