@@ -2,9 +2,17 @@ import {
   getPushSubscriptionStatus,
   removeDevicePushSubscriptions,
   removePushSubscription,
+  restoreDevicePushSubscriptions,
   savePushSubscription,
 } from '@/server/notifications/subscriptions';
 
+import {
+  keepPushRestore,
+  parsePushRestore,
+  PUSH_RESTORE_KEY,
+  type PushRestoreMemory,
+  pushRestoreAction,
+} from './push-restore';
 import { urlBase64ToUint8Array } from './push-support';
 
 export type SubscribePushResult =
@@ -18,12 +26,41 @@ export type SubscribePushResult =
 const SUBSCRIBE_FAILED = '푸시 알림을 켜지 못했어요. 잠시 후 다시 시도해 주세요';
 const UNSUBSCRIBE_FAILED = '푸시 알림을 끄지 못했어요. 잠시 후 다시 시도해 주세요';
 
-/** 이 기기의 브라우저 구독 주소. 서비스 워커를 등록한 적이 없거나 구독이 없으면 null(등록하지 않고 보기만 한다) */
-async function deviceEndpoint(): Promise<string | null> {
+/** 이 기기의 브라우저 구독. 서비스 워커를 등록한 적이 없거나 구독이 없으면 null(등록하지 않고 보기만 한다) */
+async function deviceSubscription(): Promise<PushSubscription | null> {
   if (!('serviceWorker' in navigator)) return null;
   const registration = await navigator.serviceWorker.getRegistration('/');
-  const subscription = await registration?.pushManager.getSubscription();
-  return subscription?.endpoint ?? null;
+  return (await registration?.pushManager.getSubscription()) ?? null;
+}
+
+/** 이 기기의 브라우저 구독 주소. 없으면 null */
+async function deviceEndpoint(): Promise<string | null> {
+  return (await deviceSubscription())?.endpoint ?? null;
+}
+
+// 로그아웃 때 지운 구독의 기억(push-restore.ts). 저장소를 못 쓰면(사생활 보호 모드 등) 기억하지 않고, 다시 로그인하면 직접 켠다
+function readPushRestore(): PushRestoreMemory | null {
+  try {
+    return parsePushRestore(localStorage.getItem(PUSH_RESTORE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function writePushRestore(memory: PushRestoreMemory) {
+  try {
+    localStorage.setItem(PUSH_RESTORE_KEY, JSON.stringify(memory));
+  } catch {
+    // 기억하지 못해도 로그아웃은 한다
+  }
+}
+
+function clearPushRestore() {
+  try {
+    localStorage.removeItem(PUSH_RESTORE_KEY);
+  } catch {
+    // 지우지 못해도 서버가 다시 로그인한 사람을 확인한다
+  }
 }
 
 /**
@@ -92,13 +129,49 @@ export async function unsubscribePush(): Promise<{ ok: true } | { ok: false; mes
 
 /**
  * 로그아웃 직전에 부른다(#131). 이 기기의 내 구독을 두 계정 모두 지운다. 공용 기기에서 로그아웃한 뒤에도
- * 내 알림이 오지 않게 한다. 실패해도 로그아웃은 막지 않는다
+ * 내 알림이 오지 않게 한다. 지운 계정은 이 기기에 기억해 두고, 같은 사람이 다시 로그인하면 되살린다(restorePushAfterSignIn, 11/23).
+ * 실패해도 로그아웃은 막지 않는다
  */
 export async function clearDevicePushSubscriptions(): Promise<void> {
   try {
     const endpoint = await deviceEndpoint();
-    if (endpoint) await removeDevicePushSubscriptions(endpoint);
+    if (!endpoint) return;
+    const result = await removeDevicePushSubscriptions(endpoint);
+    if (result.ok && result.data.accountTypes.length > 0) {
+      writePushRestore({ ...result.data, endpoint, savedAt: Date.now() });
+    }
   } catch {
     // 구독을 지우지 못해도 로그아웃은 한다. 다른 로그인이 이 기기에서 알림을 켜면 서버가 지운다(#131)
+  }
+}
+
+/**
+ * 로그인한 화면이 열리면 부른다(PushRestorer). 로그아웃 때 기억해 둔 구독이 있으면, 이 기기의 알림 허용과 브라우저 구독이
+ * 그대로일 때 서버에 되살려 달라고 한다. 서버가 같은 사람인지 확인하고 그때 켜져 있던 계정의 구독만 되살린다.
+ * 로그인하지 않은 화면이면 기억을 남겨 두고, 되살렸거나 다른 사람이 로그인했으면 버린다. 실패하면 다음에 다시 한다
+ */
+export async function restorePushAfterSignIn(): Promise<void> {
+  const memory = readPushRestore();
+  if (!memory) return;
+  try {
+    const subscription = await deviceSubscription();
+    const action = pushRestoreAction(memory, {
+      now: Date.now(),
+      permission: 'Notification' in window ? Notification.permission : 'unsupported',
+      endpoint: subscription?.endpoint ?? null,
+    });
+    const { endpoint, keys } = subscription?.toJSON() ?? {};
+    if (action === 'clear' || !endpoint || !keys?.p256dh || !keys.auth) {
+      clearPushRestore();
+      return;
+    }
+    const result = await restoreDevicePushSubscriptions({
+      subscription: { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth } },
+      userId: memory.userId,
+      accountTypes: memory.accountTypes,
+    });
+    if (!keepPushRestore(result)) clearPushRestore();
+  } catch {
+    // 다음에 로그인한 화면이 열리면 다시 한다
   }
 }

@@ -1,4 +1,5 @@
 // 푸시 구독 저장·지우기·조회 (연결 #12, #131). 지금 모드의 계정으로 다루는지, 입력 모양을 확인하는지 본다.
+// 로그아웃 때 지운 구독을 같은 사람이 다시 로그인하면 되살리는지(11/23)도 본다.
 // 로그인·DB·요청 헤더는 가짜로 바꿔서 DB 없이 돈다. 실제 저장은 subscription-store.db.test.ts가 본다.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,6 +12,8 @@ const state = vi.hoisted(() => ({
   upserts: [] as unknown[],
   deletes: [] as unknown[],
   deviceDeletes: [] as unknown[],
+  /** 로그아웃 때 지운 구독의 계정 종류(가짜 저장소가 돌려준다) */
+  deviceDeleted: ['customer', 'owner'] as string[],
   lookups: [] as unknown[],
   subscribed: false,
 }));
@@ -37,7 +40,7 @@ vi.mock('./subscription-store', () => ({
   },
   deleteDevicePushSubscriptions: async (_db: unknown, input: unknown) => {
     state.deviceDeletes.push(input);
-    return 2;
+    return state.deviceDeleted;
   },
   hasPushSubscription: async (_db: unknown, input: unknown) => {
     state.lookups.push(input);
@@ -49,6 +52,7 @@ const {
   getPushSubscriptionStatus,
   removeDevicePushSubscriptions,
   removePushSubscription,
+  restoreDevicePushSubscriptions,
   savePushSubscription,
 } = await import('./subscriptions');
 
@@ -74,6 +78,7 @@ beforeEach(() => {
   state.upserts = [];
   state.deletes = [];
   state.deviceDeletes = [];
+  state.deviceDeleted = ['customer', 'owner'];
   state.lookups = [];
   state.subscribed = false;
 });
@@ -176,19 +181,91 @@ describe('운영자 모드(#372)', () => {
 });
 
 describe('removeDevicePushSubscriptions', () => {
-  it('이 기기의 내 구독을 계정 종류와 상관없이 지운다', async () => {
-    expect(await removeDevicePushSubscriptions(SUBSCRIPTION.endpoint)).toEqual(ok(null));
+  it('이 기기의 내 구독을 계정 종류와 상관없이 지우고, 다시 로그인하면 되살리게 누구의 어떤 계정을 지웠는지 돌려준다', async () => {
+    expect(await removeDevicePushSubscriptions(SUBSCRIPTION.endpoint)).toEqual(
+      ok({ userId: 'user-1', accountTypes: ['customer', 'owner'] }),
+    );
     expect(state.deviceDeletes).toEqual([{ userId: 'user-1', endpoint: SUBSCRIPTION.endpoint }]);
     expect(state.deletes).toEqual([]);
   });
 
-  it('로그인하지 않았으면 UNAUTHENTICATED, 모양이 틀린 주소는 지우지 않고 성공', async () => {
+  it('로그인하지 않았으면 UNAUTHENTICATED, 모양이 틀린 주소는 지우지 않고 성공(빈 목록)', async () => {
     state.account = null;
     const result = await removeDevicePushSubscriptions(SUBSCRIPTION.endpoint);
     expect(result.ok === false && result.error.code).toBe('UNAUTHENTICATED');
     state.account = account('customer');
-    expect(await removeDevicePushSubscriptions('not a url')).toEqual(ok(null));
+    expect(await removeDevicePushSubscriptions('not a url')).toEqual(
+      ok({ userId: 'user-1', accountTypes: [] }),
+    );
     expect(state.deviceDeletes).toEqual([]);
+  });
+});
+
+describe('restoreDevicePushSubscriptions: 다시 로그인하면 되살리기(11/23)', () => {
+  const USER_ID = '9d2b1f3c-1111-4222-8333-444455556666';
+  const OTHER_ID = '1a2b3c4d-5555-4666-8777-888899990000';
+  const input = {
+    subscription: SUBSCRIPTION,
+    userId: USER_ID,
+    accountTypes: ['customer', 'owner'],
+  };
+  const upserted = () =>
+    state.upserts.map((u) => (u as { input: { accountType: string } }).input.accountType);
+
+  it('같은 사람이면 지금 모드와 상관없이 로그아웃 때 켜져 있던 계정의 구독을 되살린다', async () => {
+    state.account = account('owner', { userId: USER_ID });
+    expect(await restoreDevicePushSubscriptions(input)).toEqual(
+      ok({ sameUser: true, restored: ['customer', 'owner'] }),
+    );
+    expect(state.upserts).toEqual(
+      ['customer', 'owner'].map((accountType) => ({
+        tx: 'tx',
+        input: {
+          userId: USER_ID,
+          accountType,
+          endpoint: SUBSCRIPTION.endpoint,
+          p256dh: 'BPublicKeyBase64',
+          auth: 'AuthSecret',
+          userAgent: 'Mozilla/5.0 (iPhone)',
+        },
+      })),
+    );
+  });
+
+  it('그 사람에게 지금 없는 계정은 되살리지 않고, 같은 계정 종류는 한 번만', async () => {
+    state.account = account('customer', { userId: USER_ID, ownerId: null });
+    expect(
+      await restoreDevicePushSubscriptions({ ...input, accountTypes: ['owner', 'customer'] }),
+    ).toEqual(ok({ sameUser: true, restored: ['customer'] }));
+    expect(
+      await restoreDevicePushSubscriptions({ ...input, accountTypes: ['customer', 'customer'] }),
+    ).toEqual(ok({ sameUser: true, restored: ['customer'] }));
+    expect(upserted()).toEqual(['customer', 'customer']);
+  });
+
+  it('다른 사람이 로그인했으면 되살리지 않는다(공용 기기)', async () => {
+    state.account = account('customer', { userId: OTHER_ID });
+    expect(await restoreDevicePushSubscriptions(input)).toEqual(
+      ok({ sameUser: false, restored: [] }),
+    );
+    expect(state.upserts).toEqual([]);
+  });
+
+  it('로그인하지 않았으면 UNAUTHENTICATED, 모양이 틀린 입력은 INVALID_INPUT이고 저장하지 않는다', async () => {
+    state.account = null;
+    const unauthenticated = await restoreDevicePushSubscriptions(input);
+    expect(unauthenticated.ok === false && unauthenticated.error.code).toBe('UNAUTHENTICATED');
+    state.account = account('customer', { userId: USER_ID });
+    for (const bad of [
+      { ...input, userId: 'user-1' },
+      { ...input, accountTypes: [] },
+      { ...input, accountTypes: ['admin'] },
+      { ...input, subscription: { ...SUBSCRIPTION, endpoint: 'http://push.example/x' } },
+    ]) {
+      const result = await restoreDevicePushSubscriptions(bad);
+      expect(result.ok === false && result.error.code).toBe('INVALID_INPUT');
+    }
+    expect(state.upserts).toEqual([]);
   });
 });
 
