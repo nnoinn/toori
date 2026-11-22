@@ -32,6 +32,14 @@ describe('보는 달', () => {
     expect(resolveStatsMonth(undefined, NOW)).toBe('2026-11');
   });
 
+  it('달은 YYYY-MM 모양의 1~12월만 받는다(앞뒤에 다른 글자가 붙거나 0월이면 이번 달)', () => {
+    expect(resolveStatsMonth('2026-09', NOW)).toBe('2026-09');
+    // ' 2026-10'·'12026-10'은 글자 순서로 이번 달보다 앞이라 모양 검사가 막아야 한다
+    for (const month of ['2026-00', '2026-10x', 'x2026-10', ' 2026-10', '12026-10']) {
+      expect(resolveStatsMonth(month, NOW)).toBe('2026-11');
+    }
+  });
+
   it('주소는 이번 달이면 month 없이, 다음 달 버튼은 이번 달까지만', () => {
     expect(statsHref('2026-11', NOW)).toBe('/owner/stats');
     expect(statsHref('2026-10', NOW)).toBe('/owner/stats?month=2026-10');
@@ -80,6 +88,25 @@ describe('날 칸 값', () => {
       minutes: 0,
     });
     expect(days.size).toBe(2);
+  });
+
+  it('종류 칩은 노쇼·고객 취소·합의 후 취소·원장님 사정 취소·무효 순서로 모두 보인다', () => {
+    const at = '2026-11-05T05:00:00.000Z';
+    const days = buildStatsDays(
+      (['void', 'owner_cancel', 'agreed_cancel', 'penalty', 'no_show'] as const).map((kind) => ({
+        kind,
+        occurredAt: at,
+        menuName: '여성 커트',
+      })),
+      [],
+    );
+    expect(days.get('2026-11-05')?.kinds.map((chip) => chip.kind)).toEqual([
+      'no_show',
+      'penalty',
+      'agreed_cancel',
+      'owner_cancel',
+      'void',
+    ]);
   });
 
   it('거래를 못 읽어도 방문한 날은 살린 시간만으로 칸이 생긴다', () => {
