@@ -183,7 +183,7 @@ describeDb('웹 푸시 구독 저장 (실제 DB)', () => {
     });
   });
 
-  it('로그아웃은 이 기기의 내 구독을 모두 지우고, 다른 기기 구독과 남의 구독은 그대로다', async () => {
+  it('로그아웃은 이 기기의 내 구독을 모두 지우고(지운 계정 종류를 돌려준다), 다른 기기 구독과 남의 구독은 그대로다', async () => {
     await withRollback(async (tx) => {
       const me = await createTestUser(tx);
       const other = await createTestUser(tx);
@@ -197,14 +197,17 @@ describeDb('웹 푸시 구독 저장 (실제 DB)', () => {
         accountType: 'customer',
       });
 
-      expect(await deleteDevicePushSubscriptions(tx, { userId: other, endpoint: value })).toBe(0);
+      expect(await deleteDevicePushSubscriptions(tx, { userId: other, endpoint: value })).toEqual(
+        [],
+      );
       expect(await rowsOf(tx, value)).toHaveLength(2);
 
-      expect(await deleteDevicePushSubscriptions(tx, { userId: me, endpoint: value })).toBe(2);
+      const removed = await deleteDevicePushSubscriptions(tx, { userId: me, endpoint: value });
+      expect(removed.toSorted()).toEqual(['customer', 'owner']);
       expect(await rowsOf(tx, value)).toHaveLength(0);
       expect(await rowsOf(tx, myOtherDevice)).toHaveLength(1);
 
-      expect(await deleteDevicePushSubscriptions(tx, { userId: me, endpoint: value })).toBe(0);
+      expect(await deleteDevicePushSubscriptions(tx, { userId: me, endpoint: value })).toEqual([]);
     });
   });
 

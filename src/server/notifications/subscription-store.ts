@@ -6,7 +6,7 @@ import 'server-only';
 import { and, eq, ne } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
-import type { AccountType } from '@/db/schema/accounts';
+import { ACCOUNT_TYPES, type AccountType } from '@/db/schema/accounts';
 import { pushSubscriptions } from '@/db/schema';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select' | 'insert' | 'delete'>;
@@ -50,11 +50,14 @@ export async function deletePushSubscription(db: Db, key: SubscriptionKey): Prom
   return deleted.length > 0;
 }
 
-/** 이 기기의 내 구독을 계정 종류와 상관없이 모두 지운다(로그아웃). 지운 개수를 돌려준다 */
+/**
+ * 이 기기의 내 구독을 계정 종류와 상관없이 모두 지운다(로그아웃). 지운 구독의 계정 종류를 돌려준다
+ * (같은 사람이 다시 로그인하면 되살리려고 기기가 기억한다, restoreDevicePushSubscriptions)
+ */
 export async function deleteDevicePushSubscriptions(
   db: Db,
   input: { userId: string; endpoint: string },
-): Promise<number> {
+): Promise<AccountType[]> {
   const deleted = await db
     .delete(pushSubscriptions)
     .where(
@@ -63,8 +66,10 @@ export async function deleteDevicePushSubscriptions(
         eq(pushSubscriptions.userId, input.userId),
       ),
     )
-    .returning({ id: pushSubscriptions.id });
-  return deleted.length;
+    .returning({ accountType: pushSubscriptions.accountType });
+  return deleted
+    .map((row) => row.accountType)
+    .filter((type): type is AccountType => (ACCOUNT_TYPES as readonly string[]).includes(type));
 }
 
 /** 이 기기에 그 계정 종류의 내 구독이 있는지 */
