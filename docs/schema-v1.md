@@ -150,6 +150,8 @@ erDiagram
 | business_registration_number | text | 사업자등록번호(숫자 10자리) |
 | opened_on | date | 개업일자 |
 | business_doc_path | text | 사업자등록증 사진 위치(비공개 버킷 `business-docs`) |
+| nts_check | text, null | 국세청 사업자등록 진위확인 결과(#208): verified(맞음) / unavailable(국세청이 응답하지 않아 확인 못 함). 비어 있으면 확인 안 함(키가 없는 개발 환경, 이 기능 전 샵). 다름·휴폐업이면 저장하지 않아서 그 값은 없다 |
+| nts_checked_at | timestamptz, null | 마지막으로 국세청에 확인한 시각. nts_check와 같이 채우고 같이 비운다 |
 | status | text, 기본 `pending` | 입점 상태: `pending`(승인 대기) / `approved`(승인) / `rejected`(반려) |
 | rejection_reason | text, null | 반려 사유. 원장님에게 보여준다 |
 | applied_at | timestamptz | 입점 신청(다시 신청 포함) 시각 |
