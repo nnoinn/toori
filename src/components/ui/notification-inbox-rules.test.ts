@@ -6,7 +6,7 @@ import {
   notificationTimeText,
 } from './notification-inbox-rules';
 
-// 알림함 공통 규칙(#371): 시각 문구와 누르면 갈 주소. 기댓값은 고객 알림함(notification-rules.test.ts)과 같다.
+// 알림함 공통 규칙(#371): 시각 문구와 누르면 갈 주소. 고객·원장님 알림함이 같이 쓴다.
 // 시각은 한국 시간(UTC+9) 기준이다
 describe('notificationTimeText', () => {
   // 한국 시간 11/15(일) 12:00

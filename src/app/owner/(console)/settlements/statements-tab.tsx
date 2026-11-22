@@ -1,5 +1,5 @@
 // 원장님 정산 내역의 [정산서] 탭 (O15, S-501, 연결 #10·#20, #129 2장). 서버에서 그린다.
-// 강규민님 getSettlementStatements 결과를 그대로 보여준다: 위 카드(이의제기로 보류 중·남은 패널티, 있을 때만),
+// 강규민님 getSettlementStatements 결과를 그대로 보여준다: 위 카드(보류 중·남은 패널티, 있을 때만),
 // 지급일마다 한 장인 정산서 목록, 아래에 보류 중인 거래 줄. 화면에서 금액·지급일·보류를 계산하지 않는다.
 // 기간은 지급일 기준이다. 이번 달을 볼 때는 다음 달 지급 예정 장도 같이 찾는다(statementQueryPeriod).
 
@@ -95,12 +95,12 @@ export async function StatementsTab({
   );
 }
 
-/** 이의제기로 보류 중인 거래 요약. 기간과 상관없이 지금 보류 중인 것 전부 */
+/** 보류 중인 거래 요약(이의제기와 운영자 확인, #468). 기간과 상관없이 지금 보류 중인 것 전부 */
 function HeldCard({ held }: { held: SettlementStatementList['held'] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>이의제기로 보류 중</CardTitle>
+        <CardTitle>보류 중</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         <p className="text-2xl font-bold text-warning-foreground">{held.count}건</p>
@@ -121,11 +121,11 @@ function HeldCard({ held }: { held: SettlementStatementList['held'] }) {
   );
 }
 
-/** 보류 중인 거래 줄. 거래 내역(S-502)과 같은 모양이고, 펼치면 이의제기 접수일이 보인다 */
+/** 보류 중인 거래 줄. 거래 내역(S-502)과 같은 모양이고, 줄마다 보류 이유가 보이고 펼치면 이의제기 접수일이나 운영자 확인 안내가 보인다 */
 function HeldItemsSection({ held, now }: { held: SettlementStatementList['held']; now: Date }) {
   return (
     <section id={HELD_SECTION_ID} className="flex scroll-mt-4 flex-col gap-2">
-      <h2 className="font-semibold">이의제기로 보류 중인 거래 {held.count}건</h2>
+      <h2 className="font-semibold">보류 중인 거래 {held.count}건</h2>
       <p className="text-sm text-muted-foreground">{HELD_NOTE}</p>
       <SettlementItemList items={held.items} now={now} />
     </section>

@@ -4,6 +4,7 @@
 import Link from 'next/link';
 
 import { formatKstDateTime } from '@/lib/time';
+import { adminNoticeText } from '@/server/policy/admin-notice';
 
 import { HoldAction } from './hold-actions';
 import type { SettlementHoldRow } from './hold-queries';
@@ -38,7 +39,10 @@ export function HoldList({
               {hold.releasedAt ? '풀림' : '보류 중'} · {formatKstDateTime(hold.heldAt)}{' '}
               {who(hold.heldByName)}
             </p>
-            <p className="break-all">사유: {hold.reason}</p>
+            <p>
+              원장님에게 보이는 사유: {adminNoticeText(hold.reasonCode, 'settlement_hold').label}
+            </p>
+            <p className="break-all">운영자 메모: {hold.reason}</p>
             {hold.releasedAt ? (
               <p className="break-all text-muted-foreground">
                 푼 때 {formatKstDateTime(hold.releasedAt)} · {who(hold.releasedByName)} · 메모:{' '}

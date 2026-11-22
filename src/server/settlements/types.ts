@@ -2,6 +2,7 @@
 // 화면과 서버 어디서나 가져올 수 있다.
 
 import type { SettlementItemKind, SettlementStatus } from '@/db/schema/settlements';
+import type { SettlementHoldCode } from '@/server/policy/admin-notice';
 
 /**
  * 거래 하나의 정산 상태
@@ -63,9 +64,13 @@ export type SettlementItemView = {
   disputeDeadlineAt: string;
   /**
    * 보류 중(held)이면 그 이유. 이의제기 중(dispute)은 접수 시각과 같이 준다(예: 11/15 접수).
-   * 운영자 확인 중(admin, #373 ②)은 사유·날짜 없이 이유만 준다(원장님에게 보류 사유를 숨긴다, 11/15 nnoinn). 둘 다면 이의제기
+   * 운영자 확인 중(admin, #373 ②)은 운영자가 목록에서 고른 사유 코드만 준다(#489). 운영자가 쓴 사유는 숨긴다(11/15 nnoinn).
+   * 사유 이름과 다음에 할 일은 adminNoticeText(code, 'settlement_hold')로 보여 준다(@/server/policy). 둘 다면 이의제기
    */
-  hold: { reason: 'dispute'; receivedAt: string } | { reason: 'admin' } | null;
+  hold:
+    | { reason: 'dispute'; receivedAt: string }
+    | { reason: 'admin'; code: SettlementHoldCode }
+    | null;
   status: SettlementItemStatus;
   /** 지급일(예정일 포함). 보류·정산할 금액이 없는 줄은 null */
   payoutDate: string | null;
