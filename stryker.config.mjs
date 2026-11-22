@@ -8,6 +8,10 @@ const config = {
   testRunner: 'vitest',
   vitest: { configFile: 'vitest.config.mts' },
   coverageAnalysis: 'perTest',
+  // GitHub 실행(4코어·16GB)이 50분쯤 지나 러너와 연결이 끊긴 채 멈췄다(11/21·11/22, "lost communication" = 메모리·CPU 부족).
+  // 테스트 러너가 돌수록 메모리가 쌓여서, 동시에 2개만 돌리고 25번 쓰면 새로 띄워 메모리를 비운다
+  concurrency: 2,
+  maxTestRunnerReuse: 25,
   // 돈·시간·상태 규칙이 든 순수 함수 파일. DB 없이 도는 테스트가 지키는 파일만 고른다.
   // 규칙 파일을 새로 만들면 여기에 더한다
   mutate: [
