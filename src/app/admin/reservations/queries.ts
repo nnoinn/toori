@@ -91,7 +91,6 @@ export async function selectReservations(
     ? or(
         ilike(reservations.code, reservationCodePattern(input.query)),
         ilike(shops.name, pattern),
-        ilike(customers.name, pattern),
         ilike(customers.nickname, pattern),
       )
     : undefined;
@@ -255,7 +254,7 @@ export async function selectReservationDetail(
       hoursBeforeStartAtCancel: reservations.hoursBeforeStartAtCancel,
       createdAt: reservations.createdAt,
       customerId: customers.id,
-      customerName: customers.name,
+      customerName: customers.nickname,
       customerNickname: customers.nickname,
       shopId: shops.id,
       shopName: shops.name,
