@@ -118,6 +118,9 @@ export type ShopReviewDetail = {
     openedOn: string;
     /** 사업자등록증 경로(비공개 버킷). 운영자가 등록증을 바꾸지 않고 저장할 때 그대로 넘긴다 */
     businessDocPath: string;
+    /** 국세청 진위확인 결과와 시각(#208). 비어 있으면 확인 안 함 */
+    ntsCheck: string | null;
+    ntsCheckedAt: Date | null;
   };
   /** id는 원장님 계정 이력([원장님 이력 보기], #374) 주소에 쓴다 */
   owner: { id: string; name: string; phone: string };
@@ -158,6 +161,8 @@ export async function selectShopForReview(
       businessRegistrationNumber: shops.businessRegistrationNumber,
       openedOn: shops.openedOn,
       businessDocPath: shops.businessDocPath,
+      ntsCheck: shops.ntsCheck,
+      ntsCheckedAt: shops.ntsCheckedAt,
       ownerId: owners.id,
       ownerName: owners.name,
       ownerPhone: owners.phone,
@@ -202,6 +207,8 @@ export async function selectShopForReview(
       businessRegistrationNumber: row.businessRegistrationNumber,
       openedOn: row.openedOn,
       businessDocPath: row.businessDocPath,
+      ntsCheck: row.ntsCheck,
+      ntsCheckedAt: row.ntsCheckedAt,
     },
     owner: { id: row.ownerId, name: row.ownerName, phone: row.ownerPhone },
     shop: {

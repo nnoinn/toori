@@ -2,12 +2,14 @@
 
 // 매물 등록 서버 함수 (O4·O5, S-201). 화면(slot-form.tsx)에서 부른다.
 // ①②를 고르면 checkSlotDraft로 확인하고, ③까지 고르면 createSlot으로 저장한다.
+// 운영자가 새 매물 게시를 멈춘 샵(#373 ④)이면 둘 다 PUBLISH_PAUSED로 막는다(#472). 수정·마감은 막지 않는다
 
 import { refresh } from 'next/cache';
 
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { ok, type Result } from '@/lib/result';
+import { assertShopCanPublish } from '@/server/shops';
 
 import { requireApprovedOwner } from '../require-approved-owner';
 import { createSlotInDb, type SavedSlot } from '../slot-create-store';
@@ -20,6 +22,8 @@ export async function checkSlotDraft(
 ): Promise<Result<{ endAt: string }>> {
   const auth = await requireApprovedOwner(shopId);
   if (!auth.ok) return auth;
+  const publishable = await assertShopCanPublish(shopId);
+  if (!publishable.ok) return publishable;
 
   const draft = await validateSlotDraft(getDb(), shopId, input, await getRequestNow());
   if (!draft.ok) return draft;
@@ -30,6 +34,8 @@ export async function checkSlotDraft(
 export async function createSlot(shopId: string, input: unknown): Promise<Result<SavedSlot>> {
   const auth = await requireApprovedOwner(shopId);
   if (!auth.ok) return auth;
+  const publishable = await assertShopCanPublish(shopId);
+  if (!publishable.ok) return publishable;
 
   const created = await createSlotInDb(
     getDb(),

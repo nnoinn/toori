@@ -8,6 +8,8 @@ import { and, asc, desc, eq, ilike, or, type SQL, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import {
+  adminActions,
+  adminProfiles,
   customers,
   type DisputeOutcome,
   disputes,
@@ -128,6 +130,8 @@ export type SlotRow = {
   status: SlotStatus;
   holdCustomerId: string | null;
   holdExpiresAt: Date | null;
+  /** 손님이 시간대 매물 안에서 만든 칸이면 그 시간대(목록에는 결제가 끝난 칸만 나온다) */
+  windowId: string | null;
 };
 
 /**
@@ -159,6 +163,7 @@ export async function selectSlots(
       status: slots.status,
       holdCustomerId: slots.holdCustomerId,
       holdExpiresAt: slots.holdExpiresAt,
+      windowId: slots.windowId,
     })
     .from(slots)
     .innerJoin(shops, eq(shops.id, slots.shopId))
@@ -298,5 +303,115 @@ export async function selectReservationDetail(
         }
       : null,
     settlementBundled: Boolean(bundled),
+  };
+}
+
+export type SlotDetail = {
+  slotId: string;
+  shopId: string;
+  shopName: string;
+  serviceType: string;
+  menuName: string;
+  menuDescription: string | null;
+  startAt: Date;
+  endAt: Date;
+  durationMinutes: number;
+  listPrice: number;
+  discountRate: number;
+  salePrice: number;
+  newCustomerOnly: boolean;
+  publishAt: Date;
+  status: SlotStatus;
+  holdCustomerId: string | null;
+  holdExpiresAt: Date | null;
+  closedAt: Date | null;
+  closeReason: string | null;
+  /** 손님이 시간대 매물 안에서 만든 칸이면 그 시간대 */
+  windowId: string | null;
+  /** 취소된 매물을 재등록한 것이면 원래 매물 */
+  relistedFromSlotId: string | null;
+  createdAt: Date;
+  /** 이 매물의 예약(예약한 순서). 고객 정보는 읽지 않는다 */
+  reservations: {
+    reservationId: string;
+    code: string;
+    status: ReservationStatus;
+    visitResult: VisitResult | null;
+    bookedAt: Date;
+  }[];
+  /** 이 매물에 남은 운영자 처리 기록(최근 것부터). 이름을 정하지 않은 운영자는 null */
+  adminActions: { action: string; memo: string | null; at: Date; adminName: string | null }[];
+};
+
+/**
+ * 매물 상세(A-103, 11/19 운영자 화면 피드백). 없으면 null.
+ * 목록에서 빼는 매물(결제 없이 비운 시간대 칸 등)도 주소로 들어오면 보여 준다(운영자 기록에서 들어올 수 있다)
+ */
+export async function selectSlotDetail(db: DbReader, slotId: string): Promise<SlotDetail | null> {
+  const [row] = await db
+    .select({
+      slotId: slots.id,
+      shopId: shops.id,
+      shopName: shops.name,
+      serviceType: slots.serviceType,
+      menuName: slots.menuName,
+      menuDescription: slots.menuDescription,
+      startAt: slots.startAt,
+      endAt: slots.endAt,
+      durationMinutes: slots.durationMinutes,
+      listPrice: slots.listPrice,
+      discountRate: slots.discountRate,
+      salePrice: slots.salePrice,
+      newCustomerOnly: slots.newCustomerOnly,
+      publishAt: slots.publishAt,
+      status: slots.status,
+      holdCustomerId: slots.holdCustomerId,
+      holdExpiresAt: slots.holdExpiresAt,
+      closedAt: slots.closedAt,
+      closeReason: slots.closeReason,
+      windowId: slots.windowId,
+      relistedFromSlotId: slots.relistedFromSlotId,
+      createdAt: slots.createdAt,
+    })
+    .from(slots)
+    .innerJoin(shops, eq(shops.id, slots.shopId))
+    .where(eq(slots.id, slotId));
+  if (!row) return null;
+
+  const [reservationRows, actionRows] = await Promise.all([
+    db
+      .select({
+        reservationId: reservations.id,
+        code: reservations.code,
+        status: reservations.status,
+        visitResult: reservations.visitResult,
+        bookedAt: reservations.createdAt,
+      })
+      .from(reservations)
+      .where(eq(reservations.slotId, slotId))
+      .orderBy(asc(reservations.createdAt), asc(reservations.code)),
+    db
+      .select({
+        action: adminActions.action,
+        memo: adminActions.memo,
+        at: adminActions.createdAt,
+        adminName: adminProfiles.name,
+      })
+      .from(adminActions)
+      .leftJoin(adminProfiles, eq(adminProfiles.userId, adminActions.adminId))
+      .where(and(eq(adminActions.targetType, 'slot'), eq(adminActions.targetId, slotId)))
+      .orderBy(desc(adminActions.createdAt), asc(adminActions.id)),
+  ]);
+
+  return {
+    ...row,
+    // DB의 check 제약이 정해 둔 값만 허용한다
+    status: row.status as SlotStatus,
+    reservations: reservationRows.map((reservation) => ({
+      ...reservation,
+      status: reservation.status as ReservationStatus,
+      visitResult: reservation.visitResult as VisitResult | null,
+    })),
+    adminActions: actionRows,
   };
 }

@@ -8,6 +8,7 @@ import { resolveListArea } from '@/features/map/list-area';
 import { getCustomerLocation } from '@/features/map/location';
 import { LocationIntro } from '@/features/map/location-intro';
 import { LocationSwitcher } from '@/features/map/location-switcher';
+import { QuickFilters } from '@/features/map/quick-filters';
 import { REGION_PARAM, withLinkedRegion } from '@/features/map/region-link';
 import { parseSort } from '@/features/map/slot-list/sort';
 import { getRequestNow } from '@/lib/request-time';
@@ -28,7 +29,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 // 매물이 없으면 그 동네를 관심 동네로 등록하는 새 매물 알림 권유를 같이 보여준다(C-208)
 export default function ListPage({ searchParams }: { searchParams: SearchParams }) {
   return (
-    <main className="flex flex-1 flex-col gap-3 py-3 md:mx-auto md:w-full md:max-w-2xl md:px-6 md:py-6">
+    <main className="flex flex-1 flex-col gap-3 py-3 md:mx-auto md:w-full md:max-w-5xl md:px-6 md:py-6">
       <Suspense
         fallback={
           <LoadingList count={4} className="overflow-hidden bg-card md:rounded-2xl md:border" />
@@ -57,6 +58,7 @@ async function ListContent({ searchParams }: { searchParams: SearchParams }) {
     getOptionalConsents(),
   ]);
   const isRegion = location.kind === 'region';
+  const filters = parseFilters(params);
   const alertState: AreaAlertState | null =
     area && interest.ok && consents.ok
       ? {
@@ -72,20 +74,34 @@ async function ListContent({ searchParams }: { searchParams: SearchParams }) {
           label={isRegion ? location.region.name : '내 위치'}
           selectedCode={isRegion ? location.region.code : null}
         />
-        <FilterSheet filters={parseFilters(params)} />
+        <FilterSheet filters={filters} />
       </div>
+      <QuickFilters filters={filters} />
       {area ? (
-        <RegionListView
-          // 동네가 바뀌면 새로 시작한다(떠났다 와도 남는 화면, Activity)
-          key={area.sigunguCode}
-          areaCode={area.sigunguCode}
-          areaLabel={area.fromMyLocation ? `내 위치 · ${area.label}` : area.label}
-          sort={parseSort(params.sort)}
-          serverNow={now.toISOString()}
-          emptyAction={
-            <AreaAlert areaCode={area.sigunguCode} areaLabel={area.label} state={alertState} />
-          }
-        />
+        // PC는 오른쪽에 관심 동네 칸(11/15 회의 1번). 폰은 목록만이고, 매물이 없을 때 빈 화면 아래에 같은 권유가 나온다
+        <div className="md:grid md:grid-cols-[minmax(0,1fr)_280px] md:items-start md:gap-6">
+          <RegionListView
+            // 동네가 바뀌면 새로 시작한다(떠났다 와도 남는 화면, Activity)
+            key={area.sigunguCode}
+            areaCode={area.sigunguCode}
+            areaLabel={area.fromMyLocation ? `내 위치 · ${area.label}` : area.label}
+            sort={parseSort(params.sort)}
+            serverNow={now.toISOString()}
+            emptyAction={
+              <div className="md:hidden">
+                <AreaAlert areaCode={area.sigunguCode} areaLabel={area.label} state={alertState} />
+              </div>
+            }
+          />
+          <aside aria-label="관심 동네" className="hidden md:sticky md:top-20 md:block">
+            <AreaAlert
+              variant="side"
+              areaCode={area.sigunguCode}
+              areaLabel={area.label}
+              state={alertState}
+            />
+          </aside>
+        </div>
       ) : (
         <p role="alert" className="mx-4 rounded-xl border bg-card p-4 text-sm md:mx-0">
           내 위치가 속한 동네를 찾지 못했어요. 위쪽 &apos;내 위치&apos;를 눌러 동네를 골라 주세요.

@@ -18,6 +18,8 @@ const state = vi.hoisted(() => ({
   saves: [] as Record<string, unknown>[],
   docCheck: null as unknown,
   docChecks: [] as string[],
+  nts: { result: 'skipped' } as { result: string },
+  ntsCalls: [] as unknown[],
 }));
 
 vi.mock('@/server/auth', () => ({ requireAdmin: async () => state.auth }));
@@ -29,6 +31,14 @@ vi.mock('@/server/storage', () => ({
   assertBusinessDocPath: async (_owner: unknown, path: string) => {
     state.docChecks.push(path);
     return state.docCheck;
+  },
+}));
+// 국세청 진위확인(#208)은 결과만 바꿔 끼운다
+vi.mock('./nts', async (original) => ({
+  ...(await original<typeof import('./nts')>()),
+  checkBusinessWithNts: async (input: unknown) => {
+    state.ntsCalls.push(input);
+    return state.nts;
   },
 }));
 vi.mock('./business-info-store', async (original) => ({
@@ -66,6 +76,8 @@ beforeEach(() => {
   state.saves = [];
   state.docCheck = ok(null);
   state.docChecks = [];
+  state.nts = { result: 'skipped' };
+  state.ntsCalls = [];
 });
 
 describe('updateShopBusinessInfo', () => {
@@ -82,12 +94,41 @@ describe('updateShopBusinessInfo', () => {
       {
         shopId: SHOP,
         adminId: 'admin-1',
-        values: { businessName: '투리 헤어 2호점', businessRegistrationNumber: NEW_NUMBER },
+        // 번호가 바뀌어 국세청에 다시 확인한다. 키가 없어 건너뛰면 예전 확인 결과를 비운다(#208)
+        values: {
+          businessName: '투리 헤어 2호점',
+          businessRegistrationNumber: NEW_NUMBER,
+          ntsCheck: null,
+          ntsCheckedAt: null,
+        },
         changed: ['businessName', 'businessRegistrationNumber'],
         reason: '11/10 카카오톡 문의',
       },
     ]);
     expect(state.docChecks).toEqual([]);
+  });
+
+  it('번호·개업일자·대표자 이름을 바꿀 때 국세청 결과가 다르면 저장하지 않고, 맞으면 결과와 시각을 남긴다(#208)', async () => {
+    state.nts = { result: 'mismatch' };
+    const blocked = await updateShopBusinessInfo(
+      SHOP,
+      input({ businessRegistrationNumber: NEW_NUMBER }),
+    );
+    expect(blocked.ok ? null : blocked.error.code).toBe('NTS_MISMATCH');
+    expect(state.saves).toEqual([]);
+    expect(state.ntsCalls).toEqual([
+      { businessNumber: NEW_NUMBER, openedOn: '2025-03-01', representativeName: '김원장' },
+    ]);
+
+    state.nts = { result: 'verified' };
+    await updateShopBusinessInfo(SHOP, input({ representativeName: '이원장' }));
+    expect(state.saves[0].values).toMatchObject({ ntsCheck: 'verified', ntsCheckedAt: NOW });
+  });
+
+  it('상호만 바꾸면 국세청에 다시 확인하지 않는다(#208)', async () => {
+    await updateShopBusinessInfo(SHOP, input({ businessName: '투리 헤어 3호점' }));
+    expect(state.ntsCalls).toEqual([]);
+    expect(state.saves[0].values).toEqual({ businessName: '투리 헤어 3호점' });
   });
 
   it('하이픈을 넣어 저장된 같은 번호는 바뀐 것으로 보지 않는다', async () => {

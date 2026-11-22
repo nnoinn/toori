@@ -3,13 +3,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  canForceCloseSlot,
   labelCancelActor,
   labelHoursBefore,
   labelOrderStatus,
   labelRefundBand,
   labelRefundReason,
   labelRefundStatus,
+  labelSlotCloseReason,
   lookupHref,
+  SLOT_ORIGIN_LABELS,
+  slotDetailHref,
+  slotOrigin,
   toLookupTab,
   toReservationFilter,
   toReservationSort,
@@ -61,5 +66,53 @@ describe('매물·예약 조회 표시 모양', () => {
     expect(labelHoursBefore(30.46)).toBe('30.5시간 전');
     expect(labelHoursBefore(-2)).toBe('시작 2.0시간 뒤');
     expect(labelHoursBefore(null)).toBe('-');
+  });
+
+  it('매물 상세 주소는 매물·예약 메뉴 아래(왼쪽 메뉴가 그대로 켜진다)', () => {
+    expect(slotDetailHref('abc')).toBe('/admin/reservations/slots/abc');
+  });
+
+  it('매물 마감 사유. 원장님이 고른 셋, 결제 없이 홀딩 끝남, 운영자 마감. 모르는 값은 그대로, 없으면 -', () => {
+    expect(labelSlotCloseReason('other_channel')).toBe('다른 곳 예약');
+    expect(labelSlotCloseReason('mistake')).toBe('잘못 올림');
+    expect(labelSlotCloseReason('other')).toBe('기타');
+    expect(labelSlotCloseReason('hold_released')).toBe('결제 없이 홀딩 끝남');
+    expect(labelSlotCloseReason('admin')).toBe('운영자 마감');
+    expect(labelSlotCloseReason('new_reason')).toBe('new_reason');
+    expect(labelSlotCloseReason(null)).toBe('-');
+  });
+
+  it('매물을 올린 방식: 시간대 칸이 먼저, 그다음 재등록, 둘 다 아니면 한 시술 매물', () => {
+    expect(slotOrigin({ windowId: null, relistedFromSlotId: null })).toBe('single');
+    expect(slotOrigin({ windowId: null, relistedFromSlotId: 'old' })).toBe('relist');
+    expect(slotOrigin({ windowId: 'w', relistedFromSlotId: null })).toBe('window');
+    expect(slotOrigin({ windowId: 'w', relistedFromSlotId: 'old' })).toBe('window');
+    expect(SLOT_ORIGIN_LABELS.relist).toBe('취소된 매물을 재등록');
+  });
+
+  it('강제 마감 버튼: 판매 전(게시예정·게시중)이고 결제 중이 아니며 시간대 안의 칸이 아닐 때만', () => {
+    const now = new Date('2026-11-20T03:00:00.000Z');
+    const slot = {
+      status: 'scheduled' as const,
+      publishAt: new Date('2026-11-19T03:00:00.000Z'),
+      startAt: new Date('2026-11-21T03:00:00.000Z'),
+      holdCustomerId: null,
+      holdExpiresAt: null,
+      windowId: null,
+    };
+    expect(canForceCloseSlot(slot, now)).toBe(true);
+    // 게시 전(게시예정)도 판매 전이다
+    expect(
+      canForceCloseSlot({ ...slot, publishAt: new Date('2026-11-20T04:00:00.000Z') }, now),
+    ).toBe(true);
+    expect(canForceCloseSlot({ ...slot, status: 'reserved' }, now)).toBe(false);
+    // 시작 시각이 지나면 마감으로 보여서 닫을 것이 없다
+    expect(canForceCloseSlot({ ...slot, startAt: now }, now)).toBe(false);
+    // 손님이 결제 중이면 안 되고, 홀딩이 끝났으면 된다
+    const hold = { holdCustomerId: 'c-1', holdExpiresAt: new Date('2026-11-20T03:05:00.000Z') };
+    expect(canForceCloseSlot({ ...slot, ...hold }, now)).toBe(false);
+    expect(canForceCloseSlot({ ...slot, ...hold, holdExpiresAt: now }, now)).toBe(true);
+    // 시간대 안에서 손님이 만든 칸은 그 시간대를 마감한다
+    expect(canForceCloseSlot({ ...slot, windowId: 'w-1' }, now)).toBe(false);
   });
 });

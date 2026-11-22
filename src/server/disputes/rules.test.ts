@@ -33,6 +33,7 @@ const confirmed: DisputeTarget = {
   visitResult: null,
   visitRecordedAt: null,
   cancelledAt: null,
+  voidedAt: null,
 };
 const visited: DisputeTarget = {
   ...confirmed,
@@ -125,6 +126,14 @@ describe('disputeState·disputeBlockReason', () => {
     expect(disputeState(visited, true, kst('2026-11-12 12:00'))).toBe('submitted');
     expect(disputeState(visited, true, kst('2026-11-30 12:00'))).toBe('submitted');
     expect(disputeBlockReason(visited, true, kst('2026-11-12 12:00'))).toBe('ALREADY_SUBMITTED');
+  });
+
+  it('무효가 된 예약은 기간 안이어도 받지 않고 칸을 그리지 않는다. 이미 접수했으면 submitted 그대로(A-108, 11/22)', () => {
+    const voided = { ...visited, voidedAt: kst('2026-11-12 10:00') };
+    expect(disputeBlockReason(voided, false, kst('2026-11-12 12:00'))).toBe('RESERVATION_VOIDED');
+    expect(disputeState(voided, false, kst('2026-11-12 12:00'))).toBe('not_open');
+    expect(disputeState(voided, true, kst('2026-11-12 12:00'))).toBe('submitted');
+    expect(disputeBlockReason(voided, true, kst('2026-11-12 12:00'))).toBe('ALREADY_SUBMITTED');
   });
 
   it('접수할 수 있으면 막는 이유가 없다', () => {

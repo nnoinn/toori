@@ -31,8 +31,8 @@ describe('매물 배지', () => {
     );
   });
 
-  it('신규 고객 전용 배지', () => {
-    expect(slotBadges(slot({ newCustomerOnly: true }), null, NOW)).toEqual(['newCustomerOnly']);
+  it('신규 고객 전용 매물이어도 고객 화면에는 배지를 붙이지 않는다(11/16 nnoinn, #459)', () => {
+    expect(slotBadges(slot({ newCustomerOnly: true }), null, NOW)).toEqual([]);
   });
 
   it('다른 고객이 홀딩 중이면 결제 중 배지, 내 홀딩이나 끝난 홀딩은 없음', () => {
@@ -73,12 +73,12 @@ describe('시간대 카드 배지', () => {
     ).toEqual([]);
   });
 
-  it('신규 고객 전용 시간대는 신규 고객 전용 배지', () => {
+  it('신규 고객 전용 시간대여도 고객 화면에는 배지를 붙이지 않는다(11/16 nnoinn, #459)', () => {
     expect(
       windowBadges(
         { earliestStartAt: at('2026-11-01T18:00:00+09:00'), newCustomerOnly: true },
         NOW,
       ),
-    ).toEqual(['newCustomerOnly']);
+    ).toEqual([]);
   });
 });

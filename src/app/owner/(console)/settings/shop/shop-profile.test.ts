@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   type HoursRow,
+  isHoursTime,
   type ShopProfileInput,
   toHoursRows,
   validateShopProfile,
@@ -78,6 +79,37 @@ describe('validateShopProfile', () => {
       valid({ hours: withMonday({ closed: true, open: '10:00', close: '09:00' }) }),
     );
     expect(result.ok && result.data.businessHours).toEqual([{ weekday: 1, closed: true }]);
+    // 한쪽 시각만 고른 채로 쉬는 날을 눌러도 쉬는 날이다(시각을 다 고르라고 하지 않는다)
+    const half = validateShopProfile(
+      valid({ hours: withMonday({ closed: true, open: '10:00', close: '' }) }),
+    );
+    expect(half.ok && half.data.businessHours).toEqual([{ weekday: 1, closed: true }]);
+  });
+
+  it('시각은 HH:MM 모양만 받는다(앞뒤에 다른 글자가 붙으면 아니다)', () => {
+    expect(isHoursTime('10:00')).toBe(true);
+    expect(isHoursTime('23:59')).toBe(true);
+    expect(isHoursTime('10:00x')).toBe(false);
+    expect(isHoursTime('x10:00')).toBe(false);
+    expect(isHoursTime('24:00')).toBe(false);
+  });
+
+  it('영업시간 줄이 7줄보다 많으면 저장하지 않는다', () => {
+    const result = validateShopProfile(valid({ hours: [...emptyHours(), emptyHours()[0]] }));
+    expect(result).toEqual({ ok: false, fieldErrors: { name: '입력값을 다시 확인해 주세요' } });
+  });
+
+  it('도로명 주소 200자, 상세 주소 100자, 서비스 설명 1000자까지 받는다', () => {
+    const longest = validateShopProfile(
+      valid({
+        roadAddress: '가'.repeat(200),
+        addressDetail: 'a'.repeat(100),
+        description: 'a'.repeat(1000),
+      }),
+    );
+    expect(longest.ok).toBe(true);
+    const over = validateShopProfile(valid({ roadAddress: '가'.repeat(201) }));
+    expect(!over.ok && over.fieldErrors.roadAddress).toBe('주소가 너무 길어요');
   });
 
   it.each([

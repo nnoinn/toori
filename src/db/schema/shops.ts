@@ -4,6 +4,7 @@
 import { sql } from 'drizzle-orm';
 import { check, date, index, integer, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 
+import { PUBLISH_PAUSE_CODES } from '@/server/policy/admin-notice';
 import { SERVICE_TYPE_KEYS, SHOP_CATEGORY_KEYS } from '@/server/policy/catalog';
 
 import { owners, profiles } from './accounts';
@@ -11,6 +12,9 @@ import { createdAt, geographyPoint, inValues, timestamptz, updatedAt } from './t
 
 /** 입점 상태(연결 #13, #50): 승인 대기 / 승인 / 반려 */
 export const SHOP_STATUSES = ['pending', 'approved', 'rejected'] as const;
+/** 국세청 사업자등록 진위확인 결과(#208): 맞음 / 국세청이 응답하지 않아 확인 못 함. 다름·휴폐업이면 저장하지 않아서 그 값은 없다 */
+export const NTS_CHECKS = ['verified', 'unavailable'] as const;
+export type NtsCheckResult = (typeof NTS_CHECKS)[number];
 export type ShopStatus = (typeof SHOP_STATUSES)[number];
 
 /** 토스페이먼츠 지급대행 셀러 상태. approved일 때만 지급을 요청한다 */
@@ -63,6 +67,9 @@ export const shops = pgTable(
     openedOn: date({ mode: 'string' }).notNull(),
     // 비공개 버킷 business-docs 안의 경로
     businessDocPath: text().notNull(),
+    // 국세청 사업자등록 진위확인(#208). 마지막으로 확인한 결과와 시각. 비어 있으면 확인 안 함(키가 없는 개발 환경이나 이 기능 전에 만든 샵)
+    ntsCheck: text(),
+    ntsCheckedAt: timestamptz(),
     status: text().notNull().default('pending'),
     rejectionReason: text(),
     // 입점 신청(다시 신청 포함) 시각
@@ -72,17 +79,30 @@ export const shops = pgTable(
     // 운영자가 새 매물 게시를 멈춘 시각·사유(#373 ④, #433). 비어 있으면 게시할 수 있다.
     // 새 등록만 막고 이미 등록한 매물(게시예정 포함)은 그대로다. 누가 멈추고 풀었는지는 admin_actions에 남는다
     publishPausedAt: timestamptz(),
+    // 운영자가 쓴 사유(원장님에게 숨김)
     publishPausedReason: text(),
+    // 원장님에게 보여 줄 사유 코드(#489, 정책 PUBLISH_PAUSE_CODES). 0021 전에 멈춘 샵은 other
+    publishPausedCode: text(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     check('shops_category_check', inValues(t.category, SHOP_CATEGORY_KEYS)),
     check('shops_status_check', inValues(t.status, SHOP_STATUSES)),
-    // 멈춘 시각과 사유는 같이 채우고 같이 비운다
+    check(
+      'shops_nts_check_check',
+      sql`${t.ntsCheck} is null or ${inValues(t.ntsCheck, NTS_CHECKS)}`,
+    ),
+    // 결과와 시각은 같이 채우고 같이 비운다
+    check('shops_nts_checked_at_check', sql`(${t.ntsCheck} is null) = (${t.ntsCheckedAt} is null)`),
+    // 멈춘 시각·사유·사유 코드는 같이 채우고 같이 비운다
     check(
       'shops_publish_pause_check',
-      sql`(${t.publishPausedAt} is null) = (${t.publishPausedReason} is null)`,
+      sql`(${t.publishPausedAt} is null) = (${t.publishPausedReason} is null) and (${t.publishPausedAt} is null) = (${t.publishPausedCode} is null)`,
+    ),
+    check(
+      'shops_publish_paused_code_check',
+      sql`${t.publishPausedCode} is null or ${inValues(t.publishPausedCode, PUBLISH_PAUSE_CODES)}`,
     ),
     index('shops_location_idx').using('gist', t.location),
     index('shops_status_idx').on(t.status),

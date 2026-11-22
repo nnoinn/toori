@@ -164,7 +164,7 @@ describeDb('내 예약 조회', () => {
 
       const mine = await selectMyReservationDetail(tx, me.customerId, reservation.id);
       expect(mine?.status).toBe('confirmed');
-      expect(mine?.refund).toBeNull();
+      expect(mine?.refunds).toEqual([]);
     });
   });
 
@@ -196,11 +196,16 @@ describeDb('내 예약 조회', () => {
 
       const mine = await selectMyReservationDetail(tx, me.customerId, reservation.id);
       expect(mine?.status).toBe('cancelled');
-      expect(mine?.refund).toMatchObject({
-        refundAmount: 9800,
-        penaltyAmount: 4200,
-        penaltyRate: 30,
-      });
+      expect(mine?.refunds).toEqual([
+        {
+          reason: 'customer_cancel',
+          refundAmount: 9800,
+          penaltyAmount: 4200,
+          penaltyRate: 30,
+          processedAt: new Date('2026-10-31T10:01:00+09:00').toISOString(),
+        },
+      ]);
+      expect(mine?.voided).toBe(false);
       expect(mine?.payment.amount).toBe(14000);
       // 예약 완료 화면(C-405)의 작은 지도에 쓰는 샵 위치
       expect(mine?.shop.shopId).toBe(shop.shopId);
@@ -215,6 +220,89 @@ describeDb('내 예약 조회', () => {
       expect(withBooker?.booker).toEqual({ name: '김예약', phone: '010-0000-0000' });
 
       expect(await selectMyReservationDetail(tx, other.customerId, reservation.id)).toBeNull();
+    });
+  });
+
+  it('무효 예약(A-108): 목록·상세에 무효 표시, 고객 취소 뒤 무효면 환불 두 건을 처리 순으로', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const me = await createTestCustomer(tx);
+      const VOIDED_AT = new Date('2026-10-31T12:00:00+09:00');
+
+      // 고객이 취소해 70%를 돌려받은 뒤, 원장님 요청으로 운영자가 무효 → 나머지 30%
+      const cancelledThenVoided = await createTestReservation(
+        tx,
+        shop,
+        me.customerId,
+        '15:00',
+        '16:00',
+        'cancelled',
+        {
+          cancelledAt: new Date('2026-10-31T10:00:00+09:00'),
+          cancelActor: 'customer',
+          voidedAt: VOIDED_AT,
+        },
+      );
+      const base = {
+        orderId: cancelledThenVoided.order.id,
+        reservationId: cancelledThenVoided.reservation.id,
+      };
+      // 일부러 무효 환불을 먼저 넣는다(조회가 처리 시각 순으로 정렬하는지)
+      await tx.insert(refunds).values({
+        ...base,
+        reason: 'void',
+        penaltyRate: 0,
+        refundAmount: 4200,
+        penaltyAmount: 0,
+        processedAt: new Date('2026-10-31T12:01:00+09:00'),
+      });
+      await tx.insert(refunds).values({
+        ...base,
+        reason: 'customer_cancel',
+        band: 'over_24h',
+        penaltyRate: 30,
+        refundAmount: 9800,
+        penaltyAmount: 4200,
+        processedAt: new Date('2026-10-31T10:01:00+09:00'),
+      });
+      // 노쇼였던 이용 완료 예약을 무효로: 상태와 노쇼 기록은 그대로, 무효 시각만
+      const noShowVoided = await createTestReservation(
+        tx,
+        shop,
+        me.customerId,
+        '09:00',
+        '10:00',
+        'completed',
+        { visitResult: 'no_show', voidedAt: VOIDED_AT },
+      );
+      await createTestReservation(tx, shop, me.customerId, '11:00', '12:00', 'completed');
+
+      const detail = await selectMyReservationDetail(
+        tx,
+        me.customerId,
+        cancelledThenVoided.reservation.id,
+      );
+      expect(detail?.voided).toBe(true);
+      expect(detail?.refunds.map((refund) => [refund.reason, refund.refundAmount])).toEqual([
+        ['customer_cancel', 9800],
+        ['void', 4200],
+      ]);
+
+      const cancelled = await selectMyReservations(tx, me.customerId, 'cancelled', NOW);
+      expect(cancelled.map((item) => item.voided)).toEqual([true]);
+      const completed = await selectMyReservations(tx, me.customerId, 'completed', NOW);
+      expect(
+        completed.map((item) => [item.reservationId === noShowVoided.reservation.id, item.voided]),
+      ).toEqual([
+        [false, false],
+        [true, true],
+      ]);
+      const noShowDetail = await selectMyReservationDetail(
+        tx,
+        me.customerId,
+        noShowVoided.reservation.id,
+      );
+      expect(noShowDetail).toMatchObject({ status: 'completed', noShow: true, voided: true });
     });
   });
 });

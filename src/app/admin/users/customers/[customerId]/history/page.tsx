@@ -8,12 +8,15 @@ import { isUuid } from '@/lib/uuid';
 import { ensureAdminPage } from '@/server/auth';
 
 import { AdminHistoryList } from '../../../history-list';
-import { type HistorySearch, readHistorySearch } from '../../../history-query';
+import {
+  type AccountHistorySearch,
+  readAccountHistorySearch,
+} from '@/components/ui/account-history-query';
 
 export const metadata: Metadata = { title: '고객 이력' };
 
 type Params = Promise<{ customerId: string }>;
-type SearchParams = Promise<HistorySearch>;
+type SearchParams = Promise<AccountHistorySearch>;
 
 // 고객 계정 이력 (#374, AUTH-13). 주소: /admin/users/customers/[customerId]/history?from=…&to=…&kind=…&page=… (조회만, 볼 때마다 열람 기록)
 export default function AdminCustomerHistoryPage({
@@ -44,7 +47,7 @@ async function History({ params, searchParams }: { params: Params; searchParams:
     <AdminHistoryList
       accountType="customer"
       accountId={customerId}
-      query={readHistorySearch(await searchParams, 'customer')}
+      query={readAccountHistorySearch(await searchParams, 'customer')}
       path={`/admin/users/customers/${customerId}/history`}
     />
   );

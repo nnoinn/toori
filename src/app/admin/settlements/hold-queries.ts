@@ -8,6 +8,7 @@ import { alias } from 'drizzle-orm/pg-core';
 
 import type { getDb } from '@/db';
 import { adminProfiles, reservations, settlementHolds, shops, slots } from '@/db/schema';
+import { type SettlementHoldCode, toAdminNoticeCode } from '@/server/policy/admin-notice';
 
 type Db = Pick<ReturnType<typeof getDb>, 'select'>;
 
@@ -19,6 +20,8 @@ export type SettlementHoldRow = {
   shopId: string;
   shopName: string;
   reason: string;
+  /** 원장님에게 보여 줄 사유 코드(#489) */
+  reasonCode: SettlementHoldCode;
   heldAt: Date;
   heldByName: string | null;
   releasedAt: Date | null;
@@ -39,6 +42,7 @@ async function selectHolds(db: Db, where: SQL | undefined, limit?: number) {
       shopId: shops.id,
       shopName: shops.name,
       reason: settlementHolds.reason,
+      reasonCode: settlementHolds.reasonCode,
       heldAt: settlementHolds.heldAt,
       heldByName: heldBy.name,
       releasedAt: settlementHolds.releasedAt,
@@ -54,7 +58,10 @@ async function selectHolds(db: Db, where: SQL | undefined, limit?: number) {
     .where(where)
     .orderBy(sql`${settlementHolds.releasedAt} is not null`, desc(settlementHolds.heldAt));
   const rows = limit === undefined ? await query : await query.limit(limit);
-  return rows satisfies SettlementHoldRow[];
+  return rows.map((row): SettlementHoldRow => ({
+    ...row,
+    reasonCode: toAdminNoticeCode('settlement_hold', row.reasonCode),
+  }));
 }
 
 /** 지금 풀리지 않은 보류 전부(거래·샵). 정산 목록에 보여 준다 */

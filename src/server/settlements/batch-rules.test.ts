@@ -127,6 +127,29 @@ describe('buildShopSettlement', () => {
     });
   });
 
+  it('정산 예시 4장(법인 전환 뒤, tiered): 할인 10%면 플랫폼 수수료 4,500원 + VAT 450원도 수수료 합계에 들어가고 정산액은 38,565원', () => {
+    const draft = buildShopSettlement({
+      payoutDate: '2026-11-19',
+      previousPayoutDate: null,
+      items: [item('o-sale', { kind: 'sale' })],
+      penalties: [],
+      paymentFeeRate: PAYMENT_FEE_RATE,
+      mode: 'tiered',
+    });
+    expect(draft.items[0]).toMatchObject({
+      feeAmount: 4_500,
+      feeVat: 450,
+      paymentFee: 1_350,
+      paymentFeeVat: 135,
+      payoutAmount: 38_565,
+    });
+    expect(draft).toMatchObject({
+      totalFeeAmount: 4_500 + 450 + 1_350 + 135,
+      payoutBeforePenalty: 38_565,
+      payoutAmount: 38_565,
+    });
+  });
+
   it('기간: 첫 정산은 처음 묶이는 거래가 끝난 한국 날짜부터, 다음부터는 직전 지급일 다음 날부터 지급일까지', () => {
     const items = [
       item('o-1', { kind: 'sale' }, kst('2026-11-12 09:00')),

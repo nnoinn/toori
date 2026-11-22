@@ -9,7 +9,7 @@ export type AccountType = (typeof ACCOUNT_TYPES)[number];
  * 이력의 일. 원장님 이력과 고객 이력이 같은 이름을 같이 쓰는 것(새 예약·취소·합의 후 취소)도 있다.
  * - 원장님: 입점 신청·승인·반려, 매물 등록·재등록·게시·마감, 시간대 등록·마감, 새 예약, 예약 취소, 합의 후 취소 요청·결과,
  *   방문·노쇼 처리, 정산 계좌 변경, 정산 지급
- * - 고객: 가입, 예약, 예약 취소, 환불, 합의 후 취소 요청 받음·응답, 쿠폰 받음·사용, 이의제기 접수·결론, 알림 동의·철회
+ * - 고객: 가입, 예약, 예약 취소, 환불, 합의 후 취소 요청 받음·응답, 쿠폰 받음·사용·돌려받음, 이의제기 접수·결론, 알림 동의·철회
  */
 export const ACCOUNT_HISTORY_KINDS = [
   'shop_applied',
@@ -32,6 +32,7 @@ export const ACCOUNT_HISTORY_KINDS = [
   'refund_done',
   'coupon_issued',
   'coupon_used',
+  'coupon_returned',
   'dispute_filed',
   'dispute_resolved',
   'consent_agreed',
@@ -57,7 +58,10 @@ export type AccountHistoryEvent = {
   rate: number | null;
   /** 서비스 시작 몇 시간 전에 취소했는지(버림) */
   hoursBeforeStart: number | null;
-  /** 마감 사유·반려 메모·취소한 사람·합의 후 취소 사유·환불 사유·쿠폰 사유·정산 계좌 은행·약관 종류 등(코드나 짧은 글) */
+  /**
+   * 마감 사유·반려 메모·취소한 사람·합의 후 취소 사유·환불 사유·쿠폰 받은 사유·쿠폰 돌려받은 사유(환불 사유와 같은 코드)·
+   * 정산 계좌 은행·약관 종류 등(코드나 짧은 글)
+   */
   reason: string | null;
   /** 방문/노쇼, 합의 후 취소 동의·거절·만료·끝남, 이의제기 결론 등(코드) */
   result: string | null;
@@ -100,7 +104,7 @@ export const HISTORY_CATEGORY_KINDS = {
   ],
   settlement: ['payout_account_changed', 'settlement_paid'],
   account: ['signed_up', 'consent_agreed', 'consent_withdrawn'],
-  coupon: ['coupon_issued', 'coupon_used'],
+  coupon: ['coupon_issued', 'coupon_used', 'coupon_returned'],
   dispute: ['dispute_filed', 'dispute_resolved'],
 } as const satisfies Record<string, readonly AccountHistoryKind[]>;
 export type HistoryCategory = keyof typeof HISTORY_CATEGORY_KINDS;

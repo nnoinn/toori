@@ -1,6 +1,8 @@
 // 계정 이력(#374) 화면 문구. 원장님 계정 이력(정민석)과 운영자 [이력 보기]가 같이 써서, 문구는 여기 한 곳에서만 고친다.
 // 화면과 서버 어디서나 가져올 수 있다. 시각 자체(줄 앞 "2026-11-12 21:50")는 화면이 formatKstDateTime으로 쓴다.
 
+import { formatReservationCode } from '@/components/ui/reservation-code';
+import type { CouponReason } from '@/db/schema/refunds';
 import { formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';
 import { bankName } from '@/server/policy/banks';
@@ -51,12 +53,14 @@ const CANCEL_TITLES: Record<string, string> = {
   system: '자동 취소',
 };
 
+/** 환불 사유. 쿠폰 돌려받은 사유(원장님 사정 취소·무효)도 같은 코드라 이 이름을 쓴다 */
 const REFUND_REASONS: Record<string, string> = {
   customer_cancel: '고객 취소',
   owner_fault: '원장님 사정 취소',
   agreed_cancel: '합의 후 취소',
   auto_cancel: '자동 취소',
   admin_exception: '운영자 환불',
+  void: '무효',
 };
 
 const AGREED_RESULTS: Record<string, string> = {
@@ -86,7 +90,8 @@ const CONSENTS: Record<string, string> = {
   interest_alert: '관심 동네·찜한 샵 새 매물 알림',
 };
 
-const COUPON_REASONS: Record<string, string> = {
+/** 쿠폰 받은 이유 이름. 운영자 고객 상세의 쿠폰 칸도 같은 이름을 쓴다 */
+export const COUPON_REASON_LABELS: Record<CouponReason, string> = {
   owner_fault_compensation: '원장님 사정 취소 보상',
 };
 
@@ -101,7 +106,7 @@ function join(parts: readonly (string | null | false)[]): string | null {
 
 function reservationPart(event: AccountHistoryEvent): (string | null)[] {
   return [
-    event.reservationCode ? `예약 ${event.reservationCode}` : null,
+    event.reservationCode ? `예약 ${formatReservationCode(event.reservationCode)}` : null,
     event.menuName,
     event.startAt ? formatKst(new Date(event.startAt)) : null,
   ];
@@ -180,7 +185,7 @@ export function historyText(
       return text(
         '합의 후 취소 결과',
         join([
-          event.reservationCode && `예약 ${event.reservationCode}`,
+          event.reservationCode && `예약 ${formatReservationCode(event.reservationCode)}`,
           label(AGREED_RESULTS, event.result),
         ]),
       );
@@ -199,20 +204,29 @@ export function historyText(
       return text(
         '환불',
         join([
-          event.reservationCode && `예약 ${event.reservationCode}`,
+          event.reservationCode && `예약 ${formatReservationCode(event.reservationCode)}`,
           label(REFUND_REASONS, event.reason),
           won,
         ]),
       );
     case 'coupon_issued':
-      return text('쿠폰 받음', join([won, label(COUPON_REASONS, event.reason)]));
+      return text('쿠폰 받음', join([won, label(COUPON_REASON_LABELS, event.reason)]));
     case 'coupon_used':
-      return text('쿠폰 사용', won);
+      return text('쿠폰 사용', join([...reservationPart(event), won]));
+    case 'coupon_returned':
+      return text(
+        '쿠폰 돌려받음',
+        join([
+          event.reservationCode && `예약 ${formatReservationCode(event.reservationCode)}`,
+          label(REFUND_REASONS, event.reason),
+          won,
+        ]),
+      );
     case 'dispute_filed':
       return text(
         '이의제기 접수',
         join([
-          event.reservationCode && `예약 ${event.reservationCode}`,
+          event.reservationCode && `예약 ${formatReservationCode(event.reservationCode)}`,
           label(DISPUTE_TYPES, event.reason),
         ]),
       );
@@ -220,7 +234,7 @@ export function historyText(
       return text(
         '이의제기 결론',
         join([
-          event.reservationCode && `예약 ${event.reservationCode}`,
+          event.reservationCode && `예약 ${formatReservationCode(event.reservationCode)}`,
           label(DISPUTE_OUTCOMES, event.result),
         ]),
       );

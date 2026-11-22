@@ -36,6 +36,7 @@ export async function readDisputeTarget(
       visitResult: reservations.visitResult,
       visitRecordedAt: reservations.visitRecordedAt,
       cancelledAt: reservations.cancelledAt,
+      voidedAt: reservations.voidedAt,
     })
     .from(reservations)
     .innerJoin(slots, eq(slots.id, reservations.slotId))
@@ -66,6 +67,7 @@ export async function readDisputeTarget(
     visitResult: row.visitResult as VisitResult | null,
     visitRecordedAt: row.visitRecordedAt,
     cancelledAt: row.cancelledAt,
+    voidedAt: row.voidedAt,
     dispute: dispute
       ? {
           id: dispute.id,
