@@ -118,7 +118,7 @@ function PeriodSummaryCard({ list, from, to }: { list: SettlementList; from: str
         </dl>
         {summary.heldCount > 0 ? (
           <p className="text-xs text-warning-foreground">
-            이의제기로 보류 중인 {summary.heldCount}건이 들어 있어요.
+            보류 중인 {summary.heldCount}건이 들어 있어요.
           </p>
         ) : null}
         {excluded ? (

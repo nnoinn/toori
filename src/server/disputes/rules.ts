@@ -22,15 +22,20 @@ export type DisputeTarget = {
   visitResult: VisitResult | null;
   visitRecordedAt: Date | null;
   cancelledAt: Date | null;
+  /** 예약 무효(A-108) 시각. 무효가 된 예약은 새 이의제기를 받지 않는다(11/22 nnoinn) */
+  voidedAt: Date | null;
 };
 
+/** 접수 시각·종류 계산에 필요한 예약 값(무효 여부는 보지 않는다) */
+type DisputeTimes = Omit<DisputeTarget, 'voidedAt'>;
+
 /** 접수를 받기 시작하는 때 */
-export function disputeOpensAt(target: DisputeTarget): Date {
+export function disputeOpensAt(target: DisputeTimes): Date {
   return target.status === 'cancelled' && target.cancelledAt ? target.cancelledAt : target.startAt;
 }
 
 /** 접수 기한. 예정 예약(방문·노쇼 처리 전)은 아직 정해지지 않아서 null */
-export function disputeDeadline(target: DisputeTarget): Date | null {
+export function disputeDeadline(target: DisputeTimes): Date | null {
   if (target.status === 'confirmed') return null;
   const base = Math.max(
     target.startAt.getTime(),
@@ -41,7 +46,7 @@ export function disputeDeadline(target: DisputeTarget): Date | null {
 }
 
 /** 이 예약에서 고를 수 있는 종류(DISPUTE_TYPES 순서) */
-export function disputeTypes(target: DisputeTarget): DisputeType[] {
+export function disputeTypes(target: DisputeTimes): DisputeType[] {
   const noShow = target.visitResult === 'no_show';
   return DISPUTE_TYPES.filter((type) => {
     if (type === 'no_show') return noShow;
@@ -50,13 +55,18 @@ export function disputeTypes(target: DisputeTarget): DisputeType[] {
   });
 }
 
-/** 지금 접수할 수 없는 이유. 접수할 수 있으면 null */
+/**
+ * 지금 접수할 수 없는 이유. 접수할 수 있으면 null.
+ * 무효가 된 예약(RESERVATION_VOIDED)은 사용한 쿠폰까지 전액 돌려준 뒤라 새 이의제기를 받지 않는다(11/22 nnoinn).
+ * 이미 접수한 이의제기는 그대로 보여 준다(ALREADY_SUBMITTED가 먼저)
+ */
 export function disputeBlockReason(
   target: DisputeTarget,
   hasDispute: boolean,
   now: Date,
-): 'ALREADY_SUBMITTED' | 'NOT_OPEN_YET' | 'DEADLINE_PASSED' | null {
+): 'ALREADY_SUBMITTED' | 'RESERVATION_VOIDED' | 'NOT_OPEN_YET' | 'DEADLINE_PASSED' | null {
   if (hasDispute) return 'ALREADY_SUBMITTED';
+  if (target.voidedAt) return 'RESERVATION_VOIDED';
   if (now.getTime() < disputeOpensAt(target).getTime()) return 'NOT_OPEN_YET';
   const deadline = disputeDeadline(target);
   if (deadline && now.getTime() >= deadline.getTime()) return 'DEADLINE_PASSED';
@@ -67,7 +77,8 @@ export function disputeBlockReason(
 export function disputeState(target: DisputeTarget, hasDispute: boolean, now: Date): DisputeState {
   const reason = disputeBlockReason(target, hasDispute, now);
   if (reason === 'ALREADY_SUBMITTED') return 'submitted';
-  if (reason === 'NOT_OPEN_YET') return 'not_open';
+  // 무효가 된 예약은 칸을 그리지 않는다(시작 전 예약처럼). 화면은 고치지 않아도 된다
+  if (reason === 'NOT_OPEN_YET' || reason === 'RESERVATION_VOIDED') return 'not_open';
   if (reason === 'DEADLINE_PASSED') return 'closed';
   return 'open';
 }
@@ -87,9 +98,10 @@ export function disputeContentProblem(
 }
 
 /**
- * 지금 고를 수 있는 결론(#350 nnoinn 리뷰 1번). 돈이 오가는 결론(환불 예외 refund_exception, 무효 voided,
- * 원장님 귀책 취소로 바꿈 owner_fault_cancel)은 처리 기능이 생길 때까지 고를 수 없다(화면은 "준비 중").
- * 그동안 이의제기는 확인 중(open)으로 남아 정산 보류도 그대로다. 기능이 생기면 여기에 하나씩 더한다(DB 목록에는 이미 있다)
+ * 지금 고를 수 있는 결론(#350 nnoinn 리뷰 1번). 돈이 오가는 결론(환불 예외 refund_exception, 원장님 귀책 취소로 바꿈
+ * owner_fault_cancel)은 처리 기능이 생길 때까지 고를 수 없다(화면은 "준비 중"). 그동안 이의제기는 확인 중(open)으로 남아
+ * 정산 보류도 그대로다. 기능이 생기면 여기에 하나씩 더한다(DB 목록에는 이미 있다).
+ * 무효(voided)는 여기서 고르지 않는다. 예약 상세의 [예약 무효]로 처리하면 무효가 끝날 때 결론이 저절로 기록된다(void-store.ts finishVoid, 11/22)
  */
 export const READY_DISPUTE_OUTCOMES = [
   'no_show_confirmed',

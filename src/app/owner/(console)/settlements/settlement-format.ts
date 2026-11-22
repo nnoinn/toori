@@ -98,14 +98,19 @@ export function hoursBeforeText(hoursBeforeStart: number | null): string | null 
   return hoursBeforeStart === 0 ? '시작 1시간 이내' : `시작 ${hoursBeforeStart}시간 전`;
 }
 
-/** 줄의 상태 문구. 지급일은 함수가 준 payoutDate 그대로. 예: "11/19(목) 지급 예정", "이의제기로 보류" */
+/**
+ * 줄의 상태 문구. 지급일은 함수가 준 payoutDate 그대로. 예: "11/19(목) 지급 예정", "이의제기로 보류".
+ * 보류는 함수가 준 이유대로 "이의제기로 보류"·"운영자 확인으로 보류"(#468). 둘 다면 함수가 이의제기로 준다
+ */
 export function settlementStatusText(
-  item: Pick<SettlementItemView, 'status' | 'payoutDate'>,
+  // 정산서(S-501)도 같이 쓴다. 정산서에는 보류가 없어서 hold를 넘기지 않는다
+  item: Pick<SettlementItemView, 'status' | 'payoutDate'> &
+    Partial<Pick<SettlementItemView, 'hold'>>,
 ): string {
   const date = item.payoutDate ? `${formatDateKey(item.payoutDate)} ` : '';
   const texts: Record<SettlementItemStatus, string> = {
     scheduled: `${date}지급 예정`,
-    held: '이의제기로 보류',
+    held: HELD_STATUS_TEXTS[item.hold?.reason ?? 'unknown'],
     pending: `${date}지급 준비 중`,
     requested: `${date}지급 요청함`,
     paid: `${date}지급 완료`,
@@ -114,6 +119,16 @@ export function settlementStatusText(
   };
   return texts[item.status];
 }
+
+// 보류 줄의 상태 이름. 보류인데 이유가 없는 줄은 함수가 주지 않지만, 오면 이유 없이 "보류"
+const HELD_STATUS_TEXTS: Record<
+  NonNullable<SettlementItemView['hold']>['reason'] | 'unknown',
+  string
+> = {
+  dispute: '이의제기로 보류',
+  admin: '운영자 확인으로 보류',
+  unknown: '보류',
+};
 
 /**
  * 이의제기 접수 기한 안내. 보류 중이면 접수한 날과 다음 지급일 안내, 기한이 남았으면 "…까지 이의제기가 없으면 확정돼요",
@@ -168,8 +183,8 @@ export const EXPECTED_MARK = '(예상)';
 export const EXPECTED_PENALTY_NOTE =
   '지금 남은 패널티로 계산한 금액이에요. 지급일 전에 원장님 사정 취소가 생기면 달라질 수 있어요.';
 
-/** 이의제기로 보류 중인 거래 안내(#129 2장) */
-export const HELD_NOTE = '결론이 나면 그다음 지급일에 들어가요.';
+/** 보류 중인 거래 안내(#129 2장). 이의제기와 운영자 확인 보류를 같이 모아 보여 주는 곳에 쓴다(#468) */
+export const HELD_NOTE = '이의제기 결론이 나거나 운영자 확인이 끝나면 그다음 지급일에 들어가요.';
 
 /** 0원인 이유(zeroReason 코드)의 문구. #353 4번 */
 export const ZERO_REASON_LABELS: Record<

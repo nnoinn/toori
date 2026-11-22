@@ -1,4 +1,6 @@
-// 매물 배지·홀딩 판단 (C-203, C-306, C-308, C-404). 목록(J4)과 상세(J7)가 같이 쓴다. 서버 시각으로 정한다.
+// 매물 배지·홀딩 판단 (C-203, C-308, C-404). 목록(J4)과 상세(J7)가 같이 쓴다. 서버 시각으로 정한다.
+// 신규 고객 전용(C-306)은 고객 화면에 배지로 보여 주지 않는다(11/16 nnoinn, #459). 기존 손님에게 매물을 빼는 것은 서버 조회가 하고,
+// 원장님 화면의 신규 고객 전용 표시는 그대로다. 입력의 newCustomerOnly는 이 규칙을 테스트로 지키려고 남겨 둔다
 
 import type { SlotBadgeKind } from '@/components/ui/slot-badge';
 import { isSlotOnHold } from '@/features/slot-status/slot-status';
@@ -31,13 +33,12 @@ export function slotBadges(
   const badges: SlotBadgeKind[] = [];
   if (flags.nonRefundable) badges.push('nonRefundable');
   if (flags.imminent) badges.push('imminent');
-  if (slot.newCustomerOnly) badges.push('newCustomerOnly');
   if (isHeldByOther(slot, customerId, now)) badges.push('onHold');
   return badges;
 }
 
 /**
- * 시간대 카드 배지(#308). 가장 빠른 시작이 임박이면 임박, 신규 고객 전용이면 신규 고객 전용.
+ * 시간대 카드 배지(#308). 가장 빠른 시작이 임박이면 임박. 신규 고객 전용은 붙이지 않는다(#459).
  * 환불 불가는 고르는 시각에 따라 달라서 카드에는 붙이지 않는다(상세에서 시각을 고르면 붙는다).
  * 홀딩은 시간대가 아니라 손님이 고른 시각 하나에 걸리므로 결제 중 배지도 없다
  */
@@ -47,6 +48,5 @@ export function windowBadges(
 ): SlotBadgeKind[] {
   const badges: SlotBadgeKind[] = [];
   if (getSlotTimeFlags(window.earliestStartAt, now).imminent) badges.push('imminent');
-  if (window.newCustomerOnly) badges.push('newCustomerOnly');
   return badges;
 }

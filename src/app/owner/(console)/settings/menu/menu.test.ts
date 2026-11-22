@@ -78,6 +78,23 @@ describe('validateMenu', () => {
     expect(!long.ok && long.fieldErrors.name).toBe('서비스 이름은 40자까지 쓸 수 있어요');
   });
 
+  it('이름은 40자, 설명은 500자까지 받는다', () => {
+    const longest = validateMenu(
+      'hair',
+      valid({ name: '가'.repeat(40), description: 'a'.repeat(500) }),
+    );
+    expect(longest.ok && [longest.data.name.length, longest.data.description?.length]).toEqual([
+      40, 500,
+    ]);
+  });
+
+  it('정가는 숫자만 받는다(1e5처럼 숫자로 읽히는 글자도 막는다)', () => {
+    const result = validateMenu('hair', valid({ listPrice: '1e5' }));
+    expect(!result.ok && result.fieldErrors.listPrice).toBe(
+      '정가는 1,000원부터 1,000,000원까지 입력해 주세요',
+    );
+  });
+
   it('모양이 틀린 입력은 저장하지 않는다', () => {
     expect(validateMenu('hair', { name: 1 }).ok).toBe(false);
   });

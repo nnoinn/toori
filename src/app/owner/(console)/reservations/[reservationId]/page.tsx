@@ -20,7 +20,13 @@ import { RESERVATION_VIEW_STYLE } from '../../status-style';
 import { RESERVATION_VIEW_LABELS, reservationView, visitSummary } from '../reservation-detail';
 import { selectOwnerReservation } from '../reservation-detail-store';
 import { ReservationCancelCard } from './cancel-card';
-import { BookerCard, HistoryCard, ServiceCard, ViewNotice } from './reservation-cards';
+import {
+  BookerCard,
+  DisputeNotice,
+  HistoryCard,
+  ServiceCard,
+  ViewNotice,
+} from './reservation-cards';
 import { VisitActions } from './visit-actions';
 
 export const metadata: Metadata = { title: '예약 상세' };
@@ -32,6 +38,7 @@ type Params = Promise<{ reservationId: string }>;
 // 시작이 지났고 처리하지 않은 예약은 [방문 완료]·[노쇼](O14, S-405).
 // 예정 예약(시작 뒤 포함, 방문·노쇼 처리 전)은 [예약 취소] 카드(cancel-card.tsx). 그 창에서 원장님 사정으로 취소(S-409, 서비스 시작 전까지)와
 // 손님과 합의 후 취소(S-410)를 고른다.
+// 손님이 이의제기한 예약은 맨 위 카드에 접수한 때·확인 상태·결론과 카카오톡 채널 안내(S-407).
 // 이 파일은 예약을 읽고 배치하고, 카드와 안내 상자는 reservation-cards.tsx가 그린다.
 export default function OwnerReservationPage({ params }: { params: Params }) {
   return (
@@ -76,9 +83,11 @@ async function ReservationContent({ params }: { params: Params }) {
           </div>
           <Badge className={RESERVATION_VIEW_STYLE[view]}>{RESERVATION_VIEW_LABELS[view]}</Badge>
         </CardHeader>
-        {view === 'cancelled' ? null : (
-          <CardContent>
-            <ViewNotice view={view} />
+        {/* 이의제기(S-407)는 취소된 예약에도 올 수 있어서(취소 금액) 취소여도 보여준다 */}
+        {view === 'cancelled' && !reservation.dispute ? null : (
+          <CardContent className="flex flex-col gap-3">
+            {reservation.dispute ? <DisputeNotice dispute={reservation.dispute} /> : null}
+            {view === 'cancelled' ? null : <ViewNotice view={view} />}
           </CardContent>
         )}
         <VisitActions

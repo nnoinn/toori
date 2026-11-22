@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { NATIVE_SELECT_CLASS } from '@/components/ui/native-select';
+import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import type { DisputeType } from '@/db/schema';
 import { formatKstDateTime } from '@/lib/time';
@@ -88,9 +88,8 @@ export function RegisterDispute({
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-2">
               <Label htmlFor="dispute-type">종류</Label>
-              <select
+              <NativeSelect
                 id="dispute-type"
-                className={NATIVE_SELECT_CLASS}
                 value={type}
                 onChange={(event) => setType(event.target.value as DisputeType)}
               >
@@ -102,7 +101,7 @@ export function RegisterDispute({
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="dispute-received-at">채널에서 받은 시각(한국 시간)</Label>

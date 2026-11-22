@@ -24,6 +24,7 @@ const DETAIL: MyReservationDetail = {
   startAt: '2026-11-07T02:00:00.000Z',
   amount: 17_000,
   noShow: false,
+  voided: false,
   cancelledAt: null,
   status: 'confirmed',
   shop: {
@@ -38,7 +39,7 @@ const DETAIL: MyReservationDetail = {
   durationMinutes: 60,
   booker: { name: '김투리', phone: '010-0000-0000' },
   payment: { salePrice: 20_000, couponAmount: 3_000, amount: 17_000, paidAt: null },
-  refund: null,
+  refunds: [],
 };
 
 beforeEach(() => {
