@@ -213,7 +213,9 @@ function MenuSummary({ menu }: { menu: MenuItem }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <div className="flex items-center gap-2">
-        <Badge variant="secondary">{serviceTypeLabel(menu.serviceType)}</Badge>
+        <Badge variant="secondary" className="bg-accent text-accent-foreground">
+          {serviceTypeLabel(menu.serviceType)}
+        </Badge>
         <span className="truncate font-semibold">{menu.name}</span>
       </div>
       <span className="text-sm text-muted-foreground">
