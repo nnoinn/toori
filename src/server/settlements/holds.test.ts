@@ -19,6 +19,7 @@ const state = vi.hoisted(() => ({
   calls: [] as unknown[],
   result: null as unknown,
   throws: null as unknown,
+  notified: [] as unknown[],
 }));
 
 vi.mock('@/lib/request-time', () => ({ getRequestNow: async () => NOW }));
@@ -30,6 +31,11 @@ vi.mock('@/db', () => ({
       return run('tx');
     },
   }),
+}));
+vi.mock('@/server/notifications/alerts', () => ({
+  notifySettlementHeld: (_db: unknown, holdId: string) => state.notified.push(['held', holdId]),
+  notifySettlementReleased: (_db: unknown, holdId: string) =>
+    state.notified.push(['released', holdId]),
 }));
 vi.mock('./hold-store', () => ({
   holdReservationInTx: async (tx: unknown, input: unknown) => {
@@ -65,6 +71,7 @@ beforeEach(() => {
   state.calls = [];
   state.result = ok({ holdId: HOLD, heldAt: NOW.toISOString() });
   state.throws = null;
+  state.notified = [];
 });
 
 describe('holdReservationSettlement', () => {
@@ -184,5 +191,31 @@ describe('releaseSettlementHold', () => {
       error: { code: 'UNAUTHENTICATED' },
     });
     expect(state.calls).toHaveLength(1);
+  });
+});
+
+describe('원장님 알림 (#489)', () => {
+  it('거래·샵 전체 보류를 걸거나 풀면 그 보류로 원장님에게 알린다', async () => {
+    await holdReservationSettlement({ reservationId: RESERVATION, reason: '확인', code: CODE });
+    await holdShopSettlement({ shopId: SHOP, reason: '확인', code: CODE });
+    state.result = ok({ holdId: HOLD, releasedAt: NOW.toISOString() });
+    await releaseSettlementHold({ holdId: HOLD, memo: '확인함' });
+    expect(state.notified).toEqual([
+      ['held', HOLD],
+      ['held', HOLD],
+      ['released', HOLD],
+    ]);
+  });
+
+  it('막히거나(이미 보류·이미 풀림·확인 실패) 저장하지 않으면 알리지 않는다', async () => {
+    state.result = fail('ALREADY_HELD', '이미 정산 보류 중이에요');
+    await holdReservationSettlement({ reservationId: RESERVATION, reason: '확인', code: CODE });
+    await holdShopSettlement({ shopId: SHOP, reason: '확인', code: CODE });
+    state.result = fail('ALREADY_RELEASED', '이미 풀린 정산 보류예요');
+    await releaseSettlementHold({ holdId: HOLD, memo: '확인함' });
+    await holdReservationSettlement({ reservationId: RESERVATION, reason: '확인', code: 'nope' });
+    state.throws = uniqueViolation('settlement_holds_shop_active_unique');
+    await holdShopSettlement({ shopId: SHOP, reason: '확인', code: CODE });
+    expect(state.notified).toEqual([]);
   });
 });
