@@ -34,11 +34,27 @@ export function reservationCode() {
  * 매물 한 줄(slots 행)에 맞는 주문·예약(·환불) 한 벌. 매물 상태로 예약 상태를 정한다
  * reserved → 예정, completed → 이용 완료(visit: visited·no_show), cancelled → 고객 취소 + 환불
  * paymentPrefix로 누가 만든 데이터인지 표시한다(seed_, scenario_)
+ * cancelledAt: 고객이 취소한 시각. 주지 않으면 지금보다 30분 전이다. 시작이 지난 매물의 위약금 거래(샘플 정산)는 시작 전 시각을 준다
  */
-export function bookingRows({ slot, customerId, recordedBy, now, visit = 'visited', paymentPrefix, policyVersion }) {
+export function bookingRows({
+  slot,
+  customerId,
+  recordedBy,
+  now,
+  visit = 'visited',
+  cancelledAt: cancelledAtInput = null,
+  paymentPrefix,
+  policyVersion,
+}) {
   const startMs = slot.start_at.getTime();
-  // 예약(결제)한 시각: 시작 20시간 전. 그게 아직 오지 않았으면 지금보다 1시간 전
-  const bookedAt = new Date(Math.min(startMs - 20 * HOUR, now.getTime() - HOUR));
+  // 예약(결제)한 시각: 시작 20시간 전. 그게 아직 오지 않았으면 지금보다 1시간 전, 취소 시각을 주면 취소보다 1시간 전
+  const bookedAt = new Date(
+    Math.min(
+      startMs - 20 * HOUR,
+      now.getTime() - HOUR,
+      cancelledAtInput ? cancelledAtInput.getTime() - HOUR : Infinity,
+    ),
+  );
   const orderId = crypto.randomUUID();
   const order = {
     id: orderId,
@@ -57,7 +73,7 @@ export function bookingRows({ slot, customerId, recordedBy, now, visit = 'visite
   };
   const cancelled = slot.status === 'cancelled';
   const completed = slot.status === 'completed';
-  const cancelledAt = cancelled ? new Date(now.getTime() - HOUR / 2) : null;
+  const cancelledAt = cancelled ? (cancelledAtInput ?? new Date(now.getTime() - HOUR / 2)) : null;
   const hoursLeft = cancelled ? (startMs - cancelledAt.getTime()) / HOUR : null;
   const reservation = {
     id: crypto.randomUUID(),

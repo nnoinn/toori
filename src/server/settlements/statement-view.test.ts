@@ -13,6 +13,7 @@ import {
   scheduledStatement,
   scheduledStatements,
   type StoredSettlement,
+  storedStatement,
   storedStatementSummary,
   type UnpaidPenalty,
 } from './statement-view';
@@ -50,6 +51,7 @@ function row(extra: Partial<SettlementRow> = {}): SettlementRow {
     hasOpenDispute: false,
     openDisputeReceivedAt: null,
     hasAdminHold: false,
+    adminHoldCode: null,
     ownerPenalty: null,
     item: null,
     ...extra,
@@ -166,6 +168,26 @@ describe('scheduledStatements: 지급 예정 정산서', () => {
     ]);
   });
 
+  it('한 장 안의 거래는 받은 순서와 상관없이 처리·취소가 늦은 것부터 놓는다', () => {
+    const items = views([
+      row(),
+      cancelledRow('customer', 30, { reservationId: 'cancel' }),
+      cancelledRow('agreed', 50, { reservationId: 'agreed', cancelledAt: kst('2026-11-15 17:00') }),
+    ]).reverse();
+    const [first] = scheduledStatements({ items, lastPayoutDate: '2026-11-12', penalties: [] });
+    expect(first.items.map((item) => item.reservationId)).toEqual(['agreed', 'visit', 'cancel']);
+  });
+
+  it('플랫폼 수수료 합계는 수수료와 그 VAT를 더한다(법인 전환 뒤 할인 10%면 4,500원 + 450원)', () => {
+    const [visit] = views([row()]);
+    const [first] = scheduledStatements({
+      items: [{ ...visit, platformFeeRate: 10, platformFee: 4_500, platformFeeVat: 450 }],
+      lastPayoutDate: '2026-11-12',
+      penalties: [],
+    });
+    expect(first.summary.platformFeeTotal).toBe(4_950);
+  });
+
   it('첫 정산(묶인 정산이 없음)은 처음 거래가 끝난 한국 날짜부터 센다', () => {
     const [first] = scheduledStatements({
       items: views([row(), cancelledRow('customer', 30, { reservationId: 'cancel' })]),
@@ -221,6 +243,8 @@ describe('scheduledStatements: 지급 예정 정산서', () => {
       payoutAmount: null,
       zeroReason: null,
     });
+    // 지급액을 모르면 뗄 패널티 건별도 보여 주지 않는다
+    expect(first.penalties).toEqual([]);
   });
 
   it('보류·원장님 사정 취소·이미 묶인 거래는 지급 예정 정산서에 넣지 않는다', () => {
@@ -267,6 +291,13 @@ describe('storedStatementSummary: 묶인 정산서', () => {
       payoutAmount: 38_515,
       zeroReason: null,
       paidAt: kst('2026-11-12 11:00').toISOString(),
+    });
+  });
+
+  it('아직 지급하지 않은 정산서는 지급 완료 시각이 없다', () => {
+    expect(storedStatementSummary(stored({ status: 'pending', paidAt: null }))).toMatchObject({
+      status: 'pending',
+      paidAt: null,
     });
   });
 
@@ -320,7 +351,10 @@ describe('buildStatementList: 정산서 목록', () => {
   it('운영자 정산 보류(#373 ②) 거래도 지급 예정 정산서에서 빠지고 보류 거래에 모인다', () => {
     const list = buildStatementList({
       stored: [],
-      unpaidItems: views([row(), row({ reservationId: 'admin-held', hasAdminHold: true })]),
+      unpaidItems: views([
+        row(),
+        row({ reservationId: 'admin-held', hasAdminHold: true, adminHoldCode: 'user_inquiry' }),
+      ]),
       lastPayoutDate: '2026-11-12',
       penalties: [],
       payoutAccount: null,
@@ -330,8 +364,50 @@ describe('buildStatementList: 정산서 목록', () => {
     expect(list.statements).toMatchObject([{ payoutDate: '2026-11-19', counts: { sale: 1 } }]);
     expect(list.held.count).toBe(1);
     expect(list.held.items).toMatchObject([
-      { reservationId: 'admin-held', status: 'held', hold: { reason: 'admin' } },
+      {
+        reservationId: 'admin-held',
+        status: 'held',
+        hold: { reason: 'admin', code: 'user_inquiry' },
+      },
     ]);
+  });
+});
+
+describe('buildStatementList: 기간 경계', () => {
+  it('지급 예정 정산서는 지급일이 기간의 시작일·끝일과 같아도 넣고, 밖이면 뺀다', () => {
+    const list = (from: string, to: string) =>
+      buildStatementList({
+        stored: [],
+        unpaidItems: views([row(), wednesday]),
+        lastPayoutDate: '2026-11-12',
+        penalties: [],
+        payoutAccount: null,
+        period: { from, to },
+        now: NOW,
+      }).statements.map((statement) => statement.payoutDate);
+    expect(list('2026-11-19', '2026-11-19')).toEqual(['2026-11-19']);
+    expect(list('2026-11-26', '2026-11-26')).toEqual(['2026-11-26']);
+    expect(list('2026-11-20', '2026-11-25')).toEqual([]);
+    expect(list('2026-11-19', '2026-11-26')).toEqual(['2026-11-26', '2026-11-19']);
+  });
+});
+
+describe('storedStatement: 묶인 정산서 한 장', () => {
+  it('요약에 그 정산의 거래·뗀 패널티 건별·지급 계좌를 붙인다', () => {
+    const items = views([row({ item: pendingItem })]);
+    const penalties = [{ reservationCode: '300000000001', amount: 5_000 }];
+    const statement = storedStatement({
+      stored: stored(),
+      items,
+      penalties,
+      payoutAccount: null,
+    });
+    expect(statement).toEqual({
+      ...storedStatementSummary(stored()),
+      items,
+      penalties,
+      payoutAccount: null,
+    });
   });
 });
 

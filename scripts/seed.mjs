@@ -22,6 +22,9 @@ import {
   SEED_CUSTOMERS,
   SEED_EMAIL_DOMAIN,
   SEED_SHOPS,
+  SETTLEMENT_SAMPLE_FEE_RATE,
+  SETTLEMENT_SAMPLES,
+  WINDOW_SAMPLES,
 } from './seed-data.mjs';
 
 export { salePrice };
@@ -57,6 +60,49 @@ export function rollingStarts(base, hours) {
   return starts;
 }
 
+/** 시각(ms)이 든 한국 날짜의 0시(ms) */
+function kstMidnightOf(ms) {
+  return Math.floor((ms + KST_OFFSET) / DAY) * DAY - KST_OFFSET;
+}
+
+/** 시각(ms)이 든 한국 날짜 'YYYY-MM-DD' */
+function kstDateKey(ms) {
+  return new Date(ms + KST_OFFSET).toISOString().slice(0, 10);
+}
+
+const THURSDAY = 4;
+
+/**
+ * 샘플 정산 지급일(SETTLEMENT_SAMPLES의 payout)의 한국 날짜 0시(ms). 넣는 날 바로 전 목요일이 1, 그 전 목요일이 2다.
+ * 넣는 날이 목요일이면 바로 전 목요일은 7일 전이다
+ */
+export function samplePayoutMidnight(base, payout) {
+  const today = kstMidnightOf(base);
+  const weekday = new Date(today + KST_OFFSET).getUTCDay();
+  const back = (weekday - THURSDAY + 7) % 7 || 7;
+  return today - (back + (payout - 1) * 7) * DAY;
+}
+
+/** 시간대 매물 샘플(WINDOW_SAMPLES) 하나의 시간 범위들. rollingDays는 넣은 날로부터 그 날째의 from~to이고 쉬는 요일은 뺀다 */
+export function windowRanges(base, hours, sample) {
+  if (sample.rollingDays === undefined) {
+    const start = base + sample.at * HOUR;
+    return [{ start: new Date(start), end: new Date(start + sample.hours * HOUR) }];
+  }
+  const clock = (hhmm) => {
+    const [hour, minute] = hhmm.split(':').map(Number);
+    return hour * HOUR + minute * 60 * 1000;
+  };
+  const closed = new Set(hours.filter((h) => h.closed).map((h) => h.weekday));
+  return sample.rollingDays
+    .map((day) => kstMidnightOf(base) + day * DAY)
+    .filter((midnight) => !closed.has(new Date(midnight + KST_OFFSET).getUTCDay()))
+    .map((midnight) => ({
+      start: new Date(midnight + clock(sample.from)),
+      end: new Date(midnight + clock(sample.to)),
+    }));
+}
+
 /** 시드 계정(userIds)의 데이터를 지운다. 로그인 정보(auth.users)와 profiles는 다음 시드에서 다시 쓰려고 남긴다 */
 async function clearSeedData(sql, userIds) {
   // 조각(fragment)은 쿼리마다 새로 만든다
@@ -74,12 +120,18 @@ async function clearSeedData(sql, userIds) {
   // 결제·예약·정산·알림(W1b): 시드 매물·고객·샵을 가리키는 행부터 지운다
   await sql`delete from refunds where order_id in (${seedOrders()}) or reservation_id in (${seedReservations()})`;
   await sql`delete from disputes where reservation_id in (${seedReservations()})`;
+  // 11/22: 그 뒤에 생긴 표도 시드 예약·샵을 가리킬 수 있다(팀원이 시드 샵으로 시험한 합의 후 취소 요청·정산 보류·계좌 변경 기록)
+  await sql`delete from agreed_cancel_requests where reservation_id in (${seedReservations()})`;
+  await sql`delete from settlement_holds where reservation_id in (${seedReservations()}) or shop_id in (${seedShops()})`;
   await sql`delete from penalty_collections where penalty_id in (${seedPenalties()}) or settlement_id in (select id from settlements where shop_id in (${seedShops()}))`;
   await sql`delete from owner_penalties where id in (${seedPenalties()})`;
   await sql`delete from settlement_items where shop_id in (${seedShops()}) or order_id in (${seedOrders()})`;
   await sql`delete from settlements where shop_id in (${seedShops()})`;
-  await sql`update orders set coupon_id = null where id in (${seedOrders()})`;
-  await sql`delete from coupons where customer_id in (${seedCustomers()}) or source_reservation_id in (${seedReservations()}) or used_order_id in (${seedOrders()})`;
+  // 지울 쿠폰을 쓴 주문은 시드가 아니어도 쿠폰 연결을 먼저 끊는다(시드 예약에서 받은 보상 쿠폰을 팀원 고객이 다른 샵에서 쓴 경우)
+  const seedCoupons = () =>
+    sql`select id from coupons where customer_id in (${seedCustomers()}) or source_reservation_id in (${seedReservations()}) or used_order_id in (${seedOrders()})`;
+  await sql`update orders set coupon_id = null where id in (${seedOrders()}) or coupon_id in (${seedCoupons()})`;
+  await sql`delete from coupons where id in (${seedCoupons()})`;
   await sql`delete from reservations where id in (${seedReservations()})`;
   await sql`delete from orders where id in (${seedOrders()})`;
   await sql`delete from favorites where customer_id in (${seedCustomers()}) or shop_id in (${seedShops()})`;
@@ -88,7 +140,11 @@ async function clearSeedData(sql, userIds) {
   await sql`delete from push_subscriptions where user_id in ${sql(userIds)}`;
   await sql`update slots set hold_customer_id = null, hold_expires_at = null where hold_customer_id in (${seedCustomers()})`;
   await sql`delete from slots where shop_id in (${seedShops()}) or created_by in ${sql(userIds)}`;
+  // 시간대 매물(#308)은 그 안에서 만든 매물(slots.window_id)을 지운 뒤에 지운다
+  await sql`delete from slot_window_menus where window_id in (select id from slot_windows where shop_id in (${seedShops()}))`;
+  await sql`delete from slot_windows where shop_id in (${seedShops()})`;
   await sql`delete from shop_images where shop_id in (${seedShops()})`;
+  await sql`delete from payout_account_changes where shop_id in (${seedShops()})`;
   await sql`delete from payout_accounts where shop_id in (${seedShops()})`;
   await sql`delete from menus where shop_id in (${seedShops()})`;
   await sql`delete from shops where owner_id in (${seedOwners()})`;
@@ -148,8 +204,8 @@ export async function seedDevData(sql, { now, userIds }) {
   const customers = SEED_CUSTOMERS.map((c, i) => ({
     id: crypto.randomUUID(),
     user_id: userIds[`customer-${c.key}`],
-    // 예약자 이름(#375). 시드 이름은 현동훈이 넣기 전까지 닉네임과 같게 둔다
-    name: c.nickname,
+    // 예약자 이름(#375). 원장님 화면에 닉네임 대신 이 이름이 보여야 한다
+    name: c.name,
     nickname: c.nickname,
     // 가입 때 휴대폰 번호를 받는다(11/2, #183). 원장님 예약 상세에 연락처가 보이게
     phone: `010-0001-${pad(i + 1, 4)}`,
@@ -163,6 +219,10 @@ export async function seedDevData(sql, { now, userIds }) {
   const shops = [];
   const menus = [];
   const slots = [];
+  const windows = [];
+  const windowMenus = [];
+  const sampleBookings = [];
+  const shopIdByKey = {};
   SEED_SHOPS.forEach((shop, i) => {
     const n = i + 1;
     const ownerUserId = userIds[`owner-${shop.key}`];
@@ -171,6 +231,7 @@ export async function seedDevData(sql, { now, userIds }) {
     owners.push({ id: ownerId, user_id: ownerUserId, name: ownerName, phone: `010-0000-${pad(n, 4)}` });
 
     const shopId = crypto.randomUUID();
+    shopIdByKey[shop.key] = shopId;
     const reviewed = shop.status !== 'pending';
     shops.push({
       id: shopId,
@@ -271,12 +332,58 @@ export async function seedDevData(sql, { now, userIds }) {
         slots.push(slotRow(visible[k % visible.length], startAt, rates[k % rates.length], newOnly, 'scheduled'));
       });
     }
+
+    // 시간대 매물 샘플(WINDOW_SAMPLES, #308)
+    for (const sample of WINDOW_SAMPLES.filter((w) => w.shop === shop.key)) {
+      for (const { start, end } of windowRanges(base, shop.hours, sample)) {
+        const windowId = crypto.randomUUID();
+        const publishAt = new Date(start.getTime() - PUBLISH_BEFORE_HOURS * HOUR);
+        windows.push({
+          id: windowId,
+          shop_id: shopId,
+          start_at: start,
+          end_at: end,
+          publish_at: publishAt,
+          status: publishAt <= now ? 'published' : 'scheduled',
+          new_customer_only: false,
+          created_by: ownerUserId,
+        });
+        for (const { menu: key, rate } of sample.menus) {
+          const menu = menuByKey[key];
+          windowMenus.push({
+            window_id: windowId,
+            menu_id: menu.id,
+            service_type: menu.service_type,
+            menu_name: menu.name,
+            list_price: menu.list_price,
+            duration_minutes: menu.duration_minutes,
+            discount_rate: rate,
+            sale_price: salePrice(menu.list_price, rate),
+          });
+        }
+      }
+    }
+
+    // 샘플 정산 거래(SETTLEMENT_SAMPLES). 지난 매물이라 위 매물·시험 매물과 시간이 겹치지 않는다
+    SETTLEMENT_SAMPLES.forEach((sample, sampleIndex) => {
+      if (sample.shop !== shop.key) return;
+      const payoutMidnight = samplePayoutMidnight(base, sample.payout);
+      for (const item of sample.items) {
+        const startAt = new Date(payoutMidnight - item.day * DAY + item.hour * HOUR);
+        const status = item.result === 'cancelled' ? 'cancelled' : 'completed';
+        const row = slotRow(menuByKey[item.menu], startAt, item.rate, false, status);
+        slots.push(row);
+        sampleBookings.push({ row, item, sampleIndex, ownerUserId });
+      }
+    });
   });
 
   await sql`insert into owners ${sql(owners)}`;
   await sql`insert into shops ${sql(shops)}`;
   await sql`insert into menus ${sql(menus)}`;
   await sql`insert into slots ${sql(slots)}`;
+  await sql`insert into slot_windows ${sql(windows)}`;
+  await sql`insert into slot_window_menus ${sql(windowMenus)}`;
 
   // 예약된·완료된·취소된 매물마다 주문(결제)과 예약을 하나씩. 취소된 매물은 고객 취소와 환불 기록까지
   const booked = bookings.map(({ row, slot, ownerUserId }) =>
@@ -290,15 +397,109 @@ export async function seedDevData(sql, { now, userIds }) {
       policyVersion: 'seed',
     }),
   );
-  await insertBookings(sql, booked);
+  // 샘플 정산 거래는 모두 고객 B의 예약이다. 위약금 거래는 시작 cancelHours시간 전에 취소했다
+  const sampleEntries = sampleBookings.map(({ row, item, sampleIndex, ownerUserId }) => ({
+    item,
+    sampleIndex,
+    booking: bookingRows({
+      slot: row,
+      customerId: customerIdByKey.b,
+      recordedBy: ownerUserId,
+      now,
+      visit: item.result === 'no_show' ? 'no_show' : 'visited',
+      cancelledAt:
+        item.result === 'cancelled'
+          ? new Date(row.start_at.getTime() - item.cancelHours * HOUR)
+          : undefined,
+      paymentPrefix: 'seed_',
+      policyVersion: 'seed',
+    }),
+  }));
+  await insertBookings(sql, [...booked, ...sampleEntries.map((entry) => entry.booking)]);
+
+  const sample = sampleSettlementRows(base, sampleEntries, shopIdByKey);
+  await sql`insert into settlements ${sql(sample.settlements)}`;
+  await sql`insert into settlement_items ${sql(sample.items)}`;
 
   return {
     accounts: SEED_ACCOUNTS.length,
     shops: shops.length,
     menus: menus.length,
     slots: slots.length,
-    reservations: booked.length,
+    windows: windows.length,
+    reservations: booked.length + sampleEntries.length,
+    settlements: sample.settlements.length,
   };
+}
+
+/**
+ * 샘플 정산 묶음(SETTLEMENT_SAMPLES)의 정산·정산 줄. 계산은 목요일 정산 묶기(src/server/settlements/batch-rules.ts의
+ * buildShopSettlement)와 같고 오픈 기간(플랫폼 수수료 0%)이다. 같은지는 tests/db/seed.test.ts가 본다
+ * (스크립트에서 TS 파일을 부르지 않으려고 여기 다시 둔다). entries: { item, sampleIndex, booking(bookingRows) }
+ */
+function sampleSettlementRows(base, entries, shopIdByKey) {
+  const settlements = [];
+  const items = [];
+  SETTLEMENT_SAMPLES.forEach((sample, sampleIndex) => {
+    const shopId = shopIdByKey[sample.shop];
+    const settlementId = crypto.randomUUID();
+    const payoutMidnight = samplePayoutMidnight(base, sample.payout);
+    // 같은 샵의 더 이른 샘플 지급일이 직전 지급일이다(payout 숫자가 클수록 이르다)
+    const earlier = SETTLEMENT_SAMPLES.filter(
+      (other) => other.shop === sample.shop && other.payout > sample.payout,
+    ).map((other) => samplePayoutMidnight(base, other.payout));
+    const mine = entries.filter((entry) => entry.sampleIndex === sampleIndex);
+    const rows = mine.map(({ item, booking }) => {
+      const kind =
+        item.result === 'visited' ? 'sale' : item.result === 'no_show' ? 'no_show' : 'penalty';
+      const sale = booking.order.sale_price;
+      // 기준 금액: 이용 완료·노쇼는 판매가, 고객 취소는 판매가 × 위약금 비율(원 미만 버림)
+      const baseAmount =
+        kind === 'penalty' ? Math.floor((sale * booking.refund.penalty_rate) / 100) : sale;
+      const paymentFee = Math.floor((baseAmount * SETTLEMENT_SAMPLE_FEE_RATE) / 100);
+      const paymentFeeVat = Math.floor(paymentFee / 10);
+      return {
+        shop_id: shopId,
+        order_id: booking.order.id,
+        kind,
+        base_amount: baseAmount,
+        fee_rate: 0,
+        fee_amount: 0,
+        fee_vat: 0,
+        payment_fee_rate: SETTLEMENT_SAMPLE_FEE_RATE,
+        payment_fee: paymentFee,
+        payment_fee_vat: paymentFeeVat,
+        payout_amount: baseAmount - paymentFee - paymentFeeVat,
+        coupon_amount: 0,
+        settlement_id: settlementId,
+      };
+    });
+    // 첫 정산은 처음 묶이는 거래가 끝난 날(방문·노쇼 처리나 취소 시각)부터
+    const occurred = mine.map(({ booking }) =>
+      (booking.reservation.cancelled_at ?? booking.reservation.visit_recorded_at).getTime(),
+    );
+    const sum = (key) => rows.reduce((total, row) => total + row[key], 0);
+    settlements.push({
+      id: settlementId,
+      shop_id: shopId,
+      period_start:
+        earlier.length > 0
+          ? kstDateKey(Math.max(...earlier) + DAY)
+          : kstDateKey(Math.min(...occurred)),
+      period_end: kstDateKey(payoutMidnight),
+      item_count: rows.length,
+      total_base_amount: sum('base_amount'),
+      total_fee_amount: sum('payment_fee') + sum('payment_fee_vat'),
+      penalty_deducted: 0,
+      payout_amount: sum('payout_amount'),
+      status: sample.status,
+      paid_at: sample.status === 'paid' ? new Date(payoutMidnight + 10 * HOUR) : null,
+      payout_ref: sample.status === 'pending' ? null : `seed_payout_${sampleIndex + 1}`,
+      memo: null,
+    });
+    items.push(...rows);
+  });
+  return { settlements, items };
 }
 
 /**
@@ -360,7 +561,7 @@ async function main() {
     const userIds = await ensureSeedUsers(sql, supabaseUrl, secretKey);
     const result = await sql.begin((tx) => seedDevData(tx, { now: new Date(), userIds }));
     console.log(
-      `시드를 넣었어요: 계정 ${result.accounts}, 샵 ${result.shops}, 메뉴 ${result.menus}, 매물 ${result.slots}, 예약 ${result.reservations}`,
+      `시드를 넣었어요: 계정 ${result.accounts}, 샵 ${result.shops}, 메뉴 ${result.menus}, 매물 ${result.slots}, 시간대 매물 ${result.windows}, 예약 ${result.reservations}, 샘플 정산 ${result.settlements}`,
     );
   } finally {
     await sql.end();

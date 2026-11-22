@@ -31,6 +31,7 @@ import {
 } from '../format';
 import { DISPUTE_TYPE_LABELS, labelDisputeStatus, toKstInputValue } from '../../disputes/format';
 import { labelReservation } from '../../lookup';
+import { AGREED_REQUEST_STATUS_LABELS, agreedCancelReasonText } from '../../shops/format';
 import { HoldAction } from '../../settlements/hold-actions';
 import { HoldList } from '../../settlements/hold-list';
 import { reservationHoldBlock } from '../../settlements/hold-panel';
@@ -39,11 +40,14 @@ import {
   selectReservationHolds,
   type SettlementHoldRow,
 } from '../../settlements/hold-queries';
+import { type AgreedCancelView, agreedCancelViews } from '../agreed-cancel-format';
+import { selectReservationAgreedCancels } from '../agreed-cancel-queries';
 import { selectReservationDetail } from '../queries';
 import { OwnerFaultCancelAction } from './owner-fault-action';
 import { type OwnerFaultPanel, ownerFaultPanel } from './owner-fault-panel';
 import { RegisterDispute } from './register-dispute';
 import { VisitAction } from './visit-actions';
+import { VoidAction } from './void-action';
 import { type VisitPanel, visitPanel } from './visit-panel';
 
 export const metadata: Metadata = { title: '예약 정보' };
@@ -55,7 +59,8 @@ const when = (date: Date | null) => (date ? formatKst(date) : '-');
 // 예약 상세 (A-103). 주소: /admin/reservations/[reservationId]. 결제와 취소·환불 기록, 운영자 확인 이유를 본다.
 // 카카오톡 채널로 받은 이의제기는 여기서 등록한다(A-104, [이의제기 등록]). 이미 있으면 그 이의제기로 보낸다.
 // 원장님이 못 하면 운영자가 원장님 사정으로 대신 취소한다(#373 ③-2, '취소·환불' 칸)
-// 정산에 묶이기 전이면 이 거래의 정산을 보류하고 푼다(#373 ②)
+// 정산에 묶이기 전이면 이 거래의 정산을 보류하고 푼다(#373 ②).
+// 원장님의 합의 후 취소 요청과 손님의 답(X-208)도 본다. 보기만 하고 운영자가 대신 요청하거나 답하지는 않는다
 export default function AdminReservationPage({ params }: { params: Params }) {
   return (
     <main className="flex w-full max-w-4xl flex-1 flex-col gap-4 p-6">
@@ -83,11 +88,12 @@ async function Detail({ params }: { params: Params }) {
     targetId: reservationId,
     path: `/admin/reservations/${reservationId}`,
   });
-  const [now, refundTarget, holds, shopHeld] = await Promise.all([
+  const [now, refundTarget, holds, shopHeld, agreedCancels] = await Promise.all([
     getRequestNow(),
     readRefundTargetById(reservationId, db),
     selectReservationHolds(db, reservationId),
     isShopHeld(db, detail.shopId),
+    selectReservationAgreedCancels(db, reservationId),
   ]);
   const ownerFault: OwnerFaultPanel = refundTarget
     ? ownerFaultPanel(refundTarget, now)
@@ -119,6 +125,7 @@ async function Detail({ params }: { params: Params }) {
           <div className="flex items-center gap-2">
             <CardTitle className="text-lg">{detail.code}</CardTitle>
             <Badge variant="secondary">{labelReservation(detail.status, detail.visitResult)}</Badge>
+            {detail.voidedAt ? <Badge variant="outline">무효</Badge> : null}
           </div>
         </CardHeader>
         <CardContent>
@@ -199,6 +206,44 @@ async function Detail({ params }: { params: Params }) {
 
       <Card>
         <CardHeader>
+          <CardTitle>예약 무효</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 text-sm">
+          {detail.voidedAt ? (
+            <p>
+              {formatKstDateTime(detail.voidedAt)}에 무효로 처리했어요. 손님에게 남은 결제액과
+              사용한 쿠폰을 돌려줬고, 원장님 정산 기준 금액은 0원이에요.
+            </p>
+          ) : (
+            <>
+              <p className="text-muted-foreground">
+                원장님이 손님에게 전액 환불을 요청했을 때만 써요(고객센터 분쟁이 타협되지 않아
+                원장님이 동의한 경우 포함). 원장님 사정으로 서비스를 못 한 것이면 무효가 아니라
+                원장님 사정 취소예요.
+              </p>
+              <VoidAction reservationId={detail.reservationId} />
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>합의 후 취소 요청</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm">
+          <AgreedCancelList
+            requests={agreedCancelViews(
+              agreedCancels,
+              { status: detail.status, visitResult: detail.visitResult },
+              now,
+            )}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>방문·노쇼</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 text-sm">
@@ -219,6 +264,10 @@ async function Detail({ params }: { params: Params }) {
               >
                 {labelDisputeStatus(detail.dispute.status, detail.dispute.outcome)} · 이의제기 보기
               </Link>
+            </p>
+          ) : detail.voidedAt ? (
+            <p className="text-muted-foreground">
+              무효로 처리한 예약이라 새 이의제기를 받지 않아요.
             </p>
           ) : (
             <>
@@ -305,6 +354,32 @@ function HoldPanelView({
       )}
       {holds.length > 0 ? <HoldList holds={holds} /> : null}
     </>
+  );
+}
+
+/** 합의 후 취소 요청 칸(X-208). 최근 요청부터, 지금 상태와 그 상태의 시각 */
+function AgreedCancelList({ requests }: { requests: AgreedCancelView[] }) {
+  if (requests.length === 0) {
+    return <p className="text-muted-foreground">원장님이 합의 후 취소를 요청한 적이 없어요</p>;
+  }
+  return (
+    <ul className="flex flex-col divide-y">
+      {requests.map((request) => (
+        <li key={request.requestId} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
+          <p className="flex flex-wrap items-center gap-2">
+            <span>{formatKstDateTime(request.requestedAt)} 원장님 요청</span>
+            <Badge variant={request.status === 'requested' ? 'default' : 'secondary'}>
+              {AGREED_REQUEST_STATUS_LABELS[request.status]}
+            </Badge>
+          </p>
+          <p className="break-all">
+            <span className="text-muted-foreground">사유 </span>
+            {agreedCancelReasonText(request.reason, request.reasonText)}
+          </p>
+          {request.timeText ? <p className="text-muted-foreground">{request.timeText}</p> : null}
+        </li>
+      ))}
+    </ul>
   );
 }
 

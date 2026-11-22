@@ -27,7 +27,8 @@ const CONFIRM_TEXT: Partial<Record<DisputeOutcome, string>> = {
 };
 
 // 확인 중인 이의제기의 결론 기록 칸(A-104). 결론을 고르고 메모(사유)를 적은 뒤 확인 창에서 한 번 더 확인한다.
-// 처리 기능이 준비 중인 결론(환불 예외·무효·원장님 사정 취소)과 이 예약에서 고를 수 없는 결론은 막아 둔다(#350 리뷰).
+// 처리 기능이 준비 중인 결론(환불 예외·원장님 사정 취소)과 이 예약에서 고를 수 없는 결론은 막아 둔다(#350 리뷰).
+// 무효는 여기서 고르지 않고 예약 상세의 [예약 무효]로 처리한다. 무효가 끝나면 결론이 무효로 기록된다(A-108)
 // 성공하면 서버 함수가 화면을 새로 읽게 해서 결론이 보이고 이 칸은 사라진다
 export function ResolveForm({
   disputeId,
@@ -79,7 +80,12 @@ export function ResolveForm({
                 onChange={() => setOutcome(option.value)}
               />
               {option.label}
-              {!option.ready ? <span className="text-xs">준비 중</span> : null}
+              {/* 무효는 예약 상세의 [예약 무효]로 처리하면 이 이의제기의 결론도 무효로 기록된다(A-108, 11/22) */}
+              {option.value === 'voided' ? (
+                <span className="text-xs">예약 상세의 [예약 무효]로 처리하면 저절로 기록돼요</span>
+              ) : !option.ready ? (
+                <span className="text-xs">준비 중</span>
+              ) : null}
               {option.ready && !option.allowed ? (
                 <span className="text-xs">노쇼 예약만</span>
               ) : null}

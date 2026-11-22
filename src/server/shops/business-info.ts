@@ -21,6 +21,7 @@ import {
   lockBusinessInfo,
   saveBusinessUpdate,
 } from './business-info-store';
+import { checkBusinessWithNts, ntsBlockError, ntsFieldsChanged, ntsRecord } from './nts';
 import { SHOP_REVIEW_ERRORS } from './review-store';
 
 /** 변경 사유 글자 수 */
@@ -49,7 +50,8 @@ export async function updateShopBusinessInfo(
   const id = z.uuid().safeParse(shopId);
   if (!id.success) return fail('SHOP_NOT_FOUND', SHOP_REVIEW_ERRORS.SHOP_NOT_FOUND);
 
-  const checked = validateBusinessInput(input, kstDateKey(await getRequestNow()));
+  const now = await getRequestNow();
+  const checked = validateBusinessInput(input, kstDateKey(now));
   const fieldErrors: AdminBusinessFieldErrors = checked.ok ? {} : { ...checked.fieldErrors };
   const reason = (input?.reason ?? '').trim();
   if (reason === '') fieldErrors.reason = '변경 사유를 입력해 주세요';
@@ -79,10 +81,26 @@ export async function updateShopBusinessInfo(
       const doc = await assertBusinessDocPath({ shopId: id.data }, values.businessDocPath);
       if (!doc.ok) return doc;
     }
+    // 번호·개업일자·대표자 이름을 바꾸면 국세청에 다시 확인한다(#208). 다름·휴폐업이면 저장하지 않는다.
+    // 운영자가 드물게 하는 일이라 샵을 잠근 채로 부른다(최대 NTS_TIMEOUT_MS)
+    let nts: ReturnType<typeof ntsRecord> | null = null;
+    if (ntsFieldsChanged(values, saved)) {
+      const check = await checkBusinessWithNts({
+        businessNumber: values.businessRegistrationNumber,
+        openedOn: values.openedOn,
+        representativeName: values.representativeName,
+      });
+      const blocked = ntsBlockError(check);
+      if (blocked) return blocked;
+      nts = ntsRecord(check, now);
+    }
     await saveBusinessUpdate(tx, {
       shopId: id.data,
       adminId: auth.data.userId,
-      values: Object.fromEntries(changed.map((field) => [field, values[field]])),
+      values: {
+        ...Object.fromEntries(changed.map((field) => [field, values[field]])),
+        ...(nts ?? {}),
+      },
       changed,
       reason,
     });

@@ -9,6 +9,7 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { getDb } from '@/db';
 import { customers, owners, payoutAccounts, shops, termsAgreements } from '@/db/schema';
 import type { AccountType, TermsType } from '@/db/schema/accounts';
+import type { NtsCheckResult } from '@/db/schema/shops';
 import type { GeoPoint } from '@/db/schema/types';
 import { TERMS_VERSIONS } from '@/server/policy';
 
@@ -245,6 +246,9 @@ export type NewOwnerAccount = {
     businessRegistrationNumber: string;
     openedOn: string;
     businessDocPath: string;
+    /** 국세청 진위확인 결과(#208). 건너뛰었으면 비운다 */
+    ntsCheck?: NtsCheckResult | null;
+    ntsCheckedAt?: Date | null;
   };
   /** 계좌번호는 암호화한 값만 받는다 */
   payout: {

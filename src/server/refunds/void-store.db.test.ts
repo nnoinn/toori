@@ -10,6 +10,7 @@ import {
   adminActions,
   agreedCancelRequests,
   coupons,
+  disputes,
   orders,
   refunds,
   reservations,
@@ -36,6 +37,7 @@ import {
   readStaleVoids,
   readVoidTarget,
   startVoid,
+  VOID_DISPUTE_RESULT,
 } from './void-store';
 
 type Db = ReturnType<typeof getDb>;
@@ -359,6 +361,34 @@ describeDb('예약 무효 저장 (실제 DB)', () => {
 
         // 두 번째로 끝내면(정리 작업과 겹침) 아무것도 바꾸지 않는다
         expect(await finish(tx, made, paidAmount)).toBeNull();
+      });
+    });
+
+    it('확인 중인 이의제기는 결론을 무효로 기록하고, 결론을 기록한 운영자는 무효를 시작한 운영자다(11/22)', async () => {
+      await withRollback(async (tx) => {
+        const { made, paidAmount, adminId } = await bookingWithCoupon(tx);
+        await tx.insert(disputes).values({
+          reservationId: made.reservation.id,
+          type: 'refund_exception',
+          content: '시험',
+          status: 'open',
+          channel: 'app',
+          receivedAt: new Date(NOW.getTime() - 60 * 60 * 1000),
+        });
+        await start(tx, made, paidAmount, adminId);
+        await finish(tx, made, paidAmount);
+
+        const [dispute] = await tx
+          .select()
+          .from(disputes)
+          .where(eq(disputes.reservationId, made.reservation.id));
+        expect(dispute).toMatchObject({
+          status: 'resolved',
+          outcome: 'voided',
+          result: VOID_DISPUTE_RESULT,
+          handledBy: adminId,
+          handledAt: NOW,
+        });
       });
     });
 

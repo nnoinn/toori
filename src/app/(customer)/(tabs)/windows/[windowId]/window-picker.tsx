@@ -55,7 +55,7 @@ export function WindowPicker({ window }: { window: SlotWindowDetail }) {
   const badges: SlotBadgeKind[] = [];
   if (timeFlags?.nonRefundable) badges.push('nonRefundable');
   if (timeFlags?.imminent) badges.push('imminent');
-  if (window.newCustomerOnly) badges.push('newCustomerOnly');
+  // 신규 고객 전용 배지는 고객 화면에 보여 주지 않는다(11/16 nnoinn, #459)
 
   function chooseMenu(menuId: string) {
     setError(null);

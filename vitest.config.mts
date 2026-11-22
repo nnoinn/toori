@@ -24,6 +24,8 @@ export default defineConfig({
     env: {
       // 테스트 안의 서버 코드(getDb)는 개발 DB가 아니라 테스트 DB에만 접속한다. 테스트 DB가 없으면 비워 둔다
       DATABASE_URL: process.env.TEST_DATABASE_URL ?? '',
+      // 테스트는 국세청 진위확인(#208)을 실제로 부르지 않는다. 키가 셸에 있어도 비워서 건너뛰게 한다(필요한 테스트는 가짜 응답을 넘긴다)
+      NTS_SERVICE_KEY: '',
     },
   },
 });

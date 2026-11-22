@@ -16,6 +16,7 @@ const state = vi.hoisted(() => ({
   geocode: vi.fn(),
   saveOwnerAccount: vi.fn(),
   cookieSet: vi.fn(),
+  nts: vi.fn(),
 }));
 
 vi.mock('next/headers', () => ({ cookies: async () => ({ set: state.cookieSet }) }));
@@ -36,6 +37,11 @@ vi.mock('@/server/payouts/account-crypto', () => ({
 }));
 vi.mock('./current-account', () => ({ getSessionUser: async () => state.user }));
 vi.mock('./account-store', () => ({ saveOwnerAccount: state.saveOwnerAccount }));
+// 국세청 진위확인(#208)은 결과만 바꿔 끼운다. 막는 결과의 실패 문구 등은 진짜를 쓴다
+vi.mock('@/server/shops/nts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/server/shops/nts')>()),
+  checkBusinessWithNts: state.nts,
+}));
 
 function input(change: (value: CreateOwnerAccountInput) => void = () => {}) {
   const value: CreateOwnerAccountInput = {
@@ -73,6 +79,7 @@ beforeEach(() => {
   state.existingOwner = false;
   state.geocode.mockResolvedValue({ ok: true, data: GEOCODED });
   state.saveOwnerAccount.mockResolvedValue({ ownerId: 'owner-1', shopId: 'shop-1' });
+  state.nts.mockResolvedValue({ result: 'verified' });
 });
 
 describe('createOwnerAccount', () => {
@@ -98,6 +105,8 @@ describe('createOwnerAccount', () => {
         businessRegistrationNumber: '1234567891',
         openedOn: '2025-03-01',
         businessDocPath: DOC,
+        ntsCheck: 'verified',
+        ntsCheckedAt: new Date('2026-10-28T06:00:00Z'),
       },
       payout: {
         bankCode: '088',
@@ -111,6 +120,42 @@ describe('createOwnerAccount', () => {
       'owner',
       expect.objectContaining({ httpOnly: true }),
     );
+  });
+
+  it('국세청에 숫자 10자리 번호·개업일자·대표자 이름을 보낸다(#208)', async () => {
+    await createOwnerAccount(input());
+    expect(state.nts).toHaveBeenCalledWith({
+      businessNumber: '1234567891',
+      openedOn: '2025-03-01',
+      representativeName: '김원장',
+    });
+  });
+
+  it.each([
+    ['mismatch', 'NTS_MISMATCH'],
+    ['suspended', 'NTS_SUSPENDED'],
+    ['closed', 'NTS_CLOSED'],
+  ])('국세청 결과가 %s면 주소 변환·저장 없이 %s(#208)', async (result, code) => {
+    state.nts.mockResolvedValue({ result });
+    const saved = await createOwnerAccount(input());
+    expect(saved.ok ? null : saved.error.code).toBe(code);
+    expect(state.geocode).not.toHaveBeenCalled();
+    expect(state.saveOwnerAccount).not.toHaveBeenCalled();
+  });
+
+  it('국세청이 응답하지 않으면 막지 않고 확인 못 함으로, 키가 없어 건너뛰면 비워서 저장한다(#208)', async () => {
+    state.nts.mockResolvedValue({ result: 'unavailable' });
+    await createOwnerAccount(input());
+    expect(state.saveOwnerAccount.mock.calls[0][1].shop).toMatchObject({
+      ntsCheck: 'unavailable',
+      ntsCheckedAt: new Date('2026-10-28T06:00:00Z'),
+    });
+    state.nts.mockResolvedValue({ result: 'skipped' });
+    await createOwnerAccount(input());
+    expect(state.saveOwnerAccount.mock.calls[1][1].shop).toMatchObject({
+      ntsCheck: null,
+      ntsCheckedAt: null,
+    });
   });
 
   it('상세 주소가 비어 있으면 null, 개업일이 오늘이면 된다', async () => {
