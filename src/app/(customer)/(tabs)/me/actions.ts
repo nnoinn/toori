@@ -46,7 +46,7 @@ export async function updateMyPhone(input: unknown): Promise<Result<{ phone: str
   if (parsed.data === null) return fail('PHONE_REQUIRED', '휴대폰 번호를 입력해 주세요');
   const phone = parsed.data;
   try {
-    await getDb().update(customers).set({ phone }).where(eq(customers.id, auth.data.customerId));
+    await getDb().update(customers).set({ phone });
   } catch (error) {
     console.error('[updateMyPhone] 저장 실패:', error instanceof Error ? error.name : 'unknown');
     return fail('SAVE_FAILED', '저장하지 못했어요. 잠시 후 다시 시도해 주세요');
