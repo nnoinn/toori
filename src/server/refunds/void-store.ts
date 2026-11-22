@@ -296,7 +296,7 @@ export async function finishVoid(
       handledBy: startedBy?.adminId ?? null,
       handledAt: input.now,
     })
-    .where(and(eq(disputes.reservationId, input.reservationId), eq(disputes.status, 'open')));
+    .where(and(eq(disputes.reservationId, input.reservationId), eq(disputes.status, 'resolved')));
 
   // 아직 묶이지 않은 정산 줄은 지운다(무효는 기준 금액 0). 묶인 줄은 지우지 않고 알린다(시작할 때 막지만 정산 묶기와 겹친 경우)
   await tx
