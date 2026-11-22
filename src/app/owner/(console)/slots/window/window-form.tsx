@@ -20,6 +20,7 @@ import { createSlotWindows } from '@/server/slot-windows/actions';
 import type { LastWindowSettings } from '@/server/slot-windows/types';
 
 import { weekdayOfKey } from '../calendar-days';
+import { useFreshAfterLeave } from '../fresh-after-leave';
 import { dateKeyLabel, SlotDateCalendar } from '../slot-date-calendar';
 import type { SlotMenuOption } from '../slot-form';
 import { canOpenStep, StepNav } from '../slot-form-steps';
@@ -39,14 +40,7 @@ type WindowStep = 1 | 2 | 3 | 4;
 
 const WINDOW_STEPS = ['시간', '서비스', '할인율', '확인'] as const;
 
-export function WindowForm({
-  shopId,
-  nowIso,
-  businessHours,
-  menus,
-  busy,
-  lastSettings,
-}: {
+type WindowFormProps = {
   shopId: string;
   nowIso: string;
   /** 샵 영업시간(O2). 입력하지 않은 요일은 하루 전체를 보여준다 */
@@ -57,6 +51,25 @@ export function WindowForm({
   busy: { start: string; end: string }[];
   /** 그 샵이 마지막으로 올린 시간대의 서비스·할인율. 올린 적 없으면 null */
   lastSettings: LastWindowSettings | null;
+};
+
+/** 시간대 매물 등록. 등록을 마치고 다른 화면에 갔다 돌아오면 완료 카드가 아니라 처음 상태로 연다(#534) */
+export function WindowForm(props: WindowFormProps) {
+  const { generation, markSaved } = useFreshAfterLeave();
+  return <WindowFormBody key={generation} {...props} onSaved={markSaved} />;
+}
+
+function WindowFormBody({
+  shopId,
+  nowIso,
+  businessHours,
+  menus,
+  busy,
+  lastSettings,
+  onSaved,
+}: WindowFormProps & {
+  /** 등록을 마쳤으면 true, 완료 카드에서 하나 더 올리기 시작하면 false */
+  onSaved: (saved: boolean) => void;
 }) {
   const router = useRouter();
   const now = useMemo(() => new Date(nowIso), [nowIso]);
@@ -139,6 +152,7 @@ export function WindowForm({
         })),
         newCustomerOnly,
       });
+      onSaved(true);
       // 방금 올린 시간을 ① 시간표에서 잠그도록 이미 올린 시간(busy)을 다시 읽는다. 고른 값(상태)은 그대로 남는다
       router.refresh();
     });
@@ -146,6 +160,7 @@ export function WindowForm({
 
   /** 완료 카드에서 하나 더 올리기. 서비스·할인율·신규 고객 전용은 남기고 ① 날짜·시간부터 다시 고른다 */
   function startOver() {
+    onSaved(false);
     setSaved(null);
     setDateKey('');
     setSelected(new Set());
