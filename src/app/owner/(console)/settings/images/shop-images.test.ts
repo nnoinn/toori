@@ -13,6 +13,24 @@ describe('외부 링크 검사 (S-105)', () => {
       ok: true,
       data: { instagramUrl: null, naverPlaceUrl: null },
     });
+    expect(validateShopLinks({ instagramUrl: null, naverPlaceUrl: null })).toEqual({
+      ok: true,
+      data: { instagramUrl: null, naverPlaceUrl: null },
+    });
+  });
+
+  it('글자가 아닌 값은 칸 오류이고, 주소는 300자까지 받는다', () => {
+    expect(validateShopLinks({ instagramUrl: 123 })).toEqual({
+      ok: false,
+      fieldErrors: { instagramUrl: '주소를 다시 입력해 주세요' },
+    });
+    const prefix = 'https://naver.me/';
+    const longest = `${prefix}${'a'.repeat(300 - prefix.length)}`;
+    expect(validateShopLinks({ naverPlaceUrl: longest })).toEqual({
+      ok: true,
+      data: { instagramUrl: null, naverPlaceUrl: longest },
+    });
+    expect(validateShopLinks({ naverPlaceUrl: `${longest}a` }).ok).toBe(false);
   });
 
   it.each([

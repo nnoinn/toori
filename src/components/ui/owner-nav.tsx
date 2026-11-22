@@ -2,6 +2,7 @@
 
 import {
   CalendarDays,
+  ChartColumn,
   LayoutDashboard,
   LogOut,
   SquarePlus,
@@ -20,7 +21,7 @@ type OwnerNavProps = {
   canCreateSlot?: boolean;
 };
 
-// 원장님 메뉴(대시보드 / 예약 현황 / 매물 등록 / 매장 설정 / 내 계정 / 정산). 주소는 정민석이 화면을 만들면서 바꿀 수 있다(바꾸면 여기만 고친다).
+// 원장님 메뉴(대시보드 / 예약 현황 / 매물 등록 / 매장 설정 / 내 계정 / 정산 / 통계). 주소는 정민석이 화면을 만들면서 바꿀 수 있다(바꾸면 여기만 고친다).
 // 왼쪽 아래에 로그아웃(O7 ①). 내 계정 화면(#307)에도 같은 로그아웃 버튼(OwnerSignOutButton)이 있다
 export function OwnerNav({ canCreateSlot = true }: OwnerNavProps) {
   return (
@@ -43,6 +44,8 @@ export function OwnerNav({ canCreateSlot = true }: OwnerNavProps) {
         { href: '/owner/account', label: '내 계정', icon: UserRound },
         // 정산 내역(O15, S-502). 정산서(S-501)도 같은 화면에 더한다
         { href: '/owner/settlements', label: '정산', icon: Wallet },
+        // 월별 통계(S-504): 달력으로 날마다 거래와 살린 시간. 대시보드는 가볍게 두려고 따로 뺐다(11/20 정민석)
+        { href: '/owner/stats', label: '통계', icon: ChartColumn },
       ]}
       footer={<OwnerSignOutButton />}
     />

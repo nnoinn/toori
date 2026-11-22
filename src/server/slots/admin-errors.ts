@@ -10,6 +10,8 @@ export const ADMIN_SLOT_ERRORS = {
   WINDOW_NOT_FOUND: '시간대 매물을 찾을 수 없어요',
   /** 사유(멈춤·마감)·메모(다시 열기)가 빈칸(공백만 포함) */
   REASON_REQUIRED: '사유를 적어 주세요',
+  /** 원장님에게 보여 줄 사유를 목록에서 고르지 않았거나 그 처리에 없는 사유(#489) */
+  CODE_REQUIRED: '원장님에게 보여 줄 사유를 골라 주세요',
   /** 사유가 상한을 넘음(화면은 그 전에 입력을 멈춘다) */
   REASON_TOO_LONG: `사유는 ${ADMIN_REASON_LIMIT.toLocaleString('ko-KR')}자까지 쓸 수 있어요`,
   /** 이미 게시를 멈춘 샵 */

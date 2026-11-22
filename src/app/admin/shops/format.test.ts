@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  agreedCancelReasonText,
   defaultShopSort,
   labelPgSellerStatus,
   labelReviewAction,
@@ -47,5 +48,24 @@ describe('입점 심사 표시 모양', () => {
     expect(labelReviewAction('shop.approve')).toBe('승인');
     expect(labelReviewAction('shop.reject')).toBe('반려');
     expect(labelReviewAction('something.else')).toBe('something.else');
+  });
+});
+
+describe('합의 후 취소 사유 표시 (X-208)', () => {
+  it('정해진 사유는 이름만, 기타는 원장님이 적은 내용을 괄호로 붙인다', () => {
+    expect(agreedCancelReasonText('style_mismatch', null)).toBe(
+      '원하는 시술이 예약한 서비스와 달라요',
+    );
+    expect(agreedCancelReasonText('other', '손님 일정이 바뀌었대요')).toBe(
+      '기타(손님 일정이 바뀌었대요)',
+    );
+  });
+
+  it('기타인데 내용이 없으면 "기타"만, 정해진 사유에 내용이 있어도 붙이지 않는다', () => {
+    expect(agreedCancelReasonText('other', null)).toBe('기타');
+    expect(agreedCancelReasonText('other', '')).toBe('기타');
+    expect(agreedCancelReasonText('customer_declined', '붙지 않는 내용')).toBe(
+      '손님이 시술을 원하지 않아요',
+    );
   });
 });

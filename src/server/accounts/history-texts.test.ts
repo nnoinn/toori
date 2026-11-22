@@ -2,6 +2,8 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { REFUND_REASONS } from '@/db/schema/refunds';
+
 import { historyText } from './history-texts';
 import type { AccountHistoryEvent, AccountHistoryKind } from './history-types';
 
@@ -139,5 +141,43 @@ describe('계정 이력 문구', () => {
         accountType: 'customer',
       }).detail,
     ).toBe('예약 123456789012 · 노쇼 취소(방문으로 바꿈)');
+  });
+
+  it('쿠폰 사용: 쓴 예약·서비스·일시·금액, 누르면 운영자 예약 상세', () => {
+    expect(
+      historyText(event('coupon_used', { ...RESERVATION, amount: 3000 }), {
+        audience: 'admin',
+        accountType: 'customer',
+      }),
+    ).toEqual({
+      title: '쿠폰 사용',
+      detail: '예약 123456789012 · 여성 커트 · 11/14(토) 14:00 · 3,000원',
+      href: '/admin/reservations/r-1',
+    });
+  });
+
+  it('쿠폰 돌려받음: 예약·돌려받은 이유(원장님 사정 취소·무효)·금액', () => {
+    const returned = (reason: string) =>
+      historyText(event('coupon_returned', { ...RESERVATION, reason, amount: 3000 }), {
+        audience: 'admin',
+        accountType: 'customer',
+      });
+    expect(returned('owner_fault')).toEqual({
+      title: '쿠폰 돌려받음',
+      detail: '예약 123456789012 · 원장님 사정 취소 · 3,000원',
+      href: '/admin/reservations/r-1',
+    });
+    expect(returned('void').detail).toBe('예약 123456789012 · 무효 · 3,000원');
+  });
+
+  it('환불 사유는 모두 이름으로 보여 준다(코드 그대로 보이지 않는다)', () => {
+    for (const reason of REFUND_REASONS) {
+      const { detail } = historyText(event('refund_done', { reason }), {
+        audience: 'admin',
+        accountType: 'customer',
+      });
+      expect(detail).not.toBe(reason);
+      expect(detail).toMatch(/[가-힣]/);
+    }
   });
 });

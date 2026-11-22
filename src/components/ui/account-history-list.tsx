@@ -7,7 +7,6 @@ import Link from 'next/link';
 
 import type { Result } from '@/lib/result';
 import { formatKstDateTime } from '@/lib/time';
-import { cn } from '@/lib/utils';
 import {
   HISTORY_CATEGORY_LABELS,
   type HistoryAudience,
@@ -24,7 +23,7 @@ import { accountHistoryHref, QUICK_PERIOD_DAYS, recentPeriod } from './account-h
 import { Button, buttonVariants } from './button';
 import { Card } from './card';
 import { Input } from './input';
-import { NATIVE_SELECT_CLASS } from './native-select';
+import { NativeSelect } from './native-select';
 import { Pagination } from './pagination';
 import { EmptyState, ErrorState } from './state';
 
@@ -166,18 +165,14 @@ function HistoryFilter({
         </fieldset>
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-medium">종류</span>
-          <select
-            name="kind"
-            defaultValue={query.category ?? ''}
-            className={cn(NATIVE_SELECT_CLASS, 'w-40')}
-          >
+          <NativeSelect name="kind" defaultValue={query.category ?? ''} className="w-40">
             <option value="">전체</option>
             {ACCOUNT_HISTORY_CATEGORIES[accountType].map((category) => (
               <option key={category} value={category}>
                 {HISTORY_CATEGORY_LABELS[category]}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </label>
         <div className="flex gap-2">
           <Button type="submit">검색</Button>

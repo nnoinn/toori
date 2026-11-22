@@ -40,20 +40,20 @@ describe('사진 번호', () => {
 });
 
 describe('영업시간', () => {
-  it('월요일부터 7줄, 입력 안 한 요일은 "정보 없음"', () => {
+  it('캘린더처럼 일요일부터 토요일까지 7줄, 입력 안 한 요일은 "정보 없음"(11/15 nnoinn, #437)', () => {
     const rows = formatBusinessHours([
       { weekday: 1, open: '10:00', close: '20:00' },
       { weekday: 0, closed: true },
       { weekday: 6, closed: true },
     ]);
     expect(rows?.map((row) => `${row.label} ${row.text}`)).toEqual([
+      '일 휴무',
       '월 10:00 ~ 20:00',
       '화 정보 없음',
       '수 정보 없음',
       '목 정보 없음',
       '금 정보 없음',
       '토 휴무',
-      '일 휴무',
     ]);
   });
 
@@ -85,7 +85,8 @@ describe('영업시간', () => {
       { weekday: 4, open: '18:00', close: '00:00' },
       { weekday: 5, open: '00:00', close: '02:00' },
     ]);
-    expect(rows?.slice(0, 5).map((row) => row.text)).toEqual([
+    // 월~금 줄(맨 앞은 일요일)
+    expect(rows?.slice(1, 6).map((row) => row.text)).toEqual([
       '18:00 ~ 02:00(익일)',
       '24시간 영업',
       '24시간 영업',
