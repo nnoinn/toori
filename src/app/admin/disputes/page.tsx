@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -147,7 +148,7 @@ async function List({ searchParams }: { searchParams: SearchParams }) {
                       {formatKstDateTime(row.receivedAt)}
                     </td>
                     <td className={cn(CELL, 'font-medium whitespace-nowrap')}>
-                      {row.reservationCode}
+                      {formatReservationCode(row.reservationCode)}
                     </td>
                     <td className={CELL}>{row.shopName}</td>
                     <td className={CELL}>{row.customerName}</td>
@@ -159,7 +160,10 @@ async function List({ searchParams }: { searchParams: SearchParams }) {
                       </Badge>
                     </td>
                     <td className={cn(CELL, 'text-right')}>
-                      <DetailLink href={href} label={`이의제기 ${row.reservationCode} 상세`} />
+                      <DetailLink
+                        href={href}
+                        label={`이의제기 ${formatReservationCode(row.reservationCode)} 상세`}
+                      />
                     </td>
                   </SelectableRow>
                 );

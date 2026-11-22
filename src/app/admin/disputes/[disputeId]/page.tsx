@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -83,7 +84,9 @@ async function Detail({ params }: { params: Params }) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <CardTitle className="text-lg">{detail.reservationCode}</CardTitle>
+            <CardTitle className="text-lg">
+              {formatReservationCode(detail.reservationCode)}
+            </CardTitle>
             <Badge variant={open ? 'default' : 'secondary'}>
               {labelDisputeStatus(detail.status, detail.outcome)}
             </Badge>
@@ -96,7 +99,7 @@ async function Detail({ params }: { params: Params }) {
                 href={`/admin/reservations/${detail.reservationId}`}
                 className="hover:underline"
               >
-                {detail.reservationCode} ·{' '}
+                {formatReservationCode(detail.reservationCode)} ·{' '}
                 {labelReservation(detail.reservationStatus, detail.visitResult)}
               </Link>
             </Field>

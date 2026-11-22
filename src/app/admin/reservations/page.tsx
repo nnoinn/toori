@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -211,7 +212,9 @@ async function ReservationList({
                     <td className={cn(CELL, 'whitespace-nowrap')}>
                       {formatKstDateTime(row.bookedAt)}
                     </td>
-                    <td className={cn(CELL, 'font-medium whitespace-nowrap')}>{row.code}</td>
+                    <td className={cn(CELL, 'font-medium whitespace-nowrap')}>
+                      {formatReservationCode(row.code)}
+                    </td>
                     <td className={CELL}>{row.shopName}</td>
                     <td className={CELL}>{row.menuName}</td>
                     <td className={CELL}>{row.customerNickname}</td>
@@ -227,7 +230,10 @@ async function ReservationList({
                       </div>
                     </td>
                     <td className={cn(CELL, 'text-right')}>
-                      <DetailLink href={href} label={`예약 ${row.code} 상세`} />
+                      <DetailLink
+                        href={href}
+                        label={`예약 ${formatReservationCode(row.code)} 상세`}
+                      />
                     </td>
                   </SelectableRow>
                 );

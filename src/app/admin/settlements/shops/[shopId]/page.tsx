@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -278,7 +279,7 @@ function HeldTable({ items }: { items: SettlementStatementList['held']['items'] 
                   href={`/admin/reservations/${item.reservationId}`}
                   className="hover:underline"
                 >
-                  {item.reservationCode}
+                  {formatReservationCode(item.reservationCode)}
                 </Link>{' '}
                 · {SETTLEMENT_KIND_LABELS[item.kind]}
                 {item.hold?.reason === 'dispute'
