@@ -6,13 +6,15 @@ import { formatKstTime } from '@/lib/time';
 import {
   dayCells,
   daySpans,
-  lockLabelAt,
   minutesLabel,
   paintCells,
   rangeLabel,
   rangesSummary,
+  segmentBars,
+  segmentTimeMarks,
   selectedRanges,
   spanLabel,
+  timetableSegments,
 } from './window-cells';
 
 const kst = (iso: string) => new Date(`${iso}+09:00`);
@@ -170,21 +172,81 @@ describe('시간대 매물 ① 시간표 (#308)', () => {
     const ranges = selectedRanges(cells, new Set([0, 1, 2]));
     expect(ranges.map((range) => rangeLabel(range))).toEqual(['10:30~11:30']);
   });
+});
 
-  it('잠긴 칸 이유는 이어진 묶음의 첫 칸에만', () => {
+describe('시간표 모양: 덩어리·막대·왼쪽 시각 (11/22, 영업시간 표와 같은 디자인)', () => {
+  const night: BusinessHours = [
+    { weekday: 3, open: '18:00', close: '02:00' },
+    { weekday: 4, open: '20:00', close: '01:00' },
+  ];
+
+  it('덩어리는 줄의 첫 칸, 시간이 끊긴 곳, 다음 날 새벽이 시작하는 곳에서 나눈다', () => {
+    expect(timetableSegments(dayCells(THURSDAY, hours, now, []), 8)).toEqual([
+      { first: 0, last: 7 },
+    ]);
+    // 목 00:00~02:00(전날에서 이어짐) / 20:00~24:00 / 금 00:00~01:00
+    expect(timetableSegments(dayCells(THURSDAY, night, now, []), 14)).toEqual([
+      { first: 0, last: 3 },
+      { first: 4, last: 11 },
+      { first: 12, last: 13 },
+    ]);
+    // 하루 전체 48칸을 두 줄(24칸씩)로
+    expect(timetableSegments(dayCells('2026-11-13', hours, now, []), 24)).toEqual([
+      { first: 0, last: 23 },
+      { first: 24, last: 47 },
+    ]);
+    expect(timetableSegments([], 24)).toEqual([]);
+  });
+
+  it('막대: 켜진 칸 묶음은 시작·끝을, 잠긴 칸 묶음은 이유를 적는다. 잠긴 칸은 켜져 있어도 잠긴 막대', () => {
     const busy = [{ start: kst('2026-11-12T12:00:00'), end: kst('2026-11-12T13:00:00') }];
     const cells = dayCells(THURSDAY, hours, now, busy);
-    expect(cells.map((_, index) => lockLabelAt(cells, index))).toEqual([
-      '지난 시각',
-      null,
-      null,
-      null,
-      '이미 올린 매물',
-      null,
-      null,
-      null,
+    // 10:00(지난 시각)도 켜져 있지만 잠긴 막대로 그린다
+    expect(segmentBars(cells, new Set([0, 1, 2, 6]), { first: 0, last: 7 }, THURSDAY)).toEqual([
+      { kind: 'locked', from: 0, cells: 1, lines: ['지난 시각'] },
+      { kind: 'selected', from: 1, cells: 2, lines: ['10:30', '11:30'] },
+      { kind: 'locked', from: 4, cells: 2, lines: ['이미 올린 매물'] },
+      { kind: 'selected', from: 6, cells: 1, lines: ['13:00', '13:30'] },
     ]);
-    // 칸 밖 번호는 이유가 없다
-    expect(lockLabelAt(cells, cells.length)).toBeNull();
+    expect(segmentBars(cells, new Set(), { first: 1, last: 3 })).toEqual([]);
+  });
+
+  it('막대: 두 덩어리에 걸친 묶음은 앞 덩어리 막대에만 시각을 적는다(자정을 넘기면 "(익일)")', () => {
+    // 하루 전체: 11:00~13:00이 두 줄(24번 칸)에 걸친다
+    const day = dayCells('2026-11-13', hours, now, []);
+    const selected = new Set([22, 23, 24, 25]);
+    expect(segmentBars(day, selected, { first: 0, last: 23 }, '2026-11-13')).toEqual([
+      { kind: 'selected', from: 22, cells: 2, lines: ['11:00', '13:00'] },
+    ]);
+    expect(segmentBars(day, selected, { first: 24, last: 47 }, '2026-11-13')).toEqual([
+      { kind: 'selected', from: 0, cells: 2, lines: [] },
+    ]);
+    // 목 23:00 ~ 금 01:00
+    const cells = dayCells(THURSDAY, night, kst('2026-11-11T12:00:00'), []);
+    const late = new Set([10, 11, 12, 13]);
+    expect(segmentBars(cells, late, { first: 4, last: 11 }, THURSDAY)).toEqual([
+      { kind: 'selected', from: 6, cells: 2, lines: ['23:00', '01:00(익일)'] },
+    ]);
+    expect(segmentBars(cells, late, { first: 12, last: 13 }, THURSDAY)).toEqual([
+      { kind: 'selected', from: 0, cells: 2, lines: [] },
+    ]);
+  });
+
+  it('왼쪽 시각: 덩어리 위·아래 끝과 정각만, 정각은 진하게', () => {
+    expect(segmentTimeMarks(dayCells(THURSDAY, hours, now, []), { first: 0, last: 7 })).toEqual([
+      { at: 0, text: '10:00', onHour: true },
+      { at: 2, text: '11:00', onHour: true },
+      { at: 4, text: '12:00', onHour: true },
+      { at: 6, text: '13:00', onHour: true },
+      { at: 8, text: '14:00', onHour: true },
+    ]);
+    // 10:30 ~ 12:30 영업: 위·아래 끝은 30분이어도 적는다
+    const half = dayCells(THURSDAY, [{ weekday: 4, open: '10:30', close: '12:30' }], now, []);
+    expect(segmentTimeMarks(half, { first: 0, last: 3 })).toEqual([
+      { at: 0, text: '10:30', onHour: false },
+      { at: 1, text: '11:00', onHour: true },
+      { at: 3, text: '12:00', onHour: true },
+      { at: 4, text: '12:30', onHour: false },
+    ]);
   });
 });

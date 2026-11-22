@@ -136,10 +136,15 @@ export function selectedRanges(
  * dateKey(고른 날)를 주면 그 다음 날 새벽에 시작하는 묶음은 시작·끝 모두 "(익일)"이다(예: "00:30(익일)~02:00(익일)")
  */
 export function rangeLabel(range: TimeRange, dateKey?: string): string {
+  return rangeLabelParts(range, dateKey).join('~');
+}
+
+/** rangeLabel의 시작과 끝. 시간표 막대에 두 줄로 적을 때 쓴다. 예: ["22:00", "02:00(익일)"] */
+export function rangeLabelParts(range: TimeRange, dateKey?: string): [string, string] {
   if (dateKey && kstDateKey(range.start) !== dateKey) {
-    return `${withNextDayMark(formatKstTime(range.start))}~${withNextDayMark(formatKstTime(range.end))}`;
+    return [withNextDayMark(formatKstTime(range.start)), withNextDayMark(formatKstTime(range.end))];
   }
-  return `${formatKstTime(range.start)}~${formatEndTime(range.start, range.end)}`;
+  return [formatKstTime(range.start), formatEndTime(range.start, range.end)];
 }
 
 /** 고른 시간 요약. 예: "10:00~12:00, 13:00~18:00 (총 7시간)". 아무것도 안 켰으면 null */
@@ -152,9 +157,101 @@ export function rangesSummary(ranges: readonly TimeRange[], dateKey?: string): s
   return `${ranges.map((range) => rangeLabel(range, dateKey)).join(', ')} (총 ${formatDuration(minutes)})`;
 }
 
-/** 잠긴 칸이 이어진 묶음의 첫 칸이면 그 이유. 첫 칸에만 이유를 적어 시간표가 덜 복잡하다 */
-export function lockLabelAt(cells: readonly WindowCell[], index: number): string | null {
-  const lock = cells[index]?.lock;
-  if (!lock || cells[index - 1]?.lock === lock) return null;
-  return CELL_LOCK_LABELS[lock];
+// ── 시간표 모양(11/22 정민석: 영업시간 표와 같은 디자인) ──
+// 칸 묶음(덩어리)마다 둥근 카드 하나를 그리고, 고른 시간·잠긴 시간은 칸 위에 막대로 그린다.
+// 왼쪽 시각은 덩어리 위·아래 끝과 정각에만 적는다.
+
+/** 시간표 덩어리(둥근 카드 하나): first~last 칸 */
+export type TimetableSegment = { first: number; last: number };
+
+/**
+ * 칸을 덩어리로 나눈다. 줄의 첫 칸(rowsPerColumn마다 다음 줄), 앞 칸과 시간이 이어지지 않는 칸(전날에서 이어진 새벽과
+ * 그 날 영업 사이), 다음 날 새벽이 시작하는 칸에서 끊는다
+ */
+export function timetableSegments(
+  cells: readonly WindowCell[],
+  rowsPerColumn: number,
+): TimetableSegment[] {
+  const segments: TimetableSegment[] = [];
+  cells.forEach((cell, index) => {
+    const previous = cells[index - 1];
+    const current = segments.at(-1);
+    const breaks =
+      !previous ||
+      !current ||
+      index % rowsPerColumn === 0 ||
+      previous.end.getTime() !== cell.start.getTime() ||
+      (cell.nextDay && !previous.nextDay);
+    if (breaks) segments.push({ first: index, last: index });
+    else current.last = index;
+  });
+  return segments;
+}
+
+/**
+ * 덩어리 안 막대 하나. from은 덩어리 첫 칸부터 센 위치, cells는 칸 수.
+ * lines는 막대에 적는 글: 고른 시간은 [시작, 끝], 잠긴 시간은 [이유]. 고른 묶음이 앞 덩어리에서 이어지면 빈 목록
+ */
+export type TimetableBar = {
+  kind: 'selected' | 'locked';
+  from: number;
+  cells: number;
+  lines: string[];
+};
+
+/** 덩어리 안의 막대: 켜진 칸이 이어진 묶음(고른 시간)과 같은 이유로 잠긴 칸이 이어진 묶음 */
+export function segmentBars(
+  cells: readonly WindowCell[],
+  selected: ReadonlySet<number>,
+  segment: TimetableSegment,
+  dateKey?: string,
+): TimetableBar[] {
+  const ranges = selectedRanges(cells, selected);
+  const kindOf = (index: number) =>
+    cells[index].lock ? cells[index].lock : selected.has(index) ? 'selected' : null;
+  const bars: TimetableBar[] = [];
+  let index = segment.first;
+  while (index <= segment.last) {
+    const kind = kindOf(index);
+    let end = index;
+    while (kind && end < segment.last && kindOf(end + 1) === kind) end += 1;
+    if (kind === 'selected') {
+      const start = cells[index].start.getTime();
+      const range = ranges.find((item) => item.start.getTime() === start);
+      bars.push({
+        kind: 'selected',
+        from: index - segment.first,
+        cells: end - index + 1,
+        lines: range ? rangeLabelParts(range, dateKey) : [],
+      });
+    } else if (kind) {
+      bars.push({
+        kind: 'locked',
+        from: index - segment.first,
+        cells: end - index + 1,
+        lines: [CELL_LOCK_LABELS[kind]],
+      });
+    }
+    index = end + 1;
+  }
+  return bars;
+}
+
+/** 덩어리 왼쪽에 적을 시각. at은 덩어리 위에서부터 센 칸 경계(0 ~ 칸 수), onHour면 진하게 */
+export type TimetableMark = { at: number; text: string; onHour: boolean };
+
+/** 덩어리 위·아래 끝과 그 사이 정각 */
+export function segmentTimeMarks(
+  cells: readonly WindowCell[],
+  segment: TimetableSegment,
+): TimetableMark[] {
+  const count = segment.last - segment.first + 1;
+  const marks: TimetableMark[] = [];
+  for (let at = 0; at <= count; at += 1) {
+    const time = at < count ? cells[segment.first + at].start : cells[segment.last].end;
+    const text = formatKstTime(time);
+    const onHour = text.endsWith(':00');
+    if (at === 0 || at === count || onHour) marks.push({ at, text, onHour });
+  }
+  return marks;
 }
