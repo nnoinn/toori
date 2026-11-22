@@ -202,7 +202,6 @@ export function WindowTimetable({
                         const index = segment.first + offset;
                         const cell = cells[index];
                         // 앞 30분과 뒤 30분 사이는 연한 점선, 1시간 사이는 실선(영업시간 표와 같다)
-                        const endsOnHour = formatKstTime(cell.end).endsWith(':00');
                         return (
                           <button
                             key={index}
@@ -218,10 +217,6 @@ export function WindowTimetable({
                             onKeyDown={(event) => onKeyDown(event, index)}
                             className={cn(
                               'shrink-0 cursor-pointer outline-none hover:bg-primary/10 focus-visible:relative focus-visible:z-10 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset',
-                              offset < count - 1 &&
-                                (endsOnHour
-                                  ? 'border-b border-foreground/15'
-                                  : 'border-b border-dashed border-border'),
                               cell.lock && 'cursor-not-allowed hover:bg-transparent',
                             )}
                             style={{ height: CELL_PX }}
@@ -230,6 +225,21 @@ export function WindowTimetable({
                       })}
                       {segmentBars(cells, selected, segment, dateKey).map((bar) => (
                         <Bar key={`${bar.kind}-${bar.from}`} bar={bar} />
+                      ))}
+                      {/* 칸 사이 줄은 막대 위에 겹쳐 그려서 막대 안에서도 보인다.
+                          앞 30분과 뒤 30분 사이는 연한 점선, 1시간 사이는 실선(영업시간 표와 같다) */}
+                      {Array.from({ length: count - 1 }, (_, offset) => (
+                        <div
+                          key={offset}
+                          aria-hidden
+                          className={cn(
+                            'pointer-events-none absolute inset-x-0 border-t',
+                            formatKstTime(cells[segment.first + offset].end).endsWith(':00')
+                              ? 'border-foreground/15'
+                              : 'border-dashed border-border',
+                          )}
+                          style={{ top: (offset + 1) * CELL_PX - 1 }}
+                        />
                       ))}
                     </div>
                   </div>
