@@ -51,6 +51,7 @@ const VISITED: DisputeTarget & { dispute: DisputeRecord | null } = {
   visitResult: 'visited',
   visitRecordedAt: kst('2026-11-11 19:00'),
   cancelledAt: null,
+  voidedAt: null,
   dispute: null,
 };
 const CONTENT = '시술 중에 약속한 디자인과 다르게 진행됐어요';

@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react';
 import { Clock, ExternalLink, MapPin } from 'lucide-react';
 
 import {
-  formatDuration,
-  kakaoMapLink,
   refundPolicyLines,
   refundPolicyNotes,
 } from '@/app/(customer)/(tabs)/slots/[slotId]/detail-format';
+import { formatDuration } from '@/lib/format';
+import { kakaoMapLink } from '@/lib/kakao-map';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ShopLocationMap } from '@/features/map/shop-location-map';
 import { formatWon } from '@/lib/format';

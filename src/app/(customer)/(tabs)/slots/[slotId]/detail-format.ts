@@ -47,15 +47,6 @@ function hoursText(open: string, close: string): string {
   return `${open} ~ ${close < open ? withNextDayMark(close) : close}`;
 }
 
-/** 소요 시간. 예: 60 → "1시간", 90 → "1시간 30분", 45 → "45분" */
-export function formatDuration(minutes: number): string {
-  if (!Number.isFinite(minutes) || minutes <= 0) return '';
-  const hours = Math.floor(minutes / 60);
-  const rest = Math.round(minutes % 60);
-  if (hours === 0) return `${rest}분`;
-  return rest === 0 ? `${hours}시간` : `${hours}시간 ${rest}분`;
-}
-
 /**
  * 원장님이 입력한 외부 링크(인스타그램·네이버 플레이스)를 화면에 걸어도 되는지 본다.
  * https 주소만 받는다(javascript: 같은 위험한 주소 차단). 안 되면 null(링크를 숨긴다)
@@ -68,16 +59,6 @@ export function safeExternalUrl(raw: string | null | undefined): string | null {
   } catch {
     return null;
   }
-}
-
-/** 카카오맵에서 샵 위치 크게 보기(새 창). 이름의 쉼표 등은 주소에 맞게 바꾼다 */
-export function kakaoMapLink(name: string, lat: number, lng: number): string {
-  return `https://map.kakao.com/link/map/${encodeURIComponent(name)},${lat},${lng}`;
-}
-
-/** 카카오맵 길찾기(새 창, C-307). 도착지만 샵으로 정하고 출발지는 카카오맵이 정한다(보통 내 위치) */
-export function kakaoDirectionsLink(name: string, lat: number, lng: number): string {
-  return `https://map.kakao.com/link/to/${encodeURIComponent(name)},${lat},${lng}`;
 }
 
 /** 사진 줄의 스크롤 위치로 지금 보이는 사진 번호(0부터)를 구한다. 칸 폭을 못 재면 첫 장 */

@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -43,6 +44,7 @@ import { selectReservationAgreedCancels } from '../agreed-cancel-queries';
 import { selectReservationDetail } from '../queries';
 import { RegisterDispute } from './register-dispute';
 import { VisitAction } from './visit-actions';
+import { VoidAction } from './void-action';
 import { type VisitPanel, visitPanel } from './visit-panel';
 
 export const metadata: Metadata = { title: '예약 정보' };
@@ -113,8 +115,9 @@ async function Detail({ params }: { params: Params }) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <CardTitle className="text-lg">{detail.code}</CardTitle>
+            <CardTitle className="text-lg">{formatReservationCode(detail.code)}</CardTitle>
             <Badge variant="secondary">{labelReservation(detail.status, detail.visitResult)}</Badge>
+            {detail.voidedAt ? <Badge variant="outline">무효</Badge> : null}
           </div>
         </CardHeader>
         <CardContent>
@@ -194,6 +197,29 @@ async function Detail({ params }: { params: Params }) {
 
       <Card>
         <CardHeader>
+          <CardTitle>예약 무효</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 text-sm">
+          {detail.voidedAt ? (
+            <p>
+              {formatKstDateTime(detail.voidedAt)}에 무효로 처리했어요. 손님에게 남은 결제액과
+              사용한 쿠폰을 돌려줬고, 원장님 정산 기준 금액은 0원이에요.
+            </p>
+          ) : (
+            <>
+              <p className="text-muted-foreground">
+                원장님이 손님에게 전액 환불을 요청했을 때만 써요(고객센터 분쟁이 타협되지 않아
+                원장님이 동의한 경우 포함). 원장님 사정으로 서비스를 못 한 것이면 무효가 아니라
+                원장님 사정 취소예요.
+              </p>
+              <VoidAction reservationId={detail.reservationId} />
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>합의 후 취소 요청</CardTitle>
         </CardHeader>
         <CardContent className="text-sm">
@@ -229,6 +255,10 @@ async function Detail({ params }: { params: Params }) {
               >
                 {labelDisputeStatus(detail.dispute.status, detail.dispute.outcome)} · 이의제기 보기
               </Link>
+            </p>
+          ) : detail.voidedAt ? (
+            <p className="text-muted-foreground">
+              무효로 처리한 예약이라 새 이의제기를 받지 않아요.
             </p>
           ) : (
             <>

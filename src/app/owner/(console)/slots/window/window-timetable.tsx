@@ -6,7 +6,10 @@
 // - 마우스와 터치(태블릿) 모두 포인터 이벤트로 받는다. 시간표에 touch-none을 줘서 끄는 동안 화면이 스크롤되지 않고,
 //   select-none으로 글자가 선택되지 않는다. 포인터를 잡아 두고(setPointerCapture) 손가락 아래 칸은 elementFromPoint로 찾는다
 // - 키보드: 위·아래 화살표로 칸을 옮기고, Space·Enter로 켜고 끈다. Shift를 누른 채 누르면 마지막에 누른 칸부터 범위를 켠다
-// - 잠긴 칸(지난 시각, 14일 밖, 이미 올린 매물·시간대)은 회색이고, 끌어도 켜지지 않는다
+// - 잠긴 칸(지난 시각, 14일 밖, 이미 올린 매물·시간대)은 회색 막대로 이유를 적고, 끌어도 켜지지 않는다
+// 모양(11/22 정민석): 칸 묶음마다 둥근 카드(영업시간 표처럼 30분 사이는 연한 점선, 1시간 사이는 실선)이고, 고른 시간은
+// 진한 초록 둥근 막대 안에 묶음 시간(예: 13:00~18:00)을 적는다. 색과 왼쪽 시각(30분마다, 정각은 진하게)은 예전 그대로다.
+// 칸 높이는 30분 28px이고, 끄는 동안 바로 칠한다(점선 미리보기는 쓰지 않는다).
 // 칸이 24개(12시간)보다 많으면(영업시간을 입력하지 않은 요일, 긴 새벽 영업) 두 줄로 나눠 한눈에 보이게 한다.
 // 새벽까지 여는 샵(11/11 nnoinn)은 전날에서 이어진 새벽 칸과 그 날 영업 칸 사이를 띄우고, 다음 날 새벽 칸 위에 날짜를 적는다.
 
@@ -19,15 +22,18 @@ import { addDaysToKey } from '../calendar-days';
 import { dateKeyLabel } from '../slot-date-calendar';
 import {
   CELL_LOCK_LABELS,
-  lockLabelAt,
   paintCells,
   rangeLabel,
-  selectedRanges,
+  segmentBars,
+  type TimetableBar,
+  timetableSegments,
   type WindowCell,
 } from './window-cells';
 
 /** 이보다 칸이 많으면 두 줄로 나눈다 */
 const ONE_COLUMN_MAX_CELLS = 24;
+/** 30분 칸 높이(px). 영업시간 표의 1시간 줄과 같다 */
+const CELL_PX = 28;
 
 type Drag = { anchor: number; on: boolean; base: ReadonlySet<number>; last: number };
 
@@ -53,16 +59,12 @@ export function WindowTimetable({
   const [focusIndex, setFocusIndex] = useState(firstOpen);
   const activeIndex = cells[focusIndex] && !cells[focusIndex].lock ? focusIndex : firstOpen;
 
-  // 켜진 묶음의 첫 칸에는 그 묶음 시간을 적는다(예: 13:00~18:00)
-  const rangeStarts = new Map(
-    selectedRanges(cells, selected).map((range) => [
-      cells.findIndex((cell) => cell.start.getTime() === range.start.getTime()),
-      rangeLabel(range, dateKey),
-    ]),
-  );
-
   const columns = cells.length > ONE_COLUMN_MAX_CELLS ? 2 : 1;
   const rowsPerColumn = Math.ceil(cells.length / columns);
+  const segments = timetableSegments(cells, rowsPerColumn);
+  const columnSegments = Array.from({ length: columns }, (_, column) =>
+    segments.filter((segment) => Math.floor(segment.first / rowsPerColumn) === column),
+  );
 
   /** 포인터 아래 칸 번호. 시간표 밖이거나 칸이 아니면 null */
   function cellAt(clientX: number, clientY: number): number | null {
@@ -139,105 +141,143 @@ export function WindowTimetable({
     }
   }
 
-  /**
-   * 칸 묶음이 index 칸 앞에서 끊기면 true: 줄의 첫 칸, 앞 칸과 시간이 이어지지 않음(전날에서 이어진 새벽과 그 날 영업 사이),
-   * 다음 날 새벽이 시작함. 끊긴 곳은 칸 모서리를 둥글게 하고 사이를 띄운다
-   */
-  function breaksBefore(index: number): boolean {
-    const previous = cells[index - 1];
-    return (
-      index % rowsPerColumn === 0 ||
-      previous.end.getTime() !== cells[index].start.getTime() ||
-      (cells[index].nextDay && !previous.nextDay)
-    );
-  }
+  return (
+    <div className="flex flex-col gap-3">
+      <div
+        role="group"
+        aria-label="시간표"
+        className="grid touch-none items-start gap-x-4 select-none"
+        style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+      >
+        {columnSegments.map((list, column) => (
+          <div key={column} className="flex flex-col">
+            {list.map((segment, order) => {
+              const first = cells[segment.first];
+              const count = segment.last - segment.first + 1;
+              // 다음 날 새벽이 시작하는 덩어리 위에는 날짜를 적는다(칸 이름에도 "(익일)"이 붙는다)
+              const dayChange =
+                first.nextDay && (segment.first === 0 || !cells[segment.first - 1].nextDay);
+              return (
+                <Fragment key={first.start.toISOString()}>
+                  {dayChange ? (
+                    <p
+                      aria-hidden
+                      className={cn(
+                        'pb-1 pl-[3.25rem] text-xs font-medium text-muted-foreground',
+                        order > 0 && 'pt-3',
+                      )}
+                    >
+                      익일 · {dateKeyLabel(addDaysToKey(dateKey, 1))}
+                    </p>
+                  ) : order > 0 ? (
+                    <div aria-hidden className="h-3" />
+                  ) : null}
+                  <div className="grid grid-cols-[3.25rem_1fr]">
+                    {/* 왼쪽 시각: 30분마다, 정각은 진하게 */}
+                    <div aria-hidden className="flex flex-col">
+                      {Array.from({ length: count }, (_, offset) => {
+                        const time = formatKstTime(cells[segment.first + offset].start);
+                        return (
+                          <span
+                            key={offset}
+                            className={cn(
+                              'pr-2 text-right text-xs leading-7 tabular-nums',
+                              time.endsWith(':00')
+                                ? 'font-medium text-foreground'
+                                : 'text-muted-foreground',
+                            )}
+                            style={{ height: CELL_PX }}
+                          >
+                            {time}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <div className="relative flex flex-col overflow-hidden rounded-[14px] border bg-card">
+                      {Array.from({ length: count }, (_, offset) => {
+                        const index = segment.first + offset;
+                        const cell = cells[index];
+                        // 앞 30분과 뒤 30분 사이는 연한 점선, 1시간 사이는 실선(영업시간 표와 같다)
+                        return (
+                          <button
+                            key={index}
+                            ref={(element) => {
+                              cellRefs.current[index] = element;
+                            }}
+                            type="button"
+                            data-cell={index}
+                            disabled={cell.lock !== null}
+                            aria-pressed={cell.lock ? undefined : selected.has(index)}
+                            aria-label={`${rangeLabel(cell, dateKey)}${cell.lock ? ` · ${CELL_LOCK_LABELS[cell.lock]}` : ''}`}
+                            tabIndex={index === activeIndex ? 0 : -1}
+                            onKeyDown={(event) => onKeyDown(event, index)}
+                            className={cn(
+                              'shrink-0 cursor-pointer outline-none hover:bg-primary/10 focus-visible:relative focus-visible:z-10 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset',
+                              cell.lock && 'cursor-not-allowed hover:bg-transparent',
+                            )}
+                            style={{ height: CELL_PX }}
+                          />
+                        );
+                      })}
+                      {segmentBars(cells, selected, segment, dateKey).map((bar) => (
+                        <Bar key={`${bar.kind}-${bar.from}`} bar={bar} />
+                      ))}
+                      {/* 칸 사이 줄은 막대 위에 겹쳐 그려서 막대 안에서도 보인다.
+                          앞 30분과 뒤 30분 사이는 연한 점선, 1시간 사이는 실선(영업시간 표와 같다) */}
+                      {Array.from({ length: count - 1 }, (_, offset) => (
+                        <div
+                          key={offset}
+                          aria-hidden
+                          className={cn(
+                            'pointer-events-none absolute inset-x-0 border-t',
+                            formatKstTime(cells[segment.first + offset].end).endsWith(':00')
+                              ? 'border-foreground/15'
+                              : 'border-dashed border-border',
+                          )}
+                          style={{ top: (offset + 1) * CELL_PX - 1 }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </Fragment>
+              );
+            })}
+          </div>
+        ))}
+      </div>
 
-  const columnIndexes = Array.from({ length: columns }, (_, column) =>
-    cells.map((_, index) => index).slice(column * rowsPerColumn, (column + 1) * rowsPerColumn),
+      <div aria-hidden className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className="size-3.5 rounded-[5px] bg-primary" />
+          고른 시간
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-3.5 rounded-[5px] bg-muted" />
+          고를 수 없는 시간
+        </span>
+      </div>
+    </div>
   );
+}
 
+/** 고른 시간(진한 초록)과 잠긴 시간(회색) 둥근 막대. 막대 첫 줄에 묶음 시간이나 잠긴 이유를 적는다 */
+function Bar({ bar }: { bar: TimetableBar }) {
   return (
     <div
-      role="group"
-      aria-label="시간표"
-      className="grid touch-none items-start gap-x-4 select-none"
-      style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={endDrag}
-      onPointerCancel={endDrag}
+      aria-hidden
+      className={cn(
+        'pointer-events-none absolute inset-x-1 truncate rounded-[10px] px-2 text-left text-xs leading-6 tabular-nums',
+        bar.kind === 'selected'
+          ? 'bg-primary font-semibold text-primary-foreground'
+          : 'bg-muted text-muted-foreground',
+      )}
+      style={{ top: bar.from * CELL_PX + 2, height: bar.cells * CELL_PX - 4 }}
     >
-      {columnIndexes.map((indexes, column) => (
-        <div key={column} className="flex flex-col">
-          {indexes.map((index) => {
-            const cell = cells[index];
-            const on = selected.has(index) && !cell.lock;
-            const time = formatKstTime(cell.start);
-            const onHour = time.endsWith(':00');
-            // 정각에서 끝나는 칸 아래에 진한 줄을 그어 한 시간씩 나눠 보이게 한다
-            const endsOnHour = formatKstTime(cell.end).endsWith(':00');
-            const label = cell.lock ? lockLabelAt(cells, index) : (rangeStarts.get(index) ?? null);
-            const segmentStart = breaksBefore(index);
-            const segmentEnd = index === cells.length - 1 || breaksBefore(index + 1);
-            const columnTop = index % rowsPerColumn === 0;
-            // 다음 날 새벽이 시작하는 칸 위에는 날짜를 적는다(칸 이름에도 "(익일)"이 붙는다)
-            const dayChange = cell.nextDay && (index === 0 || !cells[index - 1].nextDay);
-            return (
-              <Fragment key={cell.start.toISOString()}>
-                {dayChange ? (
-                  <p
-                    aria-hidden
-                    className={cn(
-                      'pb-1 pl-[3.25rem] text-xs font-medium text-muted-foreground',
-                      !columnTop && 'pt-3',
-                    )}
-                  >
-                    익일 · {dateKeyLabel(addDaysToKey(dateKey, 1))}
-                  </p>
-                ) : segmentStart && !columnTop ? (
-                  <div aria-hidden className="h-3" />
-                ) : null}
-                <div className="grid grid-cols-[3.25rem_1fr] items-stretch">
-                  <span
-                    className={cn(
-                      'pr-2 text-right text-xs leading-7 tabular-nums',
-                      onHour ? 'font-medium text-foreground' : 'text-muted-foreground',
-                    )}
-                    aria-hidden
-                  >
-                    {time}
-                  </span>
-                  <button
-                    ref={(element) => {
-                      cellRefs.current[index] = element;
-                    }}
-                    type="button"
-                    data-cell={index}
-                    disabled={cell.lock !== null}
-                    aria-pressed={cell.lock ? undefined : on}
-                    aria-label={`${rangeLabel(cell, dateKey)}${cell.lock ? ` · ${CELL_LOCK_LABELS[cell.lock]}` : ''}`}
-                    tabIndex={index === activeIndex ? 0 : -1}
-                    onKeyDown={(event) => onKeyDown(event, index)}
-                    className={cn(
-                      'relative h-7 cursor-pointer truncate border-x border-b px-2 text-left text-xs outline-none focus-visible:z-10 focus-visible:ring-3 focus-visible:ring-ring/50',
-                      endsOnHour && 'border-b-foreground/25',
-                      segmentStart && 'rounded-t-md border-t',
-                      segmentEnd && 'rounded-b-md',
-                      on
-                        ? 'border-x-primary bg-primary font-semibold text-primary-foreground'
-                        : 'bg-card hover:bg-primary/10',
-                      cell.lock &&
-                        'cursor-not-allowed bg-muted text-muted-foreground hover:bg-muted',
-                    )}
-                  >
-                    {label}
-                  </button>
-                </div>
-              </Fragment>
-            );
-          })}
-        </div>
-      ))}
+      {bar.label}
     </div>
   );
 }

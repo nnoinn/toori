@@ -27,7 +27,13 @@ import {
 import { slotStatusIs } from '@/features/slot-status/slot-status-sql';
 import { ownerListedSlot } from '@/server/slots/visibility';
 
-import { ADMIN_LIST_LIMIT, containsPattern, type ListResult, toListResult } from '../lookup';
+import {
+  ADMIN_LIST_LIMIT,
+  containsPattern,
+  type ListResult,
+  reservationCodePattern,
+  toListResult,
+} from '../lookup';
 import type { ReservationFilter, ReservationSort, SlotFilter } from './format';
 
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
@@ -78,7 +84,7 @@ export async function selectReservations(
   const pattern = containsPattern(input.query);
   const search: SQL | undefined = input.query
     ? or(
-        ilike(reservations.code, pattern),
+        ilike(reservations.code, reservationCodePattern(input.query)),
         ilike(shops.name, pattern),
         ilike(customers.nickname, pattern),
       )

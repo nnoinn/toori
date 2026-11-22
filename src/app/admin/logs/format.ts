@@ -52,6 +52,7 @@ export const ACTION_LABELS: Record<string, string> = {
 export const ACCESS_ACTION_LABELS: Record<string, string> = {
   view: '상세 보기',
   search: '목록·검색',
+  contact_reveal: '연락처 보기',
 };
 
 /** 대상 종류(target_type). 모르는 값은 그대로 보여준다 */

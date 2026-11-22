@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -161,7 +162,7 @@ function ReservationsCard({ reservations }: { reservations: SlotDetail['reservat
                   href={`/admin/reservations/${reservation.reservationId}`}
                   className="font-medium hover:underline"
                 >
-                  {reservation.code}
+                  {formatReservationCode(reservation.code)}
                 </Link>
                 <Badge variant="secondary">
                   {labelReservation(reservation.status, reservation.visitResult)}

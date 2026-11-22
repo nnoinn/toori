@@ -12,6 +12,9 @@ import { createdAt, geographyPoint, inValues, timestamptz, updatedAt } from './t
 
 /** 입점 상태(연결 #13, #50): 승인 대기 / 승인 / 반려 */
 export const SHOP_STATUSES = ['pending', 'approved', 'rejected'] as const;
+/** 국세청 사업자등록 진위확인 결과(#208): 맞음 / 국세청이 응답하지 않아 확인 못 함. 다름·휴폐업이면 저장하지 않아서 그 값은 없다 */
+export const NTS_CHECKS = ['verified', 'unavailable'] as const;
+export type NtsCheckResult = (typeof NTS_CHECKS)[number];
 export type ShopStatus = (typeof SHOP_STATUSES)[number];
 
 /** 토스페이먼츠 지급대행 셀러 상태. approved일 때만 지급을 요청한다 */
@@ -64,6 +67,9 @@ export const shops = pgTable(
     openedOn: date({ mode: 'string' }).notNull(),
     // 비공개 버킷 business-docs 안의 경로
     businessDocPath: text().notNull(),
+    // 국세청 사업자등록 진위확인(#208). 마지막으로 확인한 결과와 시각. 비어 있으면 확인 안 함(키가 없는 개발 환경이나 이 기능 전에 만든 샵)
+    ntsCheck: text(),
+    ntsCheckedAt: timestamptz(),
     status: text().notNull().default('pending'),
     rejectionReason: text(),
     // 입점 신청(다시 신청 포함) 시각
@@ -83,6 +89,12 @@ export const shops = pgTable(
   (t) => [
     check('shops_category_check', inValues(t.category, SHOP_CATEGORY_KEYS)),
     check('shops_status_check', inValues(t.status, SHOP_STATUSES)),
+    check(
+      'shops_nts_check_check',
+      sql`${t.ntsCheck} is null or ${inValues(t.ntsCheck, NTS_CHECKS)}`,
+    ),
+    // 결과와 시각은 같이 채우고 같이 비운다
+    check('shops_nts_checked_at_check', sql`(${t.ntsCheck} is null) = (${t.ntsCheckedAt} is null)`),
     // 멈춘 시각·사유·사유 코드는 같이 채우고 같이 비운다
     check(
       'shops_publish_pause_check',

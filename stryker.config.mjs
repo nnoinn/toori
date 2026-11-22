@@ -32,6 +32,12 @@ const config = {
     'src/server/slot-windows/rules.ts',
     'src/server/slot-windows/starts.ts',
     'src/server/slot-windows/view.ts',
+    'src/server/payments/amount.ts',
+    'src/server/payments/checkout-rules.ts',
+    'src/server/payments/webhook-signature.ts',
+    'src/server/settlements/preview.ts',
+    'src/server/storage/business-doc-rules.ts',
+    'src/server/auth/proxy-rules.ts',
     'src/features/slot-status/slot-status.ts',
     'src/app/owner/(console)/slots/slot-time.ts',
     'src/app/owner/(console)/slots/window/window-draft.ts',
@@ -55,6 +61,15 @@ const config = {
     'src/app/owner/(console)/slots/slot-pricing.ts',
     'src/app/owner/(console)/slots/relist.ts',
     'src/app/owner/(console)/slots/window/window-cells.ts',
+    // 11/22: 월별 통계(S-504)·지난 매물로 빠르게 올리기(S-207)·이의제기 안내(S-407)·운영자 사유 한 줄(#499)
+    'src/app/owner/(console)/stats/stats.ts',
+    'src/app/owner/(console)/slots/slot-presets.ts',
+    'src/app/owner/(console)/reservations/reservation-dispute.ts',
+    'src/app/owner/(console)/admin-notice-line.ts',
+    // 운영자 화면 규칙(강규민). 주소 폴더 [reservationId]는 *로 쓴다
+    'src/app/admin/jobs/status.ts',
+    'src/app/admin/settlements/hold-panel.ts',
+    'src/app/admin/reservations/*/visit-panel.ts',
     // 고객 화면 규칙(정찬형). 주소 폴더 [slotId] 같은 이름은 글롭에서 글자 묶음이 돼서 *로 쓴다
     'src/features/map/slot-list/badges.ts',
     'src/features/map/slot-list/merge.ts',

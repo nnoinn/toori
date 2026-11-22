@@ -1,6 +1,7 @@
 // 운영자 정산서 한 장의 조각 (A-105). 묶인 정산서(/admin/settlements/[id])와 지급 예정 정산서
 // (/admin/settlements/shops/[shopId]/[payoutDate])가 같이 쓴다. 숫자는 원장님 정산서(S-501)와 같은 함수 결과를 그대로 쓴다.
 
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
@@ -152,7 +153,7 @@ export function PenaltiesCard({
         <ul className="flex flex-col gap-1 text-sm">
           {penalties.map((penalty) => (
             <li key={penalty.reservationCode} className="flex justify-between gap-3">
-              <span>원장님 사정 취소 {penalty.reservationCode}</span>
+              <span>원장님 사정 취소 {formatReservationCode(penalty.reservationCode)}</span>
               <span>{formatWon(penalty.amount)}</span>
             </li>
           ))}
@@ -203,7 +204,7 @@ export function ItemTable({
                     href={`/admin/reservations/${item.reservationId}`}
                     className="hover:underline"
                   >
-                    {item.reservationCode}
+                    {formatReservationCode(item.reservationCode)}
                   </Link>
                 </td>
                 <td className={cn(CELL, 'whitespace-nowrap')}>

@@ -8,12 +8,14 @@ import { EmptyState, ErrorState, LoadingCards } from '@/components/ui/state';
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { ensureOwnerPage } from '@/server/auth';
+import { PUBLISH_PAUSED_MESSAGE, readPublishPause } from '@/server/shops';
 import { SHOP_STATUS_LABELS } from '@/server/shops/status';
 import { getShopReviewStatus } from '@/server/shops/review';
 import { getLastWindowSettings } from '@/server/slot-windows/actions';
 
 import { OwnerPage } from '../../owner-page';
 import { SlotForm } from '../slot-form';
+import { publishPauseNoticeLine } from '../publish-pause-notice';
 import { selectSlotFormData } from '../slot-form-data';
 import { selectSlotPresetRows } from '../slot-preset-store';
 import { pickSlotPresets } from '../slot-presets';
@@ -37,7 +39,7 @@ export default function SlotCreatePage() {
   );
 }
 
-/** 입점 승인 → 메뉴가 있는지 차례로 보고 3탭 화면을 연다. 막히면 무엇을 먼저 해야 하는지 안내한다 */
+/** 입점 승인 → 게시 멈춤 → 메뉴가 있는지 차례로 보고 3탭 화면을 연다. 막히면 무엇을 먼저 해야 하는지 안내한다 */
 async function SlotCreateContent() {
   // 로그인하지 않았으면 로그인 화면, 원장님 가입 전이면 /owner/join 으로 보낸다
   const auth = await ensureOwnerPage(PAGE_PATH);
@@ -59,6 +61,29 @@ async function SlotCreateContent() {
             <Button asChild variant="outline">
               <Link href="/owner/settings">매장 설정으로</Link>
             </Button>
+          }
+        />
+      </Card>
+    );
+  }
+
+  // 운영자가 새 매물 게시를 멈춘 샵(#373 ④, #472)은 한 시술·시간대 매물 모두 올릴 수 없다. 서버 함수도 따로 막는다.
+  // 알림과 같은 제목, 서버 함수와 같은 문구, 그 아래에 운영자가 목록에서 고른 사유 한 줄(#499 ②). 운영자가 쓴 메모는 보여 주지 않는다
+  const pause = await readPublishPause(auth.shopId);
+  if (pause) {
+    const notice = publishPauseNoticeLine(pause);
+    return (
+      <Card>
+        <EmptyState
+          title="새 매물 등록이 잠시 멈췄어요"
+          description={PUBLISH_PAUSED_MESSAGE}
+          action={
+            <div className="flex flex-col items-center gap-3">
+              {notice ? <p className="text-xs text-muted-foreground">{notice}</p> : null}
+              <Button asChild variant="outline">
+                <Link href="/owner">대시보드로</Link>
+              </Button>
+            </div>
           }
         />
       </Card>

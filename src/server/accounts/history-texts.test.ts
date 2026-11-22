@@ -46,7 +46,7 @@ describe('계정 이력 문구', () => {
     });
     expect(historyText(cancelled, { audience: 'owner' })).toEqual({
       title: '고객 취소',
-      detail: '예약 123456789012 · 여성 커트 · 11/14(토) 14:00 · 시작 30시간 전 · 위약금 30%',
+      detail: '예약 1234-5678-9012 · 여성 커트 · 11/14(토) 14:00 · 시작 30시간 전 · 위약금 30%',
       href: '/owner/reservations/r-1',
     });
     expect(historyText(cancelled, { audience: 'admin' }).href).toBe('/admin/reservations/r-1');
@@ -59,7 +59,7 @@ describe('계정 이력 문구', () => {
       }),
     ).toMatchObject({
       title: '원장님 사정 취소',
-      detail: '예약 123456789012 · 여성 커트 · 11/14(토) 14:00',
+      detail: '예약 1234-5678-9012 · 여성 커트 · 11/14(토) 14:00',
     });
     expect(historyText(event('reservation_cancelled'), { audience: 'admin' }).title).toBe(
       '예약 취소',
@@ -70,11 +70,11 @@ describe('계정 이력 문구', () => {
     const booked = event('reservation_created', { ...RESERVATION, amount: 23450 });
     expect(historyText(booked, { audience: 'owner' })).toMatchObject({
       title: '새 예약',
-      detail: '예약 123456789012 · 여성 커트 · 11/14(토) 14:00 · 판매가 23,450원',
+      detail: '예약 1234-5678-9012 · 여성 커트 · 11/14(토) 14:00 · 판매가 23,450원',
     });
     expect(historyText(booked, { audience: 'admin', accountType: 'customer' })).toMatchObject({
       title: '예약',
-      detail: '예약 123456789012 · 여성 커트 · 11/14(토) 14:00 · 결제 23,450원',
+      detail: '예약 1234-5678-9012 · 여성 커트 · 11/14(토) 14:00 · 결제 23,450원',
     });
   });
 
@@ -111,7 +111,7 @@ describe('계정 이력 문구', () => {
       historyText(event('agreed_cancel_resolved', { ...RESERVATION, result: 'expired' }), {
         audience: 'owner',
       }).detail,
-    ).toBe('예약 123456789012 · 24시간 안에 답이 없어 끝남');
+    ).toBe('예약 1234-5678-9012 · 24시간 안에 답이 없어 끝남');
   });
 
   it('방문·노쇼, 환불, 쿠폰, 이의제기', () => {
@@ -128,7 +128,7 @@ describe('계정 이력 문구', () => {
           accountType: 'customer',
         },
       ).detail,
-    ).toBe('예약 123456789012 · 고객 취소 · 16,415원');
+    ).toBe('예약 1234-5678-9012 · 고객 취소 · 16,415원');
     expect(
       historyText(event('coupon_issued', { amount: 3000, reason: 'owner_fault_compensation' }), {
         audience: 'admin',
@@ -140,7 +140,7 @@ describe('계정 이력 문구', () => {
         audience: 'admin',
         accountType: 'customer',
       }).detail,
-    ).toBe('예약 123456789012 · 노쇼 취소(방문으로 바꿈)');
+    ).toBe('예약 1234-5678-9012 · 노쇼 취소(방문으로 바꿈)');
   });
 
   it('쿠폰 사용: 쓴 예약·서비스·일시·금액, 누르면 운영자 예약 상세', () => {
@@ -151,7 +151,7 @@ describe('계정 이력 문구', () => {
       }),
     ).toEqual({
       title: '쿠폰 사용',
-      detail: '예약 123456789012 · 여성 커트 · 11/14(토) 14:00 · 3,000원',
+      detail: '예약 1234-5678-9012 · 여성 커트 · 11/14(토) 14:00 · 3,000원',
       href: '/admin/reservations/r-1',
     });
   });
@@ -164,10 +164,10 @@ describe('계정 이력 문구', () => {
       });
     expect(returned('owner_fault')).toEqual({
       title: '쿠폰 돌려받음',
-      detail: '예약 123456789012 · 원장님 사정 취소 · 3,000원',
+      detail: '예약 1234-5678-9012 · 원장님 사정 취소 · 3,000원',
       href: '/admin/reservations/r-1',
     });
-    expect(returned('void').detail).toBe('예약 123456789012 · 무효 · 3,000원');
+    expect(returned('void').detail).toBe('예약 1234-5678-9012 · 무효 · 3,000원');
   });
 
   it('환불 사유는 모두 이름으로 보여 준다(코드 그대로 보이지 않는다)', () => {

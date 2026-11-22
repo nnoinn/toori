@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -214,7 +215,7 @@ function StuckCancelsTable({ rows }: { rows: StuckCancelRow[] }) {
             <td className={cn(CELL, 'whitespace-nowrap')}>{formatKstDateTime(row.requestedAt)}</td>
             <td className={cn(CELL, 'whitespace-nowrap')}>
               <Link href={`/admin/reservations/${row.reservationId}`} className="hover:underline">
-                {row.reservationCode}
+                {formatReservationCode(row.reservationCode)}
               </Link>
             </td>
             <td className={cn(CELL, 'whitespace-nowrap')}>{labelRefundReason(row.reason)}</td>
@@ -227,7 +228,11 @@ function StuckCancelsTable({ rows }: { rows: StuckCancelRow[] }) {
               {formatWon(row.refundAmount)}
             </td>
             <td className={cn(CELL, 'text-right whitespace-nowrap')}>
-              <IssueAction kind="cancel" targetId={row.reservationId} label={row.reservationCode} />
+              <IssueAction
+                kind="cancel"
+                targetId={row.reservationId}
+                label={formatReservationCode(row.reservationCode)}
+              />
             </td>
           </tr>
         ))}
@@ -262,7 +267,7 @@ function RefundReviewsTable({ rows }: { rows: RefundReviewRow[] }) {
             <td className={cn(CELL, 'whitespace-nowrap')}>
               {row.reservationId && row.reservationCode ? (
                 <Link href={`/admin/reservations/${row.reservationId}`} className="hover:underline">
-                  {row.reservationCode}
+                  {formatReservationCode(row.reservationCode)}
                 </Link>
               ) : (
                 <span className="text-muted-foreground">예약 전</span>

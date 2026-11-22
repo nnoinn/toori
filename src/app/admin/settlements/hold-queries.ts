@@ -1,9 +1,9 @@
-// 운영자 정산 보류(#373 ②) 화면 읽기. 정산 목록·샵 정산·예약 상세가 같이 쓴다. 서버에서만 부른다.
+// 운영자 정산 보류(#373 ②) 화면 읽기. 정산 목록·샵 정산·예약 상세·운영자 첫 화면이 같이 쓴다. 서버에서만 부른다.
 // 보류 사유와 건·푼 운영자 이름(admin_profiles)을 같이 읽는다. 사유는 운영자 화면에만 보이고 원장님에게는 숨긴다(11/15 nnoinn)
 
 import 'server-only';
 
-import { and, desc, eq, isNull, type SQL, sql } from 'drizzle-orm';
+import { and, count, desc, eq, isNull, type SQL, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 import type { getDb } from '@/db';
@@ -102,4 +102,19 @@ export async function isShopHeld(db: Db, shopId: string): Promise<boolean> {
     .where(and(eq(settlementHolds.shopId, shopId), isNull(settlementHolds.releasedAt)))
     .limit(1);
   return row !== undefined;
+}
+
+/**
+ * 지금 풀리지 않은 보류 수(운영자 첫 화면): 거래 하나 보류 건수와 샵 전체 보류 곳 수.
+ * 풀리지 않은 보류는 거래마다·샵마다 하나라(유니크 인덱스) 줄 수가 곧 거래 수·샵 수다
+ */
+export async function countActiveHolds(db: Db): Promise<{ reservations: number; shops: number }> {
+  const [row] = await db
+    .select({
+      reservations: count(settlementHolds.reservationId),
+      shops: count(settlementHolds.shopId),
+    })
+    .from(settlementHolds)
+    .where(isNull(settlementHolds.releasedAt));
+  return { reservations: row?.reservations ?? 0, shops: row?.shops ?? 0 };
 }

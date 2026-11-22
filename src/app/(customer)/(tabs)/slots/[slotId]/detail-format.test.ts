@@ -7,9 +7,6 @@ import { NO_SHOW_PENALTY_RATE, OWNER_FAULT_COUPON_AMOUNT, REFUND_BANDS } from '@
 
 import {
   formatBusinessHours,
-  formatDuration,
-  kakaoDirectionsLink,
-  kakaoMapLink,
   photoIndexAt,
   refundPolicyLines,
   refundPolicyNotes,
@@ -94,15 +91,6 @@ describe('영업시간', () => {
       // 자정에 열어 새벽에 닫으면 같은 날이라 (익일)이 없다
       '00:00 ~ 02:00',
     ]);
-  });
-});
-
-describe('소요 시간', () => {
-  it('시간·분으로 보여준다', () => {
-    expect(formatDuration(45)).toBe('45분');
-    expect(formatDuration(60)).toBe('1시간');
-    expect(formatDuration(90)).toBe('1시간 30분');
-    expect(formatDuration(0)).toBe('');
   });
 });
 
@@ -193,19 +181,52 @@ describe('환불 규정 안내', () => {
   });
 });
 
-describe('카카오맵 길찾기 링크 (C-307)', () => {
-  it('도착지에 샵 이름과 좌표를 넣는다', () => {
-    expect(kakaoDirectionsLink('샘플 헤어, 2층', 37.3, 126.8)).toBe(
-      'https://map.kakao.com/link/to/%EC%83%98%ED%94%8C%20%ED%97%A4%EC%96%B4%2C%202%EC%B8%B5,37.3,126.8',
-    );
+describe('이 샵의 다른 매물(11/18 회의 피드백 5번)', () => {
+  const slot = (slotId: string): ListItem => ({
+    kind: 'slot',
+    slotId,
+    shopId: 'shop',
+    shopName: '샵',
+    category: '미용실',
+    menuName: '커트',
+    startAt: '2026-11-19T02:00:00.000Z',
+    listPrice: 20000,
+    salePrice: 14000,
+    discountRate: 30,
+    imageUrl: null,
+    distanceMeters: 0,
+    badges: [],
   });
-});
+  const window: ListItem = {
+    kind: 'window',
+    windowId: 'w',
+    shopId: 'shop',
+    shopName: '샵',
+    category: '미용실',
+    firstMenuName: '커트',
+    menuCount: 2,
+    startAt: '2026-11-19T04:00:00.000Z',
+    endAt: '2026-11-19T09:00:00.000Z',
+    maxDiscountRate: 30,
+    minSalePrice: 10000,
+    imageUrl: null,
+    distanceMeters: 0,
+    badges: [],
+  };
+  const ids = (items: ListItem[]) =>
+    items.map((item) => (item.kind === 'slot' ? item.slotId : item.windowId));
 
-describe('카카오맵 크게 보기 링크', () => {
-  it('샵 이름과 좌표를 넣고, 이름의 쉼표·공백은 주소에 맞게 바꾼다', () => {
-    expect(kakaoMapLink('샘플 헤어, 2층', 37.3, 126.8)).toBe(
-      'https://map.kakao.com/link/map/%EC%83%98%ED%94%8C%20%ED%97%A4%EC%96%B4%2C%202%EC%B8%B5,37.3,126.8',
-    );
+  it('지금 보는 매물은 빼고 받은 순서 그대로, 시간대 매물도 넣는다', () => {
+    expect(ids(otherShopItems([slot('a'), slot('now'), window, slot('b')], 'now'))).toEqual([
+      'a',
+      'w',
+      'b',
+    ]);
+  });
+
+  it(`앞에서 ${OTHER_SLOT_COUNT}개까지만`, () => {
+    const many = ['1', '2', '3', '4', '5', '6', '7'].map(slot);
+    expect(ids(otherShopItems(many, 'now'))).toEqual(['1', '2', '3', '4', '5']);
   });
 });
 

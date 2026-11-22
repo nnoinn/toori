@@ -14,13 +14,12 @@ import { NO_SHOW_PENALTY_RATE, OWNER_FAULT_COUPON_AMOUNT, REFUND_BANDS } from '@
 
 import {
   formatBusinessHours,
-  kakaoDirectionsLink,
-  kakaoMapLink,
   refundPolicyLines,
   refundPolicyNotes,
   safeExternalUrl,
   telHref,
 } from './detail-format';
+import { kakaoDirectionsLink, kakaoMapLink } from '@/lib/kakao-map';
 import { FavoriteButton } from './favorite-button';
 import { SlotPhotos } from './slot-photos';
 import type { SlotDetail } from './types';
