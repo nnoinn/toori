@@ -1,7 +1,7 @@
 // 쿠폰 문구 (C-407, J17, #300). 예약 확인의 쿠폰 고르기와 내 정보의 쿠폰 줄이 같이 쓴다.
 // 문구는 동의 문구 4장, 숫자는 정책값에서 가져온다. 금액은 화면에서 계산하지 않는다(previewCheckoutAmount).
 
-import { COUPON_NOT_RETURNED_NOTE } from '@/app/(customer)/(tabs)/reservations/[reservationId]/cancel-texts';
+import { COUPON_NOT_RETURNED_NOTE } from '@/app/(customer)/coupon-notes';
 import { formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';
 import type { MyCoupon } from '@/server/coupons';

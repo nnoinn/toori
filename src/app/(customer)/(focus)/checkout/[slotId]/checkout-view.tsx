@@ -12,11 +12,11 @@ import { Countdown } from '@/components/ui/countdown';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { EmptyState } from '@/components/ui/state';
 import {
-  formatDuration,
   refundPolicyLines,
   refundPolicyNotes,
 } from '@/app/(customer)/(tabs)/slots/[slotId]/detail-format';
-import { COUPON_NOT_RETURNED_NOTE } from '@/app/(customer)/(tabs)/reservations/[reservationId]/cancel-texts';
+import { formatDuration } from '@/lib/format';
+import { COUPON_NOT_RETURNED_NOTE } from '@/app/(customer)/coupon-notes';
 import type { SlotDetail } from '@/app/(customer)/(tabs)/slots/[slotId]/types';
 import { formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';

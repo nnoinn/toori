@@ -18,7 +18,9 @@ import type { RefundErrorCode } from '@/server/refunds/errors';
 import type { RefundPreview } from '@/server/refunds/types';
 
 import { tabHref } from '../reservation-tabs';
-import { appliedRefundRule, cancelDoneText, COUPON_NOT_RETURNED_NOTE } from './cancel-texts';
+import { COUPON_NOT_RETURNED_NOTE } from '@/app/(customer)/coupon-notes';
+
+import { appliedRefundRule, cancelDoneText } from './cancel-texts';
 
 // 다시 눌러도 결과가 같은 실패. '예약 취소하기'를 막고, 창을 닫으면 상세를 새로 읽는다
 const FINAL_FAILURES: readonly string[] = [
