@@ -19,7 +19,8 @@ jobs:
   mutation:
     name: mutation
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # 검사 파일이 68개로 늘어 11/21 주간 실행이 60분 제한에 걸렸다(11/22). 공개 레포라 Actions 시간은 무료다
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
