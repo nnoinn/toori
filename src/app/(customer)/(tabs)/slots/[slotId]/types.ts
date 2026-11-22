@@ -23,9 +23,15 @@ export type SlotDetail = {
   discountRate: number;
   menu: {
     name: string;
+    /** 서비스 종류 이름(업종별 고정 목록). 예: "펌" */
+    serviceType: string;
     description: string | null;
     durationMinutes: number;
   };
+  /** 샵 업종 이름. 예: "미용실" */
+  shopCategory: string;
+  /** 샵의 시·군·구 코드("이 샵의 다른 매물"을 찾을 때 쓴다) */
+  sigunguCode: string;
   shop: {
     shopId: string;
     name: string;

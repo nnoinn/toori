@@ -105,7 +105,7 @@ export function ShopGroupBlock({
       <ul className="flex flex-col pl-[68px]">
         {visible.map((item) => (
           <li key={item.kind === 'slot' ? item.slotId : item.windowId}>
-            <GroupRow item={item} serverNow={serverNow} />
+            <ShopSlotRow item={item} serverNow={serverNow} />
           </li>
         ))}
       </ul>
@@ -133,8 +133,8 @@ export function ShopGroupBlock({
   );
 }
 
-/** 묶음 안 매물 한 줄: 왼쪽 시술·시각, 오른쪽 가격. 누르면 매물(시간대) 상세 */
-function GroupRow({ item, serverNow }: { item: ListItem; serverNow: string }) {
+/** 묶음 안 매물 한 줄: 왼쪽 시술·시각, 오른쪽 가격. 누르면 매물(시간대) 상세. 매물 상세의 "이 샵의 다른 매물"도 쓴다 */
+export function ShopSlotRow({ item, serverNow }: { item: ListItem; serverNow: string }) {
   const rowClass =
     '-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
 
