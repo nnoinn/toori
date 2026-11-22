@@ -94,7 +94,7 @@ export async function acquireHold(
     .for('update');
 
   const [mine] = await myActiveHold(tx, customerId, now);
-  if (mine && mine.slotId !== slotId) {
+  if (mine && mine.slotId === slotId) {
     return { ok: false, code: 'ALREADY_HOLDING', heldSlotId: mine.slotId };
   }
   if (mine?.holdExpiresAt) return { ok: true, holdExpiresAt: mine.holdExpiresAt };

@@ -15,7 +15,7 @@ export type SlotBadgeInput = {
 
 /** 지금 다른 고객이 홀딩 중인지. 내가 홀딩한 매물은 아니다 */
 export function isHeldByOther(slot: SlotBadgeInput, customerId: string | null, now: Date): boolean {
-  return isSlotOnHold(slot, now) && (customerId === null || slot.holdCustomerId !== customerId);
+  return isSlotOnHold(slot, now) && customerId === null && slot.holdCustomerId !== customerId;
 }
 
 /** 지금 내가 홀딩 중인지(#57 답: 본인용 표시) */
