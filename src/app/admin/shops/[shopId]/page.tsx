@@ -12,6 +12,7 @@ import { getDb } from '@/db';
 import { formatBusinessNumber } from '@/lib/business-number';
 import { getRequestNow } from '@/lib/request-time';
 import { formatEndTime, formatKst, kstDateKey } from '@/lib/time';
+import { maskPhone } from '@/lib/phone';
 import { cn } from '@/lib/utils';
 import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
@@ -32,6 +33,8 @@ import {
   toCancelStatsRange,
 } from '../cancel-stats-period';
 import { selectShopCancelStats } from '../cancel-stats-queries';
+import { revealShopOwnerContact } from '../../users/contact-actions';
+import { ContactReveal } from '../../users/contact-reveal';
 import { labelPgSellerStatus, labelReviewAction } from '../format';
 import { selectShopForReview, type ShopReviewDetail } from '../queries';
 import { SlotControlAction } from '../slot-control-actions';
@@ -157,9 +160,11 @@ async function ReviewDetail({
           <Fields
             rows={[
               ['이름', detail.owner.name],
-              ['연락처', detail.owner.phone],
+              // 연락처는 가려서 보여 주고, [번호 보기]를 누를 때만 서버에서 받아 온다(#360 4번)
+              ['연락처', maskPhone(detail.owner.phone)],
             ]}
           />
+          <ContactReveal reveal={revealShopOwnerContact.bind(null, detail.shopId)} />
           {/* 원장님 계정에서 일어난 일(입점·매물·예약·정산 계좌 등)을 시각 순으로(#374) */}
           <Link
             href={`/admin/users/owners/${detail.owner.id}/history`}

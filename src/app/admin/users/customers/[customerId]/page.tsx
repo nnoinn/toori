@@ -9,7 +9,9 @@ import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
+import { maskEmail } from '@/lib/email';
 import { formatWon } from '@/lib/format';
+import { maskPhone } from '@/lib/phone';
 import { getRequestNow } from '@/lib/request-time';
 import { formatKst } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -20,6 +22,8 @@ import { labelReservation } from '../../../lookup';
 import { customerCouponViews } from '../../coupon-format';
 import { selectCustomerCoupons } from '../../coupon-queries';
 import { selectCustomerDetail } from '../../queries';
+import { revealCustomerContact } from '../../contact-actions';
+import { ContactReveal } from '../../contact-reveal';
 import { CouponCard } from './coupon-card';
 
 export const metadata: Metadata = { title: '고객 정보' };
@@ -83,8 +87,9 @@ async function Detail({ params }: { params: Params }) {
           <Fields
             rows={[
               ['닉네임', detail.nickname],
-              ['이메일', detail.email],
-              ['휴대폰', detail.phone ?? '-'],
+              // 연락처는 가려서 보여 주고, 아래 [번호 보기]를 누를 때만 서버에서 받아 온다(#360 4번)
+              ['이메일', maskEmail(detail.email)],
+              ['휴대폰', maskPhone(detail.phone)],
               ['가입', formatKst(detail.createdAt)],
               ['탈퇴', detail.withdrawnAt ? formatKst(detail.withdrawnAt) : '-'],
               ['관심 동네·찜한 샵 새 매물 알림', labelConsent(detail.consents.interest_alert)],
@@ -95,6 +100,9 @@ async function Detail({ params }: { params: Params }) {
               ],
             ]}
           />
+          <div className="mt-3">
+            <ContactReveal reveal={revealCustomerContact.bind(null, customerId)} />
+          </div>
         </CardContent>
       </Card>
 
