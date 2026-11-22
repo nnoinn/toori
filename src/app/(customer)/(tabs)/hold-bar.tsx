@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { unstable_rethrow, usePathname, useRouter } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Countdown } from '@/components/ui/countdown';
 import {
   Dialog,
@@ -163,17 +163,15 @@ function HoldBarView({ hold, onGone }: { hold: ActiveHold; onGone: () => void })
             </p>
           ) : null}
           <div className="flex justify-end gap-2 max-md:*:h-10">
-            <Link
-              href={href}
-              className={buttonVariants({
-                variant: 'outline',
-                className: pending ? 'pointer-events-none opacity-50' : undefined,
-              })}
-              aria-disabled={pending || undefined}
+            {/* 계속 결제하기는 창만 닫는다. 결제는 막대를 눌러 이어서 한다(11/22 nnoinn 손 점검) */}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={pending}
               onClick={() => setConfirming(false)}
             >
               {HOLD_RELEASE_CONFIRM.keep}
-            </Link>
+            </Button>
             <Button type="button" variant="destructive" disabled={pending} onClick={release}>
               {pending ? '취소하는 중…' : HOLD_RELEASE_CONFIRM.release}
             </Button>
