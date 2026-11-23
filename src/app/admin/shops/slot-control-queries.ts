@@ -105,7 +105,7 @@ export async function selectShopSlotControl(
       .where(
         and(
           eq(slots.shopId, shopId),
-          or(isNull(slots.windowId), eq(slots.shopId, shopId)),
+          isNull(slots.windowId),
           or(slotStatusIs('scheduled', now), slotStatusIs('published', now)),
         ),
       )
@@ -128,7 +128,7 @@ export async function selectShopSlotControl(
       endAt: row.endAt,
       publishAt: row.publishAt,
     })),
-    openWindowCount: windowRows.length,
+    openWindowCount: windowRows[0]?.total ?? 0,
     // DB의 check 제약이 6가지 상태만 허용한다
     openSlots: slotRows.map((row) => ({
       slotId: row.slotId,
