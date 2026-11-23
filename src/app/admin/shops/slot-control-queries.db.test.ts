@@ -106,7 +106,7 @@ describeDb('운영자 샵 상세 매물 관리 조회 (실제 DB)', () => {
       const twelve = await insert('12:00', '13:00');
       const thirteen = await insert('13:00', '14:00');
       await insert('14:00', '15:00');
-      // 빼는 것: 예약됨, 원장님 마감, 시작한 매물(10/31 11시 시작), 시간대 안 칸, 다른 샵
+      // 빼는 것: 예약됨, 원장님 마감, 시작한 매물(10/31 11시 시작), 시간대 안 칸(예약됨·손님이 결제 중), 다른 샵
       await insert('15:00', '16:00', { status: 'reserved' });
       await insert('16:00', '17:00', { status: 'closed', closeReason: 'mistake' });
       await insert('17:00', '18:00', {
@@ -114,11 +114,23 @@ describeDb('운영자 샵 상세 매물 관리 조회 (실제 DB)', () => {
         endAt: kst('2026-10-31T12:00:00'),
       });
       const windowId = await addWindow(tx, shop, '2026-11-02');
-      await tx.insert(slots).values({
-        ...testSlot(shop, '13:00', '14:00', { windowId, status: 'reserved' }),
-        startAt: kst('2026-11-02T13:00:00'),
-        endAt: kst('2026-11-02T14:00:00'),
-      });
+      await tx.insert(slots).values([
+        {
+          ...testSlot(shop, '13:00', '14:00', { windowId, status: 'reserved' }),
+          startAt: kst('2026-11-02T13:00:00'),
+          endAt: kst('2026-11-02T14:00:00'),
+        },
+        // 시간대 안에서 손님이 결제 중인 칸은 게시중이지만 원장님이 올린 한 시술 매물이 아니다
+        {
+          ...testSlot(shop, '14:00', '15:00', {
+            windowId,
+            holdCustomerId: customer.customerId,
+            holdExpiresAt: kst('2026-10-31T12:05:00'),
+          }),
+          startAt: kst('2026-11-02T14:00:00'),
+          endAt: kst('2026-11-02T15:00:00'),
+        },
+      ]);
       await tx.insert(slots).values(testSlot(other, '09:00', '10:00'));
 
       const control = await selectShopSlotControl(tx, shop.shopId, NOW);
