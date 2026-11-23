@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canForceCloseSlot,
+  canForceCloseWindow,
   labelCancelActor,
   labelHoursBefore,
   labelOrderStatus,
@@ -19,6 +20,10 @@ import {
   toReservationFilter,
   toReservationSort,
   toSlotFilter,
+  toWindowFilter,
+  WINDOW_FILTER_LABELS,
+  WINDOW_FILTERS,
+  WINDOW_STATE_LABELS,
 } from './format';
 
 describe('매물·예약 조회 표시 모양', () => {
@@ -114,5 +119,43 @@ describe('매물·예약 조회 표시 모양', () => {
     expect(canForceCloseSlot({ ...slot, ...hold, holdExpiresAt: now }, now)).toBe(true);
     // 시간대 안에서 손님이 만든 칸은 그 시간대를 마감한다
     expect(canForceCloseSlot({ ...slot, windowId: 'w-1' }, now)).toBe(false);
+  });
+});
+
+describe('시간대 매물 탭 표시 모양(#567)', () => {
+  it('탭 값 windows를 읽고, 상태 거르기 값이 이상하면 전체', () => {
+    expect(toLookupTab('windows')).toBe('windows');
+    expect(toWindowFilter('published')).toBe('published');
+    expect(toWindowFilter('full')).toBe('all');
+    expect(toWindowFilter(undefined)).toBe('all');
+  });
+
+  it('거르기는 전체·게시예정·게시중·마감 순서이고, 상태 이름은 다 참까지 넷이다', () => {
+    expect(WINDOW_FILTERS.map((filter) => WINDOW_FILTER_LABELS[filter])).toEqual([
+      '전체',
+      '게시예정',
+      '게시중',
+      '마감',
+    ]);
+    expect(WINDOW_STATE_LABELS).toEqual({
+      scheduled: '게시예정',
+      published: '게시중',
+      full: '다 참',
+      closed: '마감',
+    });
+  });
+
+  it('시간대 탭 주소는 tab=windows와 상태·검색어', () => {
+    expect(lookupHref({ tab: 'windows' })).toBe('/admin/reservations?tab=windows');
+    expect(lookupHref({ tab: 'windows', status: 'published', query: '샘플 헤어' })).toBe(
+      '/admin/reservations?tab=windows&status=published&q=%EC%83%98%ED%94%8C+%ED%97%A4%EC%96%B4',
+    );
+  });
+
+  it('마감하지 않았고 끝나지 않은 시간대만 강제 마감 단추를 보인다(다 찬 시간대 포함)', () => {
+    expect(canForceCloseWindow('scheduled')).toBe(true);
+    expect(canForceCloseWindow('published')).toBe(true);
+    expect(canForceCloseWindow('full')).toBe(true);
+    expect(canForceCloseWindow('closed')).toBe(false);
   });
 });
