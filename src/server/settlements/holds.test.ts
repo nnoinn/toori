@@ -122,6 +122,16 @@ describe('holdReservationSettlement', () => {
     expect(state.calls).toEqual([]);
   });
 
+  it('샵 전체 보류도 운영자가 아니면 그 실패이고 저장·알림하지 않는다(권한 점검 1장)', async () => {
+    state.auth = fail('FORBIDDEN', '운영자만 할 수 있어요');
+    expect(await holdShopSettlement({ shopId: SHOP, reason: '확인', code: CODE })).toMatchObject({
+      ok: false,
+      error: { code: 'FORBIDDEN' },
+    });
+    expect(state.calls).toEqual([]);
+    expect(state.notified).toEqual([]);
+  });
+
   it('원장님에게 보여 줄 사유 코드(#489)가 없거나 정산 보류 목록에 없는 코드면 CODE_REQUIRED이고 저장하지 않는다', async () => {
     for (const code of ['', 'listing_mismatch', 'shop_info_check', 'nope', undefined]) {
       expect(
