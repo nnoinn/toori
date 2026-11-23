@@ -4,11 +4,17 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { isUuid } from '@/lib/uuid';
 
+import { Badge } from '@/components/ui/badge';
 import { BackButton } from '@/components/ui/back-button';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
+import {
+  getSlotStatus,
+  isSlotOnHold,
+  SLOT_STATUS_LABELS,
+} from '@/features/slot-status/slot-status';
 import { formatBusinessNumber } from '@/lib/business-number';
 import { getRequestNow } from '@/lib/request-time';
 import { formatEndTime, formatKst, kstDateKey } from '@/lib/time';
@@ -19,7 +25,7 @@ import { ensureAdminPage } from '@/server/auth';
 import { getBusinessDocUrl } from '@/server/storage/upload';
 import { adminNoticeText, bankName, categoryLabel } from '@/server/policy';
 
-import { lookupHref } from '../../reservations/format';
+import { canForceCloseSlot, lookupHref, slotDetailHref } from '../../reservations/format';
 import {
   CANCEL_STATS_ANCHOR,
   CANCEL_STATS_PERIOD_ERROR,
@@ -201,12 +207,24 @@ async function ReviewDetail({
 
         <Section title="정산 계좌">
           <PayoutFields payout={detail.payout} />
+          {/* 이 샵의 정산 묶음·지급·보류를 바로 본다(#567 2번) */}
+          <Link
+            href={`/admin/settlements/shops/${detail.shopId}`}
+            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'mt-3 w-fit')}
+          >
+            이 샵 정산 보기
+          </Link>
         </Section>
       </div>
 
       {control ? (
         <Section title="매물 관리">
-          <SlotControlPanel shopId={detail.shopId} shopName={detail.shop.name} control={control} />
+          <SlotControlPanel
+            shopId={detail.shopId}
+            shopName={detail.shop.name}
+            control={control}
+            now={now}
+          />
         </Section>
       ) : null}
 
@@ -252,17 +270,19 @@ async function ReviewDetail({
 }
 
 /**
- * 매물 관리 칸(#373 ④). 새 매물 게시를 멈추고 다시 열며, 지금 올라와 있는 시간대 매물을 강제 마감한다.
- * 한 시술 매물은 매물·예약 > 매물 목록에서 강제 마감한다
+ * 매물 관리 칸(#373 ④, #567 3번). 새 매물 게시를 멈추고 다시 열며, 아래를 [시간대 매물]과 [한 시술 매물] 두 영역으로 나눈다.
+ * 영역마다 가까운 것부터 SHOP_SLOT_CONTROL_LIMIT개까지 줄마다 강제 마감하고, [전체 보기]는 매물·예약 화면을 이 샵 이름으로 연다
  */
 function SlotControlPanel({
   shopId,
   shopName,
   control,
+  now,
 }: {
   shopId: string;
   shopName: string;
   control: ShopSlotControl;
+  now: Date;
 }) {
   return (
     <div className="flex flex-col gap-4 text-sm">
@@ -286,33 +306,81 @@ function SlotControlPanel({
         />
       </div>
 
-      <div className="flex flex-col gap-2">
-        <p className="font-medium">올라와 있는 시간대 매물 {control.openWindows.length}개</p>
-        {control.openWindows.length === 0 ? null : (
-          <ul className="flex flex-col divide-y">
-            {control.openWindows.map((window) => (
-              <li
-                key={window.windowId}
-                className="flex flex-wrap items-center justify-between gap-2 py-2"
-              >
-                <span>
-                  {formatKst(window.startAt)}~{formatEndTime(window.startAt, window.endAt)}
-                </span>
-                <SlotControlAction
-                  target={{ kind: 'close_window', windowId: window.windowId }}
-                  size="sm"
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-        <Link
-          href={lookupHref({ tab: 'slots', query: shopName })}
-          className="w-fit text-primary hover:underline"
-        >
-          이 샵의 한 시술 매물 보기(강제 마감)
-        </Link>
-      </div>
+      <SlotArea
+        title={`올라와 있는 시간대 매물 ${control.openWindowCount}개`}
+        empty="올라와 있는 시간대 매물이 없어요"
+        allHref={lookupHref({ tab: 'windows', query: shopName })}
+        more={control.openWindowCount > control.openWindows.length}
+      >
+        {control.openWindows.map((window) => (
+          <li
+            key={window.windowId}
+            className="flex flex-wrap items-center justify-between gap-2 py-2"
+          >
+            <span>
+              {formatKst(window.startAt)}~{formatEndTime(window.startAt, window.endAt)}
+            </span>
+            <SlotControlAction
+              target={{ kind: 'close_window', windowId: window.windowId }}
+              size="sm"
+            />
+          </li>
+        ))}
+      </SlotArea>
+
+      <SlotArea
+        title={`판매 전 한 시술 매물 ${control.openSlotCount}개`}
+        empty="판매 전 한 시술 매물이 없어요"
+        allHref={lookupHref({ tab: 'slots', query: shopName })}
+        more={control.openSlotCount > control.openSlots.length}
+      >
+        {control.openSlots.map((slot) => (
+          <li key={slot.slotId} className="flex flex-wrap items-center justify-between gap-2 py-2">
+            <span className="flex flex-wrap items-center gap-2">
+              <Link href={slotDetailHref(slot.slotId)} className="hover:underline">
+                {slot.menuName}
+              </Link>
+              <span className="text-muted-foreground">{formatKst(slot.startAt)}</span>
+              <Badge variant="secondary">{SLOT_STATUS_LABELS[getSlotStatus(slot, now)]}</Badge>
+              {isSlotOnHold(slot, now) ? <Badge>결제 중</Badge> : null}
+            </span>
+            {/* 손님이 결제 중이면 강제 마감할 수 없다. 막는 것은 서버가 다시 본다 */}
+            {canForceCloseSlot(slot, now) ? (
+              <SlotControlAction target={{ kind: 'close_slot', slotId: slot.slotId }} size="sm" />
+            ) : null}
+          </li>
+        ))}
+      </SlotArea>
+    </div>
+  );
+}
+
+/** 매물 관리 칸의 한 영역(#567 3번). 위에 구분선을 두고, 줄 목록 아래 [전체 보기]로 매물·예약 화면을 연다 */
+function SlotArea({
+  title,
+  empty,
+  allHref,
+  more,
+  children,
+}: {
+  title: string;
+  empty: string;
+  allHref: string;
+  /** 보여 준 줄보다 더 있는지(전체 보기 문구에 "더 있어요"를 붙인다) */
+  more: boolean;
+  children: ReactNode[];
+}) {
+  return (
+    <div className="flex flex-col gap-2 border-t pt-4">
+      <p className="font-medium">{title}</p>
+      {children.length === 0 ? (
+        <p className="text-muted-foreground">{empty}</p>
+      ) : (
+        <ul className="flex flex-col divide-y">{children}</ul>
+      )}
+      <Link href={allHref} className="w-fit text-primary hover:underline">
+        {more ? '전체 보기(더 있어요)' : '전체 보기'}
+      </Link>
     </div>
   );
 }

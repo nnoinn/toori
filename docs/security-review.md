@@ -21,6 +21,7 @@
 | 함수 | 누가 | 어떤 데이터만 | 테스트 | 상태 |
 | --- | --- | --- | --- | --- |
 | `selectAdminWindows`(`src/app/admin/reservations/window-queries.ts`, 매물·예약 [시간대 매물] 탭, #567) | 운영자: 페이지가 `ensureAdminPage`로 확인(운영자 모드의 관리자만) | 운영자는 전체(X-102). 입력은 상태 거르기와 검색어뿐이고 읽기만 한다. 강제 마감은 `forceCloseWindow`(`requireAdmin`)를 쓴다 | `src/server/auth/pages.test.ts` 관리자가 아니면 404를 보여준다, 운영자 모드로 들어온 관리자면 | ✅ |
+| `selectShopSlotControl`(`src/app/admin/shops/slot-control-queries.ts`, 샵 상세 '매물 관리' 칸, #373 ④·#567 3번) | 운영자: 페이지가 `ensureAdminPage`로 확인(운영자 모드의 관리자만) | 운영자는 전체(X-102). 입력은 주소의 샵 id이고 읽기만 한다. 강제 마감·게시 멈춤은 `forceCloseSlot`·`forceCloseWindow`·`pauseShopPublishing`(`requireAdmin`)을 쓴다 | `src/server/auth/pages.test.ts` 관리자가 아니면 404를 보여준다, 운영자 모드로 들어온 관리자면 | ✅ |
 
 ## 2. 고객 화면 서버 코드 — 정찬형
 
