@@ -2,7 +2,7 @@
 
 import 'server-only';
 
-import { and, asc, eq, inArray, isNotNull, isNull, lt, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, lt } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { customers, notifications, termsAgreements } from '@/db/schema';
@@ -39,11 +39,11 @@ export async function readRecheckAgreements(
     .innerJoin(customers, eq(customers.userId, termsAgreements.userId))
     .where(
       and(
-        or(eq(termsAgreements.accountType, 'customer'), eq(termsAgreements.accountType, 'owner')),
+        eq(termsAgreements.accountType, 'customer'),
         inArray(termsAgreements.termsType, OPTIONAL_CONSENT_TYPES),
         isNull(termsAgreements.withdrawnAt),
         lt(termsAgreements.agreedAt, input.agreedBefore),
-        or(isNull(customers.withdrawnAt), isNotNull(customers.withdrawnAt)),
+        isNull(customers.withdrawnAt),
       ),
     )
     .orderBy(asc(termsAgreements.agreedAt), asc(termsAgreements.id));
