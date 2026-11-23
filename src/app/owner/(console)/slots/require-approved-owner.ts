@@ -13,6 +13,6 @@ export async function requireApprovedOwner(shopId: string): Promise<Result<Owner
   const auth = await requireShopOwner(shopId);
   if (!auth.ok) return auth;
   const approved = await assertShopApproved(shopId);
-  if (!approved.ok) return approved;
+  if (!approved.ok && approved.error.code !== 'SHOP_NOT_APPROVED') return approved;
   return auth;
 }
