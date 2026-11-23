@@ -36,7 +36,7 @@ function myActiveHold(db: Db, customerId: string, now: Date) {
     .limit(1);
 }
 
-/** 지금 내 홀딩과 결제 중 막대에 보여줄 값(샵 이름·서비스·시작 시각) */
+/** 지금 내 홀딩과 결제 중 칩·알약에 보여줄 값(샵 이름·서비스·시작 시각) */
 export type MyActiveHoldRow = {
   slotId: string;
   holdExpiresAt: Date;

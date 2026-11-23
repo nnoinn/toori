@@ -67,7 +67,7 @@ beforeEach(() => {
 });
 
 describe('notify', () => {
-  it('켜 둔 기기마다 보내고 기록을 남긴다. 내용에 받는 계정 종류가 들어간다', async () => {
+  it('켜 둔 기기마다 보내고 기록을 남긴다. 내용에 알림 id와 받는 계정 종류가 들어간다', async () => {
     const { db, inserted, updated } = fakeDb();
     await notify(db, INPUT);
     expect(inserted).toEqual([
@@ -83,6 +83,7 @@ describe('notify', () => {
     ]);
     expect(state.sent.map(([endpoint]) => endpoint)).toEqual(['a', 'b']);
     expect(JSON.parse(state.sent[0][1])).toEqual({
+      id: 'n-1',
       title: INPUT.title,
       body: INPUT.body,
       url: INPUT.url,

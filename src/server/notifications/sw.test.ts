@@ -1,5 +1,5 @@
 // 서비스 워커의 푸시 받기 (public/sw.js, W16, #131). 지금 계정과 다른 계정의 표시, 누르면 가는 곳, 내용을 못 읽거나 계정을 묻지 못할 때,
-// 앞에 보이는 창의 화면 안내에 먼저 전하고 크롬 계열이면 기기 알림을 생략하는지(#371)를 본다.
+// 열린 창에 모두 새 알림을 전하고(11/22 손 점검), 지금 쓰고 있는 창이 그 알림을 띄웠다고 답하면 크롬 계열은 기기 알림을 생략하는지(#371)를 본다.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -17,7 +17,7 @@ type Client = {
   navigate: (path: string) => Promise<void>;
   visibilityState?: 'visible' | 'hidden';
   focused?: boolean;
-  postMessage?: (message: unknown, ports: FakePort[]) => void;
+  postMessage?: (message: unknown, ports?: FakePort[]) => void;
 };
 type FakePort = { postMessage: (data: unknown) => void };
 
@@ -46,10 +46,16 @@ const state = {
   navigated: [] as string[],
   clients: [] as Client[],
   userAgent: CHROME,
+  /** 답할 포트와 같이 보낸 메시지(지금 쓰고 있는 창에 묻기) */
   asked: [] as unknown[],
+  /** 포트 없이 보낸 메시지(쓰고 있지 않은 창에 알리기만) */
+  told: [] as unknown[],
 };
 
-/** 지금 쓰고 있는 투리 창(보이고 포커스). answer가 있으면 화면 안내처럼 { shown: answer }로 답하고, 없으면 답하지 않는다 */
+/**
+ * 지금 쓰고 있는 투리 창(보이고 포커스). 포트와 같이 물으면 answer가 있을 때 화면 안내처럼 { shown: answer }로 답하고, 없으면 답하지 않는다.
+ * 포트 없이 알리기만 하면 told에 남는다
+ */
 function visibleWindow(answer?: boolean): Client {
   return {
     focus: async () => {},
@@ -57,6 +63,10 @@ function visibleWindow(answer?: boolean): Client {
     visibilityState: 'visible',
     focused: true,
     postMessage: (message, ports) => {
+      if (!ports) {
+        state.told.push(message);
+        return;
+      }
       state.asked.push(message);
       if (answer !== undefined) ports[0].postMessage({ shown: answer });
     },
@@ -117,6 +127,7 @@ beforeEach(() => {
   state.clients = [];
   state.userAgent = CHROME;
   state.asked = [];
+  state.told = [];
 });
 
 afterEach(() => {
@@ -160,13 +171,14 @@ describe('push', () => {
   });
 });
 
-describe('push: 화면 안내와 겹치지 않게 (#371)', () => {
-  const ALERT = { ...ORDER_ALERT, account: 'customer' };
+describe('push: 열린 창에 바로 알리고 화면 안내와 겹치지 않게 (#371)', () => {
+  const ALERT = { ...ORDER_ALERT, account: 'customer', id: 'n-1' };
+  const MESSAGE = { type: PUSH_TOAST_MESSAGE, account: 'customer', id: 'n-1' };
 
-  it('크롬 계열은 앞에 보이는 창의 화면 안내가 띄웠다고 답하면 기기 알림을 띄우지 않는다', async () => {
+  it('크롬 계열은 지금 쓰고 있는 창의 화면 안내가 그 알림을 띄웠다고 답하면 기기 알림을 띄우지 않는다', async () => {
     state.clients = [visibleWindow(true)];
     await fire(load().push, push(ALERT));
-    expect(state.asked).toEqual([{ type: PUSH_TOAST_MESSAGE, account: 'customer' }]);
+    expect(state.asked).toEqual([MESSAGE]);
     expect(state.shown).toEqual([]);
   });
 
@@ -180,7 +192,7 @@ describe('push: 화면 안내와 겹치지 않게 (#371)', () => {
     expect(state.shown.map((shown) => shown.title)).toEqual([ALERT.title, ALERT.title]);
   });
 
-  it('화면 안내가 아니라고 답하면(그 계정의 화면 안내가 없는 창) 기기 알림을 띄운다. 여러 창 중 하나라도 띄웠으면 생략한다', async () => {
+  it('화면 안내가 아니라고 답하면(그 알림을 띄우지 않음, 화면 안내가 없는 창) 기기 알림을 띄운다. 여러 창 중 하나라도 띄웠으면 생략한다', async () => {
     state.clients = [visibleWindow(false)];
     await fire(load().push, push(ALERT));
     expect(state.shown).toHaveLength(1);
@@ -200,22 +212,32 @@ describe('push: 화면 안내와 겹치지 않게 (#371)', () => {
     expect(state.shown).toHaveLength(1);
   });
 
-  it('다른 앱을 보는 중이면(창은 보이지만 포커스가 없음) 묻지 않고 기기 알림을 띄운다', async () => {
-    state.clients = [{ ...visibleWindow(true), focused: false }];
+  it('쓰고 있지 않은 창(다른 앱을 보는 중, 뒤에 있는 탭)에도 알려서 종과 화면 안내를 바꾸게 하고, 묻지 않고 기기 알림을 띄운다', async () => {
+    state.clients = [
+      { ...visibleWindow(true), focused: false },
+      { ...visibleWindow(true), visibilityState: 'hidden', focused: false },
+    ];
     await fire(load().push, push(ALERT));
+    expect(state.told).toEqual([MESSAGE, MESSAGE]);
     expect(state.asked).toEqual([]);
     expect(state.shown).toHaveLength(1);
   });
 
-  it('앞에 보이는 창이 없거나, 다른 계정의 알림이거나, 계정이 없는 알림이면 묻지 않고 띄운다', async () => {
-    state.clients = [{ ...visibleWindow(true), visibilityState: 'hidden' }];
+  it('쓰고 있는 창에는 묻고, 나머지 창에는 알리기만 한다', async () => {
+    state.clients = [visibleWindow(true), { ...visibleWindow(true), focused: false }];
     await fire(load().push, push(ALERT));
+    expect(state.asked).toEqual([MESSAGE]);
+    expect(state.told).toEqual([MESSAGE]);
+    expect(state.shown).toEqual([]);
+  });
+
+  it('다른 계정의 알림이거나 계정이 없는 알림이면 창에 알리지 않고 띄운다', async () => {
     state.clients = [visibleWindow(true)];
     await fire(load().push, push({ ...ORDER_ALERT, account: 'owner' }));
     await fire(load().push, push(ORDER_ALERT));
     expect(state.asked).toEqual([]);
+    expect(state.told).toEqual([]);
     expect(state.shown.map((shown) => shown.title)).toEqual([
-      ORDER_ALERT.title,
       `[원장님] ${ORDER_ALERT.title}`,
       ORDER_ALERT.title,
     ]);

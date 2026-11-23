@@ -8,7 +8,7 @@ import { ShopSlotRow } from '@/features/map/slot-list/shop-group';
 import type { ListItem } from '@/features/map/slot-list/types';
 import { formatKst } from '@/lib/time';
 
-import { formatDuration } from './detail-format';
+import { formatDuration } from '@/lib/format';
 import {
   DetailTop,
   RefundPolicyDetails,
@@ -170,7 +170,7 @@ export function SlotDetailView({
         </DetailSection>
       </div>
 
-      <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom)+var(--hold-bar-h,0px))] z-20 mx-auto w-full max-w-[480px] border-t bg-background p-3 md:hidden">
+      <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 mx-auto w-full max-w-[480px] border-t bg-background p-3 md:hidden">
         <ReserveButton slotId={slot.slotId} availability={slot.availability} />
       </div>
     </article>

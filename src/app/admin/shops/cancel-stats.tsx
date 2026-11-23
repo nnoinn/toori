@@ -2,6 +2,7 @@
 // (핵심 규칙 X-207·X-208: 샵별로 기록한다). 반복되는 샵을 찾고, 원장님과 이야기할 때 근거로 쓴다.
 // 기본은 전체 기간이고, 위의 기간 고르기(#486)로 고른 기간 안의 건수와 기록만 볼 수 있다
 
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import Link from 'next/link';
 
 import { QUICK_PERIOD_DAYS, recentPeriod } from '@/components/ui/account-history-query';
@@ -113,7 +114,7 @@ export function ShopCancelStatsView({ stats }: { stats: ShopCancelStats }) {
             {ownerFault.recent.map((row) => (
               <li key={row.reservationId} className="flex flex-wrap gap-x-3 py-2">
                 <Link href={`/admin/reservations/${row.reservationId}`} className="hover:underline">
-                  {row.reservationCode}
+                  {formatReservationCode(row.reservationCode)}
                 </Link>
                 <span>
                   {row.menuName} · {formatKst(row.startAt)}
@@ -178,7 +179,7 @@ export function ShopCancelStatsView({ stats }: { stats: ShopCancelStats }) {
                     href={`/admin/reservations/${row.reservationId}`}
                     className="hover:underline"
                   >
-                    {row.reservationCode}
+                    {formatReservationCode(row.reservationCode)}
                   </Link>
                   <span>{formatKst(row.requestedAt)} 요청</span>
                   <span className="break-all">

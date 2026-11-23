@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 
 import { REFUND_BANDS } from '@/server/policy';
 
-import { appliedRefundRule, cancelDoneText, COUPON_NOT_RETURNED_NOTE } from './cancel-texts';
+import { COUPON_NOT_RETURNED_NOTE } from '@/app/(customer)/coupon-notes';
+
+import { appliedRefundRule, cancelDoneText } from './cancel-texts';
 
 // 화면 문구가 동의 문구 초안(docs/legal/consent-texts.md 3장)과 어긋나지 않는지 본다
 const consentDoc = readFileSync(join(process.cwd(), 'docs/legal/consent-texts.md'), 'utf8');

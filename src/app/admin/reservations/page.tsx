@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -56,7 +57,7 @@ type SearchParams = Promise<{
 
 const TAB_LABELS: Record<LookupTab, string> = { reservations: '예약', slots: '매물' };
 const SEARCH_HINTS: Record<LookupTab, string> = {
-  reservations: '예약번호, 샵 이름, 고객 닉네임',
+  reservations: '예약번호, 샵 이름, 고객 이름·닉네임',
   slots: '샵 이름, 메뉴 이름',
 };
 
@@ -211,10 +212,17 @@ async function ReservationList({
                     <td className={cn(CELL, 'whitespace-nowrap')}>
                       {formatKstDateTime(row.bookedAt)}
                     </td>
-                    <td className={cn(CELL, 'font-medium whitespace-nowrap')}>{row.code}</td>
+                    <td className={cn(CELL, 'font-medium whitespace-nowrap')}>
+                      {formatReservationCode(row.code)}
+                    </td>
                     <td className={CELL}>{row.shopName}</td>
                     <td className={CELL}>{row.menuName}</td>
-                    <td className={CELL}>{row.customerNickname}</td>
+                    <td className={CELL}>
+                      {row.customerName}
+                      <span className="block text-xs text-muted-foreground">
+                        {row.customerNickname}
+                      </span>
+                    </td>
                     <td className={cn(CELL, 'whitespace-nowrap')}>{formatKst(row.startAt)}</td>
                     <td className={cn(CELL, 'whitespace-nowrap')}>{formatWon(row.amount)}</td>
                     <td className={CELL}>
@@ -227,7 +235,10 @@ async function ReservationList({
                       </div>
                     </td>
                     <td className={cn(CELL, 'text-right')}>
-                      <DetailLink href={href} label={`예약 ${row.code} 상세`} />
+                      <DetailLink
+                        href={href}
+                        label={`예약 ${formatReservationCode(row.code)} 상세`}
+                      />
                     </td>
                   </SelectableRow>
                 );

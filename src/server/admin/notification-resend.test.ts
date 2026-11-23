@@ -87,6 +87,7 @@ describe('알림 다시 보내기', () => {
         {
           targets: state.targets,
           message: {
+            id: NOTIFICATION_ID,
             title: '예약이 확정됐어요',
             body: '샘플 헤어 · 11/17(월) 14:00',
             url: '/reservations/r-1',

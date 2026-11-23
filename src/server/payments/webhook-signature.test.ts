@@ -80,6 +80,20 @@ describe('verifyWebhook', () => {
     expect(verifyWebhook(SECRET, BODY, notTime, NOW)).toBeNull();
   });
 
+  it('웹훅 번호가 없으면 서명을 보기 전에 거절한다(번호 없이 서명한 것도 받지 않는다)', () => {
+    const timestamp = String(NOW_SECONDS);
+    const noId = new Headers({
+      'webhook-timestamp': timestamp,
+      'webhook-signature': `v1,${sign('null', timestamp, BODY)}`,
+    });
+    expect(verifyWebhook(SECRET, BODY, noId, NOW)).toBeNull();
+  });
+
+  it('길이가 다른 서명은 던지지 않고 null(포트원이 오류로 보고 다시 보내지 않게)', () => {
+    const short = `v1,${Buffer.from('short').toString('base64')}`;
+    expect(verifyWebhook(SECRET, BODY, headers({ signature: short }), NOW)).toBeNull();
+  });
+
   it('서명은 맞는데 내용이 JSON이 아니면 null', () => {
     const body = 'not json';
     const signature = `v1,${sign('msg-1', String(NOW_SECONDS), body)}`;

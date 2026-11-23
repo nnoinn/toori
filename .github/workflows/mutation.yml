@@ -19,7 +19,9 @@ jobs:
   mutation:
     name: mutation
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # 검사 파일이 68개로 늘어 한 번에 1시간 넘게 걸린다. 공개 레포라 Actions 시간은 무료다.
+    # 11/21·11/22 실행은 시간 제한이 아니라 러너 메모리·CPU 부족("lost communication")으로 멈췄다(stryker.config.mjs의 concurrency·maxTestRunnerReuse)
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,6 +31,10 @@ jobs:
       - run: npm ci
       - name: 돌연변이 테스트
         run: npm run mutation
+        # 끝없이 도는 돌연변이(반복 조건이 바뀐 것)가 메모리를 다 쓰면 러너가 멈춘다(11/22 실행). 프로세스마다 메모리를 2GB로 묶어
+        # 그런 돌연변이는 그 프로세스만 멈추게 한다(Stryker가 다시 띄운다)
+        env:
+          NODE_OPTIONS: --max-old-space-size=2048
       - name: 결과 요약
         if: always()
         run: |

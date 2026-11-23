@@ -42,6 +42,8 @@ describe('원장님 가입(/owner/join)', () => {
     const toLogin = { type: 'redirect', to: '/login?mode=owner&next=%2Fowner%2Fjoin' };
     expect(visit('/owner/join', false, 'customer')).toEqual(toLogin);
     expect(visit('/owner/join', true, 'customer')).toEqual(toLogin);
+    // 가입 화면 주소에 무엇이 붙어 있어도 돌아올 곳은 가입 화면 처음이다
+    expect(visit('/owner/join', false, 'customer', '?from=home')).toEqual(toLogin);
   });
 });
 

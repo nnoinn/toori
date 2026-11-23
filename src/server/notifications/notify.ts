@@ -37,10 +37,11 @@ export type NewNotification = {
 export async function sendToDevices(
   db: Db,
   targets: readonly PushTarget[],
-  message: { title: string; body: string; url: string; accountType: AccountType },
+  message: { id: string; title: string; body: string; url: string; accountType: AccountType },
 ): Promise<PushResult[]> {
-  // public/sw.js가 읽는 모양이다. account는 지금 계정의 알림인지 가르는 데 쓴다
+  // public/sw.js가 읽는 모양이다. account는 지금 계정의 알림인지, id는 화면 안내가 이 알림을 띄웠는지 가르는 데 쓴다
   const payload = JSON.stringify({
+    id: message.id,
     title: message.title,
     body: message.body,
     url: message.url,
@@ -80,7 +81,13 @@ export async function notify(db: Db, input: NewNotification): Promise<void> {
     .returning({ id: notifications.id });
   if (!claimed || targets.length === 0) return;
 
-  const results = await sendToDevices(db, targets, { title, body, url, accountType });
+  const results = await sendToDevices(db, targets, {
+    id: claimed.id,
+    title,
+    body,
+    url,
+    accountType,
+  });
   if (!results.includes('sent')) {
     await db
       .update(notifications)

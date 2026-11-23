@@ -1,11 +1,11 @@
-// 운영자 이의제기 화면(A-104, W19 ②)의 조회. 이 화면에서만 쓴다(목록·상세). 처리(등록·결론)는 '@/server/disputes/admin'.
+// 운영자 이의제기 화면(A-104, W19 ②)의 조회. 이 화면(목록·상세)과 운영자 첫 화면의 건수 카드가 쓴다. 처리(등록·결론)는 '@/server/disputes/admin'.
 // 고객 연락처는 읽지 않는다(#360 4번). 내용(content)·메모는 고객·운영자가 쓴 글이라 로그에 남기지 않는다.
 // 이의제기는 그 예약의 손님만 신청한다(11/13 nnoinn, DISPUTE-08). 그래서 신청한 사람은 늘 그 예약의 손님이다.
 // 손님은 예약자 이름(#375)으로 보여주고 찾는다. 닉네임으로도 찾을 수 있다
 
 import 'server-only';
 
-import { and, asc, desc, eq, ilike, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, min, or, type SQL, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 import type { getDb } from '@/db';
@@ -24,7 +24,13 @@ import {
   type VisitResult,
 } from '@/db/schema';
 
-import { ADMIN_LIST_LIMIT, containsPattern, type ListResult, toListResult } from '../lookup';
+import {
+  ADMIN_LIST_LIMIT,
+  containsPattern,
+  type ListResult,
+  reservationCodePattern,
+  toListResult,
+} from '../lookup';
 import { defaultDisputeSort, type DisputeFilter, type DisputeSort } from './format';
 
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
@@ -84,7 +90,7 @@ export async function selectDisputes(
         input.filter === 'all' ? undefined : eq(disputes.status, input.filter),
         input.query
           ? or(
-              ilike(reservations.code, pattern),
+              ilike(reservations.code, reservationCodePattern(input.query)),
               ilike(shops.name, pattern),
               ilike(customers.name, pattern),
               ilike(customers.nickname, pattern),
@@ -178,4 +184,16 @@ export async function selectDisputeDetail(
     reservationStatus: row.reservationStatus as ReservationStatus,
     visitResult: row.visitResult as VisitResult | null,
   };
+}
+
+/** 운영자 첫 화면의 이의제기 카드: 확인 중(open) 건수와 그중 가장 오래된 접수 시각(없으면 null) */
+export type OpenDisputeSummary = { count: number; oldestReceivedAt: Date | null };
+
+/** 확인 중인 이의제기 수와 가장 오래 기다린 건의 접수 시각. 그 거래는 결론이 날 때까지 정산하지 않는다(#350) */
+export async function selectOpenDisputeSummary(db: DbReader): Promise<OpenDisputeSummary> {
+  const [row] = await db
+    .select({ total: count(), oldest: min(disputes.receivedAt) })
+    .from(disputes)
+    .where(eq(disputes.status, 'open'));
+  return { count: row?.total ?? 0, oldestReceivedAt: row?.oldest ?? null };
 }

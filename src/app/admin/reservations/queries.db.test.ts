@@ -160,7 +160,7 @@ describeDb('매물·예약 조회 (실제 DB)', () => {
     });
   });
 
-  it('예약을 예약번호·샵 이름·고객 닉네임 일부로 찾고, % 는 글자 그대로 찾는다', async () => {
+  it('예약을 예약번호·샵 이름·고객 이름·닉네임 일부로 찾고(원장님이 보는 예약자 이름으로도), % 는 글자 그대로 찾는다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
       const { customerId } = await createTestCustomer(tx);
@@ -174,15 +174,17 @@ describeDb('매물·예약 조회 (실제 DB)', () => {
       );
       const shopName = unique('찾는샵');
       const nickname = unique('찾는고객');
+      const name = unique('찾는이름');
       await tx.update(shops).set({ name: shopName }).where(eq(shops.id, shop.shopId));
-      await tx.update(customers).set({ nickname }).where(eq(customers.id, customerId));
+      await tx.update(customers).set({ name, nickname }).where(eq(customers.id, customerId));
 
-      for (const query of [reservation.code.toLowerCase(), shopName, nickname]) {
+      for (const query of [reservation.code.toLowerCase(), shopName, nickname, name]) {
         const { rows } = await selectReservations(tx, { filter: 'all', query });
         expect(rows.map((row) => row.reservationId)).toEqual([reservation.id]);
         expect(rows[0]).toMatchObject({
           code: reservation.code,
           shopName,
+          customerName: name,
           customerNickname: nickname,
           menuName: '커트',
           amount: 14_000,
@@ -271,10 +273,11 @@ describeDb('매물·예약 조회 (실제 DB)', () => {
     });
   });
 
-  it('예약 상세는 결제와 환불 기록을 읽고, 없는 예약은 null', async () => {
+  it('예약 상세는 고객 이름(원장님이 보는 예약자 이름)·결제·환불 기록을 읽고, 없는 예약은 null', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
       const { customerId } = await createTestCustomer(tx);
+      await tx.update(customers).set({ name: '테스트 박세나' }).where(eq(customers.id, customerId));
       const { reservation, order } = await createTestReservation(
         tx,
         shop,
@@ -303,6 +306,8 @@ describeDb('매물·예약 조회 (실제 DB)', () => {
         status: 'cancelled',
         cancelActor: 'customer',
         hoursBeforeStartAtCancel: 30,
+        customerId,
+        customerName: '테스트 박세나',
         customerNickname: '테스트 고객',
         shopId: shop.shopId,
         menuName: '커트',

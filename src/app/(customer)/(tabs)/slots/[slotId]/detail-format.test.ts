@@ -7,9 +7,6 @@ import { NO_SHOW_PENALTY_RATE, OWNER_FAULT_COUPON_AMOUNT, REFUND_BANDS } from '@
 
 import {
   formatBusinessHours,
-  formatDuration,
-  kakaoDirectionsLink,
-  kakaoMapLink,
   photoIndexAt,
   refundPolicyLines,
   refundPolicyNotes,
@@ -97,15 +94,6 @@ describe('영업시간', () => {
   });
 });
 
-describe('소요 시간', () => {
-  it('시간·분으로 보여준다', () => {
-    expect(formatDuration(45)).toBe('45분');
-    expect(formatDuration(60)).toBe('1시간');
-    expect(formatDuration(90)).toBe('1시간 30분');
-    expect(formatDuration(0)).toBe('');
-  });
-});
-
 describe('외부 링크', () => {
   it('https 주소만 받는다', () => {
     expect(safeExternalUrl('https://instagram.com/toori_shop')).toBe(
@@ -190,22 +178,6 @@ describe('환불 규정 안내', () => {
       ],
       after: '원장님 사정으로 취소되면 전액 환불하고 3,000원 쿠폰을 드려요.',
     });
-  });
-});
-
-describe('카카오맵 길찾기 링크 (C-307)', () => {
-  it('도착지에 샵 이름과 좌표를 넣는다', () => {
-    expect(kakaoDirectionsLink('샘플 헤어, 2층', 37.3, 126.8)).toBe(
-      'https://map.kakao.com/link/to/%EC%83%98%ED%94%8C%20%ED%97%A4%EC%96%B4%2C%202%EC%B8%B5,37.3,126.8',
-    );
-  });
-});
-
-describe('카카오맵 크게 보기 링크', () => {
-  it('샵 이름과 좌표를 넣고, 이름의 쉼표·공백은 주소에 맞게 바꾼다', () => {
-    expect(kakaoMapLink('샘플 헤어, 2층', 37.3, 126.8)).toBe(
-      'https://map.kakao.com/link/map/%EC%83%98%ED%94%8C%20%ED%97%A4%EC%96%B4%2C%202%EC%B8%B5,37.3,126.8',
-    );
   });
 });
 

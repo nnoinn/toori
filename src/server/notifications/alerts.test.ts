@@ -47,6 +47,8 @@ const {
   notifyReservationCancelled,
   notifyReservationConfirmed,
   notifyReservationVoided,
+  notifySettlementHeld,
+  notifySettlementReleased,
   notifyShopReviewed,
   notifySlotForceClosed,
   notifyVisitRecordedByAdmin,
@@ -550,11 +552,12 @@ describe('예약 무효 (A-108, #423 11/15 nnoinn 문구)', () => {
   });
 });
 
-describe('운영자 매물 관리 (#373 ④, 사유는 원장님에게 숨김)', () => {
+describe('운영자 매물 관리 (#373 ④, 운영자가 쓴 사유는 숨기고 고른 사유를 보낸다 #489)', () => {
   const CONTACT = '문의는 투리 카카오톡 채널로 해 주세요';
   const changedAt = new Date('2026-11-16T09:00:00.000Z');
 
-  it('게시를 멈추거나 다시 열면 원장님에게만, 바꾼 시각마다 한 번', async () => {
+  it('게시를 멈추면 고른 사유와 다음에 할 일을, 다시 열면 확인 끝을 원장님에게만, 바꾼 시각마다 한 번', async () => {
+    state.row = { ...(state.row as object), noticeCode: 'shop_info_check' };
     notifyPublishPauseChanged(db, { shopId: 'shop-1', paused: true, changedAt });
     notifyPublishPauseChanged(db, { shopId: 'shop-1', paused: false, changedAt });
     await runAfterTasks();
@@ -565,7 +568,7 @@ describe('운영자 매물 관리 (#373 ④, 사유는 원장님에게 숨김)',
         event: 'shop.publish_paused',
         dedupeKey: `shop.publish_paused:owner:shop-1:${changedAt.toISOString()}`,
         title: '새 매물 등록이 잠시 멈췄어요',
-        body: `운영자 확인 중이에요. 이미 올린 매물과 예약은 그대로예요. ${CONTACT}`,
+        body: `입점 정보 확인이 필요해요. 내 계정에서 사업자 정보를 확인해 주세요. 이미 올린 매물과 예약은 그대로예요. ${CONTACT}`,
         url: '/owner',
       },
       {
@@ -580,15 +583,17 @@ describe('운영자 매물 관리 (#373 ④, 사유는 원장님에게 숨김)',
     ]);
   });
 
-  it('매물·시간대 매물을 강제 마감하면 원장님에게만 메뉴·시각과 문의 안내를 보낸다', async () => {
+  it('매물·시간대 매물을 강제 마감하면 원장님에게만 메뉴·시각, 고른 사유와 다음에 할 일, 문의 안내를 보낸다', async () => {
     state.row = {
       ...(state.row as object),
       shopId: 'shop-1',
       endAt: new Date('2026-11-05T09:00:00.000Z'),
+      noticeCode: 'listing_mismatch',
     };
     notifySlotForceClosed(db, 'slot-1');
     notifyWindowForceClosed(db, 'window-1');
     await runAfterTasks();
+    const NOTICE = '매물 정보가 실제와 달라요(가격·시간·서비스). 정보를 고쳐서 다시 올려 주세요';
     expect(state.notified).toEqual([
       {
         userId: 'owner-user',
@@ -596,7 +601,7 @@ describe('운영자 매물 관리 (#373 ④, 사유는 원장님에게 숨김)',
         event: 'slot.force_closed',
         dedupeKey: 'slot.force_closed:owner:slot-1',
         title: '운영자가 매물을 마감했어요',
-        body: `커트 · 11/5(목) 15:00. ${CONTACT}`,
+        body: `커트 · 11/5(목) 15:00. ${NOTICE}. ${CONTACT}`,
         url: '/owner',
       },
       expect.objectContaining({
@@ -609,8 +614,29 @@ describe('운영자 매물 관리 (#373 ④, 사유는 원장님에게 숨김)',
       }),
     ]);
     const windowBody = (state.notified[1] as { body: string }).body;
-    expect(windowBody).toMatch(/^11\/5\(목\) 15:00~.*18:00\. 결제가 끝난 예약은 그대로예요\. /);
-    expect(windowBody.endsWith(CONTACT)).toBe(true);
+    expect(windowBody).toMatch(/^11\/5\(목\) 15:00~.*18:00\. /);
+    expect(windowBody.endsWith(`. ${NOTICE}. 결제가 끝난 예약은 그대로예요. ${CONTACT}`)).toBe(
+      true,
+    );
+  });
+
+  it('기타는 다음에 할 일이 채널 안내라 문의 안내를 붙이지 않고, 원장님 요청은 다음에 할 일 없이, 코드를 못 읽으면 기타로 보낸다', async () => {
+    state.row = { ...(state.row as object), shopId: 'shop-1', noticeCode: 'other' };
+    notifySlotForceClosed(db, 'slot-1');
+    await runAfterTasks();
+    state.afterTasks = [];
+    state.row = { ...(state.row as object), noticeCode: 'owner_request' };
+    notifySlotForceClosed(db, 'slot-2');
+    await runAfterTasks();
+    state.afterTasks = [];
+    state.row = { ...(state.row as object), noticeCode: null };
+    notifyPublishPauseChanged(db, { shopId: 'shop-1', paused: true, changedAt });
+    await runAfterTasks();
+    expect(state.notified.map((sent) => (sent as { body: string }).body)).toEqual([
+      '커트 · 11/5(목) 15:00. 기타. 자세한 내용은 투리 카카오톡 채널로 안내해 드려요',
+      `커트 · 11/5(목) 15:00. 원장님이 요청하셨어요. ${CONTACT}`,
+      '기타. 자세한 내용은 투리 카카오톡 채널로 안내해 드려요. 이미 올린 매물과 예약은 그대로예요',
+    ]);
   });
 
   it('샵·매물이 없으면 보내지 않는다', async () => {
@@ -618,6 +644,64 @@ describe('운영자 매물 관리 (#373 ④, 사유는 원장님에게 숨김)',
     notifyPublishPauseChanged(db, { shopId: 'shop-x', paused: true, changedAt });
     notifySlotForceClosed(db, 'slot-x');
     notifyWindowForceClosed(db, 'window-x');
+    await runAfterTasks();
+    expect(state.notified).toEqual([]);
+  });
+});
+
+describe('정산 보류 (#489, 걸 때·풀 때 원장님에게)', () => {
+  const owner = { userId: 'owner-user', accountType: 'owner', url: '/owner/settlements' };
+
+  it('거래 보류는 그 예약의 메뉴·시각과 고른 사유·다음에 할 일, 풀면 돌아오는 지급일 안내를 보낸다. 보류마다 한 번', async () => {
+    state.row = { ...(state.row as object), reservationId: 'r-1', noticeCode: 'payment_check' };
+    notifySettlementHeld(db, 'hold-1');
+    notifySettlementReleased(db, 'hold-1');
+    await runAfterTasks();
+    expect(state.notified).toEqual([
+      {
+        ...owner,
+        event: 'settlement.held',
+        dedupeKey: 'settlement.held:owner:hold-1',
+        title: '정산을 잠시 멈췄어요',
+        body: '커트 · 11/5(목) 15:00 · 결제·환불 내역을 확인하고 있어요. 확인이 끝나면 돌아오는 지급일에 들어가요',
+      },
+      {
+        ...owner,
+        event: 'settlement.released',
+        dedupeKey: 'settlement.released:owner:hold-1',
+        title: '멈췄던 정산을 다시 진행해요',
+        body: '커트 · 11/5(목) 15:00 · 돌아오는 지급일에 들어가요',
+      },
+    ]);
+  });
+
+  it('샵 전체 보류는 "샵 전체 정산"으로 알리고, 이용자 문의는 지급일 안내, 원장님 요청은 사유만', async () => {
+    const shopHold = { reservationId: null, menuName: null, startAt: null };
+    const bodies: string[] = [];
+    for (const noticeCode of ['payout_info_check', 'user_inquiry', 'owner_request']) {
+      state.afterTasks = [];
+      state.notified = [];
+      state.row = { ...(state.row as object), ...shopHold, noticeCode };
+      notifySettlementHeld(db, `hold-${noticeCode}`);
+      await runAfterTasks();
+      bodies.push((state.notified[0] as { body: string }).body);
+    }
+    expect(bodies).toEqual([
+      '샵 전체 정산 · 정산 계좌·사업자 정보 확인이 필요해요. 정산 계좌를 확인해 주세요',
+      '샵 전체 정산 · 이용자 문의를 확인하고 있어요. 확인이 끝나면 돌아오는 지급일에 들어가요',
+      '샵 전체 정산 · 원장님이 요청하셨어요',
+    ]);
+    state.afterTasks = [];
+    state.notified = [];
+    notifySettlementReleased(db, 'hold-shop');
+    await runAfterTasks();
+    expect(state.notified).toMatchObject([{ body: '샵 전체 정산 · 돌아오는 지급일에 들어가요' }]);
+  });
+
+  it('보류가 없으면 보내지 않는다', async () => {
+    state.row = null;
+    notifySettlementHeld(db, 'hold-x');
+    notifySettlementReleased(db, 'hold-x');
     await runAfterTasks();
     expect(state.notified).toEqual([]);
   });

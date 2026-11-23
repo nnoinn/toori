@@ -17,7 +17,8 @@ import { previewRefund } from '@/server/refunds/cancel';
 import { REFUND_ERRORS } from '@/server/refunds/errors';
 
 import { BOOKER_INFO_NOTE } from '../../me/profile-rules';
-import { formatDuration, kakaoDirectionsLink } from '../../slots/[slotId]/detail-format';
+import { formatDuration } from '@/lib/format';
+import { kakaoDirectionsLink } from '@/lib/kakao-map';
 import { NO_SHOW_DISPUTE_NOTE, noShowRefundNote } from '../no-show-texts';
 import { getMyReservationDetail } from '../queries';
 import { isVisitPending, showsCancelSection, showsCheckInCard } from '../reservation-tabs';

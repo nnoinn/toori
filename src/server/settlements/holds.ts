@@ -8,7 +8,7 @@
 // - holdShopSettlement: 샵 전체를 멈춘다. 아직 묶이지 않은 그 샵 거래가 모두 목요일 묶기에서 빠진다
 // - releaseSettlementHold: 보류를 푼다. 풀린 거래는 돌아오는 지급일에 들어간다(지급일 0시 뒤에 풀면 그다음 지급일)
 // 원장님 정산 화면에는 "운영자 확인 중"과 고른 사유 코드만 보이고, 운영자가 쓴 사유는 숨긴다(11/15 nnoinn, #489).
-// 원장님 알림은 아직 보내지 않는다(#489 다음 PR에서 걸 때·풀 때 알림을 더한다)
+// 걸거나 풀면 원장님에게 알림이 간다(#489): 걸 때는 대상(예약 또는 샵 전체 정산)과 고른 사유·다음에 할 일, 풀 때는 돌아오는 지급일 안내
 
 import { z } from 'zod';
 
@@ -18,6 +18,7 @@ import { getRequestNow } from '@/lib/request-time';
 import type { Result } from '@/lib/result';
 import { toAdminReason } from '@/server/admin/reason';
 import { requireAdmin } from '@/server/auth';
+import { notifySettlementHeld, notifySettlementReleased } from '@/server/notifications/alerts';
 import { isAdminNoticeCodeFor } from '@/server/policy/admin-notice';
 
 import { settlementHoldFail } from './hold-errors';
@@ -69,7 +70,7 @@ export async function holdReservationSettlement(input: {
   const code = input?.code;
   if (!isAdminNoticeCodeFor('settlement_hold', code)) return settlementHoldFail('CODE_REQUIRED');
   const now = await getRequestNow();
-  return runHold((tx) =>
+  const held = await runHold((tx) =>
     holdReservationInTx(tx, {
       reservationId: input.reservationId,
       adminId: auth.data.userId,
@@ -78,6 +79,8 @@ export async function holdReservationSettlement(input: {
       now,
     }),
   );
+  if (held.ok) notifySettlementHeld(getDb(), held.data.holdId);
+  return held;
 }
 
 /** 샵 전체의 정산 보류. SHOP_NOT_FOUND·ALREADY_HELD, 사유가 비면 REASON_REQUIRED, 사유 코드가 맞지 않으면 CODE_REQUIRED */
@@ -94,7 +97,7 @@ export async function holdShopSettlement(input: {
   const code = input?.code;
   if (!isAdminNoticeCodeFor('settlement_hold', code)) return settlementHoldFail('CODE_REQUIRED');
   const now = await getRequestNow();
-  return runHold((tx) =>
+  const held = await runHold((tx) =>
     holdShopInTx(tx, {
       shopId: input.shopId,
       adminId: auth.data.userId,
@@ -103,6 +106,8 @@ export async function holdShopSettlement(input: {
       now,
     }),
   );
+  if (held.ok) notifySettlementHeld(getDb(), held.data.holdId);
+  return held;
 }
 
 /** 정산 보류를 푼다. HOLD_NOT_FOUND·ALREADY_RELEASED, 메모가 비면 REASON_REQUIRED */
@@ -116,7 +121,7 @@ export async function releaseSettlementHold(input: {
   const memo = toAdminReason(input?.memo);
   if (!memo.ok) return settlementHoldFail(memo.problem);
   const now = await getRequestNow();
-  return getDb().transaction((tx) =>
+  const released = await getDb().transaction((tx) =>
     releaseHoldInTx(tx, {
       holdId: input.holdId,
       adminId: auth.data.userId,
@@ -124,4 +129,6 @@ export async function releaseSettlementHold(input: {
       now,
     }),
   );
+  if (released.ok) notifySettlementReleased(getDb(), released.data.holdId);
+  return released;
 }

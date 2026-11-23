@@ -1,6 +1,7 @@
 // 운영자 정산 보류 기록 목록(#373 ②). 예약 상세·샵 정산 화면이 같이 쓴다.
 // 지금 걸린 보류는 [보류 풀기]를 붙이고, 지난 보류는 언제 누가 왜 풀었는지 남겨 보여 준다
 
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import Link from 'next/link';
 
 import { formatKstDateTime } from '@/lib/time';
@@ -31,7 +32,7 @@ export function HoldList({
                     href={`/admin/reservations/${hold.reservationId}`}
                     className="hover:underline"
                   >
-                    {hold.reservationCode}
+                    {formatReservationCode(hold.reservationCode ?? '')}
                   </Link>{' '}
                   ·{' '}
                 </>

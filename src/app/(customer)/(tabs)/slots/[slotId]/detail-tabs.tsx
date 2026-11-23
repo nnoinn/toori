@@ -68,7 +68,7 @@ export function DetailTabs({ tabs }: { tabs: DetailTab[] }) {
   return (
     <nav
       aria-label="매물 정보"
-      className="sticky top-0 z-10 border-b bg-background md:top-16 md:col-start-1"
+      className="sticky top-[var(--hold-top,0px)] z-10 border-b bg-background md:top-16 md:col-start-1"
     >
       <ul className="flex [scrollbar-width:none] gap-1 overflow-x-auto px-2 md:px-0">
         {tabs.map((tab) => (

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatWon } from '@/lib/format';
@@ -23,7 +24,7 @@ const STATE_BADGE: Record<CouponState, 'default' | 'secondary' | 'outline'> = {
 function ReservationLink({ reservationId, code }: { reservationId: string; code: string }) {
   return (
     <Link href={`/admin/reservations/${reservationId}`} className="hover:underline">
-      {code}
+      {formatReservationCode(code)}
     </Link>
   );
 }

@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { NotificationToaster } from '@/components/ui/notification-toast';
 import { OwnerNav } from '@/components/ui/owner-nav';
 import { getDb } from '@/db';
+import { PushRestorer } from '@/features/push/push-restorer';
 import { getCurrentAccount } from '@/server/auth';
 import { readShopReviewStatus } from '@/server/shops/review-store';
 
@@ -16,7 +17,8 @@ import { OwnerTopBar } from './owner-top-bar';
 // 입점 승인 전이면 메뉴의 '매물 등록'을 잠근다(O7 ②, 연결 #13). 매물 등록 화면과 서버 함수도 따로 막는다.
 // 접근 보호: proxy가 1차로 막고, 이 레이아웃과 서버 함수에서 requireOwner()로 한 번 더 확인한다(강규민, 로드맵 W3).
 // OwnerTopBar: 본문 위 오른쪽 알림 종(#371). NotificationToaster: 원장님 화면을 보고 있을 때 새 알림을 화면 위 가운데에
-// 5초 동안 보여준다(화면 안내, #371). 원장님 모드일 때만 확인한다
+// 5초 동안 보여준다(화면 안내, #371). 원장님 모드일 때만 확인한다. PushRestorer: 로그아웃 뒤 같은 사람이 다시 로그인하면 이 기기에서
+// 켜 두었던 푸시 알림을 되살린다(11/23)
 export default function OwnerLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col md:flex-row">
@@ -32,6 +34,7 @@ export default function OwnerLayout({ children }: Readonly<{ children: React.Rea
         account={OWNER_NOTIFICATION_ACCOUNT}
         inboxHref={OWNER_NOTIFICATIONS_PATH}
       />
+      <PushRestorer />
     </div>
   );
 }

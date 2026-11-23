@@ -27,7 +27,13 @@ import {
 import { slotStatusIs } from '@/features/slot-status/slot-status-sql';
 import { ownerListedSlot } from '@/server/slots/visibility';
 
-import { ADMIN_LIST_LIMIT, containsPattern, type ListResult, toListResult } from '../lookup';
+import {
+  ADMIN_LIST_LIMIT,
+  containsPattern,
+  type ListResult,
+  reservationCodePattern,
+  toListResult,
+} from '../lookup';
 import type { ReservationFilter, ReservationSort, SlotFilter } from './format';
 
 type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
@@ -64,13 +70,18 @@ export type ReservationRow = {
   visitResult: VisitResult | null;
   shopName: string;
   menuName: string;
+  /** 고객 이름. 원장님이 보는 예약자 이름과 같다(#375) */
+  customerName: string;
   customerNickname: string;
   startAt: Date;
   amount: number;
   needsReview: boolean;
 };
 
-/** 예약 목록(기본은 최근에 예약한 것부터, sort로 바꾼다). 예약번호·샵 이름·고객 닉네임 일부로 찾는다 */
+/**
+ * 예약 목록(기본은 최근에 예약한 것부터, sort로 바꾼다). 예약번호·샵 이름·고객 이름·닉네임 일부로 찾는다.
+ * 원장님은 예약자 이름을 보므로(#375) 원장님이 말한 이름으로도 찾을 수 있게 한다(11/22 손 점검)
+ */
 export async function selectReservations(
   db: DbReader,
   input: { filter: ReservationFilter; query: string; sort?: ReservationSort },
@@ -78,8 +89,9 @@ export async function selectReservations(
   const pattern = containsPattern(input.query);
   const search: SQL | undefined = input.query
     ? or(
-        ilike(reservations.code, pattern),
+        ilike(reservations.code, reservationCodePattern(input.query)),
         ilike(shops.name, pattern),
+        ilike(customers.name, pattern),
         ilike(customers.nickname, pattern),
       )
     : undefined;
@@ -92,6 +104,7 @@ export async function selectReservations(
       visitResult: reservations.visitResult,
       shopName: shops.name,
       menuName: slots.menuName,
+      customerName: customers.name,
       customerNickname: customers.nickname,
       startAt: slots.startAt,
       amount: orders.amount,
@@ -200,6 +213,9 @@ export type ReservationDetail = {
   voidedAt: Date | null;
   hoursBeforeStartAtCancel: number | null;
   createdAt: Date;
+  customerId: string;
+  /** 고객 이름. 원장님이 보는 예약자 이름과 같다(#375) */
+  customerName: string;
   customerNickname: string;
   shopId: string;
   shopName: string;
@@ -238,6 +254,8 @@ export async function selectReservationDetail(
       voidedAt: reservations.voidedAt,
       hoursBeforeStartAtCancel: reservations.hoursBeforeStartAtCancel,
       createdAt: reservations.createdAt,
+      customerId: customers.id,
+      customerName: customers.name,
       customerNickname: customers.nickname,
       shopId: shops.id,
       shopName: shops.name,

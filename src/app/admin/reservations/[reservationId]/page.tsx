@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -123,7 +124,7 @@ async function Detail({ params }: { params: Params }) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <CardTitle className="text-lg">{detail.code}</CardTitle>
+            <CardTitle className="text-lg">{formatReservationCode(detail.code)}</CardTitle>
             <Badge variant="secondary">{labelReservation(detail.status, detail.visitResult)}</Badge>
             {detail.voidedAt ? <Badge variant="outline">무효</Badge> : null}
           </div>
@@ -137,7 +138,16 @@ async function Detail({ params }: { params: Params }) {
             </Field>
             <Field label="메뉴">{detail.menuName}</Field>
             <Field label="일시">{formatKst(detail.startAt)}</Field>
-            <Field label="고객">{detail.customerNickname}</Field>
+            {/* 원장님이 보는 예약자 이름과 같게 이름을 보여 주고, 닉네임은 옆에 둔다(11/22 손 점검, 이의제기 화면과 같음) */}
+            <Field label="고객">
+              <Link
+                href={`/admin/users/customers/${detail.customerId}`}
+                className="hover:underline"
+              >
+                {detail.customerName}
+              </Link>
+              <span className="text-muted-foreground"> · 닉네임 {detail.customerNickname}</span>
+            </Field>
             <Field label="예약한 시각">{formatKst(detail.createdAt)}</Field>
             <Field label="방문 처리">{when(detail.visitRecordedAt)}</Field>
           </dl>

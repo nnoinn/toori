@@ -8,8 +8,23 @@ import { after } from 'next/server';
 
 import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { getDb } from '@/db';
-import { customers, orders, owners, reservations, shops, slots, slotWindows } from '@/db/schema';
+import {
+  customers,
+  orders,
+  owners,
+  reservations,
+  settlementHolds,
+  shops,
+  slots,
+  slotWindows,
+} from '@/db/schema';
 import { formatEndTime, formatKst } from '@/lib/time';
+import {
+  type AdminNoticeCode,
+  adminNoticeText,
+  type AdminNoticeUse,
+  toAdminNoticeCode,
+} from '@/server/policy/admin-notice';
 import { OWNER_FAULT_COUPON_AMOUNT, OWNER_FAULT_PENALTY_AMOUNT } from '@/server/policy/owner-fault';
 import { readReleasedKeptSlots } from '@/server/slot-windows/store';
 
@@ -406,6 +421,20 @@ export function notifyShopReviewed(
 /** 운영자 매물 관리 알림에 붙이는 문의 안내. 운영자가 적은 사유는 원장님에게 보이지 않는다(#373 ④, 11/16 강규민 결정) */
 const ADMIN_CONTACT_NOTE = '문의는 투리 카카오톡 채널로 해 주세요';
 
+/**
+ * 운영자가 목록에서 고른, 원장님에게 보여 줄 사유와 다음에 할 일 문장(#489). 다음에 할 일이 없으면(원장님 요청) 사유만.
+ * 운영자가 쓴 메모는 넣지 않는다
+ */
+function noticeSentences(code: AdminNoticeCode, use: AdminNoticeUse): string[] {
+  const { label, nextStep } = adminNoticeText(code, use);
+  return nextStep ? [label, nextStep] : [label];
+}
+
+/** 문의 안내. 기타는 다음에 할 일이 이미 카카오톡 채널 안내라서 붙이지 않는다(#489) */
+function contactNote(code: AdminNoticeCode): string[] {
+  return code === 'other' ? [] : [ADMIN_CONTACT_NOTE];
+}
+
 /** 샵 원장님의 로그인 id. 없는 샵이면 null */
 async function readShopOwnerUserId(db: Db, shopId: string): Promise<string | null> {
   const [row] = await db
@@ -417,7 +446,8 @@ async function readShopOwnerUserId(db: Db, shopId: string): Promise<string | nul
 }
 
 /**
- * 운영자가 샵의 새 매물 게시를 멈추거나 다시 열었을 때 원장님에게(#373 ④). 멈출 때마다 새로 가도록 바꾼 시각을 중복 방지 키에 넣는다
+ * 운영자가 샵의 새 매물 게시를 멈추거나 다시 열었을 때 원장님에게(#373 ④). 멈출 때마다 새로 가도록 바꾼 시각을 중복 방지 키에 넣는다.
+ * 멈출 때는 운영자가 고른 사유와 다음에 할 일을 넣는다(#489)
  */
 export function notifyPublishPauseChanged(
   db: Db,
@@ -425,46 +455,69 @@ export function notifyPublishPauseChanged(
 ) {
   const event = input.paused ? 'shop.publish_paused' : 'shop.publish_resumed';
   sendAfterResponse(event, async () => {
-    const ownerUserId = await readShopOwnerUserId(db, input.shopId);
-    if (!ownerUserId) return;
+    const [row] = await db
+      .select({ ownerUserId: owners.userId, noticeCode: shops.publishPausedCode })
+      .from(shops)
+      .innerJoin(owners, eq(owners.id, shops.ownerId))
+      .where(eq(shops.id, input.shopId));
+    if (!row) return;
+    // 그 사이 다시 열었으면 코드가 비어 있어서 기타로 본다
+    const code = toAdminNoticeCode('publish_pause', row.noticeCode);
     await notify(db, {
-      userId: ownerUserId,
+      userId: row.ownerUserId,
       accountType: 'owner',
       event,
       dedupeKey: `${event}:owner:${input.shopId}:${input.changedAt.toISOString()}`,
       title: input.paused ? '새 매물 등록이 잠시 멈췄어요' : '새 매물을 다시 올릴 수 있어요',
       body: input.paused
-        ? `운영자 확인 중이에요. 이미 올린 매물과 예약은 그대로예요. ${ADMIN_CONTACT_NOTE}`
+        ? [
+            ...noticeSentences(code, 'publish_pause'),
+            '이미 올린 매물과 예약은 그대로예요',
+            ...contactNote(code),
+          ].join('. ')
         : '운영자 확인이 끝났어요',
       url: '/owner',
     });
   });
 }
 
-/** 운영자가 매물을 강제 마감했을 때 원장님에게(#373 ④). 매물 하나에 한 번 */
+/** 운영자가 매물을 강제 마감했을 때 원장님에게(#373 ④). 운영자가 고른 사유와 다음에 할 일을 넣는다(#489). 매물 하나에 한 번 */
 export function notifySlotForceClosed(db: Db, slotId: string) {
   const event = 'slot.force_closed';
   sendAfterResponse(event, async () => {
     const [row] = await db
-      .select({ shopId: slots.shopId, menuName: slots.menuName, startAt: slots.startAt })
+      .select({
+        shopId: slots.shopId,
+        menuName: slots.menuName,
+        startAt: slots.startAt,
+        noticeCode: slots.adminCloseCode,
+      })
       .from(slots)
       .where(eq(slots.id, slotId));
     if (!row) return;
     const ownerUserId = await readShopOwnerUserId(db, row.shopId);
     if (!ownerUserId) return;
+    const code = toAdminNoticeCode('close', row.noticeCode);
     await notify(db, {
       userId: ownerUserId,
       accountType: 'owner',
       event,
       dedupeKey: `${event}:owner:${slotId}`,
       title: '운영자가 매물을 마감했어요',
-      body: `${row.menuName} · ${formatKst(row.startAt)}. ${ADMIN_CONTACT_NOTE}`,
+      body: [
+        `${row.menuName} · ${formatKst(row.startAt)}`,
+        ...noticeSentences(code, 'close'),
+        ...contactNote(code),
+      ].join('. '),
       url: '/owner',
     });
   });
 }
 
-/** 운영자가 시간대 매물을 강제 마감했을 때 원장님에게(#373 ④). 결제가 끝난 예약은 그대로라고 알린다. 시간대 하나에 한 번 */
+/**
+ * 운영자가 시간대 매물을 강제 마감했을 때 원장님에게(#373 ④). 운영자가 고른 사유와 다음에 할 일(#489), 결제가 끝난 예약은 그대로라고 알린다.
+ * 시간대 하나에 한 번
+ */
 export function notifyWindowForceClosed(db: Db, windowId: string) {
   const event = 'window.force_closed';
   sendAfterResponse(event, async () => {
@@ -473,20 +526,98 @@ export function notifyWindowForceClosed(db: Db, windowId: string) {
         shopId: slotWindows.shopId,
         startAt: slotWindows.startAt,
         endAt: slotWindows.endAt,
+        noticeCode: slotWindows.adminCloseCode,
       })
       .from(slotWindows)
       .where(eq(slotWindows.id, windowId));
     if (!row) return;
     const ownerUserId = await readShopOwnerUserId(db, row.shopId);
     if (!ownerUserId) return;
+    const code = toAdminNoticeCode('close', row.noticeCode);
     await notify(db, {
       userId: ownerUserId,
       accountType: 'owner',
       event,
       dedupeKey: `${event}:owner:${windowId}`,
       title: '운영자가 시간대 매물을 마감했어요',
-      body: `${formatKst(row.startAt)}~${formatEndTime(row.startAt, row.endAt)}. 결제가 끝난 예약은 그대로예요. ${ADMIN_CONTACT_NOTE}`,
+      body: [
+        `${formatKst(row.startAt)}~${formatEndTime(row.startAt, row.endAt)}`,
+        ...noticeSentences(code, 'close'),
+        '결제가 끝난 예약은 그대로예요',
+        ...contactNote(code),
+      ].join('. '),
       url: '/owner',
+    });
+  });
+}
+
+/** 정산 보류 알림이 읽는 값: 받는 원장님, 거래 보류면 그 예약의 메뉴·시작 시각, 고른 사유 코드 */
+async function readSettlementHoldAlert(db: Db, holdId: string) {
+  const [row] = await db
+    .select({
+      ownerUserId: owners.userId,
+      reservationId: settlementHolds.reservationId,
+      menuName: slots.menuName,
+      startAt: slots.startAt,
+      noticeCode: settlementHolds.reasonCode,
+    })
+    .from(settlementHolds)
+    .leftJoin(reservations, eq(reservations.id, settlementHolds.reservationId))
+    .leftJoin(slots, eq(slots.id, reservations.slotId))
+    // 거래 보류는 그 예약의 샵, 샵 전체 보류는 그 샵
+    .innerJoin(shops, eq(shops.id, sql`coalesce(${settlementHolds.shopId}, ${slots.shopId})`))
+    .innerJoin(owners, eq(owners.id, shops.ownerId))
+    .where(eq(settlementHolds.id, holdId));
+  return row ?? null;
+}
+
+/** 정산 보류 알림의 대상: 거래 보류면 "메뉴 · 시작 시각", 샵 전체 보류면 "샵 전체 정산"(#489) */
+function settlementHoldTarget(row: {
+  reservationId: string | null;
+  menuName: string | null;
+  startAt: Date | null;
+}): string {
+  return row.reservationId && row.menuName && row.startAt
+    ? `${row.menuName} · ${formatKst(row.startAt)}`
+    : '샵 전체 정산';
+}
+
+/**
+ * 운영자가 정산을 보류했을 때 원장님에게(#489). 고른 사유와 다음에 할 일을 넣고, 운영자가 쓴 사유는 넣지 않는다.
+ * 보류 하나에 한 번. 누르면 원장님 정산 화면으로 간다
+ */
+export function notifySettlementHeld(db: Db, holdId: string) {
+  const event = 'settlement.held';
+  sendAfterResponse(event, async () => {
+    const row = await readSettlementHoldAlert(db, holdId);
+    if (!row) return;
+    const code = toAdminNoticeCode('settlement_hold', row.noticeCode);
+    await notify(db, {
+      userId: row.ownerUserId,
+      accountType: 'owner',
+      event,
+      dedupeKey: `${event}:owner:${holdId}`,
+      title: '정산을 잠시 멈췄어요',
+      body: `${settlementHoldTarget(row)} · ${noticeSentences(code, 'settlement_hold').join('. ')}`,
+      url: '/owner/settlements',
+    });
+  });
+}
+
+/** 운영자가 정산 보류를 풀었을 때 원장님에게(#489). 보류 하나에 한 번 */
+export function notifySettlementReleased(db: Db, holdId: string) {
+  const event = 'settlement.released';
+  sendAfterResponse(event, async () => {
+    const row = await readSettlementHoldAlert(db, holdId);
+    if (!row) return;
+    await notify(db, {
+      userId: row.ownerUserId,
+      accountType: 'owner',
+      event,
+      dedupeKey: `${event}:owner:${holdId}`,
+      title: '멈췄던 정산을 다시 진행해요',
+      body: `${settlementHoldTarget(row)} · 돌아오는 지급일에 들어가요`,
+      url: '/owner/settlements',
     });
   });
 }
