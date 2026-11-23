@@ -7,9 +7,10 @@ import {
   type SlotHoldInput,
   type SlotStatusInput,
 } from '@/features/slot-status/slot-status';
+import type { WindowState } from '@/server/slot-windows/types';
 
-/** 목록 탭. 주소 ?tab= 값 */
-export const LOOKUP_TABS = ['reservations', 'slots'] as const;
+/** 목록 탭. 주소 ?tab= 값. windows는 시간대 매물(#567) */
+export const LOOKUP_TABS = ['reservations', 'slots', 'windows'] as const;
 export type LookupTab = (typeof LOOKUP_TABS)[number];
 
 export function toLookupTab(value: string | undefined): LookupTab {
@@ -64,6 +65,37 @@ export const SLOT_FILTERS: readonly SlotFilter[] = ['all', ...SLOT_STATUSES];
 
 export function toSlotFilter(value: string | undefined): SlotFilter {
   return SLOT_FILTERS.find((filter) => filter === value) ?? 'all';
+}
+
+/**
+ * 시간대 매물 목록 거르기(#567). 주소 ?status= 값. 지금 시각으로 나눈다:
+ * 게시예정(게시 시각 전), 게시중(게시 시각이 지났고 끝나지 않음, 다 찬 시간대 포함), 마감(마감했거나 끝남)
+ */
+export const WINDOW_FILTERS = ['all', 'scheduled', 'published', 'closed'] as const;
+export type WindowFilter = (typeof WINDOW_FILTERS)[number];
+
+export function toWindowFilter(value: string | undefined): WindowFilter {
+  return WINDOW_FILTERS.find((filter) => filter === value) ?? 'all';
+}
+
+export const WINDOW_FILTER_LABELS: Record<WindowFilter, string> = {
+  all: '전체',
+  scheduled: '게시예정',
+  published: '게시중',
+  closed: '마감',
+};
+
+/** 시간대 매물 한 줄의 상태 이름. 다 참은 게시중인데 남은 시간에 들어가는 서비스가 없는 것(windowStatus) */
+export const WINDOW_STATE_LABELS: Record<WindowState, string> = {
+  scheduled: '게시예정',
+  published: '게시중',
+  full: '다 참',
+  closed: '마감',
+};
+
+/** 운영자가 강제 마감할 수 있는 시간대 매물(#373 ④): 마감하지 않았고 끝나지 않음. 막는 것은 서버가 다시 본다 */
+export function canForceCloseWindow(state: WindowState): boolean {
+  return state !== 'closed';
 }
 
 /** 목록 주소. 기본값은 주소에 넣지 않는다. 정렬은 예약 목록에만 있다 */
