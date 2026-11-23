@@ -95,7 +95,7 @@ export const WINDOW_STATE_LABELS: Record<WindowState, string> = {
 
 /** 운영자가 강제 마감할 수 있는 시간대 매물(#373 ④): 마감하지 않았고 끝나지 않음. 막는 것은 서버가 다시 본다 */
 export function canForceCloseWindow(state: WindowState): boolean {
-  return state !== 'full';
+  return state !== 'closed';
 }
 
 /** 목록 주소. 기본값은 주소에 넣지 않는다. 정렬은 예약 목록에만 있다 */
