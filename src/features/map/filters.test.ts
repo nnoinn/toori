@@ -61,6 +61,10 @@ describe('parseFilters', () => {
       minDiscount: 30,
     });
   });
+
+  it('할인율은 숫자만 있는 값만 읽는다. 앞뒤에 다른 글자가 붙으면 버린다', () => {
+    expect(parseFilters({ discount: [' 30', '30 ', '20'] }).minDiscount).toBe(20);
+  });
 });
 
 describe('applyFiltersToSearch', () => {

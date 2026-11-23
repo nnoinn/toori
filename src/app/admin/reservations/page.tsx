@@ -19,7 +19,7 @@ import {
 import { formatWon } from '@/lib/format';
 import { getRequestNow } from '@/lib/request-time';
 import { firstParam, type SearchValue } from '@/lib/search-params';
-import { formatKst, formatKstDateTime } from '@/lib/time';
+import { formatEndTime, formatKst, formatKstDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { recordAdminAccess } from '@/server/admin/access-log';
 import { ensureAdminPage } from '@/server/auth';
@@ -27,6 +27,7 @@ import { ensureAdminPage } from '@/server/auth';
 import { ADMIN_LIST_LIMIT, labelReservation, toSearchQuery } from '../lookup';
 import {
   canForceCloseSlot,
+  canForceCloseWindow,
   LOOKUP_TABS,
   type LookupTab,
   lookupHref,
@@ -42,9 +43,14 @@ import {
   toReservationFilter,
   toReservationSort,
   toSlotFilter,
+  toWindowFilter,
+  WINDOW_FILTER_LABELS,
+  WINDOW_FILTERS,
+  WINDOW_STATE_LABELS,
 } from './format';
 import { SlotControlAction } from '../shops/slot-control-actions';
 import { selectReservations, selectSlots } from './queries';
+import { selectAdminWindows } from './window-queries';
 
 export const metadata: Metadata = { title: '매물·예약' };
 
@@ -55,10 +61,15 @@ type SearchParams = Promise<{
   sort?: SearchValue;
 }>;
 
-const TAB_LABELS: Record<LookupTab, string> = { reservations: '예약', slots: '매물' };
+const TAB_LABELS: Record<LookupTab, string> = {
+  reservations: '예약',
+  slots: '매물',
+  windows: '시간대 매물',
+};
 const SEARCH_HINTS: Record<LookupTab, string> = {
   reservations: '예약번호, 샵 이름, 고객 이름·닉네임',
   slots: '샵 이름, 메뉴 이름',
+  windows: '샵 이름',
 };
 
 // 운영자 화면 폭(왼쪽 메뉴를 뺀 1,000px 안팎)에 예약 한 줄이 가로 스크롤 없이 들어가게 칸 여백을 좁게 둔다
@@ -68,9 +79,10 @@ const CELL = 'px-3 py-3';
 const slotFilterLabel = (filter: SlotFilter) =>
   filter === 'all' ? '전체' : SLOT_STATUS_LABELS[filter];
 
-// 매물·예약 조회 (A-103). 주소: /admin/reservations?tab=reservations|slots&status=...&q=검색어&sort=... (조회만)
+// 매물·예약 조회 (A-103). 주소: /admin/reservations?tab=reservations|slots|windows&status=...&q=검색어&sort=... (조회만)
 // 예약 목록은 줄을 한 번 누르면 선택, 두 번 누르거나 Enter·[상세]로 상세가 열리고, 오른쪽 위에서 정렬을 고른다(#360 1번)
 // 매물 목록도 같다. 메뉴 이름을 눌러도 매물 상세가 열린다(11/19 운영자 화면 피드백). 샵 이름은 샵 화면으로 간다
+// 시간대 매물 목록(#567)은 시간대마다 시간·서비스 수·예약된 칸·상태를 보고, 샵 상세와 같은 강제 마감을 한다
 export default function AdminReservationsPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <main className="flex flex-1 flex-col gap-4 p-6">
@@ -94,7 +106,12 @@ async function Lookup({ searchParams }: { searchParams: SearchParams }) {
     targetType: 'list',
     path: lookupHref({
       tab,
-      status: tab === 'slots' ? toSlotFilter(status) : toReservationFilter(status),
+      status:
+        tab === 'slots'
+          ? toSlotFilter(status)
+          : tab === 'windows'
+            ? toWindowFilter(status)
+            : toReservationFilter(status),
     }),
     query,
   });
@@ -134,8 +151,10 @@ async function Lookup({ searchParams }: { searchParams: SearchParams }) {
       </div>
       {tab === 'reservations' ? (
         <ReservationList status={status} query={query} sort={sort} />
-      ) : (
+      ) : tab === 'slots' ? (
         <SlotList status={status} query={query} />
+      ) : (
+        <WindowList status={status} query={query} />
       )}
     </div>
   );
@@ -338,6 +357,85 @@ async function SlotList({ status, query }: { status: string | undefined; query: 
                 );
               })}
             </SelectableRows>
+          </table>
+        </div>
+      )}
+      <MoreNotice hasMore={hasMore} />
+    </>
+  );
+}
+
+/** 시간대 매물 목록(#567). 줄을 누르는 상세 화면은 없고, 샵 이름은 샵 화면으로 간다 */
+async function WindowList({ status, query }: { status: string | undefined; query: string }) {
+  const filter = toWindowFilter(status);
+  const now = await getRequestNow();
+  const { rows, hasMore } = await selectAdminWindows(getDb(), { filter, query, now });
+  return (
+    <>
+      <nav aria-label="시간대 매물 상태" className="flex flex-wrap gap-2">
+        {WINDOW_FILTERS.map((value) => (
+          <Link
+            key={value}
+            href={lookupHref({ tab: 'windows', status: value, query })}
+            aria-current={value === filter ? 'page' : undefined}
+            className={chipClass(value === filter)}
+          >
+            {WINDOW_FILTER_LABELS[value]}
+          </Link>
+        ))}
+      </nav>
+      {rows.length === 0 ? (
+        <EmptyState title="맞는 시간대 매물이 없어요" className="rounded-xl bg-card" />
+      ) : (
+        <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
+          <table className="w-full min-w-[52rem] text-sm">
+            <thead className="text-left text-muted-foreground">
+              <tr className="border-b">
+                <th className={HEAD_CELL}>샵</th>
+                <th className={HEAD_CELL}>시간</th>
+                <th className={HEAD_CELL}>서비스</th>
+                <th className={HEAD_CELL}>예약된 칸</th>
+                <th className={HEAD_CELL}>상태</th>
+                <th className={HEAD_CELL}>
+                  <span className="sr-only">관리</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.windowId} className="border-b last:border-0">
+                  <td className={cn(CELL, 'font-medium')}>
+                    <Link href={`/admin/shops/${row.shopId}`} className="hover:underline">
+                      {row.shopName}
+                    </Link>
+                  </td>
+                  <td className={cn(CELL, 'whitespace-nowrap')}>
+                    {formatKst(row.startAt)}~{formatEndTime(row.startAt, row.endAt)}
+                  </td>
+                  <td className={CELL}>{row.menuCount}개</td>
+                  <td className={cn(CELL, 'whitespace-nowrap')}>
+                    {row.bookedCount}칸
+                    {row.holdingCount > 0 ? (
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        결제 중 {row.holdingCount}칸
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className={CELL}>
+                    <Badge variant="secondary">{WINDOW_STATE_LABELS[row.state]}</Badge>
+                  </td>
+                  <td className={cn(CELL, 'text-right')}>
+                    {/* 마감하지 않았고 끝나지 않은 시간대는 운영자가 강제 마감한다(#373 ④). 막는 것은 서버가 다시 본다 */}
+                    {canForceCloseWindow(row.state) ? (
+                      <SlotControlAction
+                        target={{ kind: 'close_window', windowId: row.windowId }}
+                        size="sm"
+                      />
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
       )}

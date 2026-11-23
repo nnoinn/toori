@@ -8,6 +8,7 @@ import {
   type AgreedCancelReason,
 } from '@/server/refunds/agreed-cancel-types';
 
+import { ACTION_LABELS } from '../logs/format';
 import type { ReviewFilter } from './queries';
 
 /** 입점 심사 목록 정렬. 주소 ?sort= 값(#360 1번) */
@@ -63,9 +64,13 @@ const REVIEW_ACTION_LABELS: Record<string, string> = {
   'shop.reject': '반려',
 };
 
-/** 운영자 작업 기록(admin_actions.action)의 화면 이름 */
+/**
+ * 샵 상세 '심사 기록'의 한 줄 이름. 그 샵에 남은 운영자 처리 기록(admin_actions, target_type shop)을 모두 보여 준다.
+ * 승인·반려는 짧게, 그 밖의 처리(게시 멈춤·다시 열기, 사업자 정보 수정, 샵 전체 정산 보류·풀기)는 운영자 기록 화면과 같은 이름이다.
+ * 모르는 값은 그대로 보여 준다
+ */
 export function labelReviewAction(action: string): string {
-  return REVIEW_ACTION_LABELS[action] ?? action;
+  return REVIEW_ACTION_LABELS[action] ?? ACTION_LABELS[action] ?? action;
 }
 
 /** 합의 후 취소 요청의 결과 이름(운영자 샵 상세 '취소 기록', 예약 상세 '합의 후 취소 요청') */

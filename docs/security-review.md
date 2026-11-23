@@ -20,6 +20,8 @@
 
 | 함수 | 누가 | 어떤 데이터만 | 테스트 | 상태 |
 | --- | --- | --- | --- | --- |
+| `selectAdminWindows`(`src/app/admin/reservations/window-queries.ts`, 매물·예약 [시간대 매물] 탭, #567) | 운영자: 페이지가 `ensureAdminPage`로 확인(운영자 모드의 관리자만) | 운영자는 전체(X-102). 입력은 상태 거르기와 검색어뿐이고 읽기만 한다. 강제 마감은 `forceCloseWindow`(`requireAdmin`)를 쓴다 | `src/server/auth/pages.test.ts` 관리자가 아니면 404를 보여준다, 운영자 모드로 들어온 관리자면 | ✅ |
+| `selectShopSlotControl`(`src/app/admin/shops/slot-control-queries.ts`, 샵 상세 '매물 관리' 칸, #373 ④·#567 3번) | 운영자: 페이지가 `ensureAdminPage`로 확인(운영자 모드의 관리자만) | 운영자는 전체(X-102). 입력은 주소의 샵 id이고 읽기만 한다. 강제 마감·게시 멈춤은 `forceCloseSlot`·`forceCloseWindow`·`pauseShopPublishing`(`requireAdmin`)을 쓴다 | `src/server/auth/pages.test.ts` 관리자가 아니면 404를 보여준다, 운영자 모드로 들어온 관리자면 | ✅ |
 | `getCustomerWithdrawalCheck`·`withdrawCustomer`(`src/server/accounts/withdrawal.ts`, 고객 회원 탈퇴, #154 가짜 결과 버전) | `requireCustomer`(고객 모드의 고객 계정) | 세션의 고객 계정. 입력을 받지 않는다 | `src/server/accounts/withdrawal.test.ts` 계정 확인에 막히면 그 실패를 그대로 주고 읽지 않는다 | ✅ |
 | `getOwnerWithdrawalCheck`·`withdrawOwner`(같은 파일, 원장님 탈퇴) | `requireOwner`(원장님 모드의 원장님 계정) | 세션의 원장님 샵. 입력을 받지 않는다 | `src/server/accounts/withdrawal.test.ts` 계정 확인에 막히면 그 실패를 그대로 주고 읽지 않는다 | ✅ |
 | `getRestorableAccount`·`restoreCustomer`·`restoreOwner`(같은 파일, 계정 되살리기) | 로그인(`getCurrentAccount`). 탈퇴한 계정은 계정 확인 함수를 통과하지 못해서 로그인만 본다 | 세션의 로그인. 계정 종류 값만 받는다(customer·owner가 아니면 INVALID_INPUT). 가짜 결과 버전이라 아무것도 읽거나 바꾸지 않는다 | `src/server/accounts/withdrawal.test.ts` 로그인하지 않았으면 UNAUTHENTICATED, 계정 종류 값이 틀리면 INVALID_INPUT | ✅ |
@@ -30,6 +32,21 @@
 
 | 함수 | 누가 | 어떤 데이터만 | 테스트 | 상태 |
 | --- | --- | --- | --- | --- |
+| `loadCompletedReservation` (`(focus)/payment/result/actions.ts`, 예약 완료 화면) | `requireCustomer`(`getMyReservationDetail` 안) | 세션 고객. 예약 id는 `selectMyReservationDetail`이 고객 id로 걸러서 남의 예약·모양이 틀린 id는 `NOT_FOUND` | `src/app/(customer)/customer-access.db.test.ts` 다른 손님의 예약 id로 내 예약 상세·예약 완료 화면을 열면 찾을 수 없다 | ✅ |
+| `setFavorite` (`(tabs)/home/favorites/actions.ts`) | `requireCustomer` | 세션 고객. 입력에 계정 id를 넣어도 버린다. 샵 id는 승인된 샵만(`customerVisibleShop`) | `src/app/(customer)/customer-access.db.test.ts` 입력에 다른 손님의 계정 id를 넣어도 내 계정만 바뀐다<br>`src/app/(customer)/(tabs)/home/favorites/store.db.test.ts` 승인되지 않은 샵은 찜하지 못하고 | ✅ |
+| `watchListArea` (`(tabs)/home/list/actions.ts`) | `getInterestAreas`·`setInterestAreas`(1장, 안에서 `requireCustomer`) | 세션 고객의 관심 동네만. 동네 코드는 동네 목록에 있는지 `setInterestAreas`가 본다 | `src/app/(customer)/(tabs)/home/list/actions.test.ts` 관심 동네를 읽지 못하면(로그인 안 함 등) 저장하지 않고<br>`src/server/notifications/interest-store.db.test.ts` 다른 고객의 관심 동네는 건드리지 않는다 | ✅ |
+| `updateMyProfile` (`(tabs)/me/actions.ts`) | `requireCustomer` | 세션 고객. 입력에 계정 id를 넣어도 버린다 | `src/app/(customer)/customer-access.db.test.ts` 입력에 다른 손님의 계정 id를 넣어도 내 계정만 바뀐다<br>`src/app/(customer)/customer-access.db.test.ts` 로그인하지 않았거나 원장님 모드면 | ✅ |
+| `updateMyPhone` (`(tabs)/me/actions.ts`, 예약 확인 화면) | `requireCustomer` | 세션 고객(입력은 번호 하나) | `src/app/(customer)/customer-access.db.test.ts` 입력에 다른 손님의 계정 id를 넣어도 내 계정만 바뀐다<br>`src/app/(customer)/(tabs)/me/actions.test.ts` 고객으로 로그인하지 않았으면 저장하지 않는다 | ✅ |
+| `getMyReservations`·`getMyReservationDetail` (`(tabs)/reservations/queries.ts`, 내 예약 목록·상세 `/reservations/[id]`) | `requireCustomer` | 세션 고객. 예약 id는 고객 id로 거른다. 남의 예약·모양이 틀린 id는 `NOT_FOUND`이고 상세 화면은 404 | `src/app/(customer)/customer-access.db.test.ts` 다른 손님의 예약 id로 내 예약 상세·예약 완료 화면을 열면 찾을 수 없다<br>`src/app/(customer)/(tabs)/reservations/queries.db.test.ts` 상세는 본인 예약만 열리고<br>`src/app/(customer)/(tabs)/reservations/queries.db.test.ts` 본인 예약만, 탭별로 | ✅ |
+| 내 예약 상세가 같이 부르는 `previewRefund`·`getDisputeStatus`·`getAgreedCancelRequest`(1장) | `requireCustomer` | 내 예약만. 남의 예약이면 `RESERVATION_NOT_FOUND`·`REQUEST_NOT_FOUND` | `src/server/refunds/cancel.test.ts` 없거나 남의 예약이면 RESERVATION_NOT_FOUND<br>`src/server/disputes/dispute.test.ts` id 모양이 틀리거나 내 예약이 아니면 RESERVATION_NOT_FOUND<br>`src/server/refunds/agreed-cancel.test.ts` 내 예약이 아니면 REQUEST_NOT_FOUND | ✅ |
+| 예약 확인 화면 `/checkout/[slotId]`: `getMyHold`·`previewCheckoutAmount`(1장)와 예약자 이름·연락처 조회(`page.tsx`) | `ensureCustomerPage`, `requireCustomer` | 세션 고객. 남의 홀딩이면 `getMyHold`가 null이라 "결제 가능 시간이 끝났어요" 안내만 보이고(남의 홀딩 정보는 주지 않는다), 금액 미리보기는 `NOT_HOLDER`. 예약자 이름·연락처는 세션 고객 줄만 읽는다 | `src/app/(customer)/customer-access.db.test.ts` 다른 손님이 결제 중인 매물로 예약 확인 화면을 열면<br>`src/server/payments/checkout.test.ts` previewCheckoutAmount: 내 홀딩이 아니면 NOT_HOLDER | ✅ |
+| `selectSlotDetail` (`(tabs)/slots/[slotId]/queries.ts`, 매물 상세 `/slots/[id]`) | 누구나(로그인 없이 둘러보는 공개 매물) | 승인 샵의 게시 뒤 매물만, 게시 전·없는 매물은 404. 신규 고객 전용은 그 샵 이력이 있는 고객에게 404(C-306). 홀딩은 "나/다른 고객"만 알리고 누가 홀딩했는지는 주지 않는다 | `src/app/(customer)/(tabs)/slots/[slotId]/queries.db.test.ts` 승인되지 않은 샵, 게시 전 매물, 없는 매물은 null(404)<br>`src/app/(customer)/(tabs)/slots/[slotId]/queries.db.test.ts` 신규 고객 전용은 그 샵 이력이 있는 고객에게만 null | ✅ |
+| `loadHomeMap`·`loadHomeSlots`·`loadRegionSlots` (`src/features/map/slot-list/actions.ts`, 지도·목록·로비) | 누구나(로그인 없이 둘러보기) | 승인 샵의 게시중 매물만. 고객으로 들어왔으면 세션 고객 기준으로 신규 고객 전용을 거르고 결제 중 배지를 정한다 | `src/features/map/slot-list/queries.db.test.ts` 승인 샵의 게시중 매물만<br>`src/features/map/slot-list/queries.db.test.ts` 신규 고객 전용 매물은 그 샵 이력이 있는 고객에게 보이지 않는다 | ✅ |
+| `selectRegion`·`saveMyLocation` (`src/features/map/location-actions.ts`) | 누구나 | 이 브라우저 쿠키만 바꾸고 계정 데이터는 읽지 않는다. 내 위치는 위치 이용 기록을 남긴다(위치정보법) | `src/features/map/location-actions.test.ts` 위치 이용 기록을 1번 남기고<br>`src/features/map/location-actions.test.ts` 목록에 없는 동네는 거절한다 | ✅ |
+| `selectFavoriteSlots` (`src/features/map/slot-list/queries.ts`)·`countFavoriteShops`·`isFavoriteShop` (`(tabs)/home/favorites/store.ts`), 찜한 샵 매물·로비·매물 상세 하트 | `ensureCustomerPage`·`getCurrentAccount`(페이지) | 세션 고객의 찜만 | `src/features/map/slot-list/queries.db.test.ts` 찜한 샵 매물: 내가 찜한 샵의 보이는 매물만<br>`src/app/(customer)/(tabs)/home/favorites/store.db.test.ts` 본인 찜만 바뀐다 | ✅ |
+| `selectMyNoShows` (`(tabs)/me/no-show-history.ts`, 내 정보) | `ensureCustomerPage`(페이지) | 세션 고객 | `src/app/(customer)/(tabs)/me/no-show-history.db.test.ts` 본인 노쇼만 세고 | ✅ |
+
+페이지가 같이 부르는 나머지 공통 서버 함수는 1장(강규민) 표에서 본다: 쿠폰함·예약 확인의 `getMyCoupons`, 시간대 상세 `/windows/[id]`의 `getSlotWindow`, 알림함, 관심 동네·선택 동의(`getInterestAreas`·`getOptionalConsents`).
 
 ## 3. 원장님 화면 서버 코드 — 정민석
 

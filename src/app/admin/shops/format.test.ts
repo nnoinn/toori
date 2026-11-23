@@ -50,6 +50,14 @@ describe('입점 심사 표시 모양', () => {
     expect(labelReviewAction('shop.reject')).toBe('반려');
     expect(labelReviewAction('something.else')).toBe('something.else');
   });
+
+  it('심사 기록의 승인·반려 말고 다른 운영자 처리도 이름으로(운영자 기록 화면과 같은 이름)', () => {
+    expect(labelReviewAction('shop.publish_pause')).toBe('게시 멈춤');
+    expect(labelReviewAction('shop.publish_resume')).toBe('게시 다시 열기');
+    expect(labelReviewAction('shop.business_update')).toBe('사업자 정보 수정');
+    expect(labelReviewAction('settlement.hold')).toBe('정산 보류');
+    expect(labelReviewAction('settlement.release')).toBe('정산 보류 풀기');
+  });
 });
 
 describe('합의 후 취소 사유 표시 (X-208)', () => {

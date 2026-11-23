@@ -25,7 +25,7 @@ import {
   type AdminNoticeUse,
   toAdminNoticeCode,
 } from '@/server/policy/admin-notice';
-import { OWNER_FAULT_COUPON_AMOUNT } from '@/server/policy/owner-fault';
+import { OWNER_FAULT_COUPON_AMOUNT, OWNER_FAULT_PENALTY_AMOUNT } from '@/server/policy/owner-fault';
 import { readReleasedKeptSlots } from '@/server/slot-windows/store';
 
 import { notify } from './notify';
@@ -252,6 +252,27 @@ export function notifyReservationVoided(
         url: `/owner/reservations/${reservationId}`,
       }),
     ]);
+  });
+}
+
+/**
+ * 운영자가 원장님 대신 원장님 사정으로 취소했을 때 원장님에게(#373 ③-2). 원장님 예약을 운영자가 바꿨다는 것과 패널티를 알린다.
+ * 손님에게 가는 알림은 원장님이 했을 때와 같이 notifyOwnerFaultCancelled가 보낸다. 예약 하나에 한 번
+ */
+export function notifyOwnerFaultCancelledByAdmin(db: Db, reservationId: string) {
+  const event = 'reservation.owner_fault_cancelled_by_admin';
+  sendAfterResponse(event, async () => {
+    const alert = await readReservationAlert(db, reservationId);
+    if (!alert) return;
+    await notify(db, {
+      userId: alert.ownerUserId,
+      accountType: 'owner',
+      event,
+      dedupeKey: `${event}:owner:${reservationId}`,
+      title: '운영자가 원장님 사정으로 예약을 취소했어요',
+      body: `${alert.menuName} · ${formatKst(alert.startAt)}. 패널티 ${OWNER_FAULT_PENALTY_AMOUNT.toLocaleString('ko-KR')}원은 정산에서 빼요`,
+      url: `/owner/reservations/${reservationId}`,
+    });
   });
 }
 
