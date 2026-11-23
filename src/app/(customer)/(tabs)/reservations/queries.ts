@@ -198,7 +198,7 @@ export async function selectMyReservationDetail(
     .innerJoin(shops, eq(shops.id, slots.shopId))
     .innerJoin(orders, eq(orders.id, reservations.orderId))
     .innerJoin(customers, eq(customers.id, reservations.customerId))
-    .where(eq(reservations.id, reservationId))
+    .where(and(eq(reservations.id, reservationId), eq(reservations.customerId, customerId)))
     .limit(1);
   if (!row) return null;
 
