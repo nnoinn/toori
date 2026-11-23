@@ -47,7 +47,7 @@ function windowFilterIs(filter: WindowFilter, now: Date): SQL | undefined {
     case 'published':
       return and(openStored(), lte(slotWindows.publishAt, now), gt(slotWindows.endAt, now));
     case 'closed':
-      return or(eq(slotWindows.status, 'closed'), lte(slotWindows.endAt, now));
+      return or(eq(slotWindows.status, 'closed'));
   }
 }
 
@@ -89,10 +89,7 @@ export async function selectAdminWindows(
     db
       .select({
         windowId: slots.windowId,
-        booked:
-          sql<number>`count(${reservations.id}) filter (where ${inArray(reservations.status, ['confirmed', 'completed'])})`.mapWith(
-            Number,
-          ),
+        booked: sql<number>`count(${reservations.id})`.mapWith(Number),
         holding: sql<number>`count(distinct ${slots.id}) filter (where ${and(
           inArray(slots.status, ['scheduled', 'published']),
           gt(slots.holdExpiresAt, now),
@@ -123,7 +120,7 @@ export async function selectAdminWindows(
           publishAt: row.publishAt,
           window: { start: row.startAt, end: row.endAt },
           menuDurations: menus.map((menu) => menu.durationMinutes),
-          occupied: occupiedByShop.get(row.shopId) ?? [],
+          occupied: (occupiedByShop.get(row.shopId) ?? []).slice(0, 1),
           now,
         }),
         menuCount: menus.length,
