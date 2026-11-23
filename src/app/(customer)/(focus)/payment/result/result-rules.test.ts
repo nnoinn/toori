@@ -74,6 +74,12 @@ describe("결제 결과를 아직 모를 때 '다시 확인' (#155)", () => {
     expect(canRecheck(CONFIRM_FAILED)).toBe(true);
   });
 
+  it('결제 확인 요청이 서버에 닿지 않은 실패(화면이 만든다)는 CONFIRM_FAILED 코드로 다시 확인하고, 빈 안내를 보여 주지 않는다', () => {
+    expect(CONFIRM_FAILED.code).toBe('CONFIRM_FAILED');
+    expect(canRecheck({ code: 'CONFIRM_FAILED', message: '' })).toBe(true);
+    expect(CONFIRM_FAILED.message).not.toBe('');
+  });
+
   it('결과가 정해진 실패는 다시 확인하지 않는다', () => {
     expect(
       canRecheck({

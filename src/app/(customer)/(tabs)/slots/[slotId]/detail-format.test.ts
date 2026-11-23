@@ -161,6 +161,23 @@ describe('환불 규정 안내', () => {
     ]);
   });
 
+  it('"·노쇼"는 마지막 구간 줄에만 붙인다(앞 구간의 위약금이 노쇼와 같아도)', () => {
+    expect(
+      refundPolicyLines(
+        [
+          { minHoursLeft: 24, penaltyRate: 30 },
+          { minHoursLeft: 6, penaltyRate: 100 },
+          { minHoursLeft: 0, penaltyRate: 100 },
+        ],
+        100,
+      ),
+    ).toEqual([
+      '24시간 이상 남음: 70% 환불(위약금 30%)',
+      '6시간 이상 24시간 미만: 환불 없음',
+      '6시간 미만·노쇼: 환불 없음',
+    ]);
+  });
+
   it('문서(docs/legal/consent-texts.md)가 바뀌어 코드와 어긋나면 알려 준다', () => {
     const doc = readFileSync(join(process.cwd(), 'docs/legal/consent-texts.md'), 'utf8');
     const notes = refundPolicyNotes(OWNER_FAULT_COUPON_AMOUNT);
