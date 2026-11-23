@@ -189,6 +189,22 @@ describe('매물과 시간대 섞기', () => {
     expect(cursor).toEqual({ sort: 'imminent', value: '2026-11-14T04:30:00.000Z', id: uuid(1) });
     expect(cursorKey(cursor)).toEqual({ value: at, id: uuid(1) });
   });
+
+  it('할인율순·임박순 커서에는 샵·시작 시각을 넣지 않는다(목록 조회는 정렬 값에 늘 넣지만, 거리순에서만 쓴다)', () => {
+    // 목록 조회(slotSortKey)는 정렬과 상관없이 샵 id와 시작 시각을 함께 넣는다
+    const time = Date.UTC(2026, 10, 14, 4, 30);
+    const withShop = { id: uuid(1), shop: uuid(901), time };
+    expect(keyCursor('discount', { value: 30, ...withShop })).toEqual({
+      sort: 'discount',
+      value: 30,
+      id: uuid(1),
+    });
+    expect(keyCursor('imminent', { value: time, ...withShop })).toEqual({
+      sort: 'imminent',
+      value: '2026-11-14T04:30:00.000Z',
+      id: uuid(1),
+    });
+  });
 });
 
 describe('지도 핀에 시간대 더하기', () => {
