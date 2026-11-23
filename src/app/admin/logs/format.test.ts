@@ -108,6 +108,7 @@ describe('이름표와 대상', () => {
     expect(labelOf(ACTION_LABELS, 'slot.force_close')).toBe('운영자 마감');
     expect(labelOf(TARGET_TYPE_LABELS, 'slot')).toBe('매물');
     expect(labelOf(TARGET_TYPE_LABELS, 'slot_window')).toBe('시간대 매물');
+    expect(labelOf(ACTION_LABELS, 'reservation.owner_fault_cancel')).toBe('원장님 사정 취소(대신)');
     expect(labelOf(ACTION_LABELS, 'shop.new_thing')).toBe('shop.new_thing');
     expect(labelOf(ACTION_LABELS, 'constructor')).toBe('constructor');
   });

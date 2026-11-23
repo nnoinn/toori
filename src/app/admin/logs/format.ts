@@ -33,6 +33,7 @@ export const ACTION_LABELS: Record<string, string> = {
   'dispute.resolve': '이의제기 결론',
   'visit.override': '방문으로 바꿈(노쇼 취소)',
   'visit.record': '방문·노쇼 대신 처리',
+  'reservation.owner_fault_cancel': '원장님 사정 취소(대신)',
   'refund.exception': '환불 예외',
   'reservation.void': '예약 무효',
   'settlement.payout_request': '지급 요청',
