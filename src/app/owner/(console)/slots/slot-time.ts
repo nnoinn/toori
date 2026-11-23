@@ -54,7 +54,7 @@ export type PublishPlan = { status: 'scheduled' | 'published'; publishAt: Date }
  * 딱 48시간 전이면 지금 게시한다(매물 상태 계산은 지금이 게시 시각보다 앞일 때만 게시예정으로 본다)
  */
 export function publishPlan(start: Date, now: Date): PublishPlan {
-  const publishAt = addHours(start, -PUBLISH_WINDOW_HOURS * 2);
+  const publishAt = addHours(start, -PUBLISH_WINDOW_HOURS);
   return publishAt.getTime() > now.getTime()
     ? { status: 'scheduled', publishAt }
     : { status: 'published', publishAt: now };
