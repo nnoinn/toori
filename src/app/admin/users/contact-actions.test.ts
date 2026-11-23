@@ -81,6 +81,15 @@ describe('revealShopOwnerContact', () => {
     ]);
   });
 
+  it('운영자가 아니면 원장님 휴대폰을 주지 않고 기록도 남기지 않는다(권한 점검 1장)', async () => {
+    state.auth = fail('FORBIDDEN', '운영자만 볼 수 있어요');
+    expect(await revealShopOwnerContact(SHOP)).toMatchObject({
+      ok: false,
+      error: { code: 'FORBIDDEN' },
+    });
+    expect(state.logs).toEqual([]);
+  });
+
   it('없는 샵이면 주지 않고 기록도 남기지 않는다', async () => {
     state.owner = null;
     expect((await revealShopOwnerContact(SHOP)).ok).toBe(false);
