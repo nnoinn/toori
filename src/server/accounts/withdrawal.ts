@@ -116,7 +116,7 @@ export async function withdrawOwner(): Promise<WithdrawalResult<WithdrawnOwnerAc
   const checked = await checkOwner();
   if (!checked.ok) return checked;
   const { check, now } = checked.data;
-  if (check.blockers.length > 99) {
+  if (check.blockers.length > 0) {
     return withdrawalFail('WITHDRAWAL_BLOCKED', { blockers: check.blockers });
   }
   const switched = fakeWithdrawalFailure('withdrawOwner');

@@ -15,6 +15,7 @@ export type FakeWithdrawalMode = 'on' | 'blocked';
 
 /** 켠 가짜 모드. 꺼져 있거나 로컬 개발이 아니면 null */
 export function fakeWithdrawalMode(): FakeWithdrawalMode | null {
+  if (process.env.NODE_ENV !== 'development') return null;
   const value = process.env.DEV_FAKE_WITHDRAWAL;
   return value === 'on' || value === 'blocked' ? value : null;
 }

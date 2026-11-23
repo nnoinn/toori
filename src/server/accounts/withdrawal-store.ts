@@ -3,7 +3,7 @@
 
 import 'server-only';
 
-import { and, count, eq, gt, inArray, isNotNull, isNull, lte, or, type SQL } from 'drizzle-orm';
+import { and, count, eq, gt, inArray, isNull, lte, or, type SQL } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { coupons, disputes, reservations, slots, slotWindows } from '@/db/schema';
@@ -72,7 +72,13 @@ export async function readCustomerWithdrawalFacts(
       db
         .select({ value: count() })
         .from(coupons)
-        .where(and(eq(coupons.customerId, customerId), isNull(coupons.usedOrderId))),
+        .where(
+          and(
+            eq(coupons.customerId, customerId),
+            isNull(coupons.usedOrderId),
+            gt(coupons.expiresAt, now),
+          ),
+        ),
     ),
     countOf(
       db
@@ -111,7 +117,7 @@ export async function readOwnerWithdrawalFacts(
         db
           .select({ value: count() })
           .from(slots)
-          .where(and(eq(slots.shopId, shopId), openSlot(now), isNotNull(slots.holdCustomerId))),
+          .where(and(eq(slots.shopId, shopId), openSlot(now), slotIsOnHold(now))),
       ),
       // 시간대 안 칸은 그 시간대를 마감하면 같이 닫혀서 한 시술 매물만 센다
       countOf(
@@ -140,7 +146,7 @@ export async function readOwnerWithdrawalFacts(
   const options = { now, paymentFeeRate: PAYMENT_FEE_RATE };
   const unpaid = unpaidRows
     .map((row) => toSettlementItemView(row, options))
-    .filter((item) => item !== null && item.status !== 'paid');
+    .filter((item) => item !== null && item.status !== 'no_payout' && item.status !== 'paid');
   const nextPayout = buildSettlementList({
     rows: [],
     unpaidRows,
