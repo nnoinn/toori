@@ -23,7 +23,7 @@ export function visitBlockReason(
   if (target.status === 'cancelled') return 'NOT_RESERVED';
   if (target.status === 'completed' || target.visitResult !== null) return 'ALREADY_RECORDED';
   // 시작 시각부터 처리할 수 있다(기술 가이드 S-405 "서비스 시작 시각 이후에만")
-  if (now.getTime() < target.startAt.getTime() - 24 * 60 * 60 * 1000) return 'TOO_EARLY';
+  if (now.getTime() < target.startAt.getTime()) return 'TOO_EARLY';
   return null;
 }
 
