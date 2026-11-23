@@ -48,10 +48,11 @@ export function DetailTop({
   const extra = imageUrls.length - GALLERY_SLOTS;
   return (
     <div className="relative md:col-start-1 md:row-start-1">
-      {/* 공유한 주소로 바로 들어와 이전 화면이 없으면 고객 홈으로(#215) */}
+      {/* 폰만(아래 메뉴만 있고 위쪽 메뉴가 없어서). PC는 위쪽 메뉴와 브라우저 뒤로 가기를 쓴다(#533, 11/22 nnoinn).
+          공유한 주소로 바로 들어와 이전 화면이 없으면 고객 홈으로(#215) */}
       <BackButton
         fallbackHref={CUSTOMER_HOME}
-        className="absolute top-2 left-2 z-10 bg-background/80 max-md:size-10"
+        className="absolute top-2 left-2 z-10 size-10 bg-background/80 md:hidden"
       />
       <div className="md:hidden">
         {imageUrls.length > 0 ? (
