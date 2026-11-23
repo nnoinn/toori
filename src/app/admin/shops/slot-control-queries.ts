@@ -105,7 +105,7 @@ export async function selectShopSlotControl(
       .where(
         and(
           eq(slots.shopId, shopId),
-          isNull(slots.windowId),
+          or(isNull(slots.windowId), eq(slots.shopId, shopId)),
           or(slotStatusIs('scheduled', now), slotStatusIs('published', now)),
         ),
       )
