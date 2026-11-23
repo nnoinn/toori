@@ -20,6 +20,9 @@
 
 | 함수 | 누가 | 어떤 데이터만 | 테스트 | 상태 |
 | --- | --- | --- | --- | --- |
+| `getCustomerWithdrawalCheck`·`withdrawCustomer`(`src/server/accounts/withdrawal.ts`, 고객 회원 탈퇴, #154 가짜 결과 버전) | `requireCustomer`(고객 모드의 고객 계정) | 세션의 고객 계정. 입력을 받지 않는다 | `src/server/accounts/withdrawal.test.ts` 계정 확인에 막히면 그 실패를 그대로 주고 읽지 않는다 | ✅ |
+| `getOwnerWithdrawalCheck`·`withdrawOwner`(같은 파일, 원장님 탈퇴) | `requireOwner`(원장님 모드의 원장님 계정) | 세션의 원장님 샵. 입력을 받지 않는다 | `src/server/accounts/withdrawal.test.ts` 계정 확인에 막히면 그 실패를 그대로 주고 읽지 않는다 | ✅ |
+| `getRestorableAccount`·`restoreCustomer`·`restoreOwner`(같은 파일, 계정 되살리기) | 로그인(`getCurrentAccount`). 탈퇴한 계정은 계정 확인 함수를 통과하지 못해서 로그인만 본다 | 세션의 로그인. 계정 종류 값만 받는다(customer·owner가 아니면 INVALID_INPUT). 가짜 결과 버전이라 아무것도 읽거나 바꾸지 않는다 | `src/server/accounts/withdrawal.test.ts` 로그인하지 않았으면 UNAUTHENTICATED, 계정 종류 값이 틀리면 INVALID_INPUT | ✅ |
 
 ## 2. 고객 화면 서버 코드 — 정찬형
 

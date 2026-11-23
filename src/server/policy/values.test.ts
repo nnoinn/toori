@@ -49,6 +49,7 @@ import {
   UPLOAD_ALLOWED_TYPES,
   UPLOAD_MAX_BYTES,
 } from './upload';
+import { WITHDRAWAL_RESTORE_DAYS } from './withdrawal';
 
 describe('시간 (#48 1장)', () => {
   it('48시간 게시, 6시간 임박·환불 불가, 10분 홀딩, 시작 시각·소요 시간 30분 단위', () => {
@@ -184,5 +185,11 @@ describe('정산 계좌 은행 (S-107)', () => {
     expect(BANK_CODES.every((code) => /^\d{3}$/.test(code))).toBe(true);
     expect(new Set(BANK_CODES).size).toBe(BANKS.length);
     expect(BANKS.find((bank) => bank.code === '004')?.name).toBe('KB국민은행');
+  });
+});
+
+describe('회원 탈퇴 (#154)', () => {
+  it('탈퇴한 계정은 30일 안에 되살릴 수 있다(10/29 nnoinn 결정)', () => {
+    expect(WITHDRAWAL_RESTORE_DAYS).toBe(30);
   });
 });
