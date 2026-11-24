@@ -180,6 +180,11 @@ export function slotDetailHref(slotId: string): string {
   return `/admin/reservations/slots/${slotId}`;
 }
 
+/** 시간대 매물 상세 주소(#567 2번) */
+export function windowDetailHref(windowId: string): string {
+  return `/admin/reservations/windows/${windowId}`;
+}
+
 const SLOT_CLOSE_REASON_LABELS: Record<SlotCloseReason, string> = {
   other_channel: '다른 곳 예약',
   mistake: '잘못 올림',

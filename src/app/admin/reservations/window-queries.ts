@@ -1,4 +1,4 @@
-// 운영자 매물·예약 화면의 [시간대 매물] 탭(#567, A-103). 서버에서만 부른다. 조회만 하고, 강제 마감은 샵 상세와 같은
+// 운영자 매물·예약 화면의 [시간대 매물] 탭과 시간대 매물 상세(#567, A-103). 서버에서만 부른다. 조회만 하고, 강제 마감은 샵 상세와 같은
 // forceCloseWindow(#373 ④)를 쓴다. 상태는 원장님 대시보드와 같은 windowStatus(게시예정·게시중·다 참·마감)로 계산한다
 
 import 'server-only';
@@ -6,10 +6,12 @@ import 'server-only';
 import { and, asc, desc, eq, gt, ilike, inArray, lte, or, type SQL, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
-import { reservations, shops, slots, slotWindows } from '@/db/schema';
-import type { SlotWindowStatus } from '@/db/schema/slots';
+import { adminActions, adminProfiles, reservations, shops, slots, slotWindows } from '@/db/schema';
+import type { ReservationStatus, VisitResult } from '@/db/schema/payments';
+import type { SlotStatus, SlotWindowStatus } from '@/db/schema/slots';
 import { windowStatus } from '@/server/slot-windows/starts';
 import { readOccupiedRangesByShop, readWindowMenus } from '@/server/slot-windows/store';
+import type { WindowMenuRow } from '@/server/slot-windows/view';
 import type { WindowState } from '@/server/slot-windows/types';
 
 import { ADMIN_LIST_LIMIT, containsPattern, type ListResult, toListResult } from '../lookup';
@@ -131,5 +133,164 @@ export async function selectAdminWindows(
         holdingCount: cell?.holding ?? 0,
       };
     }),
+  };
+}
+
+/** 시간대 안에서 손님이 만든 칸 하나와 그 칸의 예약 */
+export type AdminWindowCell = {
+  slotId: string;
+  menuName: string;
+  startAt: Date;
+  endAt: Date;
+  publishAt: Date;
+  status: SlotStatus;
+  holdCustomerId: string | null;
+  holdExpiresAt: Date | null;
+  closeReason: string | null;
+  reservations: {
+    reservationId: string;
+    code: string;
+    status: ReservationStatus;
+    visitResult: VisitResult | null;
+  }[];
+};
+
+/** 시간대 매물 상세(#567 2번) */
+export type AdminWindowDetail = {
+  windowId: string;
+  shopId: string;
+  shopName: string;
+  startAt: Date;
+  endAt: Date;
+  publishAt: Date;
+  newCustomerOnly: boolean;
+  /** 지금 상태(목록과 같은 windowStatus) */
+  state: WindowState;
+  closedAt: Date | null;
+  closeReason: string | null;
+  createdAt: Date;
+  menus: WindowMenuRow[];
+  /** 시작 순 */
+  cells: AdminWindowCell[];
+  /** 운영자 처리 기록(시간대 강제 마감 slot.force_close, 최근 순) */
+  adminActions: { action: string; memo: string | null; at: Date; adminName: string | null }[];
+};
+
+/** 시간대 매물 하나. 없으면 null */
+export async function selectAdminWindowDetail(
+  db: DbReader,
+  input: { windowId: string; now: Date },
+): Promise<AdminWindowDetail | null> {
+  const { windowId, now } = input;
+  const [row] = await db
+    .select({
+      windowId: slotWindows.id,
+      shopId: shops.id,
+      shopName: shops.name,
+      startAt: slotWindows.startAt,
+      endAt: slotWindows.endAt,
+      publishAt: slotWindows.publishAt,
+      status: slotWindows.status,
+      newCustomerOnly: slotWindows.newCustomerOnly,
+      closedAt: slotWindows.closedAt,
+      closeReason: slotWindows.closeReason,
+      createdAt: slotWindows.createdAt,
+    })
+    .from(slotWindows)
+    .innerJoin(shops, eq(shops.id, slotWindows.shopId))
+    .where(eq(slotWindows.id, windowId));
+  if (!row) return null;
+
+  const [menusByWindow, occupiedByShop, cellRows, actionRows] = await Promise.all([
+    readWindowMenus(db, [windowId]),
+    readOccupiedRangesByShop(db, {
+      shopIds: [row.shopId],
+      from: row.startAt,
+      to: row.endAt,
+      now,
+    }),
+    db
+      .select({
+        slotId: slots.id,
+        menuName: slots.menuName,
+        startAt: slots.startAt,
+        endAt: slots.endAt,
+        publishAt: slots.publishAt,
+        status: slots.status,
+        holdCustomerId: slots.holdCustomerId,
+        holdExpiresAt: slots.holdExpiresAt,
+        closeReason: slots.closeReason,
+        reservationId: reservations.id,
+        code: reservations.code,
+        reservationStatus: reservations.status,
+        visitResult: reservations.visitResult,
+      })
+      .from(slots)
+      .leftJoin(reservations, eq(reservations.slotId, slots.id))
+      .where(eq(slots.windowId, windowId))
+      .orderBy(asc(slots.startAt), asc(slots.id), asc(reservations.createdAt)),
+    db
+      .select({
+        action: adminActions.action,
+        memo: adminActions.memo,
+        at: adminActions.createdAt,
+        adminName: adminProfiles.name,
+      })
+      .from(adminActions)
+      .leftJoin(adminProfiles, eq(adminProfiles.userId, adminActions.adminId))
+      .where(and(eq(adminActions.targetType, 'slot_window'), eq(adminActions.targetId, windowId)))
+      .orderBy(desc(adminActions.createdAt), asc(adminActions.id)),
+  ]);
+
+  const cells = new Map<string, AdminWindowCell>();
+  for (const cell of cellRows) {
+    const current = cells.get(cell.slotId) ?? {
+      slotId: cell.slotId,
+      menuName: cell.menuName,
+      startAt: cell.startAt,
+      endAt: cell.endAt,
+      publishAt: cell.publishAt,
+      // DB의 check 제약이 정해 둔 값만 허용한다
+      status: cell.status as SlotStatus,
+      holdCustomerId: cell.holdCustomerId,
+      holdExpiresAt: cell.holdExpiresAt,
+      closeReason: cell.closeReason,
+      reservations: [],
+    };
+    if (cell.reservationId && cell.code && cell.reservationStatus) {
+      current.reservations.push({
+        reservationId: cell.reservationId,
+        code: cell.code,
+        status: cell.reservationStatus as ReservationStatus,
+        visitResult: cell.visitResult as VisitResult | null,
+      });
+    }
+    cells.set(cell.slotId, current);
+  }
+  const menus = menusByWindow.get(windowId) ?? [];
+
+  return {
+    windowId: row.windowId,
+    shopId: row.shopId,
+    shopName: row.shopName,
+    startAt: row.startAt,
+    endAt: row.endAt,
+    publishAt: row.publishAt,
+    newCustomerOnly: row.newCustomerOnly,
+    state: windowStatus({
+      // status는 DB 제약(slot_windows_status_check)으로 세 값만 들어간다
+      status: row.status as SlotWindowStatus,
+      publishAt: row.publishAt,
+      window: { start: row.startAt, end: row.endAt },
+      menuDurations: menus.map((menu) => menu.durationMinutes),
+      occupied: occupiedByShop.get(row.shopId) ?? [],
+      now,
+    }),
+    closedAt: row.closedAt,
+    closeReason: row.closeReason,
+    createdAt: row.createdAt,
+    menus,
+    cells: [...cells.values()],
+    adminActions: actionRows,
   };
 }

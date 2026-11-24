@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { BackButton } from '@/components/ui/back-button';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SelectableRow, SelectableRows } from '@/components/ui/selectable-rows';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
 import {
@@ -25,7 +26,12 @@ import { ensureAdminPage } from '@/server/auth';
 import { getBusinessDocUrl } from '@/server/storage/upload';
 import { adminNoticeText, bankName, categoryLabel } from '@/server/policy';
 
-import { canForceCloseSlot, lookupHref, slotDetailHref } from '../../reservations/format';
+import {
+  canForceCloseSlot,
+  lookupHref,
+  slotDetailHref,
+  windowDetailHref,
+} from '../../reservations/format';
 import {
   CANCEL_STATS_ANCHOR,
   CANCEL_STATS_PERIOD_ERROR,
@@ -271,7 +277,8 @@ async function ReviewDetail({
 
 /**
  * 매물 관리 칸(#373 ④, #567 3번). 새 매물 게시를 멈추고 다시 열며, 아래를 [시간대 매물]과 [한 시술 매물] 두 영역으로 나눈다.
- * 영역마다 가까운 것부터 SHOP_SLOT_CONTROL_LIMIT개까지 줄마다 강제 마감하고, [전체 보기]는 매물·예약 화면을 이 샵 이름으로 연다
+ * 영역마다 가까운 것부터 SHOP_SLOT_CONTROL_LIMIT개까지 줄마다 강제 마감하고, [전체 보기]는 매물·예약 화면을 이 샵 이름으로 연다.
+ * 줄을 두 번 누르거나 Enter를 누르면 그 시간대 매물·매물 상세가 열린다(#567, 완료의 기준 7번). 시각·메뉴 이름도 상세로 가는 링크다
  */
 function SlotControlPanel({
   shopId,
@@ -313,18 +320,22 @@ function SlotControlPanel({
         more={control.openWindowCount > control.openWindows.length}
       >
         {control.openWindows.map((window) => (
-          <li
+          <SelectableRow
+            as="li"
             key={window.windowId}
+            id={window.windowId}
+            href={windowDetailHref(window.windowId)}
+            title={DOUBLE_CLICK_HINT}
             className="flex flex-wrap items-center justify-between gap-2 py-2"
           >
-            <span>
+            <Link href={windowDetailHref(window.windowId)} className="hover:underline">
               {formatKst(window.startAt)}~{formatEndTime(window.startAt, window.endAt)}
-            </span>
+            </Link>
             <SlotControlAction
               target={{ kind: 'close_window', windowId: window.windowId }}
               size="sm"
             />
-          </li>
+          </SelectableRow>
         ))}
       </SlotArea>
 
@@ -335,7 +346,14 @@ function SlotControlPanel({
         more={control.openSlotCount > control.openSlots.length}
       >
         {control.openSlots.map((slot) => (
-          <li key={slot.slotId} className="flex flex-wrap items-center justify-between gap-2 py-2">
+          <SelectableRow
+            as="li"
+            key={slot.slotId}
+            id={slot.slotId}
+            href={slotDetailHref(slot.slotId)}
+            title={DOUBLE_CLICK_HINT}
+            className="flex flex-wrap items-center justify-between gap-2 py-2"
+          >
             <span className="flex flex-wrap items-center gap-2">
               <Link href={slotDetailHref(slot.slotId)} className="hover:underline">
                 {slot.menuName}
@@ -348,12 +366,15 @@ function SlotControlPanel({
             {canForceCloseSlot(slot, now) ? (
               <SlotControlAction target={{ kind: 'close_slot', slotId: slot.slotId }} size="sm" />
             ) : null}
-          </li>
+          </SelectableRow>
         ))}
       </SlotArea>
     </div>
   );
 }
+
+/** 매물 관리 줄에 마우스를 올리면 보이는 안내 */
+const DOUBLE_CLICK_HINT = '두 번 누르면 상세가 열려요';
 
 /** 매물 관리 칸의 한 영역(#567 3번). 위에 구분선을 두고, 줄 목록 아래 [전체 보기]로 매물·예약 화면을 연다 */
 function SlotArea({
@@ -376,7 +397,9 @@ function SlotArea({
       {children.length === 0 ? (
         <p className="text-muted-foreground">{empty}</p>
       ) : (
-        <ul className="flex flex-col divide-y">{children}</ul>
+        <SelectableRows as="ul" className="flex flex-col divide-y">
+          {children}
+        </SelectableRows>
       )}
       <Link href={allHref} className="w-fit text-primary hover:underline">
         {more ? '전체 보기(더 있어요)' : '전체 보기'}
