@@ -90,10 +90,10 @@ describe('afterRestore', () => {
     });
   });
 
-  it('그 밖의 실패는 받은 문구(배포 주소의 가짜 결과 버전은 NOT_OPEN)', () => {
-    expect(afterRestore(withdrawalFail('NOT_OPEN'))).toEqual({
+  it('그 밖의 실패는 받은 문구(예: 같은 사람 표시 키가 없으면 NOT_READY)', () => {
+    expect(afterRestore(withdrawalFail('NOT_READY'))).toEqual({
       kind: 'error',
-      message: '회원 탈퇴는 곧 열려요',
+      message: '지금은 탈퇴할 수 없어요. 잠시 후 다시 시도해 주세요',
     });
   });
 });
