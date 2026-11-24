@@ -39,11 +39,23 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  // PC 화면(1280×800)부터 한다. 폰 크기(375×812)는 3차(#592)
+  // 같은 흐름을 PC(1280×800)와 고객 폰(375×812, 터치, #592 3차)에서 돌린다.
+  // 원장님 화면의 폰 배치는 출시 뒤(사이클 9단계)라 원장님 흐름은 PC에서만 본다(테스트 안에서 건너뛴다)
   projects: [
     {
       name: 'pc',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } },
+    },
+    {
+      name: 'phone',
+      use: {
+        browserName: 'chromium',
+        userAgent: devices['Pixel 7'].userAgent,
+        viewport: { width: 375, height: 812 },
+        deviceScaleFactor: 2,
+        isMobile: true,
+        hasTouch: true,
+      },
     },
   ],
   webServer: {

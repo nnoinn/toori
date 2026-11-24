@@ -47,13 +47,15 @@ test('[예약하기]를 누르면 10분 홀딩하고, 환불 규정에 동의하
   await page.getByRole('checkbox', { name: '(필수) 환불 규정을 확인했고 동의해요' }).check();
   await expect(pay).toBeEnabled();
 
-  // 4. 홈으로 돌아가면 위쪽 메뉴에 결제 중 칩(남은 시간)
+  // 4. 홈으로 돌아가면 결제 중 칩(남은 시간). PC는 위쪽 메뉴의 칩, 폰은 화면 위 가운데 알약이다(#564, 같은 이름)
   await page.goto('/home');
   const chip = page.getByRole('button', { name: /^결제 중인 매물: / });
   await expect(chip).toBeVisible();
-  await expect(chip).toHaveText(/결제 중\s*(10:00|09:[0-5]\d)/);
+  await expect(chip).toContainText('결제 중');
+  await expect(chip).toContainText(/(10:00|09:[0-5]\d)/);
 
   // 5. 칩 → [그만두기] → 한 번 더 묻는 창의 [그만두기] → 칩이 사라지고 홀딩이 풀린다
+  // (PC는 칩 아래 상자, 폰은 화면 가운데 창에 [그만두기]가 있다, #566)
   await chip.click();
   await page.getByRole('button', { name: '그만두기', exact: true }).click();
   const confirm = page.getByRole('dialog', { name: '결제를 그만둘까요?' });
