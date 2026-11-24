@@ -226,7 +226,7 @@ export async function selectAdminWindowDetail(
         visitResult: reservations.visitResult,
       })
       .from(slots)
-      .leftJoin(reservations, eq(reservations.slotId, slots.id))
+      .innerJoin(reservations, eq(reservations.slotId, slots.id))
       .where(eq(slots.windowId, windowId))
       .orderBy(asc(slots.startAt), asc(slots.id), asc(reservations.createdAt)),
     db
@@ -238,7 +238,7 @@ export async function selectAdminWindowDetail(
       })
       .from(adminActions)
       .leftJoin(adminProfiles, eq(adminProfiles.userId, adminActions.adminId))
-      .where(and(eq(adminActions.targetType, 'slot_window'), eq(adminActions.targetId, windowId)))
+      .where(and(eq(adminActions.targetId, windowId)))
       .orderBy(desc(adminActions.createdAt), asc(adminActions.id)),
   ]);
 
