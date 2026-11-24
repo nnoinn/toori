@@ -67,7 +67,7 @@ export async function saveCustomerAccount(
       phone: input.phone,
     })
     // 탈퇴하지 않은 고객 계정이 이미 있으면 저장하지 않는다(한 로그인에 하나, 0023 부분 unique, #154)
-    .onConflictDoNothing({ target: customers.userId })
+    .onConflictDoNothing({ target: customers.userId, where: sql`${customers.withdrawnAt} is null` })
     .returning({ id: customers.id });
   if (!customer) return null;
 

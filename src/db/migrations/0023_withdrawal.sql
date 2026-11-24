@@ -27,6 +27,7 @@ ALTER TABLE "owners" DROP CONSTRAINT "owners_user_id_unique";--> statement-break
 ALTER TABLE "shops" DROP CONSTRAINT "shops_status_check";--> statement-breakpoint
 ALTER TABLE "slot_windows" DROP CONSTRAINT "slot_windows_close_reason_check";--> statement-breakpoint
 ALTER TABLE "slots" DROP CONSTRAINT "slots_close_reason_check";--> statement-breakpoint
+ALTER TABLE "profiles" DROP CONSTRAINT "profiles_id_users_id_fk";
 --> statement-breakpoint
 ALTER TABLE "owners" ALTER COLUMN "phone" DROP NOT NULL;--> statement-breakpoint
 ALTER TABLE "profiles" ALTER COLUMN "email" DROP NOT NULL;--> statement-breakpoint
@@ -38,6 +39,7 @@ ALTER TABLE "coupons" ADD COLUMN "forfeited_at" timestamp with time zone;--> sta
 ALTER TABLE "account_withdrawals" ADD CONSTRAINT "account_withdrawals_user_id_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "account_withdrawals" ADD CONSTRAINT "account_withdrawals_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "account_withdrawals" ADD CONSTRAINT "account_withdrawals_owner_id_owners_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."owners"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "account_withdrawals_open_customer_unique" ON "account_withdrawals" USING btree ("customer_id") WHERE "account_withdrawals"."restored_at" is null and "account_withdrawals"."erased_at" is null;--> statement-breakpoint
 CREATE UNIQUE INDEX "account_withdrawals_open_owner_unique" ON "account_withdrawals" USING btree ("owner_id") WHERE "account_withdrawals"."restored_at" is null and "account_withdrawals"."erased_at" is null;--> statement-breakpoint
 CREATE INDEX "account_withdrawals_open_idx" ON "account_withdrawals" USING btree ("withdrawn_at") WHERE "account_withdrawals"."restored_at" is null and "account_withdrawals"."erased_at" is null;--> statement-breakpoint
 CREATE INDEX "account_withdrawals_user_id_idx" ON "account_withdrawals" USING btree ("user_id");--> statement-breakpoint
@@ -46,8 +48,10 @@ CREATE INDEX "customers_user_id_idx" ON "customers" USING btree ("user_id");--> 
 CREATE UNIQUE INDEX "owners_user_id_active_unique" ON "owners" USING btree ("user_id") WHERE "owners"."withdrawn_at" is null;--> statement-breakpoint
 CREATE INDEX "owners_user_id_idx" ON "owners" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "profiles_identity_hash_idx" ON "profiles" USING btree ("identity_hash");--> statement-breakpoint
+ALTER TABLE "owners" ADD CONSTRAINT "owners_phone_check" CHECK ("owners"."phone" is not null or "owners"."withdrawn_at" is not null);--> statement-breakpoint
+ALTER TABLE "coupons" ADD CONSTRAINT "coupons_forfeited_check" CHECK ("coupons"."forfeited_at" is null or "coupons"."used_order_id" is null);--> statement-breakpoint
 ALTER TABLE "payout_accounts" ADD CONSTRAINT "payout_accounts_erased_check" CHECK (("payout_accounts"."account_number_encrypted" is null) = ("payout_accounts"."account_holder" is null));--> statement-breakpoint
 ALTER TABLE "shops" ADD CONSTRAINT "shops_business_doc_path_check" CHECK ("shops"."business_doc_path" is not null or "shops"."status" = 'withdrawn');--> statement-breakpoint
 ALTER TABLE "shops" ADD CONSTRAINT "shops_status_check" CHECK ("shops"."status" in ('pending', 'approved', 'rejected', 'withdrawn'));--> statement-breakpoint
 ALTER TABLE "slot_windows" ADD CONSTRAINT "slot_windows_close_reason_check" CHECK ("slot_windows"."close_reason" is null or "slot_windows"."close_reason" in ('other_channel', 'mistake', 'other', 'hold_released', 'admin', 'account_withdrawal'));--> statement-breakpoint
-ALTER TABLE "slots" ADD CONSTRAINT "slots_close_reason_check" CHECK ("slots"."close_reason" is null or "slots"."close_reason" in ('other_channel', 'mistake', 'other', 'hold_released', 'admin'));
+ALTER TABLE "slots" ADD CONSTRAINT "slots_close_reason_check" CHECK ("slots"."close_reason" is null or "slots"."close_reason" in ('other_channel', 'mistake', 'other', 'hold_released', 'admin', 'account_withdrawal'));
