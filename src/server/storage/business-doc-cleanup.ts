@@ -37,12 +37,13 @@ export async function readBusinessDocObjects(db: DbReader): Promise<BusinessDocO
   return rows.map((row) => ({ path: row.name, createdAt: new Date(row.created_at) }));
 }
 
-/** 샵마다 지금 쓰는 등록증 경로 */
+/** 샵마다 지금 쓰는 등록증 경로. 탈퇴하고 30일이 지나 등록증을 지운 샵은 뺀다(#154) */
 export async function readBusinessDocRefs(db: DbReader): Promise<BusinessDocRef[]> {
-  return db
+  const rows = await db
     .select({ shopId: shops.id, ownerUserId: owners.userId, path: shops.businessDocPath })
     .from(shops)
     .innerJoin(owners, eq(owners.id, shops.ownerId));
+  return rows.flatMap((row) => (row.path === null ? [] : [{ ...row, path: row.path }]));
 }
 
 /** Storage에서 지운다. 실패한 묶음의 파일 수를 돌려준다(다음 날 다시 지운다) */

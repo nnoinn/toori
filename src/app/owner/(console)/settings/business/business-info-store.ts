@@ -40,8 +40,11 @@ export async function selectBusinessInfo(
     })
     .from(shops)
     .where(eq(shops.id, shopId));
-  // status는 DB 제약(shops_status_check)으로 세 값만 들어간다
-  return row ? { ...row, status: row.status as ShopStatus } : null;
+  // status는 DB 제약(shops_status_check)으로 정해진 값만 들어간다.
+  // 등록증 경로는 탈퇴하고 30일이 지나야 비는데(#154) 탈퇴한 원장님은 이 화면에 들어올 수 없다
+  return row
+    ? { ...row, businessDocPath: row.businessDocPath ?? '', status: row.status as ShopStatus }
+    : null;
 }
 
 /** 사업자 정보를 저장한다. 그 샵이 아니거나 승인 대기·반려가 아니면(승인됨) 바꾸지 않고 false */

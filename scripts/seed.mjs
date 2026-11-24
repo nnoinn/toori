@@ -147,6 +147,8 @@ async function clearSeedData(sql, userIds) {
   await sql`delete from payout_account_changes where shop_id in (${seedShops()})`;
   await sql`delete from payout_accounts where shop_id in (${seedShops()})`;
   await sql`delete from menus where shop_id in (${seedShops()})`;
+  // 탈퇴 기록(#154)은 샵·계정을 가리키므로 먼저 지운다
+  await sql`delete from account_withdrawals where user_id in ${sql(userIds)}`;
   await sql`delete from shops where owner_id in (${seedOwners()})`;
   await sql`delete from owners where user_id in ${sql(userIds)}`;
   await sql`delete from customers where user_id in ${sql(userIds)}`;

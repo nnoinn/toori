@@ -87,11 +87,13 @@ export async function acquireHold(
   const { slotId, customerId, now } = input;
 
   // 같은 고객이 두 매물을 동시에 눌러도 차례로 처리되게 고객 줄을 잠근다(트랜잭션이 끝나면 풀린다)
-  await tx
+  const [active] = await tx
     .select({ id: customers.id })
     .from(customers)
-    .where(eq(customers.id, customerId))
+    .where(and(eq(customers.id, customerId), isNull(customers.withdrawnAt)))
     .for('update');
+  // 잠금을 기다리는 사이 이 고객이 탈퇴했으면(#154, 탈퇴도 이 줄을 잠근다) 홀딩하지 않는다
+  if (!active) return { ok: false, code: 'SLOT_NOT_AVAILABLE' };
 
   const [mine] = await myActiveHold(tx, customerId, now);
   if (mine && mine.slotId !== slotId) {

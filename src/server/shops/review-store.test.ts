@@ -137,6 +137,7 @@ describeDb('입점 심사 (실제 DB)', () => {
         pending: false,
         approved: true,
         rejected: false,
+        withdrawn: false,
       };
       for (const [status, passes] of Object.entries(expected) as [ShopStatus, boolean][]) {
         const { shopId } = await createTestShop(tx, { status });

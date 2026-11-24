@@ -101,7 +101,8 @@ export async function selectCustomers(
 export type OwnerRow = {
   ownerId: string;
   name: string;
-  phone: string;
+  /** 탈퇴하고 30일이 지나 지웠으면 null(#154) */
+  phone: string | null;
   createdAt: Date;
   withdrawnAt: Date | null;
   /** 샵은 가입 때 같이 만들어진다. 없으면 null */
@@ -177,7 +178,8 @@ export type CustomerDetail = {
   name: string;
   nickname: string;
   phone: string | null;
-  email: string;
+  /** 두 계정이 모두 탈퇴하고 30일이 지나 지웠으면 null(#154) */
+  email: string | null;
   createdAt: Date;
   withdrawnAt: Date | null;
   /** 선택 동의 두 개(관심 동네·찜한 샵 새 매물 알림, 이벤트·혜택, #267) */
