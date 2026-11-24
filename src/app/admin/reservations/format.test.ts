@@ -70,6 +70,8 @@ describe('매물·예약 조회 표시 모양', () => {
   it('취소할 때 남은 시간. 시작 뒤 취소도 뜻이 통하게 보여준다', () => {
     expect(labelHoursBefore(30.46)).toBe('30.5시간 전');
     expect(labelHoursBefore(-2)).toBe('시작 2.0시간 뒤');
+    // 딱 시작할 때 취소는 "0.0시간 전"
+    expect(labelHoursBefore(0)).toBe('0.0시간 전');
     expect(labelHoursBefore(null)).toBe('-');
   });
 

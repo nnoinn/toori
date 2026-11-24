@@ -37,6 +37,66 @@ const RESERVATION = {
 };
 
 describe('계정 이력 문구', () => {
+  it('입점: 신청·승인은 제목만, 반려는 반려 사유. 예약이 없어 여는 주소가 없다', () => {
+    expect(historyText(event('shop_applied'), { audience: 'owner' })).toEqual({
+      title: '입점 신청',
+      detail: null,
+      href: null,
+    });
+    expect(historyText(event('shop_approved'), { audience: 'admin' })).toEqual({
+      title: '입점 승인',
+      detail: null,
+      href: null,
+    });
+    expect(
+      historyText(event('shop_rejected', { reason: '사업자등록증이 흐려요' }), {
+        audience: 'owner',
+      }),
+    ).toEqual({ title: '입점 반려', detail: '사업자등록증이 흐려요', href: null });
+  });
+
+  it('매물 등록·재등록은 서비스·일시·판매가, 게시는 서비스·일시. 금액이 없으면 판매가를 뺀다', () => {
+    const slot = { menuName: '여성 커트', startAt: RESERVATION.startAt };
+    expect(
+      historyText(event('slot_created', { ...slot, amount: 23450 }), { audience: 'owner' }),
+    ).toEqual({
+      title: '매물 등록',
+      detail: '여성 커트 · 11/14(토) 14:00 · 판매가 23,450원',
+      href: null,
+    });
+    expect(
+      historyText(event('slot_relisted', { ...slot, amount: 23450 }), { audience: 'owner' }),
+    ).toMatchObject({
+      title: '매물 재등록',
+      detail: '여성 커트 · 11/14(토) 14:00 · 판매가 23,450원',
+    });
+    expect(historyText(event('slot_created', slot), { audience: 'owner' }).detail).toBe(
+      '여성 커트 · 11/14(토) 14:00',
+    );
+    expect(historyText(event('slot_relisted', slot), { audience: 'owner' }).detail).toBe(
+      '여성 커트 · 11/14(토) 14:00',
+    );
+    expect(
+      historyText(event('slot_published', { ...slot, amount: 23450 }), { audience: 'owner' }),
+    ).toMatchObject({ title: '매물 게시', detail: '여성 커트 · 11/14(토) 14:00' });
+  });
+
+  it('시간대 등록은 시작 일시, 시간대 마감은 시작 일시·마감 사유. 일시가 없으면 뺀다', () => {
+    expect(
+      historyText(event('window_created', { startAt: RESERVATION.startAt }), { audience: 'owner' }),
+    ).toEqual({ title: '시간대 등록', detail: '11/14(토) 14:00', href: null });
+    expect(historyText(event('window_created'), { audience: 'owner' }).detail).toBeNull();
+    expect(
+      historyText(event('window_closed', { startAt: RESERVATION.startAt, reason: 'mistake' }), {
+        audience: 'owner',
+      }),
+    ).toMatchObject({ title: '시간대 마감', detail: '11/14(토) 14:00 · 잘못 올림' });
+    expect(
+      historyText(event('window_closed', { reason: 'hold_released' }), { audience: 'owner' })
+        .detail,
+    ).toBe('결제 없이 홀딩 끝남');
+  });
+
   it('고객 취소: 예약·서비스·시작 몇 시간 전·위약금, 원장님은 원장님 예약 상세로 연다', () => {
     const cancelled = event('reservation_cancelled', {
       ...RESERVATION,
@@ -179,5 +239,52 @@ describe('계정 이력 문구', () => {
       expect(detail).not.toBe(reason);
       expect(detail).toMatch(/[가-힣]/);
     }
+  });
+
+  it('정산 지급은 지급액, 가입은 제목만, 알림 동의는 동의 이름, 이의제기 접수는 예약·종류(예약번호가 없으면 종류만)', () => {
+    expect(historyText(event('settlement_paid', { amount: 41570 }), { audience: 'owner' })).toEqual(
+      { title: '정산 지급', detail: '41,570원', href: null },
+    );
+    expect(historyText(event('signed_up'), { audience: 'admin' })).toEqual({
+      title: '가입',
+      detail: null,
+      href: null,
+    });
+    expect(
+      historyText(event('consent_agreed', { reason: 'marketing' }), {
+        audience: 'admin',
+        accountType: 'customer',
+      }),
+    ).toMatchObject({ title: '알림 동의', detail: '광고성 정보 수신' });
+    expect(
+      historyText(event('dispute_filed', { ...RESERVATION, reason: 'no_show' }), {
+        audience: 'admin',
+      }),
+    ).toEqual({
+      title: '이의제기 접수',
+      detail: '예약 1234-5678-9012 · 노쇼 처리 오류',
+      href: '/admin/reservations/r-1',
+    });
+    expect(
+      historyText(event('dispute_filed', { reason: 'after_start' }), { audience: 'admin' }).detail,
+    ).toBe('서비스 중 문제');
+  });
+
+  it('방문 처리와 노쇼 처리는 제목이 다르고, 합의 후 취소 사유를 모르면 코드를 그대로 보여 준다', () => {
+    expect(
+      historyText(event('visit_recorded', { ...RESERVATION, result: 'visited' }), {
+        audience: 'owner',
+      }).title,
+    ).toBe('방문 처리');
+    expect(
+      historyText(event('visit_recorded', { ...RESERVATION, result: 'no_show' }), {
+        audience: 'owner',
+      }).title,
+    ).toBe('노쇼 처리');
+    expect(
+      historyText(event('agreed_cancel_requested', { reason: 'unknown_reason' }), {
+        audience: 'owner',
+      }).detail,
+    ).toBe('unknown_reason');
   });
 });

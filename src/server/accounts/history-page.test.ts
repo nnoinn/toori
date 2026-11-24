@@ -101,4 +101,19 @@ describe('계정 이력 한 쪽', () => {
     expect(clampHistoryPage(3.7)).toBe(3);
     expect(clampHistoryPage(10_000)).toBe(250);
   });
+
+  it('같은 시각·같은 기록 id면 일 이름 순이다. 넣은 순서가 거꾸로여도, 일 이름의 끝 글자가 달라도 같다', () => {
+    const same = '2026-11-11T03:00:00.000Z';
+    const created = event('id-1', same, 'slot_created');
+    const withdrawn = event('id-1', same, 'consent_withdrawn');
+    const keys = (events: AccountHistoryEvent[]) =>
+      toHistoryPage([list(events)], 1, 10).events.map((e) => e.key);
+    expect(keys([created, withdrawn])).toEqual(['consent_withdrawn:id-1', 'slot_created:id-1']);
+    expect(keys([withdrawn, created])).toEqual(['consent_withdrawn:id-1', 'slot_created:id-1']);
+    // 기록 id는 키의 ':' 다음 전체다. 다른 id면 일 이름보다 id 순이 먼저다
+    expect(keys([event('id-2', same, 'consent_withdrawn'), created])).toEqual([
+      'slot_created:id-1',
+      'consent_withdrawn:id-2',
+    ]);
+  });
 });
