@@ -1,0 +1,49 @@
+# 브라우저 자동 테스트(E2E, #592)용 로컬 Supabase 설정. 공용 개발 DB(toori-dev)와 상관없는 내 컴퓨터·GitHub 검사 안의 Supabase다.
+# 켜기: npx supabase start (Docker Desktop 필요), 끄기: npx supabase stop. 쓰는 법은 tests/e2e/README.md
+# DB 구조는 여기서 만들지 않고 src/db/migrations를 그대로 적용한다(tests/e2e/setup/prepare-db.mjs). 그래서 supabase/migrations는 두지 않는다
+project_id = "toori-e2e"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+# 테스트 DB(.github/workflows/ci.yml의 postgis/postgis:17)와 같은 버전
+major_version = 17
+
+[db.seed]
+# 시드는 scripts/seed.mjs의 시드 데이터를 prepare-db.mjs가 넣는다
+enabled = false
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/api/auth/callback"]
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+# E2E에 필요 없는 것은 켜지 않는다(켜는 시간과 메모리를 줄인다)
+[studio]
+enabled = false
+
+[inbucket]
+enabled = false
+
+[storage]
+enabled = false
+
+[realtime]
+enabled = false
+
+[edge_runtime]
+enabled = false
+
+[analytics]
+enabled = false

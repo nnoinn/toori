@@ -1,0 +1,4 @@
+# supabase start가 만드는 작업 파일
+.branches
+.temp
+.env
