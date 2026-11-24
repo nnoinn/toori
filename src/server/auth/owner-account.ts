@@ -15,6 +15,8 @@ import { normalizePhone } from '@/lib/phone';
 import { getRequestNow } from '@/lib/request-time';
 import { fail, ok } from '@/lib/result';
 import { kstDateKey } from '@/lib/time';
+import { WITHDRAWAL_ERRORS } from '@/server/accounts/withdrawal-errors';
+import { hasRestorableWithdrawal } from '@/server/accounts/withdrawal-restore-store';
 import { encryptAccountNumber } from '@/server/payouts/account-crypto';
 import { BANK_CODES, SHOP_CATEGORIES, type ShopCategory } from '@/server/policy';
 import { checkBusinessWithNts, ntsBlockError, ntsRecord } from '@/server/shops/nts';
@@ -97,7 +99,8 @@ export type CreateOwnerAccountResult =
 /**
  * 원장님 계정·샵(승인 대기)·정산 계좌·약관 동의를 한 번에 만든다.
  * 좌표·지역은 화면에서 받지 않고 서버가 geocodeAddress(#51)로 만든다. 계좌번호는 암호화해서 저장하고 뒷자리 4개만 따로 둔다.
- * 전화번호는 하이픈 넣은 모양으로 맞춘다. 성공하면 원장님 모드로 두고 결과를 돌려준다(화면이 /owner로 이동)
+ * 전화번호는 하이픈 넣은 모양으로 맞춘다. 성공하면 원장님 모드로 두고 결과를 돌려준다(화면이 /owner로 이동).
+ * 되살리기 기간 안에 탈퇴한 원장님 계정이 있으면 새로 만들지 않고 WITHDRAWN_RESTORABLE(가입 화면이 [계정 되살리기]를 안내, #154)
  */
 export async function createOwnerAccount(
   input: CreateOwnerAccountInput,
@@ -124,6 +127,10 @@ export async function createOwnerAccount(
   if (!docPath.ok) return docPath;
   // 주소 변환(외부 API)을 부르기 전에 이미 가입했는지 먼저 본다. 동시에 두 번 눌러도 저장 단계에서 한 번만 된다
   if (await hasOwnerAccount(user.userId)) return fail('ALREADY_EXISTS', ALREADY_EXISTS_MESSAGE);
+  const restorable = { userId: user.userId, accountType: 'owner', now } as const;
+  if (await hasRestorableWithdrawal(getDb(), restorable)) {
+    return fail('WITHDRAWN_RESTORABLE', WITHDRAWAL_ERRORS.WITHDRAWN_RESTORABLE);
+  }
 
   // 국세청 사업자등록 진위확인(#208). 다름·휴업·폐업이면 저장하지 않고, 국세청이 응답하지 않으면 막지 않고 '확인 못 함'으로 남긴다
   const nts = await checkBusinessWithNts({
@@ -137,8 +144,10 @@ export async function createOwnerAccount(
   const geo = await geocodeAddress(shop.roadAddress);
   if (!geo.ok) return geo;
 
-  const saved = await getDb().transaction((tx) =>
-    saveOwnerAccount(tx, {
+  const saved = await getDb().transaction(async (tx) => {
+    // 주소 변환을 기다리는 사이 탈퇴한 경우도 저장 전에 한 번 더 본다
+    if (await hasRestorableWithdrawal(tx, restorable)) return 'restorable' as const;
+    return saveOwnerAccount(tx, {
       userId: user.userId,
       owner,
       shop: {
@@ -165,8 +174,11 @@ export async function createOwnerAccount(
         accountLast4: payout.accountNumber.slice(-4),
         accountHolder: payout.accountHolder,
       },
-    }),
-  );
+    });
+  });
+  if (saved === 'restorable') {
+    return fail('WITHDRAWN_RESTORABLE', WITHDRAWAL_ERRORS.WITHDRAWN_RESTORABLE);
+  }
   if (!saved) return fail('ALREADY_EXISTS', ALREADY_EXISTS_MESSAGE);
 
   (await cookies()).set(ACCOUNT_MODE_COOKIE, 'owner', ACCOUNT_MODE_COOKIE_OPTIONS);

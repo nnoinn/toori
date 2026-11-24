@@ -37,11 +37,20 @@ export const BUSINESS_UPDATE_ERRORS = {
   NO_CHANGE: '바뀐 내용이 없어요',
 } as const;
 
-/** 지금 사업자 정보와 샵 상태. 두 운영자가 같은 샵을 동시에 고치지 않게 그 줄을 잠근다(트랜잭션 안에서 부른다) */
+/**
+ * 지금 사업자 정보와 샵 상태. 두 운영자가 같은 샵을 동시에 고치지 않게 그 줄을 잠근다(트랜잭션 안에서 부른다).
+ * 등록증 경로는 원장님이 탈퇴하고 30일이 지나 지웠으면 null(#154, 탈퇴한 샵이라 고칠 수 없다)
+ */
 export async function lockBusinessInfo(
   tx: Tx,
   shopId: string,
-): Promise<(BusinessValues & { status: ShopStatus }) | null> {
+): Promise<
+  | (Omit<BusinessValues, 'businessDocPath'> & {
+      businessDocPath: string | null;
+      status: ShopStatus;
+    })
+  | null
+> {
   const [row] = await tx
     .select({
       status: shops.status,

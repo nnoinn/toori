@@ -13,7 +13,7 @@ type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 export async function selectCustomerContact(
   db: DbReader,
   customerId: string,
-): Promise<{ email: string; phone: string | null } | null> {
+): Promise<{ email: string | null; phone: string | null } | null> {
   const [row] = await db
     .select({ email: profiles.email, phone: customers.phone })
     .from(customers)
@@ -22,11 +22,11 @@ export async function selectCustomerContact(
   return row ?? null;
 }
 
-/** 샵 원장님의 id와 휴대폰 번호(입점 심사 화면의 연락처). 없는 샵이면 null */
+/** 샵 원장님의 id와 휴대폰 번호(입점 심사 화면의 연락처). 없는 샵이면 null. 탈퇴하고 30일이 지나 지운 번호는 null(#154) */
 export async function selectShopOwnerContact(
   db: DbReader,
   shopId: string,
-): Promise<{ ownerId: string; phone: string } | null> {
+): Promise<{ ownerId: string; phone: string | null } | null> {
   const [row] = await db
     .select({ ownerId: owners.id, phone: owners.phone })
     .from(shops)

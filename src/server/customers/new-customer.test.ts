@@ -1,14 +1,15 @@
 // 신규 고객 판별 (#49). 이력 기준(확정·이용 완료(노쇼 포함)만, 취소 제외)과 목록 조건을 실제 DB(TEST_DATABASE_URL이 있을 때만)로 확인한다.
 
-import { and, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
-import { slots } from '@/db/schema';
+import { customers, profiles, slots } from '@/db/schema';
 
 import {
   createTestCustomer,
   createTestReservation,
   createTestShop,
+  createTestUser,
   testSlot,
   type TestShop,
 } from '../../../tests/db/fixtures';
@@ -36,6 +37,30 @@ async function createListedSlot(tx: TestTx, shop: TestShop, newCustomerOnly: boo
 }
 
 /** 목록 조건을 넣었을 때 보이는 매물 id */
+/** 같은 로그인에 고객 계정을 하나 더 만든다(앞 계정은 탈퇴한 것으로 둔다) */
+async function rejoinSameLogin(tx: TestTx, previous: { userId: string; customerId: string }) {
+  await tx
+    .update(customers)
+    .set({ withdrawnAt: new Date('2026-09-01T10:00:00+09:00') })
+    .where(eq(customers.id, previous.customerId));
+  const [row] = await tx
+    .insert(customers)
+    .values({ userId: previous.userId, name: '다시 온 고객', nickname: '고객' })
+    .returning({ id: customers.id });
+  return row.id;
+}
+
+/** 다른 로그인(새 로그인 정보)의 고객 계정. identityHash를 주면 그 같은 사람 표시를 넣는다 */
+async function customerWithIdentity(tx: TestTx, identityHash: string | null) {
+  const userId = await createTestUser(tx);
+  await tx.update(profiles).set({ identityHash }).where(eq(profiles.id, userId));
+  const [row] = await tx
+    .insert(customers)
+    .values({ userId, name: '고객', nickname: '고객' })
+    .returning({ id: customers.id });
+  return { userId, customerId: row.id };
+}
+
 async function visibleSlotIds(tx: TestTx, customerId: string | null, slotIds: string[]) {
   const rows = await tx
     .select({ id: slots.id })
@@ -88,6 +113,59 @@ describeDb('신규 고객 판별 (실제 DB)', () => {
       expect(await isNewCustomer(customerId, shop.shopId, tx)).toBe(true);
       const newOnly = await createListedSlot(tx, shop, true);
       expect(await visibleSlotIds(tx, customerId, [newOnly])).toEqual(new Set([newOnly]));
+    });
+  });
+
+  it('같은 로그인의 탈퇴한 고객 계정 이력도 이력으로 본다(#154, 30일 뒤 다시 가입)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const before = await createTestCustomer(tx);
+      await createTestReservation(tx, shop, before.customerId, ...nextWindow(), 'completed', {
+        visitResult: 'visited',
+      });
+      const again = await rejoinSameLogin(tx, before);
+
+      expect(await isNewCustomer(again, shop.shopId, tx)).toBe(false);
+      expect(await getVisitedShopIds(again, [shop.shopId], tx)).toEqual(new Set([shop.shopId]));
+      const newOnly = await createListedSlot(tx, shop, true);
+      expect(await visibleSlotIds(tx, again, [newOnly])).toEqual(new Set());
+    });
+  });
+
+  it('로그인 정보까지 지운 뒤 같은 이메일로 다시 가입한 계정은 같은 사람 표시로 예전 이력을 잇는다(#154)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const before = await customerWithIdentity(tx, 'same-person');
+      await createTestReservation(tx, shop, before.customerId, ...nextWindow(), 'confirmed');
+      const again = await customerWithIdentity(tx, 'same-person');
+      const stranger = await customerWithIdentity(tx, 'other-person');
+
+      expect(await isNewCustomer(again.customerId, shop.shopId, tx)).toBe(false);
+      expect(await isNewCustomer(stranger.customerId, shop.shopId, tx)).toBe(true);
+      const newOnly = await createListedSlot(tx, shop, true);
+      expect(await visibleSlotIds(tx, again.customerId, [newOnly])).toEqual(new Set());
+      expect(await visibleSlotIds(tx, stranger.customerId, [newOnly])).toEqual(new Set([newOnly]));
+    });
+  });
+
+  it('같은 사람 표시가 둘 다 비어 있으면 같은 사람으로 보지 않는다(키가 없던 환경). 취소만 있는 예전 계정도 이력이 아니다', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const before = await customerWithIdentity(tx, null);
+      await createTestReservation(tx, shop, before.customerId, ...nextWindow(), 'confirmed');
+      const unknown = await customerWithIdentity(tx, null);
+      expect(await isNewCustomer(unknown.customerId, shop.shopId, tx)).toBe(true);
+
+      const cancelledBefore = await customerWithIdentity(tx, 'cancel-only');
+      await createTestReservation(
+        tx,
+        shop,
+        cancelledBefore.customerId,
+        ...nextWindow(),
+        'cancelled',
+      );
+      const cancelledAgain = await customerWithIdentity(tx, 'cancel-only');
+      expect(await isNewCustomer(cancelledAgain.customerId, shop.shopId, tx)).toBe(true);
     });
   });
 

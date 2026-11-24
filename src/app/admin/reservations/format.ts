@@ -180,12 +180,18 @@ export function slotDetailHref(slotId: string): string {
   return `/admin/reservations/slots/${slotId}`;
 }
 
+/** 시간대 매물 상세 주소(#567 2번) */
+export function windowDetailHref(windowId: string): string {
+  return `/admin/reservations/windows/${windowId}`;
+}
+
 const SLOT_CLOSE_REASON_LABELS: Record<SlotCloseReason, string> = {
   other_channel: '다른 곳 예약',
   mistake: '잘못 올림',
   other: '기타',
   hold_released: '결제 없이 홀딩 끝남',
   admin: '운영자 마감',
+  account_withdrawal: '계정 탈퇴로 일괄 마감',
 };
 
 /** 매물 마감 사유. 앞의 셋은 원장님이 고른 것이다(S-206) */

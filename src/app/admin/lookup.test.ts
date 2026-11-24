@@ -7,6 +7,7 @@ import {
   ADMIN_PAGE_SIZE,
   containsPattern,
   labelReservation,
+  reservationCodePattern,
   toListResult,
   toPage,
   toSearchQuery,
@@ -28,6 +29,15 @@ describe('운영자 조회 공통 모양', () => {
     const rows = Array.from({ length: ADMIN_LIST_LIMIT + 1 }, (_, i) => i);
     expect(toListResult(rows)).toEqual({ rows: rows.slice(0, ADMIN_LIST_LIMIT), hasMore: true });
     expect(toListResult([1, 2])).toEqual({ rows: [1, 2], hasMore: false });
+    // 딱 최대 줄 수면 더 없다
+    const exact = rows.slice(0, ADMIN_LIST_LIMIT);
+    expect(toListResult(exact)).toEqual({ rows: exact, hasMore: false });
+  });
+
+  it('예약번호 검색은 화면에 보이는 하이픈·공백을 빼고 숫자로 찾는다(11/22)', () => {
+    expect(reservationCodePattern('1234-5678-9012')).toBe('%123456789012%');
+    expect(reservationCodePattern(' 1234 5678\t9012 ')).toBe('%123456789012%');
+    expect(reservationCodePattern('5678')).toBe('%5678%');
   });
 
   it('쪽 나누기: 한 쪽 20줄, 쪽 수보다 큰 쪽은 마지막 쪽, 기록이 없으면 1쪽(기술 가이드 7장)', () => {

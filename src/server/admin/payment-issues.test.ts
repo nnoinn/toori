@@ -105,6 +105,21 @@ describe('retryStuckOrder', () => {
     expect(state.recorded).toEqual([]);
   });
 
+  it('진행 중 취소 다시 시도·환불 금액 확인함도 운영자가 아니면 그 실패를 그대로 돌려주고 아무것도 읽거나 남기지 않는다(권한 점검 1장)', async () => {
+    state.auth = fail('NOT_ADMIN', '운영자만 할 수 있어요');
+    expect(await retryStuckCancel({ reservationId: RESERVATION, reason: '확인' })).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_ADMIN' },
+    });
+    expect(await checkRefundReview({ refundId: REFUND, reason: '확인' })).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_ADMIN' },
+    });
+    expect(state.cancelReads).toEqual([]);
+    expect(state.settled).toEqual([]);
+    expect(state.recorded).toEqual([]);
+  });
+
   it('주문 id 모양이 틀리면 ORDER_NOT_FOUND, 사유가 빈칸이면 REASON_REQUIRED', async () => {
     expect(await retryStuckOrder({ orderId: 'x', reason: '확인' })).toMatchObject({
       error: { code: 'ORDER_NOT_FOUND' },

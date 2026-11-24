@@ -143,6 +143,8 @@ export async function getBusinessDocUrl(
     .from(shops)
     .where(eq(shops.id, id.data));
   if (!shop) return fail('SHOP_NOT_FOUND', SHOP_REVIEW_ERRORS.SHOP_NOT_FOUND);
+  // 원장님이 탈퇴하고 30일이 지나 지운 등록증(#154)
+  if (shop.businessDocPath === null) return fail('DOC_NOT_FOUND', STORAGE_ERRORS.DOC_NOT_FOUND);
 
   const now = await getRequestNow();
   const { data, error } = await createSupabaseAdminClient()

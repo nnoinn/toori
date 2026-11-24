@@ -31,5 +31,6 @@ export async function selectPayoutAccount(
     })
     .from(payoutAccounts)
     .where(eq(payoutAccounts.shopId, shopId));
-  return row ?? null;
+  // 예금주는 탈퇴하고 30일이 지나야 비는데(#154) 탈퇴한 원장님은 이 화면에 들어올 수 없다
+  return row ? { ...row, accountHolder: row.accountHolder ?? '' } : null;
 }

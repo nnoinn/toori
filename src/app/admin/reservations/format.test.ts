@@ -15,6 +15,7 @@ import {
   lookupHref,
   SLOT_ORIGIN_LABELS,
   slotDetailHref,
+  windowDetailHref,
   slotOrigin,
   toLookupTab,
   toReservationFilter,
@@ -70,11 +71,17 @@ describe('매물·예약 조회 표시 모양', () => {
   it('취소할 때 남은 시간. 시작 뒤 취소도 뜻이 통하게 보여준다', () => {
     expect(labelHoursBefore(30.46)).toBe('30.5시간 전');
     expect(labelHoursBefore(-2)).toBe('시작 2.0시간 뒤');
+    // 딱 시작할 때 취소는 "0.0시간 전"
+    expect(labelHoursBefore(0)).toBe('0.0시간 전');
     expect(labelHoursBefore(null)).toBe('-');
   });
 
   it('매물 상세 주소는 매물·예약 메뉴 아래(왼쪽 메뉴가 그대로 켜진다)', () => {
     expect(slotDetailHref('abc')).toBe('/admin/reservations/slots/abc');
+  });
+
+  it('시간대 매물 상세 주소도 매물·예약 메뉴 아래(#567)', () => {
+    expect(windowDetailHref('abc')).toBe('/admin/reservations/windows/abc');
   });
 
   it('매물 마감 사유. 원장님이 고른 셋, 결제 없이 홀딩 끝남, 운영자 마감. 모르는 값은 그대로, 없으면 -', () => {

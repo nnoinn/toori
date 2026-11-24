@@ -1,7 +1,8 @@
 // 지금 들어온 사람 확인. 로그인 세션이 없으면 DB를 보지 않고 null인지, 프로필 이름을 맞게 읽는지(DB 없이),
 // loadAccount·ensureProfile이 DB에서 계정·샵을 맞게 읽고 쓰는지(실제 DB, TEST_DATABASE_URL이 있을 때만) 확인한다.
 
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
+import { authUsers } from 'drizzle-orm/supabase';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { customers, owners, profiles } from '@/db/schema';
@@ -123,6 +124,23 @@ describeDb('loadAccount·ensureProfile (실제 DB)', () => {
       await ensureProfile(tx, userId, 'changed@test.invalid');
       const [row] = await tx.select().from(profiles).where(eq(profiles.id, userId));
       expect(row.email).toBe(`${userId}@test.invalid`);
+    });
+  });
+
+  it('ensureProfile은 처음 만들 때 같은 사람 표시(이메일 HMAC)를 채운다. 같은 이메일이면 같은 값이다(#154)', async () => {
+    await withRollback(async (tx) => {
+      const first = crypto.randomUUID();
+      const second = crypto.randomUUID();
+      await tx.insert(authUsers).values([{ id: first }, { id: second }]);
+      await ensureProfile(tx, first, 'Again@Test.invalid');
+      await ensureProfile(tx, second, 'again@test.invalid');
+      const rows = await tx
+        .select({ id: profiles.id, identityHash: profiles.identityHash })
+        .from(profiles)
+        .where(inArray(profiles.id, [first, second]));
+      expect(rows).toHaveLength(2);
+      expect(rows[0].identityHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(rows[0].identityHash).toBe(rows[1].identityHash);
     });
   });
 });
