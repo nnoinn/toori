@@ -115,9 +115,9 @@ describe('afterCheck', () => {
   });
 
   it('확인에 실패하면 받은 문구', () => {
-    expect(afterCheck(withdrawalFail('NOT_OPEN'), false)).toEqual({
+    expect(afterCheck(withdrawalFail('NOT_READY'), false)).toEqual({
       kind: 'error',
-      message: '회원 탈퇴는 곧 열려요',
+      message: '지금은 탈퇴할 수 없어요. 잠시 후 다시 시도해 주세요',
     });
   });
 });
@@ -144,10 +144,10 @@ describe('afterWithdraw', () => {
     });
   });
 
-  it('그 밖의 실패는 받은 문구(배포 주소의 가짜 결과 버전은 NOT_OPEN)', () => {
-    expect(afterWithdraw(withdrawalFail('NOT_OPEN'))).toEqual({
+  it('그 밖의 실패는 받은 문구(예: 같은 사람 표시 키가 없으면 NOT_READY)', () => {
+    expect(afterWithdraw(withdrawalFail('NOT_READY'))).toEqual({
       kind: 'error',
-      message: '회원 탈퇴는 곧 열려요',
+      message: '지금은 탈퇴할 수 없어요. 잠시 후 다시 시도해 주세요',
     });
     expect(afterWithdraw(withdrawalFail('WITHDRAWAL_BLOCKED'))).toEqual({
       kind: 'error',
