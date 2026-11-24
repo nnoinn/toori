@@ -13,6 +13,7 @@ import { KAKAO_CHANNEL_URL, SITE_NAME } from '@/lib/site';
 import { ensureOwnerPage, getCurrentAccount } from '@/server/auth';
 
 import { OwnerPage } from '../owner-page';
+import { WithdrawOwner } from './withdraw-owner';
 
 export const metadata: Metadata = { title: '내 계정' };
 
@@ -20,7 +21,7 @@ const PAGE_PATH = '/owner/account';
 
 // 원장님 내 계정 (#307, O12 원장님 알림 받기 S-404). 고객 화면의 '내 정보'처럼 계정과 설정을 한곳에서 다룬다.
 // 로그인 계정, 계정 이력(#374, 메뉴에 두지 않고 여기서 들어간다), 이 기기 푸시 알림(기기에 소리·배너로 뜨는 알림,
-// #371 11/13 이름), 고객센터(카카오톡 채널), 로그아웃.
+// #371 11/13 이름), 고객센터(카카오톡 채널), 로그아웃, 원장님 탈퇴(#154, 로그아웃 옆에 눈에 덜 띄게. 고객 내 정보와 같은 자리).
 // 계정 바꾸기 버튼은 두지 않는다(11/10 nnoinn): 같은 메일이어도 고객·원장님 계정은 별개라서,
 // 다른 계정으로 가려면 로그아웃한 뒤 로그인 화면에서 고른다. PC 기준
 export default function OwnerAccountPage() {
@@ -100,7 +101,10 @@ async function AccountContent() {
         </CardContent>
       </Card>
 
-      <OwnerSignOutButton variant="page" />
+      <div className="flex flex-wrap items-start gap-2">
+        <OwnerSignOutButton variant="page" />
+        <WithdrawOwner hasCustomerAccount={account?.customerId != null} />
+      </div>
     </div>
   );
 }
