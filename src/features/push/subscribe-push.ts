@@ -1,3 +1,4 @@
+import type { AccountType } from '@/db/schema/accounts';
 import {
   getPushSubscriptionStatus,
   removeDevicePushSubscriptions,
@@ -12,6 +13,8 @@ import {
   PUSH_RESTORE_KEY,
   type PushRestoreMemory,
   pushRestoreAction,
+  withdrawWithPushCleanup,
+  withoutAccountType,
 } from './push-restore';
 import { urlBase64ToUint8Array } from './push-support';
 
@@ -174,4 +177,28 @@ export async function restorePushAfterSignIn(): Promise<void> {
   } catch {
     // 다음에 로그인한 화면이 열리면 다시 한다
   }
+}
+
+/**
+ * 회원 탈퇴 화면(고객 내 정보, 원장님 내 계정)이 탈퇴 함수를 이것으로 감싸 부른다(11/24 nnoinn, NOTI-09).
+ * 순서는 withdrawWithPushCleanup: 이 기기 구독을 지우고 기억 → 탈퇴 → 탈퇴했으면 그 계정을 기억에서 빼고, 못 했으면 되살린다
+ */
+export function withdrawWithDevicePush<T extends { ok: boolean }>(
+  accountType: AccountType,
+  withdraw: () => Promise<T>,
+): Promise<T> {
+  return withdrawWithPushCleanup(withdraw, {
+    clear: clearDevicePushSubscriptions,
+    forget: () => forgetPushRestoreAccount(accountType),
+    restore: restorePushAfterSignIn,
+  });
+}
+
+/** 탈퇴한 계정을 이 기기의 기억에서 뺀다. 남는 계정이 없으면 기억을 버린다 */
+function forgetPushRestoreAccount(accountType: AccountType) {
+  const memory = readPushRestore();
+  if (!memory) return;
+  const rest = withoutAccountType(memory, accountType);
+  if (rest) writePushRestore(rest);
+  else clearPushRestore();
 }

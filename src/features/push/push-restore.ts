@@ -2,6 +2,7 @@
 // 보통 앱처럼 로그아웃하면 이 기기로 가는 내 알림을 끊고(공용 기기에서 남에게 보이지 않게), 같은 사람이 다시 로그인하면
 // 그때 켜 두었던 계정의 알림을 다시 켠다. 알림을 꺼 둔 계정은 로그아웃 때 구독이 없었으므로 다시 켜지지 않는다.
 // 기억은 이 기기(localStorage)에만 둔다. 서버(restoreDevicePushSubscriptions)가 지금 로그인한 사람과 같은지 다시 확인한다.
+// 회원 탈퇴도 로그아웃까지 하므로 같은 순서를 쓴다(withdrawWithPushCleanup, 11/24 nnoinn).
 
 import type { AccountType } from '@/db/schema/accounts';
 import type { Result } from '@/lib/result';
@@ -73,4 +74,46 @@ export function pushRestoreAction(
  */
 export function keepPushRestore(result: Result<unknown>): boolean {
   return !result.ok && result.error.code === 'UNAUTHENTICATED';
+}
+
+/** 탈퇴한 계정을 기억에서 뺀다(되살려도 꺼진 알림은 돌아오지 않는다, #154 3장). 남는 계정이 없으면 null(기억을 버린다) */
+export function withoutAccountType(
+  memory: PushRestoreMemory,
+  accountType: AccountType,
+): PushRestoreMemory | null {
+  const accountTypes = memory.accountTypes.filter((type) => type !== accountType);
+  return accountTypes.length > 0 ? { ...memory, accountTypes } : null;
+}
+
+/** 탈퇴 순서에서 이 기기에 하는 일. 브라우저 일이라 받아서 쓴다(테스트할 수 있게) */
+export type WithdrawalDevicePush = {
+  /** 이 기기의 내 구독(고객·원장님)을 지우고 기억한다(clearDevicePushSubscriptions) */
+  clear: () => Promise<void>;
+  /** 탈퇴한 계정을 기억에서 뺀다 */
+  forget: () => void;
+  /** 방금 지운 구독을 되살린다(restorePushAfterSignIn) */
+  restore: () => Promise<void>;
+};
+
+/**
+ * 회원 탈퇴(고객·원장님)의 이 기기 푸시 알림 순서(11/24 nnoinn, NOTI-09). 탈퇴 함수는 로그아웃까지 하므로, 로그아웃(useSignOut)처럼
+ * 로그인이 풀리기 전에 이 기기의 내 구독을 모두 지우고 기억한다(같이 쓰는 기기에서 남은 계정의 알림이 오지 않게).
+ * 탈퇴했으면 탈퇴한 계정을 기억에서 뺀다(남은 계정은 같은 사람이 다시 로그인하면 되살아난다).
+ * 탈퇴하지 못했으면(막힘·실패·오류) 아직 로그인한 상태라 방금 지운 구독을 바로 되살린다
+ */
+export async function withdrawWithPushCleanup<T extends { ok: boolean }>(
+  withdraw: () => Promise<T>,
+  device: WithdrawalDevicePush,
+): Promise<T> {
+  await device.clear();
+  let result: T;
+  try {
+    result = await withdraw();
+  } catch (error) {
+    await device.restore();
+    throw error;
+  }
+  if (result.ok) device.forget();
+  else await device.restore();
+  return result;
 }

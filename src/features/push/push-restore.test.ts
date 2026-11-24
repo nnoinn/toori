@@ -1,4 +1,5 @@
 // 로그아웃 뒤 다시 로그인하면 푸시 알림을 되살리는 규칙(11/23 nnoinn): 기억 읽기, 되살릴지 버릴지, 서버 답 뒤에 남길지.
+// 회원 탈퇴 때 이 기기 푸시 알림 순서(11/24 nnoinn).
 
 import { describe, expect, it } from 'vitest';
 
@@ -10,6 +11,8 @@ import {
   PUSH_RESTORE_DAYS,
   type PushRestoreMemory,
   pushRestoreAction,
+  withdrawWithPushCleanup,
+  withoutAccountType,
 } from './push-restore';
 
 const ENDPOINT = 'https://fcm.googleapis.com/fcm/send/abc123';
@@ -81,5 +84,68 @@ describe('keepPushRestore: 서버 답을 받은 뒤', () => {
     expect(keepPushRestore(ok({ sameUser: true, restored: [] }))).toBe(false);
     expect(keepPushRestore(ok({ sameUser: false, restored: [] }))).toBe(false);
     expect(keepPushRestore(fail('INVALID_INPUT', '요청을 확인하지 못했어요'))).toBe(false);
+  });
+});
+
+describe('withoutAccountType: 탈퇴한 계정을 기억에서 빼기', () => {
+  it('탈퇴한 계정만 빼고 나머지 계정은 남긴다', () => {
+    expect(withoutAccountType(MEMORY, 'owner')).toEqual({ ...MEMORY, accountTypes: ['customer'] });
+    expect(withoutAccountType(MEMORY, 'customer')).toEqual({ ...MEMORY, accountTypes: ['owner'] });
+  });
+
+  it('남는 계정이 없으면 null(기억을 버린다)', () => {
+    expect(withoutAccountType({ ...MEMORY, accountTypes: ['owner'] }, 'owner')).toBeNull();
+  });
+});
+
+describe('withdrawWithPushCleanup: 회원 탈퇴의 이 기기 푸시 알림 순서', () => {
+  function fakeDevice() {
+    const calls: string[] = [];
+    const device = {
+      clear: async () => {
+        calls.push('clear');
+      },
+      forget: () => {
+        calls.push('forget');
+      },
+      restore: async () => {
+        calls.push('restore');
+      },
+    };
+    return { calls, device };
+  }
+
+  it('탈퇴하기 전에 이 기기 구독을 지우고, 탈퇴했으면 탈퇴한 계정을 기억에서 뺀다(되살리지 않는다)', async () => {
+    const { calls, device } = fakeDevice();
+    const done = { ok: true };
+    const result = await withdrawWithPushCleanup(async () => {
+      calls.push('withdraw');
+      return done;
+    }, device);
+    expect(result).toBe(done);
+    expect(calls).toEqual(['clear', 'withdraw', 'forget']);
+  });
+
+  it('탈퇴하지 못했으면(막힘·실패) 방금 지운 구독을 되살리고 받은 결과를 그대로 돌려준다', async () => {
+    const { calls, device } = fakeDevice();
+    const blocked = { ok: false, error: { code: 'WITHDRAWAL_BLOCKED' } };
+    const result = await withdrawWithPushCleanup(async () => {
+      calls.push('withdraw');
+      return blocked;
+    }, device);
+    expect(result).toBe(blocked);
+    expect(calls).toEqual(['clear', 'withdraw', 'restore']);
+  });
+
+  it('탈퇴 중 오류가 나도 방금 지운 구독을 되살리고 그 오류를 그대로 던진다', async () => {
+    const { calls, device } = fakeDevice();
+    const error = new Error('network');
+    await expect(
+      withdrawWithPushCleanup(async () => {
+        calls.push('withdraw');
+        throw error;
+      }, device),
+    ).rejects.toBe(error);
+    expect(calls).toEqual(['clear', 'withdraw', 'restore']);
   });
 });
