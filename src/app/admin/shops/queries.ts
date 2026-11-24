@@ -117,13 +117,15 @@ export type ShopReviewDetail = {
     businessRegistrationNumber: string;
     openedOn: string;
     /** 사업자등록증 경로(비공개 버킷). 운영자가 등록증을 바꾸지 않고 저장할 때 그대로 넘긴다 */
-    businessDocPath: string;
+    /** 원장님이 탈퇴하고 30일이 지나 지웠으면 null(#154) */
+    businessDocPath: string | null;
     /** 국세청 진위확인 결과와 시각(#208). 비어 있으면 확인 안 함 */
     ntsCheck: string | null;
     ntsCheckedAt: Date | null;
   };
   /** id는 원장님 계정 이력([원장님 이력 보기], #374) 주소에 쓴다 */
-  owner: { id: string; name: string; phone: string };
+  /** phone: 탈퇴하고 30일이 지나 지웠으면 null(#154) */
+  owner: { id: string; name: string; phone: string | null };
   shop: {
     name: string;
     category: string;

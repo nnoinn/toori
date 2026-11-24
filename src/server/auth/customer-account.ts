@@ -11,8 +11,11 @@ import { z } from 'zod';
 
 import { getDb } from '@/db';
 import { normalizePhone, PHONE_FORMAT_MESSAGE } from '@/lib/phone';
+import { getRequestNow } from '@/lib/request-time';
 import { fail, ok, type Result } from '@/lib/result';
 import { safeNextPath } from '@/lib/safe-next';
+import { WITHDRAWAL_ERRORS } from '@/server/accounts/withdrawal-errors';
+import { hasRestorableWithdrawal } from '@/server/accounts/withdrawal-restore-store';
 
 import { ACCOUNT_MODE_COOKIE, ACCOUNT_MODE_COOKIE_OPTIONS } from './account-mode';
 import {
@@ -60,6 +63,7 @@ const createSchema = z.object({
  * 이름은 예약자 이름이라 가입 화면에서 직접 받고 꼭 있어야 한다(앞뒤 공백 빼고 1~30자, #375, AUTH-12).
  * 보내지 않거나 빈칸이면 NAME_REQUIRED로 막는다. 닉네임으로 대신 채우지 않는다.
  * 번호는 인증 없이 모양만 보고 하이픈 넣은 모양으로 맞춰 저장한다. 다른 고객과 같은 번호여도 막지 않는다(#183).
+ * 되살리기 기간 안에 탈퇴한 고객 계정이 있으면 새로 만들지 않고 WITHDRAWN_RESTORABLE(가입 화면이 [계정 되살리기]를 안내, #154).
  * 성공하면 돌아오지 않고 next(안전한 주소만, 없으면 홈)로 보낸다. 실패했을 때만 결과를 돌려준다
  */
 export async function createCustomerAccount(input: {
@@ -101,15 +105,22 @@ export async function createCustomerAccount(input: {
   if (!user) return fail('UNAUTHENTICATED', AUTH_ERRORS.UNAUTHENTICATED);
 
   const nickname = user.name ?? DEFAULT_CUSTOMER_NICKNAME;
-  const saved = await getDb().transaction((tx) =>
-    saveCustomerAccount(tx, {
+  const now = await getRequestNow();
+  const saved = await getDb().transaction(async (tx) => {
+    if (await hasRestorableWithdrawal(tx, { userId: user.userId, accountType: 'customer', now })) {
+      return 'restorable' as const;
+    }
+    return saveCustomerAccount(tx, {
       userId: user.userId,
       name,
       nickname,
       phone,
       optionalTerms: OPTIONAL_CUSTOMER_TERMS.filter((type) => agreements[type] === true),
-    }),
-  );
+    });
+  });
+  if (saved === 'restorable') {
+    return fail('WITHDRAWN_RESTORABLE', WITHDRAWAL_ERRORS.WITHDRAWN_RESTORABLE);
+  }
   if (!saved) return fail('ALREADY_EXISTS', '이미 가입한 계정이에요');
 
   const store = await cookies();

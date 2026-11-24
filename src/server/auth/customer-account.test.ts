@@ -28,6 +28,9 @@ const state = vi.hoisted(() => ({
   writeOptionalConsent: vi.fn(),
   cookieSet: vi.fn(),
   cookieDelete: vi.fn(),
+  /** 되살리기 기간 안에 탈퇴한 고객 계정이 있는지(#154) */
+  restorable: false,
+  restorableChecks: [] as unknown[],
 }));
 
 vi.mock('next/headers', () => ({
@@ -49,6 +52,15 @@ vi.mock('@/db', () => ({
   getDb: () => ({ transaction: (run: (tx: string) => unknown) => run('tx') }),
 }));
 vi.mock('./current-account', () => ({ getSessionUser: async () => state.user }));
+vi.mock('@/lib/request-time', () => ({
+  getRequestNow: async () => new Date('2026-11-24T03:00:00.000Z'),
+}));
+vi.mock('@/server/accounts/withdrawal-restore-store', () => ({
+  hasRestorableWithdrawal: async (db: unknown, input: unknown) => {
+    state.restorableChecks.push([db, input]);
+    return state.restorable;
+  },
+}));
 vi.mock('./require', () => ({
   AUTH_ERRORS: { UNAUTHENTICATED: '로그인이 필요해요' },
   requireCustomer: async () => state.customerAuth,
@@ -78,6 +90,8 @@ beforeEach(() => {
   state.saveCustomerAccount.mockImplementation(async () => state.saved);
   state.cookies.clear();
   state.cookieDelete.mockImplementation((name: string) => state.cookies.delete(name));
+  state.restorable = false;
+  state.restorableChecks = [];
 });
 
 describe('createCustomerAccount', () => {
@@ -275,6 +289,29 @@ describe('createCustomerAccount', () => {
       name: NAME,
     });
     expect(result).toEqual(fail('ALREADY_EXISTS', '이미 가입한 계정이에요'));
+    expect(state.cookieSet).not.toHaveBeenCalled();
+  });
+
+  it('되살리기 기간 안에 탈퇴한 고객 계정이 있으면 저장 트랜잭션 안에서 보고 WITHDRAWN_RESTORABLE, 저장·쿠키 없음(#154)', async () => {
+    state.restorable = true;
+    const result = await createCustomerAccount({
+      agreements: { ...ALL_REQUIRED, marketing: false },
+      phone: PHONE,
+      name: NAME,
+    });
+    expect(result).toEqual(
+      fail(
+        'WITHDRAWN_RESTORABLE',
+        '탈퇴한 지 30일이 지나지 않아 새 계정을 만들 수 없어요. 탈퇴한 계정을 되살릴 수 있어요',
+      ),
+    );
+    expect(state.restorableChecks).toEqual([
+      [
+        'tx',
+        { userId: 'user-1', accountType: 'customer', now: new Date('2026-11-24T03:00:00.000Z') },
+      ],
+    ]);
+    expect(state.saveCustomerAccount).not.toHaveBeenCalled();
     expect(state.cookieSet).not.toHaveBeenCalled();
   });
 

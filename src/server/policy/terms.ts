@@ -25,3 +25,14 @@ export const CHECKOUT_CONSENT_VERSIONS = {
   // 동의 문구 3-1 항목을 닉네임에서 이름으로(#375, 11/14)
   bookerInfo: 'draft-2026-11',
 } as const;
+
+/**
+ * 선택 동의 이름(동의 문구 1-2·6·7장, #267). 서버 알림(2년마다 수신 동의 확인, #535)이 쓴다.
+ * 고객 화면(src/app/(customer)/(tabs)/me/profile-rules.ts OPTIONAL_CONSENT_NAMES)에도 같은 이름이 있어서, 바꿀 때는 둘을 같이 바꾼다
+ */
+export const OPTIONAL_CONSENT_NAMES = {
+  interest_alert: '관심 동네·찜한 샵 새 매물 알림',
+  marketing: '이벤트·혜택 소식',
+} as const satisfies Partial<Record<TermsType, string>>;
+
+export type OptionalConsentType = keyof typeof OPTIONAL_CONSENT_NAMES;

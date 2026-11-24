@@ -2,7 +2,11 @@
 // 고객 id를 그대로 받으므로 'use server'로 만들지 않는다(화면에서 남의 이력을 물어볼 수 없게). 쿼리·서버 함수 파일에서 부른다.
 //
 // 이력 있음: 그 샵 예약 중 확정 또는 이용 완료(노쇼 포함)가 하나라도 있음. 취소된 예약은 위약금을 냈어도 뺀다(#13 Q12).
-// 고객 계정 기준이라 같은 사람의 원장님 계정과는 상관없다.
+// 같은 사람의 고객 계정 모두를 본다(#154 본문 4장, 탈퇴·재가입으로 신규 고객 전용 혜택을 다시 받지 못하게):
+//  ① 같은 로그인의 다른 고객 계정(탈퇴한 계정 포함)
+//  ② 같은 사람 표시(profiles.identity_hash, 로그인 이메일의 HMAC)가 같은 로그인의 고객 계정(로그인 정보까지 지운 뒤 다시 가입한 경우).
+//     표시가 비어 있으면(키가 없던 환경) ②로는 잇지 않는다.
+// 고객 계정만 보므로 같은 사람의 원장님 계정과는 상관없다.
 
 import 'server-only';
 
@@ -10,7 +14,7 @@ import { type AnyColumn, and, eq, exists, inArray, not, or, type SQL, sql } from
 import { alias, QueryBuilder } from 'drizzle-orm/pg-core';
 
 import { getDb } from '@/db';
-import { reservations, slots } from '@/db/schema';
+import { customers, profiles, reservations, slots } from '@/db/schema';
 import type { ReservationStatus } from '@/db/schema/payments';
 
 type Db = Pick<ReturnType<typeof getDb>, 'selectDistinct'>;
@@ -21,20 +25,41 @@ export const VISITED_RESERVATION_STATUSES = [
   'completed',
 ] as const satisfies readonly ReservationStatus[];
 
-// 바깥 쿼리의 slots와 섞이지 않게 이력 조회에는 별칭을 쓴다
+// 바깥 쿼리의 slots·customers와 섞이지 않게 이력 조회에는 별칭을 쓴다
 const visitedReservation = alias(reservations, 'visited_reservation');
 const visitedSlot = alias(slots, 'visited_slot');
 const joinVisitedSlot = eq(visitedSlot.id, visitedReservation.slotId);
-
-function isVisitedBy(customerId: string): SQL {
-  return and(
-    eq(visitedReservation.customerId, customerId),
-    inArray(visitedReservation.status, [...VISITED_RESERVATION_STATUSES]),
-  )!;
-}
+const me = alias(customers, 'me_customer');
+const myProfile = alias(profiles, 'me_profile');
+const sameCustomer = alias(customers, 'same_customer');
+const sameProfile = alias(profiles, 'same_profile');
 
 // DB 연결 없이 조건 안의 하위 쿼리만 만든다. 실행할 때 바깥 쿼리와 같은 이름 규칙(snake_case)으로 바뀐다
 const queryBuilder = new QueryBuilder({ casing: 'snake_case' });
+
+/** 이 고객과 같은 사람의 고객 계정 id(이 계정 포함, 탈퇴한 계정 포함) */
+function samePersonCustomerIds(customerId: string) {
+  return queryBuilder
+    .select({ id: sameCustomer.id })
+    .from(me)
+    .innerJoin(myProfile, eq(myProfile.id, me.userId))
+    .innerJoin(sameProfile, sql`true`)
+    .innerJoin(sameCustomer, eq(sameCustomer.userId, sameProfile.id))
+    .where(
+      and(
+        eq(me.id, customerId),
+        // ② 표시가 비어 있으면 같지 않다(null = null은 참이 아니다)
+        or(eq(sameProfile.id, myProfile.id), eq(sameProfile.identityHash, myProfile.identityHash)),
+      ),
+    );
+}
+
+function isVisitedBy(customerId: string): SQL {
+  return and(
+    inArray(visitedReservation.customerId, samePersonCustomerIds(customerId)),
+    inArray(visitedReservation.status, [...VISITED_RESERVATION_STATUSES]),
+  )!;
+}
 
 /**
  * 목록·지도 조회의 where에 넣는 조건: 신규 고객 전용이 아니거나, 이 고객이 그 샵 이력이 없는 매물만.

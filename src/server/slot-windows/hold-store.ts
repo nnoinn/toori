@@ -6,7 +6,7 @@
 
 import 'server-only';
 
-import { and, eq, gt, inArray, lte } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull, lte } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import { customers, shops, slots, slotWindowMenus, slotWindows } from '@/db/schema';
@@ -40,11 +40,13 @@ export async function acquireWindowHold(
   const { windowId, menuId, startAt, customerId, now } = input;
 
   // 같은 고객이 두 칸을 동시에 눌러도 차례로 처리되게 고객 줄을 잠근다(acquireHold와 같다)
-  await tx
+  const [active] = await tx
     .select({ id: customers.id })
     .from(customers)
-    .where(eq(customers.id, customerId))
+    .where(and(eq(customers.id, customerId), isNull(customers.withdrawnAt)))
     .for('update');
+  // 잠금을 기다리는 사이 이 고객이 탈퇴했으면(#154, 탈퇴도 이 줄을 잠근다) 홀딩하지 않는다
+  if (!active) return { ok: false, code: 'SLOT_NOT_AVAILABLE' };
 
   const [mine] = await tx
     .select({

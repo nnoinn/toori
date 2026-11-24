@@ -4,10 +4,12 @@ import { redirect } from 'next/navigation';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { safeNextPath } from '@/lib/safe-next';
+import { getRestorableAccount } from '@/server/accounts/withdrawal';
 import { getCurrentAccount } from '@/server/auth';
 import { loginPath } from '@/server/auth/paths';
 import { firstParam } from '@/lib/search-params';
 
+import { restorePath } from '../restore/restore-rules';
 import { JoinForm } from './join-form';
 
 export const metadata: Metadata = { title: '약관 동의' };
@@ -17,6 +19,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 // 첫 로그인 고객의 약관 동의 화면 (C-104, J8, D16). 로그인 콜백이 /join?next=... 로 보낸다(#47 3장).
 // 로그인하지 않았으면 고객 토글로 로그인 화면에, 이미 고객 계정이 있으면 next로 바로 보낸다.
 // 원장님 계정만 있는 사람은 그대로 보여준다(가입하면 고객 모드로 바뀐다, #47 4장).
+// 탈퇴한 지 30일 안의 고객 계정이 있으면 새 가입 대신 되살리기 화면(/restore)으로 보낸다(#154 3장, 로그인 콜백은 그대로 여기로 온다).
 export default function JoinPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <Suspense fallback={<JoinSkeleton />}>
@@ -30,6 +33,8 @@ async function JoinContent({ searchParams }: { searchParams: SearchParams }) {
   const next = safeNextPath(firstParam(params.next), '/');
   if (!account) redirect(loginPath('customer', next));
   if (account.customerId) redirect(next);
+  const restorable = await getRestorableAccount('customer');
+  if (restorable.ok && restorable.data) redirect(restorePath(next));
   return <JoinForm next={next} />;
 }
 
