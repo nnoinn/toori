@@ -48,6 +48,9 @@ describe('목록 탭과 주소', () => {
 describe('상태 이름', () => {
   it('확인 중이면 "확인 중", 결론이 났으면 결론 종류', () => {
     expect(labelDisputeStatus('open', null)).toBe('확인 중');
+    // 결론이 났다고 표시된 예약만 결론 이름. 확인 중이면 결론 값이 있어도, 결론이 났는데 값이 없으면 "확인 중"
+    expect(labelDisputeStatus('open', 'no_show_reversed')).toBe('확인 중');
+    expect(labelDisputeStatus('resolved', null)).toBe('확인 중');
     expect(labelDisputeStatus('resolved', 'no_show_reversed')).toBe('노쇼 취소(방문으로 바꿈)');
   });
 
@@ -76,7 +79,14 @@ describe('받은 시각 칸(한국 시간)', () => {
   });
 
   it('모양이 틀리면 null', () => {
-    for (const value of ['', '2026-11-13', '2026-11-13 14:07', '2026-11-13T14:07:00']) {
+    for (const value of [
+      '',
+      '2026-11-13',
+      '2026-11-13 14:07',
+      '2026-11-13T14:07:00',
+      'x2026-11-13T14:07',
+      '2026-11-13T14:07x',
+    ]) {
       expect(fromKstInputValue(value), value).toBeNull();
     }
   });

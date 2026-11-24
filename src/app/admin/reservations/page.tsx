@@ -47,6 +47,7 @@ import {
   WINDOW_FILTER_LABELS,
   WINDOW_FILTERS,
   WINDOW_STATE_LABELS,
+  windowDetailHref,
 } from './format';
 import { SlotControlAction } from '../shops/slot-control-actions';
 import { selectReservations, selectSlots } from './queries';
@@ -365,7 +366,7 @@ async function SlotList({ status, query }: { status: string | undefined; query: 
   );
 }
 
-/** 시간대 매물 목록(#567). 줄을 누르는 상세 화면은 없고, 샵 이름은 샵 화면으로 간다 */
+/** 시간대 매물 목록(#567). 줄을 두 번 누르거나 Enter·[상세]로 시간대 매물 상세가 열리고, 샵 이름은 샵 화면으로 간다 */
 async function WindowList({ status, query }: { status: string | undefined; query: string }) {
   const filter = toWindowFilter(status);
   const now = await getRequestNow();
@@ -401,41 +402,52 @@ async function WindowList({ status, query }: { status: string | undefined; query
                 </th>
               </tr>
             </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.windowId} className="border-b last:border-0">
-                  <td className={cn(CELL, 'font-medium')}>
-                    <Link href={`/admin/shops/${row.shopId}`} className="hover:underline">
-                      {row.shopName}
-                    </Link>
-                  </td>
-                  <td className={cn(CELL, 'whitespace-nowrap')}>
-                    {formatKst(row.startAt)}~{formatEndTime(row.startAt, row.endAt)}
-                  </td>
-                  <td className={CELL}>{row.menuCount}개</td>
-                  <td className={cn(CELL, 'whitespace-nowrap')}>
-                    {row.bookedCount}칸
-                    {row.holdingCount > 0 ? (
-                      <span className="ml-1 text-xs text-muted-foreground">
-                        결제 중 {row.holdingCount}칸
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className={CELL}>
-                    <Badge variant="secondary">{WINDOW_STATE_LABELS[row.state]}</Badge>
-                  </td>
-                  <td className={cn(CELL, 'text-right')}>
-                    {/* 마감하지 않았고 끝나지 않은 시간대는 운영자가 강제 마감한다(#373 ④). 막는 것은 서버가 다시 본다 */}
-                    {canForceCloseWindow(row.state) ? (
-                      <SlotControlAction
-                        target={{ kind: 'close_window', windowId: row.windowId }}
-                        size="sm"
-                      />
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+            <SelectableRows>
+              {rows.map((row) => {
+                const href = windowDetailHref(row.windowId);
+                return (
+                  <SelectableRow key={row.windowId} id={row.windowId} href={href}>
+                    <td className={cn(CELL, 'font-medium')}>
+                      <Link href={`/admin/shops/${row.shopId}`} className="hover:underline">
+                        {row.shopName}
+                      </Link>
+                    </td>
+                    <td className={cn(CELL, 'whitespace-nowrap')}>
+                      <Link href={href} className="hover:underline">
+                        {formatKst(row.startAt)}~{formatEndTime(row.startAt, row.endAt)}
+                      </Link>
+                    </td>
+                    <td className={CELL}>{row.menuCount}개</td>
+                    <td className={cn(CELL, 'whitespace-nowrap')}>
+                      {row.bookedCount}칸
+                      {row.holdingCount > 0 ? (
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          결제 중 {row.holdingCount}칸
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className={CELL}>
+                      <Badge variant="secondary">{WINDOW_STATE_LABELS[row.state]}</Badge>
+                    </td>
+                    <td className={cn(CELL, 'text-right')}>
+                      <div className="flex items-center justify-end gap-2">
+                        {/* 마감하지 않았고 끝나지 않은 시간대는 운영자가 강제 마감한다(#373 ④). 막는 것은 서버가 다시 본다 */}
+                        {canForceCloseWindow(row.state) ? (
+                          <SlotControlAction
+                            target={{ kind: 'close_window', windowId: row.windowId }}
+                            size="sm"
+                          />
+                        ) : null}
+                        <DetailLink
+                          href={href}
+                          label={`${row.shopName} ${formatKst(row.startAt)} 시간대 매물 상세`}
+                        />
+                      </div>
+                    </td>
+                  </SelectableRow>
+                );
+              })}
+            </SelectableRows>
           </table>
         </div>
       )}

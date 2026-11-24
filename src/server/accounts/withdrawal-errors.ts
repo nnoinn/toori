@@ -9,12 +9,14 @@ import type { WithdrawalBlocker } from './withdrawal-types';
 export const WITHDRAWAL_ERRORS = {
   /** 막는 이유가 있다. 오류의 blockers에 이유를 모두 준다(확인 뒤 그 사이에 생긴 경우 포함) */
   WITHDRAWAL_BLOCKED: '지금은 탈퇴할 수 없어요. 아래 이유를 확인해 주세요',
-  /** 가짜 결과 버전: 배포 주소에서는 탈퇴·되살리기를 저장하지 않아서 열지 않는다 */
-  NOT_OPEN: '회원 탈퇴는 곧 열려요',
+  /** 운영 배포에 같은 사람 표시 키(ACCOUNT_IDENTITY_KEY)가 없다. 아무것도 바꾸지 않았다 */
+  NOT_READY: '지금은 탈퇴할 수 없어요. 잠시 후 다시 시도해 주세요',
   /** 되살리기: 그 계정 종류로 탈퇴한 계정이 없다 */
   NOT_WITHDRAWN: '되살릴 탈퇴 계정이 없어요',
   /** 되살리기: 탈퇴한 지 되살리기 기간이 지났다 */
   RESTORE_EXPIRED: `탈퇴한 지 ${WITHDRAWAL_RESTORE_DAYS}일이 지나 되살릴 수 없어요. 새로 가입해 주세요`,
+  /** 가입 함수(createCustomerAccount·createOwnerAccount): 되살리기 기간 안에 그 계정 종류로 탈퇴한 계정이 있어 새로 가입할 수 없다 */
+  WITHDRAWN_RESTORABLE: `탈퇴한 지 ${WITHDRAWAL_RESTORE_DAYS}일이 지나지 않아 새 계정을 만들 수 없어요. 탈퇴한 계정을 되살릴 수 있어요`,
   /** 계정 종류 값이 틀림(customer·owner가 아님) */
   INVALID_INPUT: '계정 종류가 올바르지 않아요',
 } as const;

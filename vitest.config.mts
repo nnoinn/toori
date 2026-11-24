@@ -26,6 +26,8 @@ export default defineConfig({
       DATABASE_URL: process.env.TEST_DATABASE_URL ?? '',
       // 테스트는 국세청 진위확인(#208)을 실제로 부르지 않는다. 키가 셸에 있어도 비워서 건너뛰게 한다(필요한 테스트는 가짜 응답을 넘긴다)
       NTS_SERVICE_KEY: '',
+      // 같은 사람 표시(#154, src/server/accounts/identity.ts)의 가짜 키(32바이트 16진수). 진짜 키는 단톡방·Vercel에만 있다(11/23 nnoinn)
+      ACCOUNT_IDENTITY_KEY: '0123456789abcdef'.repeat(4),
     },
   },
 });

@@ -118,9 +118,13 @@ export const coupons = pgTable(
     // 쓴 주문. 원장님 귀책 취소면 비워서 다시 쓸 수 있게 돌려준다
     usedOrderId: uuid().references((): AnyPgColumn => orders.id),
     usedAt: timestamptz(),
+    // 고객이 탈퇴해서 없어진 시각(#154). 있으면 되살려도 쓸 수 없다. 운영자 쿠폰 칸에는 "탈퇴로 없어짐"
+    forfeitedAt: timestamptz(),
   },
   (t) => [
     check('coupons_reason_check', inValues(t.reason, COUPON_REASONS)),
+    // 안 쓴 쿠폰만 없어진다(#154)
+    check('coupons_forfeited_check', sql`${t.forfeitedAt} is null or ${t.usedOrderId} is null`),
     index('coupons_customer_id_expires_at_idx').on(t.customerId, t.expiresAt),
     // 원장님 귀책 보상 쿠폰은 원인 예약 하나에 한 장. 처리를 다시 해도 두 장이 나가지 않게(#419)
     uniqueIndex('coupons_compensation_unique')

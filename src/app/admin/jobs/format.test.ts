@@ -40,7 +40,12 @@ describe('예약 작업 표시', () => {
     expect(durationLabel(at(0), new Date(at(0).getTime() + 400))).toBe('1초 미만');
     expect(durationLabel(at(0), at(42))).toBe('42초');
     expect(durationLabel(at(0), at(125))).toBe('2분 5초');
+    // 경계: 딱 1초는 "1초", 59초까지 초, 딱 60초부터 분
+    expect(durationLabel(at(0), at(1))).toBe('1초');
+    expect(durationLabel(at(0), at(59))).toBe('59초');
+    expect(durationLabel(at(0), at(60))).toBe('1분 0초');
     expect(summaryLabel(null)).toBe('-');
+    expect(summaryLabel(undefined)).toBe('-');
     expect(summaryLabel({ reminders: { sent: 2 } })).toBe('{"reminders":{"sent":2}}');
   });
 });

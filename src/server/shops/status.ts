@@ -8,4 +8,6 @@ export const SHOP_STATUS_LABELS = {
   pending: '승인 대기',
   approved: '승인',
   rejected: '반려',
+  // 원장님이 탈퇴함(#154)
+  withdrawn: '탈퇴',
 } as const satisfies Record<ShopStatus, string>;

@@ -36,6 +36,8 @@ function isSameAccount(
   input: Pick<ChangePayoutAccountInput, 'bankCode' | 'accountNumber'>,
 ): boolean {
   if (current.bankCode !== input.bankCode) return false;
+  // 탈퇴하고 30일이 지나 지운 계좌(#154)는 같은지 알 수 없으니 바뀐 것으로 본다
+  if (current.accountNumberEncrypted === null) return false;
   try {
     return decryptAccountNumber(current.accountNumberEncrypted) === input.accountNumber;
   } catch (error) {

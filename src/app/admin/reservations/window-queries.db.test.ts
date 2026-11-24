@@ -1,18 +1,29 @@
-// 운영자 매물·예약 화면 [시간대 매물] 탭 조회(#567)를 실제 DB(TEST_DATABASE_URL이 있을 때만)로 확인한다.
+// 운영자 매물·예약 화면 [시간대 매물] 탭 조회와 시간대 매물 상세(#567)를 실제 DB(TEST_DATABASE_URL이 있을 때만)로 확인한다.
 // 샵 이름으로 찾기, 지금 시각으로 나눈 상태 거르기, 시간대마다 서비스 수·예약된 칸·결제 중 칸, 다 참(windowStatus)을 본다.
+// 상세는 시간대 내용·서비스·손님이 만든 칸과 그 예약·이 시간대의 운영자 처리 기록을 본다.
 
 import { afterAll, expect, it } from 'vitest';
 
-import { menus, orders, reservations, slots, slotWindowMenus, slotWindows } from '@/db/schema';
+import {
+  adminActions,
+  adminProfiles,
+  menus,
+  orders,
+  reservations,
+  slots,
+  slotWindowMenus,
+  slotWindows,
+} from '@/db/schema';
 
 import {
   createTestCustomer,
   createTestShop,
+  createTestUser,
   type TestShop,
   testSlot,
 } from '../../../../tests/db/fixtures';
 import { closeTestDb, describeDb, type TestTx, withRollback } from '../../../../tests/db/test-db';
-import { selectAdminWindows } from './window-queries';
+import { selectAdminWindowDetail, selectAdminWindows } from './window-queries';
 
 const kst = (dateTime: string) => new Date(`${dateTime}+09:00`);
 /** 화면을 연 시각 */
@@ -255,6 +266,99 @@ describeDb('운영자 시간대 매물 목록 (실제 DB)', () => {
           now: NOW,
         }),
       ).toEqual({ rows: [], hasMore: false });
+    });
+  });
+
+  it('상세: 시간대 내용·지금 상태·올린 서비스, 손님이 만든 칸(시작 순)과 칸마다 예약(취소 포함)을 준다', async () => {
+    await withRollback(async (tx) => {
+      const { name, shop, ids } = await seedWindows(tx);
+      const detail = await selectAdminWindowDetail(tx, { windowId: ids.full, now: NOW });
+      expect(detail).toMatchObject({
+        windowId: ids.full,
+        shopId: shop.shopId,
+        shopName: name,
+        startAt: kst('2026-11-01T13:00:00'),
+        endAt: kst('2026-11-01T15:00:00'),
+        publishAt: kst('2026-10-31T08:00:00'),
+        newCustomerOnly: false,
+        state: 'full',
+        closedAt: null,
+        closeReason: null,
+        menus: [
+          expect.objectContaining({
+            menuId: shop.menuId,
+            name: '커트',
+            durationMinutes: 60,
+            listPrice: 20000,
+            discountRate: 10,
+            salePrice: 18000,
+          }),
+        ],
+      });
+      const cells = detail!.cells;
+      expect(cells.map((cell) => cell.startAt)).toEqual([
+        kst('2026-11-01T13:00:00'),
+        kst('2026-11-01T13:00:00'),
+        kst('2026-11-01T14:00:00'),
+      ]);
+      // 13시 칸 둘: 결제를 마친 예약과 손님이 취소한 예약. 순서는 칸 id 순이라 상태로 맞춘다
+      expect(
+        cells
+          .slice(0, 2)
+          .map((cell) => [cell.status, cell.reservations.map((r) => r.status)])
+          .sort(),
+      ).toEqual([
+        ['cancelled', ['cancelled']],
+        ['reserved', ['confirmed']],
+      ]);
+      // 14시 칸: 결제 중(예약 없음)
+      expect(cells[2]).toMatchObject({
+        status: 'published',
+        holdExpiresAt: kst('2026-11-01T12:05:00'),
+        reservations: [],
+      });
+      expect(cells[2].holdCustomerId).not.toBeNull();
+    });
+  });
+
+  it('상세: 마감한 시간대는 마감 시각·사유를, 운영자 처리 기록은 이 시간대 것만 최근 순으로 준다. 없는 시간대는 null', async () => {
+    await withRollback(async (tx) => {
+      const { ids } = await seedWindows(tx);
+      const admin = await createTestUser(tx);
+      await tx.insert(adminProfiles).values({ userId: admin, name: `운영자 ${admin.slice(0, 6)}` });
+      const at = (hm: string) => kst(`2026-10-31T${hm}:00`);
+      const action = (targetType: string, targetId: string, memo: string, createdAt: Date) => ({
+        adminId: admin,
+        action: 'slot.force_close',
+        targetType,
+        targetId,
+        memo,
+        createdAt,
+      });
+      await tx
+        .insert(adminActions)
+        .values([
+          action('slot_window', ids.closed, '먼저 남긴 기록', at('09:00')),
+          action('slot_window', ids.closed, '나중에 남긴 기록', at('10:00')),
+          action('slot_window', ids.full, '다른 시간대', at('11:00')),
+          action('slot', ids.closed, '다른 대상 종류', at('12:00')),
+        ]);
+
+      const detail = await selectAdminWindowDetail(tx, { windowId: ids.closed, now: NOW });
+      expect(detail).toMatchObject({
+        state: 'closed',
+        closedAt: kst('2026-10-31T09:00:00'),
+        closeReason: 'other',
+        cells: [],
+      });
+      expect(detail!.adminActions.map((row) => row.memo)).toEqual([
+        '나중에 남긴 기록',
+        '먼저 남긴 기록',
+      ]);
+      expect(detail!.adminActions[0].adminName).toMatch(/^운영자 /);
+      expect(
+        await selectAdminWindowDetail(tx, { windowId: crypto.randomUUID(), now: NOW }),
+      ).toBeNull();
     });
   });
 });
