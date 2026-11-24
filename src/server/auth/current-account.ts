@@ -14,6 +14,7 @@ import { cache } from 'react';
 
 import { getDb } from '@/db';
 import { customers, owners, profiles, shops } from '@/db/schema';
+import { identityHashOf } from '@/server/accounts/identity';
 import { createSupabaseServerClient } from '@/server/supabase/server';
 
 import { ACCOUNT_MODE_COOKIE, type AccountMode, parseAccountMode } from './account-mode';
@@ -94,7 +95,11 @@ export async function loadAccount(
   return { ...row, mode };
 }
 
-/** 첫 로그인이면 profiles를 만든다. 이미 있으면 그대로 둔다(로그인 콜백) */
+/**
+ * 첫 로그인이면 profiles를 만든다. 이미 있으면 그대로 둔다(로그인 콜백).
+ * 같은 사람 표시(#154)를 처음부터 채운다. 로그인 정보까지 지운 사람이 같은 이메일로 다시 가입하면 새 줄이 되는데,
+ * 신규 고객 판별이 이 값으로 예전 이력을 잇는다. 키가 없으면 비워 둔다(같은 로그인 안의 계정만 잇는다)
+ */
 export async function ensureProfile(
   db: Pick<Db, 'insert'>,
   userId: string,
@@ -102,6 +107,6 @@ export async function ensureProfile(
 ): Promise<void> {
   await db
     .insert(profiles)
-    .values({ id: userId, email })
+    .values({ id: userId, email, identityHash: identityHashOf(email) })
     .onConflictDoNothing({ target: profiles.id });
 }
