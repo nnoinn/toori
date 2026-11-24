@@ -1,16 +1,18 @@
 // 관심 동네·찜한 샵 새 매물 알림 주소 (W17 ②). CRON_SECRET이 맞을 때만 보내는지, 보낸 뒤 쓰이지 않는 등록증을 지우는지(#478),
-// 마지막에 탈퇴 30일 뒤 개인정보를 지우는지(#154) 본다.
-// 보내기 자체는 digest.test.ts, 등록증 고르기는 business-doc-cleanup.test.ts, 개인정보 지우기는 withdrawal-erase.test.ts가 본다.
+// 그다음 수신 동의 확인 알림(#535)을 보내고, 마지막에 탈퇴 30일 뒤 개인정보를 지우는지(#154) 본다.
+// 보내기 자체는 digest.test.ts, 등록증 고르기는 business-doc-cleanup.test.ts, 동의 확인은 consent-recheck.test.ts, 개인정보 지우기는 withdrawal-erase.test.ts가 본다.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const NOW = new Date('2026-11-12T04:00:00.000Z');
 const SUMMARY = { customers: 3, sent: 2, failed: 0, skipped: null };
 const CLEANUP = { checked: 6, deleted: 2, failed: 0 };
+const RECHECK = { due: 2, sent: 2, failed: 0 };
 const ERASE = { erased: 1, failed: 0, filesFailed: 0, forgotten: 1, forgetFailed: 0 };
 const state = vi.hoisted(() => ({
   send: vi.fn(),
   cleanUp: vi.fn(),
+  recheck: vi.fn(),
   erase: vi.fn(),
   order: [] as string[],
 }));
@@ -26,7 +28,10 @@ vi.mock('@/server/cron/run-log', () => ({
   },
 }));
 vi.mock('@/lib/request-time', () => ({ getRequestNow: async () => NOW }));
-vi.mock('@/server/notifications', () => ({ sendSlotDigest: state.send }));
+vi.mock('@/server/notifications', () => ({
+  sendSlotDigest: state.send,
+  sendConsentRechecks: state.recheck,
+}));
 vi.mock('@/server/storage/business-doc-cleanup', () => ({ cleanUpBusinessDocs: state.cleanUp }));
 vi.mock('@/server/accounts/withdrawal-erase', () => ({ eraseWithdrawnAccounts: state.erase }));
 
@@ -53,6 +58,11 @@ beforeEach(() => {
     state.order.push('cleanUp');
     return CLEANUP;
   });
+  state.recheck.mockReset();
+  state.recheck.mockImplementation(async () => {
+    state.order.push('recheck');
+    return RECHECK;
+  });
   state.erase.mockReset();
   state.erase.mockImplementation(async () => {
     state.order.push('erase');
@@ -74,6 +84,7 @@ describe('POST /api/cron/slot-digest', () => {
     expect(await response.json()).toEqual({
       digest: SUMMARY,
       businessDocs: CLEANUP,
+      consentRecheck: RECHECK,
       withdrawalErase: ERASE,
     });
     expect(state.send).toHaveBeenCalledWith('db', NOW);
@@ -81,18 +92,30 @@ describe('POST /api/cron/slot-digest', () => {
 
   it('알림을 보낸 뒤 같은 서버 시각으로 쓰이지 않는 등록증을 지우고(#478) 결과에 지운 수를 남긴다', async () => {
     await POST(request('Bearer cron-secret-test'));
-    expect(state.order).toEqual(['send', 'cleanUp', 'erase']);
+    expect(state.order).toEqual(['send', 'cleanUp', 'recheck', 'erase']);
     expect(state.cleanUp).toHaveBeenCalledWith('db', NOW);
   });
 
-  it('마지막에 같은 서버 시각으로 탈퇴 30일 뒤 개인정보를 지운다(#154). 실패하면 앞의 두 일은 끝난 뒤 실패로 올라온다', async () => {
+  it('등록증을 지운 뒤 같은 서버 시각으로 수신 동의 확인 알림을 보낸다(#535). 실패하면 앞의 두 일은 끝난 뒤 실패로 올라오고 탈퇴 지우기는 하지 않는다', async () => {
+    await POST(request('Bearer cron-secret-test'));
+    expect(state.recheck).toHaveBeenCalledWith('db', NOW);
+
+    state.order = [];
+    state.erase.mockClear();
+    state.recheck.mockRejectedValueOnce(new Error('read failed'));
+    await expect(POST(request('Bearer cron-secret-test'))).rejects.toThrow('read failed');
+    expect(state.order).toEqual(['send', 'cleanUp']);
+    expect(state.erase).not.toHaveBeenCalled();
+  });
+
+  it('마지막에 같은 서버 시각으로 탈퇴 30일 뒤 개인정보를 지운다(#154). 실패하면 앞의 일들은 끝난 뒤 실패로 올라온다', async () => {
     await POST(request('Bearer cron-secret-test'));
     expect(state.erase).toHaveBeenCalledWith('db', NOW);
 
     state.order = [];
     state.erase.mockRejectedValueOnce(new Error('read failed'));
     await expect(POST(request('Bearer cron-secret-test'))).rejects.toThrow('read failed');
-    expect(state.order).toEqual(['send', 'cleanUp']);
+    expect(state.order).toEqual(['send', 'cleanUp', 'recheck']);
   });
 
   it.each([
@@ -104,6 +127,7 @@ describe('POST /api/cron/slot-digest', () => {
     expect(response.status).toBe(401);
     expect(state.send).not.toHaveBeenCalled();
     expect(state.cleanUp).not.toHaveBeenCalled();
+    expect(state.recheck).not.toHaveBeenCalled();
     expect(state.erase).not.toHaveBeenCalled();
   });
 });

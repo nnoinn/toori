@@ -5,6 +5,7 @@
 // - 알림함(listMyNotifications, countMyUnreadNotifications, markNotificationsRead, listMyNotificationsSince): '@/server/notifications/inbox', 모양은 '@/server/notifications/inbox-types'
 // 이벤트 알림은 다른 서버 함수가 '@/server/notifications/alerts'에서 가져온다
 
+export { type ConsentRecheckSummary, sendConsentRechecks } from './consent-recheck';
 export { type DigestSummary, sendSlotDigest } from './digest';
 export { NOTIFICATION_ERRORS } from './errors';
 export { type NewNotification, notify } from './notify';
