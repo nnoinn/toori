@@ -70,6 +70,12 @@ const config = {
     'src/app/owner/(console)/slots/slot-presets.ts',
     'src/app/owner/(console)/reservations/reservation-dispute.ts',
     'src/app/owner/(console)/admin-notice-line.ts',
+    // 11/25: 원장님 탈퇴·되살리기(#154)·끌어서 순서·게시 멈춤 안내 한 줄·알림함 빈 안내
+    'src/app/owner/(console)/account/withdrawal-steps.ts',
+    'src/app/owner/restore/restore-rules.ts',
+    'src/app/owner/(console)/settings/reorder.ts',
+    'src/app/owner/(console)/slots/publish-pause-notice.ts',
+    'src/app/owner/(console)/notifications/owner-notifications.ts',
     // 운영자 화면 규칙(강규민). 주소 폴더 [reservationId]는 *로 쓴다
     'src/app/admin/jobs/status.ts',
     'src/app/admin/settlements/hold-panel.ts',

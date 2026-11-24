@@ -16,6 +16,7 @@ import {
   resolveSettlementItemSort,
   resolveSettlementPeriod,
   resolveSettlementView,
+  SETTLEMENT_KIND_LABELS,
   settlementsHref,
   settlementStatusText,
   shiftMonth,
@@ -99,6 +100,29 @@ describe('정산 내역 문구 (O15, S-502)', () => {
     expect(settlementStatusText({ status: 'no_payout', payoutDate: null })).toBe(
       '정산할 금액 없음',
     );
+  });
+
+  it('지급 준비 중·지급 요청함도 지급일을 앞에 붙이고, 지급 실패는 날짜 없이 "다시 요청 예정"', () => {
+    expect(settlementStatusText({ status: 'pending', payoutDate: '2026-11-26' })).toBe(
+      '11/26(목) 지급 준비 중',
+    );
+    expect(settlementStatusText({ status: 'requested', payoutDate: '2026-11-26' })).toBe(
+      '11/26(목) 지급 요청함',
+    );
+    expect(settlementStatusText({ status: 'failed', payoutDate: '2026-11-26' })).toBe(
+      '지급 실패 · 다시 요청 예정',
+    );
+  });
+
+  it('거래 종류 이름 6가지(정산 내역 줄과 통계 달력이 같이 쓴다)', () => {
+    expect(SETTLEMENT_KIND_LABELS).toEqual({
+      sale: '이용 완료',
+      no_show: '노쇼',
+      penalty: '고객 취소',
+      agreed_cancel: '합의 후 취소',
+      owner_cancel: '원장님 사정 취소',
+      void: '무효',
+    });
   });
 
   it('보류 줄은 함수가 준 이유대로: 이의제기면 "이의제기로 보류", 운영자 보류면 "운영자 확인으로 보류" (#468)', () => {
@@ -237,6 +261,8 @@ describe('정산서 문구 (O15, S-501)', () => {
 
   it('상태 이름과 정산 계좌(은행·끝 4자리만)', () => {
     expect(STATEMENT_STATUS_LABELS.scheduled).toBe('지급 예정');
+    expect(STATEMENT_STATUS_LABELS.pending).toBe('지급 준비 중');
+    expect(STATEMENT_STATUS_LABELS.requested).toBe('지급 요청함');
     expect(STATEMENT_STATUS_LABELS.paid).toBe('지급 완료');
     expect(STATEMENT_STATUS_LABELS.failed).toBe('지급 실패 · 다시 요청 예정');
     expect(payoutAccountText({ bankName: '국민은행', accountLast4: '1234' })).toBe(
