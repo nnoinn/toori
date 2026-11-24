@@ -162,6 +162,13 @@
       "when": 1795326252761,
       "tag": "0022_nts_check",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795439173554,
+      "tag": "0023_withdrawal",
+      "breakpoints": true
     }
   ]
 }

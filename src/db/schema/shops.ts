@@ -10,8 +10,11 @@ import { SERVICE_TYPE_KEYS, SHOP_CATEGORY_KEYS } from '@/server/policy/catalog';
 import { owners, profiles } from './accounts';
 import { createdAt, geographyPoint, inValues, timestamptz, updatedAt } from './types';
 
-/** 입점 상태(연결 #13, #50): 승인 대기 / 승인 / 반려 */
-export const SHOP_STATUSES = ['pending', 'approved', 'rejected'] as const;
+/**
+ * 입점 상태(연결 #13, #50): 승인 대기 / 승인 / 반려 / 탈퇴(원장님이 탈퇴함, #154). 고객 화면·지도·매물 등록은 approved만 보므로
+ * 탈퇴한 샵은 저절로 빠진다. 30일 안에 되살리면 탈퇴 전 상태(account_withdrawals.shop_status_before)로 돌아간다
+ */
+export const SHOP_STATUSES = ['pending', 'approved', 'rejected', 'withdrawn'] as const;
 /** 국세청 사업자등록 진위확인 결과(#208): 맞음 / 국세청이 응답하지 않아 확인 못 함. 다름·휴폐업이면 저장하지 않아서 그 값은 없다 */
 export const NTS_CHECKS = ['verified', 'unavailable'] as const;
 export type NtsCheckResult = (typeof NTS_CHECKS)[number];
@@ -65,8 +68,8 @@ export const shops = pgTable(
     representativeName: text().notNull(),
     businessRegistrationNumber: text().notNull(),
     openedOn: date({ mode: 'string' }).notNull(),
-    // 비공개 버킷 business-docs 안의 경로
-    businessDocPath: text().notNull(),
+    // 비공개 버킷 business-docs 안의 경로. 원장님이 탈퇴하고 30일이 지나면 파일을 지우고 비운다(#154)
+    businessDocPath: text(),
     // 국세청 사업자등록 진위확인(#208). 마지막으로 확인한 결과와 시각. 비어 있으면 확인 안 함(키가 없는 개발 환경이나 이 기능 전에 만든 샵)
     ntsCheck: text(),
     ntsCheckedAt: timestamptz(),
@@ -89,6 +92,11 @@ export const shops = pgTable(
   (t) => [
     check('shops_category_check', inValues(t.category, SHOP_CATEGORY_KEYS)),
     check('shops_status_check', inValues(t.status, SHOP_STATUSES)),
+    // 사업자등록증은 탈퇴한 샵에서만 비울 수 있다(#154)
+    check(
+      'shops_business_doc_path_check',
+      sql`${t.businessDocPath} is not null or ${t.status} = 'withdrawn'`,
+    ),
     check(
       'shops_nts_check_check',
       sql`${t.ntsCheck} is null or ${inValues(t.ntsCheck, NTS_CHECKS)}`,
@@ -120,11 +128,12 @@ export const payoutAccounts = pgTable(
       .unique('payout_accounts_shop_id_unique')
       .references(() => shops.id),
     bankCode: text().notNull(),
-    // 계좌번호 암호문(AES-256-GCM, 키는 서버 환경변수 PAYOUT_ACCOUNT_ENCRYPTION_KEY)
-    accountNumberEncrypted: text().notNull(),
+    // 계좌번호 암호문(AES-256-GCM, 키는 서버 환경변수 PAYOUT_ACCOUNT_ENCRYPTION_KEY).
+    // 원장님이 탈퇴하고 30일이 지나면 예금주와 같이 지운다(빈 값). 은행과 뒷자리는 정산 기록으로 남긴다(#154)
+    accountNumberEncrypted: text(),
     // 원장님 화면 표시용 뒷자리
     accountLast4: text().notNull(),
-    accountHolder: text().notNull(),
+    accountHolder: text(),
     pgSellerId: text(),
     pgSellerStatus: text().notNull().default('not_registered'),
     pgSellerCheckedAt: timestamptz(),
@@ -132,6 +141,11 @@ export const payoutAccounts = pgTable(
   },
   (t) => [
     check('payout_accounts_pg_seller_status_check', inValues(t.pgSellerStatus, PG_SELLER_STATUSES)),
+    // 계좌번호와 예금주는 같이 지운다(#154)
+    check(
+      'payout_accounts_erased_check',
+      sql`(${t.accountNumberEncrypted} is null) = (${t.accountHolder} is null)`,
+    ),
   ],
 ).enableRLS();
 

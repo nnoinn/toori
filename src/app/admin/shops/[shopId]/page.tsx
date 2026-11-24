@@ -159,7 +159,14 @@ async function ReviewDetail({
             등록증 주소는 5분 동안만 열려요. 지나면 화면을 새로 고쳐 주세요.
           </p>
           {detail.status === 'approved' ? (
-            <BusinessEdit shopId={detail.shopId} current={detail.business} />
+            // 승인된 샵은 등록증이 늘 있다(탈퇴한 샵만 비울 수 있다, shops_business_doc_path_check)
+            <BusinessEdit
+              shopId={detail.shopId}
+              current={{
+                ...detail.business,
+                businessDocPath: detail.business.businessDocPath ?? '',
+              }}
+            />
           ) : null}
         </Section>
 
