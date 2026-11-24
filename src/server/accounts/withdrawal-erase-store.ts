@@ -5,7 +5,7 @@
 
 import 'server-only';
 
-import { and, asc, eq, exists, isNotNull, isNull, lte, not, or, sql } from 'drizzle-orm';
+import { and, asc, eq, exists, isNotNull, isNull, lte, not, sql } from 'drizzle-orm';
 
 import type { getDb } from '@/db';
 import {
@@ -52,7 +52,7 @@ export async function readDueWithdrawals(
       and(
         isNull(accountWithdrawals.restoredAt),
         isNull(accountWithdrawals.erasedAt),
-        lte(accountWithdrawals.withdrawnAt, new Date(input.before.getTime() - 1)),
+        lte(accountWithdrawals.withdrawnAt, input.before),
       ),
     )
     .orderBy(asc(accountWithdrawals.withdrawnAt), asc(accountWithdrawals.id))
@@ -98,7 +98,7 @@ export async function eraseCustomerData(
 ): Promise<void> {
   await tx
     .update(customers)
-    .set({ name: ERASED_NAME, nickname: ERASED_NAME })
+    .set({ name: ERASED_NAME, nickname: ERASED_NAME, phone: null })
     .where(and(eq(customers.id, input.customerId), isNotNull(customers.withdrawnAt)));
   await finish(tx, input.withdrawalId, input.now);
 }
@@ -132,7 +132,7 @@ export async function eraseOwnerData(
     await tx
       .update(payoutAccounts)
       .set({ accountNumberEncrypted: null, accountHolder: null })
-      .where(eq(payoutAccounts.shopId, ownerId));
+      .where(eq(payoutAccounts.shopId, shop.id));
     await tx.update(menus).set({ description: null }).where(eq(menus.shopId, shop.id));
     const images = await tx
       .delete(shopImages)
@@ -183,7 +183,7 @@ export async function readProfilesToForget(
         exists(withdrawals(false)),
         not(exists(withdrawals(true))),
         not(exists(activeCustomer)),
-        or(not(exists(activeOwner)), exists(activeOwner)),
+        not(exists(activeOwner)),
       ),
     )
     .orderBy(asc(profiles.id))
