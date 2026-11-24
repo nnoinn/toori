@@ -81,7 +81,10 @@ describe('[계정 되살리기]를 누른 뒤', () => {
       }),
     ).toEqual({ kind: 'gone', message: '되살릴 탈퇴 계정이 없어요' });
     expect(
-      afterRestore({ ok: false, error: { code: 'NOT_OPEN', message: WITHDRAWAL_ERRORS.NOT_OPEN } }),
-    ).toEqual({ kind: 'error', message: '회원 탈퇴는 곧 열려요' });
+      afterRestore({
+        ok: false,
+        error: { code: 'NOT_READY', message: WITHDRAWAL_ERRORS.NOT_READY },
+      }),
+    ).toEqual({ kind: 'error', message: WITHDRAWAL_ERRORS.NOT_READY });
   });
 });

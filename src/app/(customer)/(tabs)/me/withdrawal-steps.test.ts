@@ -133,8 +133,8 @@ describe('[탈퇴하기]를 누른 뒤', () => {
     expect(
       afterWithdraw({
         ok: false,
-        error: { code: 'NOT_OPEN', message: WITHDRAWAL_ERRORS.NOT_OPEN },
+        error: { code: 'NOT_READY', message: WITHDRAWAL_ERRORS.NOT_READY },
       }),
-    ).toEqual({ kind: 'error', message: '회원 탈퇴는 곧 열려요' });
+    ).toEqual({ kind: 'error', message: WITHDRAWAL_ERRORS.NOT_READY });
   });
 });

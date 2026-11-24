@@ -47,6 +47,7 @@ const CLOSE_REASONS: Record<SlotCloseReason, string> = {
   other: '기타',
   hold_released: '결제 없이 홀딩 끝남',
   admin: '운영자 마감',
+  account_withdrawal: '계정 탈퇴로 일괄 마감',
 };
 
 /** 누가 예약을 취소했는지 */
