@@ -1,7 +1,7 @@
 // 회원 탈퇴 가짜 결과 버전의 스위치 (#154). 서버에서만 부른다. 로컬 개발(NODE_ENV=development)에서만 켜지고,
-// 배포 주소·테스트에서는 꺼져 있다. 진짜 버전(DB 구조 0023 승인 뒤)에서 이 파일을 지운다.
+// 배포 주소·테스트에서는 꺼져 있다. 탈퇴 처리는 진짜가 됐고, 되살리기가 진짜가 되면(다음 PR) 이 파일을 지운다.
 //
-// - DEV_FAKE_WITHDRAWAL=on: 탈퇴·되살리기가 저장하지 않고 성공 모양을 돌려주고, getRestorableAccount가 "3일 전에 탈퇴한 계정"을 준다
+// - DEV_FAKE_WITHDRAWAL=on: 되살리기가 저장하지 않고 성공 모양을 돌려주고, getRestorableAccount가 "3일 전에 탈퇴한 계정"을 준다
 // - DEV_FAKE_WITHDRAWAL=blocked: 탈퇴 확인이 막는 이유를 그 계정 종류의 것 모두로 주고, 탈퇴 처리가 WITHDRAWAL_BLOCKED로 막힌다
 //   (막힌 이유를 모두 보여 주는 화면 확인용. 진짜 데이터로 만들기 어려운 미지급 정산금·미수 패널티까지 보인다)
 // - DEV_FAKE_WITHDRAWAL_FAILURE=<함수>:<코드>: 그 함수가 그 실패를 돌려준다. 예: restoreCustomer:RESTORE_EXPIRED
@@ -41,8 +41,6 @@ export const FAKE_OWNER_BLOCKERS: WithdrawalBlocker[] = [
 export const FAKE_WITHDRAWN_DAYS_AGO = 3;
 
 const SWITCHABLE = {
-  withdrawCustomer: ['NOT_OPEN'],
-  withdrawOwner: ['NOT_OPEN'],
   restoreCustomer: ['NOT_WITHDRAWN', 'RESTORE_EXPIRED', 'NOT_OPEN'],
   restoreOwner: ['NOT_WITHDRAWN', 'RESTORE_EXPIRED', 'NOT_OPEN'],
 } as const satisfies Record<string, readonly WithdrawalErrorCode[]>;

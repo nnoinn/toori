@@ -9,8 +9,10 @@ import type { WithdrawalBlocker } from './withdrawal-types';
 export const WITHDRAWAL_ERRORS = {
   /** 막는 이유가 있다. 오류의 blockers에 이유를 모두 준다(확인 뒤 그 사이에 생긴 경우 포함) */
   WITHDRAWAL_BLOCKED: '지금은 탈퇴할 수 없어요. 아래 이유를 확인해 주세요',
-  /** 가짜 결과 버전: 배포 주소에서는 탈퇴·되살리기를 저장하지 않아서 열지 않는다 */
+  /** 가짜 결과 버전(되살리기): 배포 주소에서는 저장하지 않아서 열지 않는다 */
   NOT_OPEN: '회원 탈퇴는 곧 열려요',
+  /** 운영 배포에 같은 사람 표시 키(ACCOUNT_IDENTITY_KEY)가 없다. 아무것도 바꾸지 않았다 */
+  NOT_READY: '지금은 탈퇴할 수 없어요. 잠시 후 다시 시도해 주세요',
   /** 되살리기: 그 계정 종류로 탈퇴한 계정이 없다 */
   NOT_WITHDRAWN: '되살릴 탈퇴 계정이 없어요',
   /** 되살리기: 탈퇴한 지 되살리기 기간이 지났다 */
