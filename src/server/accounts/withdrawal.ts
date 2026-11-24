@@ -4,16 +4,18 @@
 // 원장님 매장 설정 > [원장님 탈퇴]·[계정 되살리기](정민석)에서 부른다. 화면에서는 '@/server/accounts/withdrawal'에서 가져온다.
 // 값의 모양은 ./withdrawal-types, 막힌 이유 문구는 withdrawalBlockerText(./withdrawal-texts), 실패 문구는 ./withdrawal-errors.
 //
-// - 진짜: 로그인·계정 확인, 탈퇴를 막는 이유 계산, 탈퇴 처리(한 트랜잭션에서 처리하고 로그아웃까지 한다, #154 2장).
-//   화면은 성공하면 첫 화면으로 보낸다
-// - 아직 가짜(되살리기, 다음 PR): 저장하지 않는다. 로컬 스위치(DEV_FAKE_WITHDRAWAL=on, ./withdrawal-fake)를 켜면 성공 모양을 주고,
-//   꺼진 곳(배포 주소)에서는 NOT_OPEN "회원 탈퇴는 곧 열려요"로 끝난다. 저장하지 않으면서 성공을 돌려주지 않는다.
-// - DEV_FAKE_WITHDRAWAL=blocked(로컬만)는 탈퇴 확인과 탈퇴 처리가 막는 이유를 모두 준다(막힌 화면 확인용)
+// - 탈퇴 처리: 한 트랜잭션에서 처리하고 로그아웃까지 한다(#154 2장). 화면은 성공하면 첫 화면으로 보낸다
+// - 되살리기(#154 3장): 30일 안에 같은 로그인으로 그 계정 종류에 들어오면 로그인 콜백은 지금처럼 가입 화면으로 보내고(11/24),
+//   가입 화면이 getRestorableAccount로 되살리기를 안내한다. 가입 함수는 그동안 WITHDRAWN_RESTORABLE로 막는다
+// - DEV_FAKE_WITHDRAWAL=blocked(로컬만, ./withdrawal-fake)는 탈퇴 확인과 탈퇴 처리가 막는 이유를 모두 준다(막힌 화면 확인용)
+
+import { cookies } from 'next/headers';
 
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { fail, ok } from '@/lib/result';
 import { AUTH_ERRORS, getCurrentAccount, requireCustomer, requireOwner } from '@/server/auth';
+import { ACCOUNT_MODE_COOKIE, ACCOUNT_MODE_COOKIE_OPTIONS } from '@/server/auth/account-mode';
 import { signOut } from '@/server/auth/session';
 import { WITHDRAWAL_RESTORE_DAYS } from '@/server/policy/withdrawal';
 
@@ -28,18 +30,20 @@ import {
 } from './withdrawal-apply-store';
 
 import { type WithdrawalResult, withdrawalFail } from './withdrawal-errors';
-import {
-  FAKE_CUSTOMER_BLOCKERS,
-  FAKE_OWNER_BLOCKERS,
-  FAKE_WITHDRAWN_DAYS_AGO,
-  fakeWithdrawalFailure,
-  fakeWithdrawalMode,
-} from './withdrawal-fake';
+import { FAKE_CUSTOMER_BLOCKERS, FAKE_OWNER_BLOCKERS, fakeWithdrawalMode } from './withdrawal-fake';
 import {
   customerWithdrawalBlockers,
   ownerWithdrawalBlockers,
   restorableUntil,
 } from './withdrawal-rules';
+import {
+  hasActiveAccount,
+  lockOpenWithdrawal,
+  readOpenWithdrawal,
+  restoreCustomerAccount,
+  restoreOwnerAccount,
+  type WithdrawalAccountType,
+} from './withdrawal-restore-store';
 import { readCustomerWithdrawalFacts, readOwnerWithdrawalFacts } from './withdrawal-store';
 import type {
   CustomerWithdrawalCheck,
@@ -50,8 +54,6 @@ import type {
   WithdrawnAccount,
   WithdrawnOwnerAccount,
 } from './withdrawal-types';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** 고객 탈퇴 확인: 막는 이유와 확인 창에 보여 줄 값. 지금 고객 계정만 */
 async function checkCustomer() {
@@ -216,8 +218,8 @@ export async function withdrawOwner(): Promise<WithdrawalResult<WithdrawnOwnerAc
 
 /**
  * 로그인 뒤 고른 계정 종류(mode)가 되살리기 기간 안에 탈퇴한 계정이면 그 정보, 아니면 null.
- * 되살리기 화면이 부른다(진짜 버전은 로그인 콜백이 30일 안이면 새 가입 대신 이 화면으로 보낸다).
- * 가짜 버전: 스위치를 켜면 늘 "3일 전에 탈퇴한 계정", 꺼져 있으면 null
+ * 그 계정 종류의 탈퇴하지 않은 계정이 있거나, 탈퇴한 지 기간이 지났으면 null이다.
+ * 가입 화면(고객 /join, 원장님 /owner/join)이 불러서 null이 아니면 새 가입 대신 [계정 되살리기]를 안내한다
  */
 export async function getRestorableAccount(
   mode: 'customer' | 'owner',
@@ -225,39 +227,75 @@ export async function getRestorableAccount(
   const account = await getCurrentAccount();
   if (!account) return fail('UNAUTHENTICATED', AUTH_ERRORS.UNAUTHENTICATED);
   if (mode !== 'customer' && mode !== 'owner') return withdrawalFail('INVALID_INPUT');
-  if (fakeWithdrawalMode() !== 'on') return ok(null);
+  const db = getDb();
+  const input = { userId: account.userId, accountType: mode };
+  if (await hasActiveAccount(db, input)) return ok(null);
+  const open = await readOpenWithdrawal(db, input);
+  if (!open) return ok(null);
   const now = await getRequestNow();
-  const withdrawnAt = new Date(now.getTime() - FAKE_WITHDRAWN_DAYS_AGO * DAY_MS);
-  return ok({
-    withdrawnAt: withdrawnAt.toISOString(),
-    restorableUntil: restorableUntil(withdrawnAt, WITHDRAWAL_RESTORE_DAYS).toISOString(),
-  });
+  const until = restorableUntil(open.withdrawnAt, WITHDRAWAL_RESTORE_DAYS);
+  if (now >= until) return ok(null);
+  return ok({ withdrawnAt: open.withdrawnAt.toISOString(), restorableUntil: until.toISOString() });
 }
 
-/** [계정 되살리기] 실패·성공 공통. 로그인만 확인한다(탈퇴한 계정은 계정 확인 함수를 통과하지 못한다) */
+/**
+ * [계정 되살리기] 공통. 로그인만 확인한다(탈퇴한 계정은 계정 확인 함수를 통과하지 못한다).
+ * 한 트랜잭션에서 그 계정 종류의 탈퇴 기록을 잠그고, 없거나 이미 탈퇴하지 않은 계정이 있으면 NOT_WITHDRAWN,
+ * 기간이 지났으면 RESTORE_EXPIRED. 되살리면 그 계정 종류로 계정 모드를 맞춘다
+ */
 async function restore(
-  fn: 'restoreCustomer' | 'restoreOwner',
+  accountType: WithdrawalAccountType,
 ): Promise<WithdrawalResult<RestoredAccount>> {
   const account = await getCurrentAccount();
   if (!account) return fail('UNAUTHENTICATED', AUTH_ERRORS.UNAUTHENTICATED);
-  const switched = fakeWithdrawalFailure(fn);
-  if (switched) return switched;
-  if (fakeWithdrawalMode() !== 'on') return withdrawalFail('NOT_OPEN');
-  return ok({ restoredAt: (await getRequestNow()).toISOString() });
+  const now = await getRequestNow();
+  const input = { userId: account.userId, accountType };
+
+  const result = await getDb().transaction(
+    async (tx): Promise<WithdrawalResult<RestoredAccount>> => {
+      const open = await lockOpenWithdrawal(tx, input);
+      if (!open || (await hasActiveAccount(tx, input))) return withdrawalFail('NOT_WITHDRAWN');
+      if (now >= restorableUntil(open.withdrawnAt, WITHDRAWAL_RESTORE_DAYS)) {
+        return withdrawalFail('RESTORE_EXPIRED');
+      }
+      if (accountType === 'customer' && open.customerId) {
+        await restoreCustomerAccount(tx, {
+          withdrawalId: open.id,
+          customerId: open.customerId,
+          now,
+        });
+      } else if (accountType === 'owner' && open.ownerId && open.shopStatusBefore) {
+        await restoreOwnerAccount(tx, {
+          withdrawalId: open.id,
+          ownerId: open.ownerId,
+          shopStatusBefore: open.shopStatusBefore,
+          now,
+        });
+      } else {
+        // DB 제약(account_withdrawals_account_check)으로 생기지 않는다
+        return withdrawalFail('NOT_WITHDRAWN');
+      }
+      return ok({ restoredAt: now.toISOString() });
+    },
+  );
+  if (result.ok) {
+    (await cookies()).set(ACCOUNT_MODE_COOKIE, accountType, ACCOUNT_MODE_COOKIE_OPTIONS);
+  }
+  return result;
 }
 
 /**
- * 고객 [계정 되살리기]. 진짜 버전: 탈퇴한 고객 계정을 되살린다(이력 그대로, 없어진 쿠폰은 돌아오지 않는다).
- * 그 계정 종류로 탈퇴한 계정이 없으면 NOT_WITHDRAWN, 되살리기 기간이 지났으면 RESTORE_EXPIRED
+ * 고객 [계정 되살리기]. 탈퇴한 고객 계정을 되살린다(이력 그대로). 없어진 쿠폰, 철회한 광고성 동의, 지운 관심 동네·찜·푸시 구독은
+ * 돌아오지 않는다(#154 3장). 탈퇴한 계정이 없으면 NOT_WITHDRAWN, 되살리기 기간이 지났으면 RESTORE_EXPIRED
  */
 export async function restoreCustomer(): Promise<WithdrawalResult<RestoredAccount>> {
-  return restore('restoreCustomer');
+  return restore('customer');
 }
 
 /**
- * 원장님 [계정 되살리기]. 진짜 버전: 샵을 탈퇴 전 상태(보통 승인)로 돌린다(일괄 마감한 매물은 돌아오지 않는다).
- * 그 계정 종류로 탈퇴한 계정이 없으면 NOT_WITHDRAWN, 되살리기 기간이 지났으면 RESTORE_EXPIRED
+ * 원장님 [계정 되살리기]. 샵을 탈퇴 전 상태(보통 승인)로 돌린다. 일괄 마감한 매물과 지운 푸시 구독은 돌아오지 않는다.
+ * 탈퇴한 계정이 없으면 NOT_WITHDRAWN, 되살리기 기간이 지났으면 RESTORE_EXPIRED
  */
 export async function restoreOwner(): Promise<WithdrawalResult<RestoredAccount>> {
-  return restore('restoreOwner');
+  return restore('owner');
 }

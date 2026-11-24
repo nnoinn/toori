@@ -1,7 +1,6 @@
-// 회원 탈퇴·되살리기 함수(#154). 누가 부를 수 있는지, 막는 이유가 있으면 막는지, 탈퇴 처리를 어떤 차례로 하는지 본다.
-// 되살리기는 아직 가짜 결과 버전이라 배포 주소(스위치 꺼짐)에서 성공을 돌려주지 않는지, 로컬 스위치를 켜면 화면이 쓸 모양을 주는지 본다.
+// 회원 탈퇴·되살리기 함수(#154). 누가 부를 수 있는지, 막는 이유가 있으면 막는지, 탈퇴 처리와 되살리기를 어떤 차례로 하는지 본다.
 // 로그인·DB는 가짜로 바꿔서 DB 없이 돈다. 막는 이유를 실제로 어떻게 세는지는 withdrawal-store.db.test.ts,
-// 탈퇴 처리 저장은 withdrawal-apply-store.db.test.ts가 본다.
+// 탈퇴 처리 저장은 withdrawal-apply-store.db.test.ts, 되살리기 저장은 withdrawal-restore-store.db.test.ts가 본다.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -26,6 +25,38 @@ const state = vi.hoisted(() => ({
   calls: [] as unknown[],
   rolledBack: false,
   signOutResult: null as unknown,
+  /** 되살리기: 그 계정 종류의 탈퇴하지 않은 계정이 있는지, 끝나지 않은 탈퇴 기록 */
+  activeAccount: false,
+  openWithdrawal: null as unknown,
+  cookieSet: [] as unknown[],
+}));
+
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    set: (...args: unknown[]) => {
+      state.cookieSet.push(args);
+    },
+  }),
+}));
+vi.mock('./withdrawal-restore-store', () => ({
+  hasActiveAccount: async (db: unknown, input: unknown) => {
+    state.calls.push(['hasActiveAccount', db === 'tx' ? 'tx' : 'db', input]);
+    return state.activeAccount;
+  },
+  readOpenWithdrawal: async (_db: unknown, input: unknown) => {
+    state.calls.push(['readOpenWithdrawal', input]);
+    return state.openWithdrawal;
+  },
+  lockOpenWithdrawal: async (tx: unknown, input: unknown) => {
+    state.calls.push(['lockOpenWithdrawal', tx, input]);
+    return state.openWithdrawal;
+  },
+  restoreCustomerAccount: async (tx: unknown, input: unknown) => {
+    state.calls.push(['restoreCustomerAccount', tx, input]);
+  },
+  restoreOwnerAccount: async (tx: unknown, input: unknown) => {
+    state.calls.push(['restoreOwnerAccount', tx, input]);
+  },
 }));
 
 vi.mock('@/lib/request-time', () => ({
@@ -135,6 +166,9 @@ beforeEach(() => {
   state.calls = [];
   state.rolledBack = false;
   state.signOutResult = ok(null);
+  state.activeAccount = false;
+  state.openWithdrawal = null;
+  state.cookieSet = [];
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -143,11 +177,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** 로컬 개발에서 가짜 스위치를 켠다 */
-function switchOn(mode: 'on' | 'blocked', failure?: string) {
+/** 로컬 개발에서 막힌 화면 확인용 스위치를 켠다 */
+function switchOn(mode: 'blocked') {
   vi.stubEnv('NODE_ENV', 'development');
   vi.stubEnv('DEV_FAKE_WITHDRAWAL', mode);
-  if (failure) vi.stubEnv('DEV_FAKE_WITHDRAWAL_FAILURE', failure);
 }
 
 describe('탈퇴 확인', () => {
@@ -353,6 +386,23 @@ describe('탈퇴 처리', () => {
 });
 
 describe('되살리기', () => {
+  /** 11/1 03:00(UTC)에 탈퇴: 22일 전, 12/1 03:00까지 되살릴 수 있다 */
+  const WITHDRAWN_AT = new Date('2026-11-01T03:00:00.000Z');
+  const CUSTOMER_WITHDRAWAL = {
+    id: 'withdrawal-c',
+    withdrawnAt: WITHDRAWN_AT,
+    customerId: 'customer-1',
+    ownerId: null,
+    shopStatusBefore: null,
+  };
+  const OWNER_WITHDRAWAL = {
+    id: 'withdrawal-o',
+    withdrawnAt: WITHDRAWN_AT,
+    customerId: null,
+    ownerId: 'owner-1',
+    shopStatusBefore: 'pending',
+  };
+
   it('로그인하지 않았으면 UNAUTHENTICATED', async () => {
     state.account = null;
     expect(await getRestorableAccount('customer')).toMatchObject({
@@ -360,6 +410,7 @@ describe('되살리기', () => {
       error: { code: 'UNAUTHENTICATED' },
     });
     expect(await restoreOwner()).toMatchObject({ ok: false, error: { code: 'UNAUTHENTICATED' } });
+    expect(state.calls).toEqual([]);
   });
 
   it('계정 종류 값이 틀리면 INVALID_INPUT', async () => {
@@ -369,32 +420,92 @@ describe('되살리기', () => {
     });
   });
 
-  it('스위치 꺼짐: 되살릴 계정이 없고(null), 되살리기는 NOT_OPEN', async () => {
-    expect(await getRestorableAccount('customer')).toEqual(ok(null));
-    expect(await restoreCustomer()).toMatchObject({ ok: false, error: { code: 'NOT_OPEN' } });
-  });
-
-  it('스위치 켬: 3일 전에 탈퇴한 계정(27일 남음)이 보이고 되살리기는 성공 모양', async () => {
-    switchOn('on');
+  it('되살리기 기간 안의 탈퇴 기록이면 탈퇴 시각과 30일 뒤 기한을 준다(가입 화면이 [계정 되살리기]를 안내)', async () => {
+    state.openWithdrawal = OWNER_WITHDRAWAL;
     expect(await getRestorableAccount('owner')).toEqual(
       ok({
-        withdrawnAt: '2026-11-20T03:00:00.000Z',
-        restorableUntil: '2026-12-20T03:00:00.000Z',
+        withdrawnAt: '2026-11-01T03:00:00.000Z',
+        restorableUntil: '2026-12-01T03:00:00.000Z',
       }),
     );
-    expect(await restoreOwner()).toEqual(ok({ restoredAt: '2026-11-23T03:00:00.000Z' }));
+    expect(state.calls).toEqual([
+      ['hasActiveAccount', 'db', { userId: 'user-c', accountType: 'owner' }],
+      ['readOpenWithdrawal', { userId: 'user-c', accountType: 'owner' }],
+    ]);
   });
 
-  it('실패 스위치로 기한 지남·탈퇴 계정 없음 화면을 볼 수 있다', async () => {
-    switchOn('on', 'restoreCustomer:RESTORE_EXPIRED');
+  it('탈퇴 기록이 없거나, 그 계정 종류의 계정이 이미 있거나, 30일이 지났으면 null', async () => {
+    expect(await getRestorableAccount('customer')).toEqual(ok(null));
+    state.openWithdrawal = CUSTOMER_WITHDRAWAL;
+    state.activeAccount = true;
+    expect(await getRestorableAccount('customer')).toEqual(ok(null));
+    state.activeAccount = false;
+    // 딱 30일이 되는 시각부터는 되살릴 수 없다
+    state.openWithdrawal = {
+      ...CUSTOMER_WITHDRAWAL,
+      withdrawnAt: new Date('2026-10-24T03:00:00.000Z'),
+    };
+    expect(await getRestorableAccount('customer')).toEqual(ok(null));
+    state.openWithdrawal = {
+      ...CUSTOMER_WITHDRAWAL,
+      withdrawnAt: new Date('2026-10-24T03:00:01.000Z'),
+    };
+    expect(await getRestorableAccount('customer')).toMatchObject({
+      ok: true,
+      data: { restorableUntil: '2026-11-23T03:00:01.000Z' },
+    });
+  });
+
+  it('고객: 트랜잭션에서 탈퇴 기록을 잠그고 되살린 뒤 고객 모드로 둔다', async () => {
+    state.openWithdrawal = CUSTOMER_WITHDRAWAL;
+    expect(await restoreCustomer()).toEqual(ok({ restoredAt: '2026-11-23T03:00:00.000Z' }));
+    expect(state.calls).toEqual([
+      ['lockOpenWithdrawal', 'tx', { userId: 'user-c', accountType: 'customer' }],
+      ['hasActiveAccount', 'tx', { userId: 'user-c', accountType: 'customer' }],
+      [
+        'restoreCustomerAccount',
+        'tx',
+        { withdrawalId: 'withdrawal-c', customerId: 'customer-1', now: NOW },
+      ],
+    ]);
+    expect(state.cookieSet).toEqual([['account_mode', 'customer', expect.any(Object)]]);
+  });
+
+  it('원장님: 샵을 탈퇴 전 상태로 되살리고 원장님 모드로 둔다', async () => {
+    state.openWithdrawal = OWNER_WITHDRAWAL;
+    expect(await restoreOwner()).toEqual(ok({ restoredAt: '2026-11-23T03:00:00.000Z' }));
+    expect(state.calls.at(-1)).toEqual([
+      'restoreOwnerAccount',
+      'tx',
+      { withdrawalId: 'withdrawal-o', ownerId: 'owner-1', shopStatusBefore: 'pending', now: NOW },
+    ]);
+    expect(state.cookieSet).toEqual([['account_mode', 'owner', expect.any(Object)]]);
+  });
+
+  it('탈퇴 기록이 없거나 이미 그 계정 종류의 계정이 있으면 NOT_WITHDRAWN, 30일이 지났으면 RESTORE_EXPIRED. 되살리지도 모드를 바꾸지도 않는다', async () => {
     expect(await restoreCustomer()).toEqual({
+      ok: false,
+      error: { code: 'NOT_WITHDRAWN', message: '되살릴 탈퇴 계정이 없어요' },
+    });
+    state.openWithdrawal = CUSTOMER_WITHDRAWAL;
+    state.activeAccount = true;
+    expect(await restoreCustomer()).toMatchObject({ ok: false, error: { code: 'NOT_WITHDRAWN' } });
+    state.activeAccount = false;
+    state.openWithdrawal = {
+      ...OWNER_WITHDRAWAL,
+      withdrawnAt: new Date('2026-10-24T03:00:00.000Z'),
+    };
+    expect(await restoreOwner()).toEqual({
       ok: false,
       error: {
         code: 'RESTORE_EXPIRED',
         message: '탈퇴한 지 30일이 지나 되살릴 수 없어요. 새로 가입해 주세요',
       },
     });
-    // 다른 함수에는 영향이 없다
-    expect(await restoreOwner()).toEqual(ok({ restoredAt: '2026-11-23T03:00:00.000Z' }));
+    expect(state.calls.map((call) => (call as string[])[0])).not.toContain(
+      'restoreCustomerAccount',
+    );
+    expect(state.calls.map((call) => (call as string[])[0])).not.toContain('restoreOwnerAccount');
+    expect(state.cookieSet).toEqual([]);
   });
 });

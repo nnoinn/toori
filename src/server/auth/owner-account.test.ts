@@ -17,6 +17,9 @@ const state = vi.hoisted(() => ({
   saveOwnerAccount: vi.fn(),
   cookieSet: vi.fn(),
   nts: vi.fn(),
+  /** 되살리기 기간 안에 탈퇴한 원장님 계정이 있는지(#154). 부를 때마다 앞에서부터 하나씩 쓰고 마지막 값을 계속 쓴다 */
+  restorable: [false] as boolean[],
+  restorableChecks: [] as [string, unknown][],
 }));
 
 vi.mock('next/headers', () => ({ cookies: async () => ({ set: state.cookieSet }) }));
@@ -37,6 +40,12 @@ vi.mock('@/server/payouts/account-crypto', () => ({
 }));
 vi.mock('./current-account', () => ({ getSessionUser: async () => state.user }));
 vi.mock('./account-store', () => ({ saveOwnerAccount: state.saveOwnerAccount }));
+vi.mock('@/server/accounts/withdrawal-restore-store', () => ({
+  hasRestorableWithdrawal: async (db: unknown, input: unknown) => {
+    state.restorableChecks.push([typeof db === 'string' ? db : 'db', input]);
+    return state.restorable.length > 1 ? state.restorable.shift() : state.restorable[0];
+  },
+}));
 // 국세청 진위확인(#208)은 결과만 바꿔 끼운다. 막는 결과의 실패 문구 등은 진짜를 쓴다
 vi.mock('@/server/shops/nts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/server/shops/nts')>()),
@@ -80,6 +89,8 @@ beforeEach(() => {
   state.geocode.mockResolvedValue({ ok: true, data: GEOCODED });
   state.saveOwnerAccount.mockResolvedValue({ ownerId: 'owner-1', shopId: 'shop-1' });
   state.nts.mockResolvedValue({ result: 'verified' });
+  state.restorable = [false];
+  state.restorableChecks = [];
 });
 
 describe('createOwnerAccount', () => {
@@ -249,6 +260,33 @@ describe('createOwnerAccount', () => {
       fail('ALREADY_EXISTS', '이미 원장님 계정이 있어요'),
     );
     expect(state.geocode).not.toHaveBeenCalled();
+  });
+
+  it('되살리기 기간 안에 탈퇴한 원장님 계정이 있으면 국세청·주소 변환 전에 WITHDRAWN_RESTORABLE(#154)', async () => {
+    state.restorable = [true];
+    expect(await createOwnerAccount(input())).toEqual(
+      fail(
+        'WITHDRAWN_RESTORABLE',
+        '탈퇴한 지 30일이 지나지 않아 새 계정을 만들 수 없어요. 탈퇴한 계정을 되살릴 수 있어요',
+      ),
+    );
+    expect(state.restorableChecks).toEqual([
+      ['db', { userId: USER, accountType: 'owner', now: new Date('2026-10-28T06:00:00Z') }],
+    ]);
+    expect(state.nts).not.toHaveBeenCalled();
+    expect(state.geocode).not.toHaveBeenCalled();
+    expect(state.saveOwnerAccount).not.toHaveBeenCalled();
+  });
+
+  it('주소 변환을 기다리는 사이 탈퇴했으면 저장 트랜잭션 안에서 다시 보고 WITHDRAWN_RESTORABLE, 모드를 바꾸지 않는다', async () => {
+    state.restorable = [false, true];
+    expect(await createOwnerAccount(input())).toMatchObject({
+      ok: false,
+      error: { code: 'WITHDRAWN_RESTORABLE' },
+    });
+    expect(state.restorableChecks.map(([db]) => db)).toEqual(['db', 'tx']);
+    expect(state.saveOwnerAccount).not.toHaveBeenCalled();
+    expect(state.cookieSet).not.toHaveBeenCalled();
   });
 
   it('동시에 두 번 눌러 저장 단계에서 겹치면 ALREADY_EXISTS이고 모드를 바꾸지 않는다', async () => {
