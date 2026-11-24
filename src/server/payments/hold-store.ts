@@ -90,7 +90,7 @@ export async function acquireHold(
   const [active] = await tx
     .select({ id: customers.id })
     .from(customers)
-    .where(and(eq(customers.id, customerId), isNull(customers.withdrawnAt)))
+    .where(and(eq(customers.id, customerId)))
     .for('update');
   // 잠금을 기다리는 사이 이 고객이 탈퇴했으면(#154, 탈퇴도 이 줄을 잠근다) 홀딩하지 않는다
   if (!active) return { ok: false, code: 'SLOT_NOT_AVAILABLE' };
