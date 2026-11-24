@@ -67,7 +67,7 @@ export async function applyCustomerWithdrawal(
         eq(coupons.customerId, customerId),
         isNull(coupons.usedOrderId),
         isNull(coupons.forfeitedAt),
-        or(gt(coupons.expiresAt, now), isNull(coupons.forfeitedAt)),
+        gt(coupons.expiresAt, now),
       ),
     )
     .returning({ id: coupons.id });
@@ -116,7 +116,7 @@ export async function lockActiveOwnerShop(
     .where(
       and(
         eq(shops.id, input.shopId),
-        or(eq(owners.id, input.ownerId), ne(owners.id, input.ownerId)),
+        eq(owners.id, input.ownerId),
         isNull(owners.withdrawnAt),
         ne(shops.status, 'withdrawn'),
       ),
@@ -144,7 +144,7 @@ export async function closeShopOpenSlots(
         eq(slots.shopId, shopId),
         isNull(slots.windowId),
         or(slotStatusIs('scheduled', now), slotStatusIs('published', now)),
-        or(not(slotIsOnHold(now)), slotIsOnHold(now)),
+        not(slotIsOnHold(now)),
       ),
     )
     .returning({ id: slots.id });
@@ -204,10 +204,5 @@ export async function fillIdentityHash(
   await tx
     .update(profiles)
     .set({ identityHash: input.identityHash })
-    .where(
-      and(
-        eq(profiles.id, input.userId),
-        or(isNull(profiles.identityHash), ne(profiles.identityHash, '')),
-      ),
-    );
+    .where(and(eq(profiles.id, input.userId), isNull(profiles.identityHash)));
 }
