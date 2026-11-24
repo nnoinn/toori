@@ -3,6 +3,7 @@
 
 import { formatReservationCode } from '@/components/ui/reservation-code';
 import type { CouponReason } from '@/db/schema/refunds';
+import type { SlotCloseReason } from '@/db/schema/slots';
 import { formatWon } from '@/lib/format';
 import { formatKst } from '@/lib/time';
 import { bankName } from '@/server/policy/banks';
@@ -36,12 +37,16 @@ export type HistoryText = {
   href: string | null;
 };
 
-/** 매물·시간대 마감 사유(원장님 화면 SLOT_CLOSE_REASON_LABELS와 같은 이름) */
-const CLOSE_REASONS: Record<string, string> = {
+/**
+ * 매물·시간대 마감 사유(원장님 화면 SLOT_CLOSE_REASON_LABELS와 같은 이름). 모든 사유에 이름이 있어야 해서(빠지면 코드 글자가 보인다)
+ * 사유가 늘면 타입 검사가 여기도 고치라고 알려 준다
+ */
+const CLOSE_REASONS: Record<SlotCloseReason, string> = {
   other_channel: '다른 곳 예약',
   mistake: '잘못 올림',
   other: '기타',
   hold_released: '결제 없이 홀딩 끝남',
+  admin: '운영자 마감',
 };
 
 /** 누가 예약을 취소했는지 */

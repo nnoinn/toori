@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { REFUND_REASONS } from '@/db/schema/refunds';
+import { SLOT_CLOSE_REASONS } from '@/db/schema/slots';
 
 import { historyText } from './history-texts';
 import type { AccountHistoryEvent, AccountHistoryKind } from './history-types';
@@ -286,5 +287,26 @@ describe('계정 이력 문구', () => {
         audience: 'owner',
       }).detail,
     ).toBe('unknown_reason');
+  });
+
+  it('운영자가 강제 마감한 매물·시간대도 마감 사유를 이름으로 보여 준다(코드 글자 admin이 보이지 않는다)', () => {
+    expect(
+      historyText(event('slot_closed', { menuName: '여성 커트', reason: 'admin' }), {
+        audience: 'owner',
+      }).detail,
+    ).toBe('여성 커트 · 운영자 마감');
+    expect(
+      historyText(event('window_closed', { startAt: RESERVATION.startAt, reason: 'admin' }), {
+        audience: 'admin',
+      }).detail,
+    ).toBe('11/14(토) 14:00 · 운영자 마감');
+  });
+
+  it('모든 마감 사유가 이름으로 보인다(코드 그대로 보이지 않는다)', () => {
+    for (const reason of SLOT_CLOSE_REASONS) {
+      const detail = historyText(event('slot_closed', { reason }), { audience: 'owner' }).detail;
+      expect(detail, reason).not.toBe(reason);
+      expect(detail, reason).toBeTruthy();
+    }
   });
 });
