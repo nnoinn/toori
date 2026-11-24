@@ -49,7 +49,10 @@ function samePersonCustomerIds(customerId: string) {
       and(
         eq(me.id, customerId),
         // ② 표시가 비어 있으면 같지 않다(null = null은 참이 아니다)
-        or(eq(sameProfile.id, myProfile.id), eq(sameProfile.identityHash, myProfile.identityHash)),
+        or(
+          eq(sameCustomer.id, me.id),
+          sql`(${sameProfile.identityHash} is null and ${myProfile.identityHash} is null)`,
+        ),
       ),
     );
 }

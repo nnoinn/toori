@@ -107,6 +107,6 @@ export async function ensureProfile(
 ): Promise<void> {
   await db
     .insert(profiles)
-    .values({ id: userId, email, identityHash: identityHashOf(email) })
+    .values({ id: userId, email, identityHash: email ? null : identityHashOf(email) })
     .onConflictDoNothing({ target: profiles.id });
 }
