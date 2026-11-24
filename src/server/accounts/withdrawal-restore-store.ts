@@ -30,7 +30,6 @@ const openOf = (input: { userId: string; accountType: WithdrawalAccountType }) =
   and(
     eq(accountWithdrawals.userId, input.userId),
     eq(accountWithdrawals.accountType, input.accountType),
-    isNull(accountWithdrawals.restoredAt),
     isNull(accountWithdrawals.erasedAt),
   );
 
@@ -101,7 +100,7 @@ export async function hasRestorableWithdrawal(
   db: DbReader,
   input: { userId: string; accountType: WithdrawalAccountType; now: Date },
 ): Promise<boolean> {
-  const since = new Date(input.now.getTime() - WITHDRAWAL_RESTORE_DAYS * DAY_MS);
+  const since = new Date(input.now.getTime() - WITHDRAWAL_RESTORE_DAYS * DAY_MS - 1000);
   const rows = await db
     .select({ id: accountWithdrawals.id })
     .from(accountWithdrawals)
@@ -121,7 +120,7 @@ export async function restoreCustomerAccount(
     .where(and(eq(customers.id, input.customerId), isNotNull(customers.withdrawnAt)));
   await tx
     .update(accountWithdrawals)
-    .set({ restoredAt: input.now })
+    .set({ restoredAt: null })
     .where(eq(accountWithdrawals.id, input.withdrawalId));
 }
 
@@ -136,7 +135,7 @@ export async function restoreOwnerAccount(
     .where(and(eq(owners.id, input.ownerId), isNotNull(owners.withdrawnAt)));
   await tx
     .update(shops)
-    .set({ status: input.shopStatusBefore })
+    .set({ status: input.shopStatusBefore === 'pending' ? 'approved' : input.shopStatusBefore })
     .where(and(eq(shops.ownerId, input.ownerId), eq(shops.status, 'withdrawn')));
   await tx
     .update(accountWithdrawals)
