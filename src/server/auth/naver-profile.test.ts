@@ -25,7 +25,7 @@ describe('네이버 프로필 → 표준 모양', () => {
     ).toEqual({
       sub: 'abcdefgABCDEFG1234567',
       email: 'naveridlogin@naver.com',
-      email_verified: NAVER_EMAIL_VERIFIED,
+      email_verified: true,
       name: '네이버닉네임',
       nickname: '네이버닉네임',
       picture: 'https://phinf.pstatic.net/image.jpg',
@@ -47,5 +47,52 @@ describe('네이버 프로필 → 표준 모양', () => {
     expect(toStandardProfile(success({ id: '   ' }))).toBeNull();
     expect(toStandardProfile(null)).toBeNull();
     expect(toStandardProfile('00')).toBeNull();
+  });
+
+  it('연락처 이메일은 인증된 이메일로 본다(11/15 nnoinn: 같은 이메일이면 카카오·구글과 한 로그인으로 묶는다)', () => {
+    expect(NAVER_EMAIL_VERIFIED).toBe(true);
+    expect(toStandardProfile(success({ id: 'id-1', email: 'a@b.c' }))).toMatchObject({
+      email: 'a@b.c',
+      email_verified: true,
+    });
+  });
+
+  it('결과 코드가 00이 아니면 프로필이 같이 와도 쓰지 않는다', () => {
+    expect(
+      toStandardProfile({
+        resultcode: '024',
+        message: 'Authentication failed',
+        response: { id: 'id-1' },
+      }),
+    ).toBeNull();
+  });
+
+  it('성공 코드인데 프로필이 비었거나 객체가 아니면 멈추지 않고 null', () => {
+    expect(toStandardProfile({ resultcode: '00', message: 'success', response: null })).toBeNull();
+    expect(
+      toStandardProfile({ resultcode: '00', message: 'success', response: 'id-1' }),
+    ).toBeNull();
+    expect(toStandardProfile({ resultcode: '00', message: 'success' })).toBeNull();
+  });
+
+  it('값의 앞뒤 공백은 다듬고, 빈칸뿐인 별명은 없는 것으로 보고 이름을 쓴다', () => {
+    expect(
+      toStandardProfile(
+        success({
+          id: '  id-1 ',
+          email: ' a@b.c ',
+          nickname: '   ',
+          name: ' 네이버 ',
+          profile_image: ' https://phinf.pstatic.net/image.jpg ',
+        }),
+      ),
+    ).toEqual({
+      sub: 'id-1',
+      email: 'a@b.c',
+      email_verified: true,
+      name: '네이버',
+      nickname: null,
+      picture: 'https://phinf.pstatic.net/image.jpg',
+    });
   });
 });
