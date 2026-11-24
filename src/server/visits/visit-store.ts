@@ -52,8 +52,7 @@ export async function recordVisitInTx(
     })
     .from(reservations)
     .innerJoin(slots, eq(slots.id, reservations.slotId))
-    // 임시: 권한 점검 테스트(#597)가 잡는지 일부러 샵 조건을 뺐다. 되돌린다
-    .where(and(eq(reservations.id, input.reservationId)))
+    .where(and(eq(reservations.id, input.reservationId), eq(slots.shopId, input.shopId)))
     .for('update');
   // 남의 샵 예약도 '없음'으로 답해서 있는지조차 알려주지 않는다
   if (!target) return visitFail('RESERVATION_NOT_FOUND');

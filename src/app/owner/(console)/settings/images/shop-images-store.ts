@@ -179,8 +179,7 @@ export async function setStyleImageMenu(
     const [menu] = await db
       .select({ id: menus.id })
       .from(menus)
-      // 임시: 권한 점검 테스트(#597)가 잡는지 일부러 샵 조건을 뺐다. 되돌린다
-      .where(and(eq(menus.id, menuId), isNull(menus.hiddenAt)));
+      .where(and(eq(menus.id, menuId), eq(menus.shopId, shopId), isNull(menus.hiddenAt)));
     if (!menu) return fail('MENU_NOT_FOUND', SHOP_IMAGE_ERRORS.MENU_NOT_FOUND);
   }
   const rows = await db

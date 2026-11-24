@@ -80,8 +80,7 @@ export async function selectSlotForEdit(
       holdExpiresAt: slots.holdExpiresAt,
     })
     .from(slots)
-    // 임시: 권한 점검 테스트(#597)가 잡는지 일부러 샵 조건을 뺐다. 되돌린다
-    .where(and(eq(slots.id, slotId)));
+    .where(and(eq(slots.id, slotId), eq(slots.shopId, shopId)));
   if (!row) return null;
   // status는 DB 제약(slots_status_check), 할인율은 저장할 때 선택지만 받는다
   return {

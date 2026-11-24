@@ -26,7 +26,8 @@ export async function closeSlot(
   slotId: string,
   reason: unknown,
 ): Promise<Result<null>> {
-  // 임시: 권한 점검 테스트(#597)가 잡는지 일부러 원장님 확인을 뺐다. 되돌린다
+  const check = await requireApprovedOwner(shopId);
+  if (!check.ok) return check;
 
   const closed = await closeSlotInDb(getDb(), shopId, slotId, reason, await getRequestNow());
   // 대시보드 목록에 마감 상태가 바로 보이게 화면 값을 다시 받는다
