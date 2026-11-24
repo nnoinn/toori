@@ -23,7 +23,8 @@ export type { AccountMode } from './account-mode';
 export type CurrentAccount = {
   /** profiles.id (= Supabase 로그인 사용자 ID) */
   userId: string;
-  email: string;
+  /** 로그인 이메일. 두 계정이 모두 탈퇴하고 30일이 지나면 지우는데(#154) 그때는 로그인 정보도 지워서 로그인할 수 없다 */
+  email: string | null;
   /** 로그인 때 고른 계정 종류. 없으면 'customer' */
   mode: AccountMode;
   /** 고객 계정이 있으면 */

@@ -66,7 +66,8 @@ export async function saveCustomerAccount(
       nickname: input.nickname,
       phone: input.phone,
     })
-    .onConflictDoNothing({ target: customers.userId })
+    // 탈퇴하지 않은 고객 계정이 이미 있으면 저장하지 않는다(한 로그인에 하나, 0023 부분 unique, #154)
+    .onConflictDoNothing({ target: customers.userId, where: sql`${customers.withdrawnAt} is null` })
     .returning({ id: customers.id });
   if (!customer) return null;
 
@@ -271,7 +272,8 @@ export async function saveOwnerAccount(
   const [owner] = await tx
     .insert(owners)
     .values({ userId: input.userId, ...input.owner })
-    .onConflictDoNothing({ target: owners.userId })
+    // 탈퇴하지 않은 원장님 계정이 이미 있으면 저장하지 않는다(한 로그인에 하나, 0023 부분 unique, #154)
+    .onConflictDoNothing({ target: owners.userId, where: sql`${owners.withdrawnAt} is null` })
     .returning({ id: owners.id });
   if (!owner) return null;
 

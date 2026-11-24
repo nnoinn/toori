@@ -39,7 +39,8 @@ export type SlotStatus = (typeof SLOT_STATUSES)[number];
  * 마감 사유: 다른 곳 예약 / 잘못 올림 / 기타(원장님이 직접 고름, S-206) /
  * 결제 없이 홀딩 끝남(손님이 시간대 안에 만든 칸을 결제 없이 비움, #308 ④ 11/11. 원장님 목록·통계에서는 뺀다) /
  * 운영자 마감(운영자가 문제 매물을 강제 마감, #373 ④ #433. 운영자가 쓴 사유는 admin_actions slot.force_close에, 원장님에게 보여 줄
- * 사유 코드는 admin_close_code에 남는다, #489)
+ * 사유 코드는 admin_close_code에 남는다, #489) /
+ * 계정 탈퇴로 일괄 마감(원장님이 탈퇴할 때 판매 전 매물·시간대를 한꺼번에 마감, #154. 원장님이 고르는 사유가 아니다)
  */
 export const SLOT_CLOSE_REASONS = [
   'other_channel',
@@ -47,6 +48,7 @@ export const SLOT_CLOSE_REASONS = [
   'other',
   'hold_released',
   'admin',
+  'account_withdrawal',
 ] as const;
 export type SlotCloseReason = (typeof SLOT_CLOSE_REASONS)[number];
 

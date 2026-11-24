@@ -10,9 +10,10 @@ import * as schema from './schema';
 const tables = Object.values(schema).filter((value) => is(value, PgTable)) as unknown as PgTable[];
 
 describe('DB 스키마 (docs/schema-v1.md W1a·W1b)', () => {
-  it('테이블 33개가 모두 있다(운영자 열람 기록 #269, 정산 계좌 변경 기록 #295, 시간대 매물 #308, 합의 후 취소 요청 #320, 운영자 프로필 #372, 예약 작업 기록·정산 보류 #433 포함)', () => {
+  it('테이블 34개가 모두 있다(운영자 열람 기록 #269, 정산 계좌 변경 기록 #295, 시간대 매물 #308, 합의 후 취소 요청 #320, 운영자 프로필 #372, 예약 작업 기록·정산 보류 #433, 회원 탈퇴 기록 #154 포함)', () => {
     expect(tables.map((t) => getTableName(t)).sort()).toEqual(
       [
+        'account_withdrawals',
         'admin_access_logs',
         'admin_actions',
         'admin_profiles',
@@ -61,12 +62,13 @@ describe('DB 스키마 (docs/schema-v1.md W1a·W1b)', () => {
     for (const table of tables) {
       for (const fk of getTableConfig(table).foreignKeys) {
         const target = getTableName(fk.reference().foreignTable);
-        // profiles만 Supabase 로그인 사용자(auth.users)를 가리킨다
-        expect(names.has(target) || target === 'users', `${getTableName(table)} → ${target}`).toBe(
-          true,
-        );
+        expect(names.has(target), `${getTableName(table)} → ${target}`).toBe(true);
       }
     }
+  });
+
+  it('profiles는 로그인 정보(auth.users)를 FK로 가리키지 않는다(탈퇴 30일 뒤 로그인 정보를 지워도 기록은 남김, #154 (가))', () => {
+    expect(getTableConfig(schema.profiles).foreignKeys).toEqual([]);
   });
 
   it('환불은 예약 없이도 남길 수 있다(자동 취소, #64)', () => {

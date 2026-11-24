@@ -61,22 +61,25 @@ erDiagram
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
-| id | uuid PK | `auth.users.id`와 같은 값 |
-| email | text | 간편 로그인에서 받은 이메일 |
+| id | uuid PK | `auth.users.id`와 같은 값. FK는 걸지 않는다(0023에서 끊었다, 아래) |
+| email | text, null 가능 | 간편 로그인에서 받은 이메일. 두 계정이 모두 탈퇴하고 30일이 지나면 지운다(#154) |
 | is_admin | boolean, 기본 false | 관리자 여부. nnoinn이 DB에서 직접 바꾼다 |
+| identity_hash | text, null, 인덱스 | 같은 사람 표시(#154): 로그인 이메일의 HMAC-SHA256(키는 서버 환경변수 `ACCOUNT_IDENTITY_KEY`). 이메일을 지운 뒤에도 5년 남긴다. 신규 고객 판별(#49)이 탈퇴·재가입한 같은 사람의 예전 이력을 찾을 때 쓴다. 다시 가입한 사람은 새 줄에 같은 값이 들어가서 unique가 아니다 |
 | created_at | timestamptz | |
+
+- 고객·원장님 계정이 모두 탈퇴하고 30일이 지나면 로그인 정보(`auth.users`)를 지우고 이 줄은 기록 보관용으로 남긴다(#154 (가), 11/23 nnoinn). 그래서 `auth.users`를 FK로 가리키지 않는다. 같은 간편 로그인으로 다시 오면 새 로그인 정보·새 줄로 시작하고, 같은 사람인지는 `identity_hash`로만 잇는다
 
 ### customers — 고객 계정
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | id | uuid PK | |
-| user_id | uuid, unique → profiles | 한 사람당 고객 계정 하나 |
+| user_id | uuid → profiles | 한 사람당 탈퇴하지 않은 고객 계정 하나(부분 unique `withdrawn_at is null`, #154). 탈퇴하고 30일이 지나면 같은 로그인으로 새 계정을 만들 수 있어서 탈퇴한 줄은 여럿일 수 있다 |
 | name | text | 예약자 이름(#375, 11/13 nnoinn, 0015). 가입 화면에서 받고 내 정보에서 고친다. 앞뒤 공백 빼고 1~30자(계정 확인 함수에서 검사). 예약한 샵에는 이름과 휴대폰 번호만 주고 닉네임은 주지 않는다. 0015 전에 있던 계정은 닉네임으로 채웠다 |
 | nickname | text | 투리 안에서만 쓰는 이름(내 정보, 운영자 회원 목록 둘째 칸) |
 | phone | text, null 가능 | 예약 확인·노쇼 연락용. 인증 없이 형식만 검사. 고객 계정을 만들 때 받는다(11/2, #183). 그 전에 만든 계정은 비어 있을 수 있어 예약 전에 꼭 입력. 휴대폰만, 하이픈 넣은 모양(`010-1234-5678`, `normalizePhone(…, 'mobile')`) |
 | last_interest_push_at | timestamptz, null | 관심 지역 알림을 마지막으로 보낸 시각. 하루 1번(13시) 묶음 발송에서 "그 뒤에 새로 올라온 매물"을 고르는 기준 |
-| withdrawn_at | timestamptz, null | 탈퇴 시각(C-106, P1) |
+| withdrawn_at | timestamptz, null | 탈퇴 시각(C-106, #154). 되살리기·30일 뒤 지우기 기록은 `account_withdrawals` |
 | created_at | timestamptz | |
 
 ### owners — 원장님 계정
@@ -84,13 +87,34 @@ erDiagram
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | id | uuid PK | |
-| user_id | uuid, unique → profiles | 한 사람당 원장님 계정 하나 |
-| name | text | 원장님 이름(표시용) |
-| phone | text | 원장님 연락처. 하이픈 넣은 모양(`normalizePhone`) |
-| withdrawn_at | timestamptz, null | |
+| user_id | uuid → profiles | 한 사람당 탈퇴하지 않은 원장님 계정 하나(부분 unique `withdrawn_at is null`, #154) |
+| name | text | 원장님 이름(표시용). 탈퇴하고 30일이 지나면 "탈퇴한 회원" |
+| phone | text, null 가능 | 원장님 연락처. 하이픈 넣은 모양(`normalizePhone`). 탈퇴하고 30일이 지나면 지운다. check: 탈퇴하지 않은 계정은 꼭 있다 |
+| withdrawn_at | timestamptz, null | 탈퇴 시각(#154). 자세한 기록은 `account_withdrawals` |
 | created_at | timestamptz | |
 
 원장님 계정은 가입 흐름(S-101)에서 사업자 정보·정산 계좌와 **한 번에** 만든다. `owners` + `shops` + `payout_accounts`를 한 트랜잭션으로 저장한다.
+
+### account_withdrawals — 회원 탈퇴 기록 (#154, 11/23 nnoinn 승인, 0023)
+
+탈퇴 한 번이 한 줄이다. 한 계정이 탈퇴·되살리기를 여러 번 해도 줄마다 남는다. 탈퇴 여부 자체는 `customers.withdrawn_at`·`owners.withdrawn_at`으로 보고, 되살리기·30일 뒤 지우기·운영자 확인이 이 표를 본다.
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| id | uuid PK | |
+| user_id | uuid → profiles, 인덱스 | |
+| account_type | text | `customer` / `owner` |
+| customer_id | uuid → customers, null | 고객이면 채운다 |
+| owner_id | uuid → owners, null | 원장님이면 채운다 |
+| withdrawn_at | timestamptz | 탈퇴한 시각. 되살리기 기한은 이때부터 30일(정책값 `WITHDRAWAL_RESTORE_DAYS`) |
+| restored_at | timestamptz, null | 되살린 시각. 되살리면 이 줄은 끝난다 |
+| erased_at | timestamptz, null | 30일 뒤 개인정보를 지운 시각 |
+| shop_status_before | text, null | 원장님만: 되살릴 때 돌려놓을 샵 상태(`pending` / `approved` / `rejected`). 승인 전에 탈퇴한 샵이 되살리면서 승인되지 않게 |
+| forfeited_coupon_count | integer, 기본 0 | 탈퇴로 없어진 안 쓴 쿠폰 수(고객) |
+| closed_slot_count | integer, 기본 0 | 탈퇴할 때 일괄 마감한 판매 전 매물·시간대 수(원장님) |
+
+- check: 고객이면 `customer_id`만, 원장님이면 `owner_id`와 `shop_status_before`만 채운다. 되살린 줄은 지우지 않고 지운 줄은 되살리지 않는다(`restored_at`·`erased_at` 중 하나만). 두 수는 0 이상
+- 한 계정에 되살리지도 지우지도 않은 줄은 하나만(부분 unique, 고객·원장님 따로). 30일 뒤 지우기 작업은 끝나지 않은 줄을 탈퇴 시각 순으로 찾는다(부분 인덱스)
 
 ### terms_agreements — 약관 동의 기록
 
@@ -149,10 +173,10 @@ erDiagram
 | representative_name | text | 대표자명 |
 | business_registration_number | text | 사업자등록번호(숫자 10자리) |
 | opened_on | date | 개업일자 |
-| business_doc_path | text | 사업자등록증 사진 위치(비공개 버킷 `business-docs`) |
+| business_doc_path | text, null 가능 | 사업자등록증 사진 위치(비공개 버킷 `business-docs`). 원장님이 탈퇴하고 30일이 지나면 파일을 지우고 비운다. check: 탈퇴한 샵(`withdrawn`)만 비울 수 있다(#154) |
 | nts_check | text, null | 국세청 사업자등록 진위확인 결과(#208): verified(맞음) / unavailable(국세청이 응답하지 않아 확인 못 함). 비어 있으면 확인 안 함(키가 없는 개발 환경, 이 기능 전 샵). 다름·휴폐업이면 저장하지 않아서 그 값은 없다 |
 | nts_checked_at | timestamptz, null | 마지막으로 국세청에 확인한 시각. nts_check와 같이 채우고 같이 비운다 |
-| status | text, 기본 `pending` | 입점 상태: `pending`(승인 대기) / `approved`(승인) / `rejected`(반려) |
+| status | text, 기본 `pending` | 입점 상태: `pending`(승인 대기) / `approved`(승인) / `rejected`(반려) / `withdrawn`(원장님이 탈퇴함, #154. 고객 화면·지도·매물 등록이 모두 `approved`만 보므로 저절로 빠진다. 30일 안에 되살리면 `account_withdrawals.shop_status_before`로 돌아간다) |
 | rejection_reason | text, null | 반려 사유. 원장님에게 보여준다 |
 | applied_at | timestamptz | 입점 신청(다시 신청 포함) 시각 |
 | reviewed_at | timestamptz, null | |
@@ -173,9 +197,9 @@ erDiagram
 | id | uuid PK | |
 | shop_id | uuid, unique → shops | |
 | bank_code | text | 은행 코드 |
-| account_number_encrypted | text | 계좌번호 암호문. 서버에서 암호화(키는 서버 환경변수) |
+| account_number_encrypted | text, null 가능 | 계좌번호 암호문. 서버에서 암호화(키는 서버 환경변수). 원장님이 탈퇴하고 30일이 지나면 예금주와 같이 지운다(은행·뒷자리는 정산 기록으로 남긴다, #154). check: 예금주와 같이 비운다 |
 | account_last4 | text | 원장님 화면 표시용 뒷자리 |
-| account_holder | text | 예금주 |
+| account_holder | text, null 가능 | 예금주. 계좌번호와 같이 지운다(#154) |
 | pg_seller_id | text, null | 토스페이먼츠 지급대행에 등록한 셀러 번호 |
 | pg_seller_status | text, 기본 `not_registered` | `not_registered`(등록 전) / `requested`(원장님 본인인증 대기 등 확인 중) / `approved`(지급 가능) / `rejected`(정보 오류, 수정 필요). `approved`일 때만 지급을 요청한다 |
 | pg_seller_checked_at | timestamptz, null | 셀러 상태를 마지막으로 확인한 시각 |
@@ -265,7 +289,7 @@ erDiagram
 | hold_customer_id | uuid, null → customers | 10분 홀딩한 고객 |
 | hold_expires_at | timestamptz, null | 홀딩 만료 시각 |
 | closed_at | timestamptz, null | 원장님이 직접 마감한 시각 |
-| close_reason | text, null | `other_channel`(다른 곳 예약) / `mistake`(잘못 올림) / `other`(기타) / `hold_released`(결제 없이 홀딩 끝남: 손님이 시간대 안에 만든 칸을 결제 없이 비움. 원장님이 고르는 사유가 아니고, 원장님 대시보드·예약 현황·운영자 목록·통계에서는 뺀다, #308 ④) / `admin`(운영자 마감: 운영자가 문제 매물을 강제 마감. 원장님이 고르는 사유가 아니다. 운영자가 쓴 사유는 `admin_actions` `slot.force_close`에 남는다, #373 ④ #433) |
+| close_reason | text, null | `other_channel`(다른 곳 예약) / `mistake`(잘못 올림) / `other`(기타) / `hold_released`(결제 없이 홀딩 끝남: 손님이 시간대 안에 만든 칸을 결제 없이 비움. 원장님이 고르는 사유가 아니고, 원장님 대시보드·예약 현황·운영자 목록·통계에서는 뺀다, #308 ④) / `admin`(운영자 마감: 운영자가 문제 매물을 강제 마감. 원장님이 고르는 사유가 아니다. 운영자가 쓴 사유는 `admin_actions` `slot.force_close`에 남는다, #373 ④ #433) / `account_withdrawal`(계정 탈퇴로 일괄 마감: 원장님이 탈퇴할 때 판매 전 매물·시간대를 한꺼번에 마감. 원장님이 고르는 사유가 아니다, #154) |
 | admin_close_code | text, null | 운영자 마감일 때 원장님에게 보여 줄 사유 코드(#489): `listing_mismatch` / `user_inquiry` / `owner_request` / `other`. check: `close_reason`이 `admin`일 때만, 그때는 꼭 채운다. 0021 전 운영자 마감은 `other` |
 | relisted_from_slot_id | uuid, null → slots | 재등록(S-408)으로 만든 매물이면 원래 매물 |
 | window_id | uuid, null → slot_windows | 시간대 매물 안에서 고객이 [예약하기]로 만든 매물이면 그 시간대(#308). 한 시술 매물은 비어 있다 |
@@ -310,7 +334,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | status | text | `scheduled`(게시예정) / `published`(게시중) / `closed`(마감). 시간이 지나서 마감되는 것은 조회할 때 계산한다 |
 | new_customer_only | boolean, 기본 false | 시간대 전체에 켠다. 안에서 만든 매물도 같은 값 |
 | closed_at | timestamptz, null | 원장님이 직접 마감한 시각 |
-| close_reason | text, null | 매물과 같은 사유(`other_channel` / `mistake` / `other` / `hold_released` / `admin`) |
+| close_reason | text, null | 매물과 같은 사유(`other_channel` / `mistake` / `other` / `hold_released` / `admin` / `account_withdrawal`) |
 | admin_close_code | text, null | 매물과 같다(운영자 마감일 때 원장님에게 보여 줄 사유 코드, #489) |
 | created_by | uuid → profiles | 올린 사람 |
 | created_at, updated_at | timestamptz | |
@@ -493,6 +517,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | expires_at | timestamptz | 발급 + 90일(정책 설정값) |
 | used_order_id | uuid, null → orders | 쓴 주문 |
 | used_at | timestamptz, null | |
+| forfeited_at | timestamptz, null | 고객이 탈퇴해서 없어진 시각(#154). 있으면 되살려도 쓸 수 없다. 운영자 쿠폰 칸에는 "탈퇴로 없어짐". check: 안 쓴 쿠폰(`used_order_id`가 빈 것)만 |
 
 - 고객이 직접 취소하면 쓴 쿠폰은 그대로 "사용됨"으로 둔다(돌려주지 않음)
 - 원장님 귀책 취소면 `used_order_id`, `used_at`을 비워서 다시 쓸 수 있게 돌려주고(기한은 원래 그대로, 11/15), 보상 쿠폰을 새로 발급한다
@@ -755,11 +780,7 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 - 계좌번호 암호화 키는 서버 환경변수 `PAYOUT_ACCOUNT_ENCRYPTION_KEY`다(AES-256-GCM, 32바이트 base64). `.env.example`에 이름을 넣었고 개발용 값은 nnoinn이 만들었다(10/13). 다른 암호화 방식을 쓰려면 먼저 nnoinn에게 알린다
 - 정책 숫자(할인율 선택지, 위약금 구간, 수수료율, 쿠폰·패널티 금액, 홀딩 10분)는 DB가 아니라 `src/server/policy/`에 둔다. DB에는 계산한 당시 값만 저장한다
 - 마이그레이션은 이 문서가 승인된 뒤 PR로 올리고, nnoinn이 머지하면 강규민만 개발 DB에 적용한다
-- **회원 탈퇴(P1)에서 바꿀 것(10/29 방향 승인, 규칙은 기술 가이드 7장 "회원 탈퇴").** P1을 시작할 때 강규민이 schema Issue로 자세한 모양을 올리고 nnoinn이 승인한다
-  - `shops.status`에 `withdrawn`(탈퇴)을 더한다. 고객 화면·매물 등록이 모두 `approved`만 보므로 탈퇴한 샵이 저절로 빠진다. 30일 안에 되살리면 `approved`로 돌린다
-  - `slots.close_reason`에 `account_withdrawal`(계정 탈퇴로 일괄 마감)을 더한다. 탈퇴 처리만 쓰고 원장님이 고르는 목록에는 넣지 않는다
-  - `customers.user_id`·`owners.user_id`의 unique를 "탈퇴하지 않은 계정 하나"로 바꾼다(30일이 지나 새 계정을 만들 수 있게)
-  - 같은 사람 표시: 30일 뒤 개인정보를 지울 때 로그인을 알아볼 수 있는 되돌릴 수 없는 값(해시)을 남겨, 신규 고객 판별(#49)이 탈퇴 전 이용 이력을 같은 사람으로 보게 한다. 보관은 거래 기록과 같은 5년
+- **회원 탈퇴(#154)는 0023으로 바꿨다(11/23 승인, 규칙은 기술 가이드 7장 "회원 탈퇴").** 샵 상태 `withdrawn`, 마감 사유 `account_withdrawal`, 계정 unique를 탈퇴하지 않은 계정 기준으로, 탈퇴 기록 `account_withdrawals`, `coupons.forfeited_at`, 같은 사람 표시 `profiles.identity_hash`, 30일 뒤 지우는 칸의 빈 값 허용, `profiles`의 `auth.users` FK 끊기. 위 표에 적었다
 - 예약자 정보 제공 동의 칸(`orders.booker_info_version`·`booker_info_agreed_at`)은 빈 값을 허용한다. W11 전에 만든 주문(시드·테스트)만 비어 있고, 새 주문은 결제 시작이 늘 채운다(#153). 주문을 만드는 다른 길이 생기면 빈 값을 막을지 다시 본다
 
 ## 11. 결정 기록
@@ -792,3 +813,4 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | 2026-11-17 | 예약 무효(A-108, #423, 11/15 nnoinn 승인): `refunds.reason`에 `void`, 무효 환불은 예약 하나에 하나(`refunds_void_unique`), `reservations.voided_at`(무효 시각)을 더한다. 진행 중 환불은 이유와 상관없이 예약 하나에 하나(`refunds_requested_unique`)로 막는다. 마이그레이션 0019 |
 | 2026-11-16 | 운영자 문제 대처 DB(#373 ②④⑥, #433, 11/15 nnoinn 승인): 예약 작업 실행 기록 `cron_runs`(30일 보관), 정산 보류 `settlement_holds`(묶이기 전 거래·샵만, 원장님에게는 사유를 숨김), `shops.publish_paused_at`·`publish_paused_reason`(새 등록만 막는다), `slots`·`slot_windows`의 `close_reason`에 `admin`(운영자 마감). 마이그레이션 0020 |
 | 2026-11-18 | 원장님에게 보여 줄 운영자 사유 코드(#489, 11/17 nnoinn 결정·11/18 승인): `settlement_holds.reason_code`(필수), `shops.publish_paused_code`(멈춘 시각·사유와 같이), `slots`·`slot_windows.admin_close_code`(운영자 마감일 때만). 쓰는 곳마다 고를 수 있는 코드만 받고(정책 `src/server/policy/admin-notice.ts`), 운영자가 쓴 사유·메모 칸은 그대로 원장님에게 숨긴다. 지금 있는 보류·멈춤·운영자 마감은 `other`로 채운다. 마이그레이션 0021 |
+| 2026-11-23 | 회원 탈퇴(#154, 11/23 nnoinn 승인): 탈퇴 기록 `account_withdrawals`, `shops.status`에 `withdrawn`, `slots`·`slot_windows.close_reason`에 `account_withdrawal`, `customers`·`owners.user_id` unique를 탈퇴하지 않은 계정 하나로(부분 unique), `coupons.forfeited_at`, `profiles.identity_hash`(같은 사람 표시, 5년). 30일 뒤 지우는 칸(`owners.phone`, `shops.business_doc_path`, `payout_accounts.account_number_encrypted`·`account_holder`, `profiles.email`)은 빈 값 허용. 두 계정이 모두 탈퇴하고 30일이 지나면 로그인 정보를 지우므로 `profiles`의 `auth.users` FK를 끊는다((가)). 마이그레이션 0023 |

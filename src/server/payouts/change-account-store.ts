@@ -12,7 +12,8 @@ type Tx = Pick<ReturnType<typeof getDb>, 'select' | 'insert'>;
 
 export type CurrentPayoutAccount = {
   bankCode: string;
-  accountNumberEncrypted: string;
+  /** 원장님이 탈퇴하고 30일이 지나 지웠으면 null(#154) */
+  accountNumberEncrypted: string | null;
   accountLast4: string;
 };
 

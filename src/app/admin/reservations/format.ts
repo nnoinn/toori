@@ -186,6 +186,7 @@ const SLOT_CLOSE_REASON_LABELS: Record<SlotCloseReason, string> = {
   other: '기타',
   hold_released: '결제 없이 홀딩 끝남',
   admin: '운영자 마감',
+  account_withdrawal: '계정 탈퇴로 일괄 마감',
 };
 
 /** 매물 마감 사유. 앞의 셋은 원장님이 고른 것이다(S-206) */

@@ -11,3 +11,4 @@ export * from './schema/refunds';
 export * from './schema/settlements';
 export * from './schema/shops';
 export * from './schema/slots';
+export * from './schema/withdrawals';
