@@ -5,9 +5,14 @@ import { formatKst } from '@/lib/time';
 /** 칩·알약 이름(화면 읽기 프로그램) */
 export const HOLD_BAR_LABEL = '결제 중인 매물';
 
-/** PC 위쪽 메뉴의 칩과 폰 위쪽 알약의 글자, 칩을 누르면 뜨는 상자 문구(11/23 nnoinn, 시안 A) */
+/**
+ * PC 위쪽 메뉴의 칩과 폰 위쪽 알약의 글자, 칩을 누르면 뜨는 상자 문구(11/23 nnoinn, 시안 A).
+ * 폰은 알약을 누르면 같은 문구로 창이 뜬다(#566)
+ */
 export const HOLD_CHIP = {
   label: '결제 중',
+  /** 폰 알약 창의 타이머 이름(#566). PC는 칩에 타이머가 있어 상자에 쓰지 않는다 */
+  remaining: '남은 시간',
   note: '시간 안에 결제하지 않으면 다른 고객이 예약할 수 있어요',
   continue: '결제 이어서 하기',
   release: '그만두기',

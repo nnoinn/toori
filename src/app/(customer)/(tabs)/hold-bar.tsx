@@ -3,7 +3,7 @@
 import { createContext, Suspense, use, useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { unstable_rethrow, usePathname, useRouter } from 'next/navigation';
-import { ChevronRight, Timer, X } from 'lucide-react';
+import { Timer } from 'lucide-react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Countdown } from '@/components/ui/countdown';
@@ -13,11 +13,13 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { getMyActiveHold, releaseHold } from '@/server/payments/checkout';
 import type { ActiveHold } from '@/server/payments/types';
 
+import { serverNowAt } from './hold-bar-rules';
 import {
   HOLD_BAR_LABEL,
   HOLD_CHIP,
@@ -29,7 +31,10 @@ import { checkoutPath } from './slots/[slotId]/reserve-button';
 
 const RELEASE_FAILED_MESSAGE = '취소하지 못했어요. 잠시 후 다시 시도해 주세요';
 
-type HoldState = { hold: ActiveHold | null; setHold: (hold: ActiveHold | null) => void };
+/** 지금 내 홀딩과, 이 기기가 그것을 서버에서 받은 시각(ms, 폰 알약 창의 남은 시간을 맞출 때 쓴다) */
+type ClientHold = ActiveHold & { receivedAt: number };
+
+type HoldState = { hold: ClientHold | null; setHold: (hold: ClientHold | null) => void };
 
 const HoldContext = createContext<HoldState>({ hold: null, setHold: () => {} });
 
@@ -40,7 +45,7 @@ const HoldContext = createContext<HoldState>({ hold: null, setHold: () => {} });
  * 타이머는 예약 확인 화면과 같은 서버 시각 기준이고, 시간이 다 되면 칩·알약이 사라진다
  */
 export function HoldProvider({ children }: { children: React.ReactNode }) {
-  const [hold, setHold] = useState<ActiveHold | null>(null);
+  const [hold, setHold] = useState<ClientHold | null>(null);
   const value = useMemo(() => ({ hold, setHold }), [hold]);
   return (
     <HoldContext value={value}>
@@ -54,7 +59,7 @@ export function HoldProvider({ children }: { children: React.ReactNode }) {
 }
 
 /** 화면을 옮길 때마다, 그리고 다른 앱에 갔다가 돌아올 때 지금 내 홀딩을 서버에 묻는다(getMyActiveHold). 아무것도 그리지 않는다 */
-function HoldLoader({ setHold }: { setHold: (hold: ActiveHold | null) => void }) {
+function HoldLoader({ setHold }: { setHold: (hold: ClientHold | null) => void }) {
   const pathname = usePathname();
 
   useEffect(() => {
@@ -63,7 +68,8 @@ function HoldLoader({ setHold }: { setHold: (hold: ActiveHold | null) => void })
       try {
         const result = await getMyActiveHold();
         // 로그인 안 함·원장님 모드·홀딩 없음은 모두 null이다
-        if (!ignore) setHold(result.ok ? result.data : null);
+        if (ignore) return;
+        setHold(result.ok && result.data ? { ...result.data, receivedAt: Date.now() } : null);
       } catch {
         // 읽지 못하면 지금 표시를 그대로 둔다. 다음 화면 이동 때 다시 묻는다
       }
@@ -149,7 +155,8 @@ function HoldChipView({ hold, onGone }: { hold: ActiveHold; onGone: () => void }
 }
 
 /**
- * 폰 화면 위 가운데 초록 알약. 누르면 예약 확인 화면으로 가서 결제를 이어서 하고, ×는 한 번 물은 뒤 홀딩을 푼다.
+ * 폰 화면 위 가운데 초록 알약. 타이머와 "결제 중 · 샵 · 메뉴"만 두고, 누르면 화면 가운데 창(공통 UI Dialog)이 뜬다(#566, 11/23 nnoinn).
+ * 창에는 매물·시작 시각·남은 시간·안내와 [결제 이어서 하기]·[그만두기]가 있고, ×나 창 바깥을 누르면 창만 닫힌다(홀딩은 그대로)
  * 알약이 있는 동안 화면 틀(layout)이 그 높이만큼 위를 비운다(data-hold-pill, --hold-top). PC에서는 숨긴다(HoldChip)
  */
 export function HoldPill() {
@@ -158,8 +165,17 @@ export function HoldPill() {
   return <HoldPillView key={hold.slotId} hold={hold} onGone={() => setHold(null)} />;
 }
 
-function HoldPillView({ hold, onGone }: { hold: ActiveHold; onGone: () => void }) {
+function HoldPillView({ hold, onGone }: { hold: ClientHold; onGone: () => void }) {
+  const [open, setOpen] = useState(false);
+  // 창을 연 때의 서버 시각. 창 안 타이머가 알약과 같은 남은 시간에서 시작한다(닫히는 동안에도 값을 둔다)
+  const [openedAt, setOpenedAt] = useState(hold.serverNow);
   const [confirming, setConfirming] = useState(false);
+  const title = holdBarTitle(hold);
+
+  function handleOpenChange(next: boolean) {
+    if (next) setOpenedAt(serverNowAt(hold.serverNow, hold.receivedAt, Date.now()));
+    setOpen(next);
+  }
 
   return (
     <section
@@ -167,35 +183,59 @@ function HoldPillView({ hold, onGone }: { hold: ActiveHold; onGone: () => void }
       aria-label={HOLD_BAR_LABEL}
       className="fixed inset-x-0 top-[calc(0.5rem+env(safe-area-inset-top))] z-30 mx-auto w-full max-w-[480px] px-3 md:hidden"
     >
-      <div className="relative flex h-11 items-center gap-2 rounded-full bg-primary pr-1 pl-3.5 text-primary-foreground shadow-lg">
-        <Timer className="size-4 shrink-0" aria-hidden />
-        <Countdown
-          targetAt={hold.holdExpiresAt}
-          serverNow={hold.serverNow}
-          variant="clock"
-          onExpire={onGone}
-          className="shrink-0 text-sm font-semibold"
-        />
-        {/* 알약 전체를 눌러도 예약 확인 화면으로 간다(after로 알약을 덮고, ×만 그 위에 둔다) */}
-        <Link
-          href={checkoutPath(hold.slotId)}
-          className="flex min-w-0 flex-1 items-center gap-1 outline-none after:absolute after:inset-0 after:rounded-full focus-visible:after:ring-3 focus-visible:after:ring-ring/50"
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogTrigger
+          aria-label={`${HOLD_BAR_LABEL}: ${title}`}
+          className="flex h-11 w-full items-center gap-2 rounded-full bg-primary px-3.5 text-primary-foreground shadow-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:bg-primary/90"
         >
-          <span className="sr-only">결제 이어서 하기: </span>
+          <Timer className="size-4 shrink-0" aria-hidden />
+          <Countdown
+            targetAt={hold.holdExpiresAt}
+            serverNow={hold.serverNow}
+            variant="clock"
+            onExpire={onGone}
+            className="shrink-0 text-sm font-semibold"
+          />
           <span className="truncate text-sm">
-            {HOLD_CHIP.label} · {holdBarTitle(hold)}
+            {HOLD_CHIP.label} · {title}
           </span>
-          <ChevronRight className="ml-auto size-4 shrink-0" aria-hidden />
-        </Link>
-        <button
-          type="button"
-          aria-label={HOLD_CHIP.release}
-          onClick={() => setConfirming(true)}
-          className="relative z-10 flex size-9 shrink-0 items-center justify-center rounded-full outline-none hover:bg-white/15 focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <X className="size-4" aria-hidden />
-        </button>
-      </div>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>{holdBarStartText(hold.startAt)}</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-between rounded-lg bg-muted p-3">
+            <span className="text-muted-foreground">{HOLD_CHIP.remaining}</span>
+            <Countdown
+              targetAt={hold.holdExpiresAt}
+              serverNow={openedAt}
+              variant="clock"
+              className="text-base font-semibold text-primary"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">{HOLD_CHIP.note}</p>
+          <div className="flex gap-2 *:h-10">
+            <Link
+              href={checkoutPath(hold.slotId)}
+              onClick={() => setOpen(false)}
+              className={buttonVariants({ className: 'flex-1' })}
+            >
+              {HOLD_CHIP.continue}
+            </Link>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setOpen(false);
+                setConfirming(true);
+              }}
+            >
+              {HOLD_CHIP.release}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <HoldReleaseDialog
         hold={hold}
         open={confirming}
