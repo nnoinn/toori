@@ -1,12 +1,14 @@
 // 세션 시작 브리핑
 // - 로컬 main을 GitHub 최신으로 맞춘다(fast-forward만, 작업 중인 파일은 건드리지 않음)
 // - 지난 세션 이후 머지된 변경, 새 팀 공지, 바뀐 규칙·문서, 현재 브랜치 상태, 내 PR·Issue 상태를 모은다
+// - PR이 끝났는데 남은 브랜치를 알려 준다(로컬은 모두, GitHub는 nnoinn. 기준은 scripts/branches.mjs)
 // - SessionStart 훅(.claude/settings.json)에서 실행되면 결과를 Claude의 컨텍스트로 넘긴다
 // 수동 실행: node scripts/session-start.mjs --print
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { localCleanup, parseRefs, remoteLeftovers, renderLocalCleanup, renderRemoteLeftovers } from './branches.mjs';
 import { collectWaiting, fetchRepo, renderFor } from './inbox.mjs';
 
 const PRINT = process.argv.includes('--print');
@@ -129,7 +131,8 @@ function briefing() {
       }
     }
     // 아직 PR이 없는 내 작업: main에 없는 커밋이 있는데 어떤 PR도 없는 로컬 브랜치(마지막 커밋이 내 것만)
-    const allPrs = ghJson('pr', 'list', '--state', 'all', '--limit', '300', '--json', 'headRefName') || [];
+    // PR이 300개를 넘어서(11/24 약 490개) 1000개까지 받는다. 300개만 받으면 예전 PR의 브랜치를 PR 없음으로 잘못 본다
+    const allPrs = ghJson('pr', 'list', '--state', 'all', '--limit', '1000', '--json', 'number,headRefName,headRefOid,state') || [];
     const withPr = new Set(allPrs.map((p) => p.headRefName));
     const myEmail = git('config', 'user.email').out;
     const unpr = [];
@@ -143,6 +146,19 @@ function briefing() {
     }
     if (unpr.length) {
       sections.push(['아직 PR이 없는 내 브랜치 (기능 하나가 끝났으면 지금 PR을 올리자고 먼저 제안한다)', unpr.join('\n')]);
+    }
+    // 끝난 브랜치(11/24): GitHub는 머지된 PR의 브랜치만 저절로 지운다. 닫은 PR의 브랜치와 로컬 브랜치는 남는다
+    const openInFolders = git('worktree', 'list', '--porcelain').out.split('\n')
+      .filter((l) => l.startsWith('branch refs/heads/')).map((l) => l.slice('branch refs/heads/'.length));
+    const localBranches = parseRefs(git('for-each-ref', '--format=%(refname:short)%09%(objectname)', 'refs/heads').out);
+    const cleanup = renderLocalCleanup(localCleanup(localBranches, allPrs, [branch, ...openInFolders]));
+    if (cleanup) {
+      sections.push(['지워도 되는 로컬 브랜치 (PR이 머지되거나 닫혔고 그 뒤 커밋이 없다. 커밋은 GitHub의 PR에 남는다. 사용자에게 한 줄로 알리고 `git branch -D`로 지운다)', cleanup]);
+    }
+    if (me === 'nnoinn') {
+      const remoteBranches = parseRefs(git('for-each-ref', '--format=%(refname:lstrip=3)%09%(objectname)%09%(committerdate:iso-strict)%09%(authorname)', 'refs/remotes/origin').out);
+      const leftovers = renderRemoteLeftovers(remoteLeftovers(remoteBranches, allPrs));
+      if (leftovers) sections.push(['정리할 GitHub 브랜치 (닫은 PR의 브랜치는 닫은 사람이 바로 지운다. 남은 것은 일요일 주간 점검 때 비운다)', leftovers]);
     }
 
     const issues = ghJson('issue', 'list', '--assignee', '@me', '--state', 'open', '--json', 'number,title') || [];
@@ -162,7 +178,7 @@ function briefing() {
   const header = [
     '[세션 시작 브리핑 — scripts/session-start.mjs가 자동으로 모은 정보]',
     'Claude가 할 일: 사용자의 첫 메시지에 답하기 전에 이 브리핑을 3~6줄로 먼저 알린다.',
-    '우선순위: ① "나에게 온 요청"(답하거나, 사용자 결정이 필요하면 묻고, 지금 못 하면 "확인했어요, 언제 할게요"라도 남긴다)과 수정 요청된 내 PR ② 나에게 배정된 Issue와 새 공지의 "할 일" ③ PR이 없는 내 브랜치(기능 하나가 끝났으면 PR부터) ④ 바뀐 규칙·문서는 지금 다시 읽고 무엇이 바뀌었는지 한 줄 ⑤ 현재 브랜치 상태와 오늘의 다음 단계 제안.',
+    '우선순위: ① "나에게 온 요청"(답하거나, 사용자 결정이 필요하면 묻고, 지금 못 하면 "확인했어요, 언제 할게요"라도 남긴다)과 수정 요청된 내 PR ② 나에게 배정된 Issue와 새 공지의 "할 일" ③ PR이 없는 내 브랜치(기능 하나가 끝났으면 PR부터)와 지워도 되는 로컬 브랜치(한 줄로 알리고 지운다) ④ 바뀐 규칙·문서는 지금 다시 읽고 무엇이 바뀌었는지 한 줄 ⑤ 현재 브랜치 상태와 오늘의 다음 단계 제안.',
     '새 소식이 없으면 "새 소식 없음"이라고 한 줄만 말하고 바로 사용자 요청을 처리한다.',
   ];
   const body = sections.map(([title, text]) => `### ${title}\n${text}`).join('\n\n');
