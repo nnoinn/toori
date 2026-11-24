@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { AFTER_SIGN_OUT_PATH } from '@/components/ui/use-sign-out';
+import { withdrawWithDevicePush } from '@/features/push/subscribe-push';
 import { getOwnerWithdrawalCheck, withdrawOwner } from '@/server/accounts/withdrawal';
 
 import {
@@ -32,6 +33,7 @@ type View =
  * 원장님 내 계정 > [원장님 탈퇴] (#154). 누르면 서버에 탈퇴할 수 있는지 먼저 묻는다(getOwnerWithdrawalCheck).
  * 막는 이유가 있으면 모두 보여 주고, 없으면 확인 창 두 번(탈퇴하면 이렇게 돼요 → 정말 탈퇴할까요?) 뒤 탈퇴한다(withdrawOwner).
  * 탈퇴 함수가 판매 전 매물 일괄 마감과 로그아웃까지 하므로, 성공하면 로그아웃처럼 첫 화면을 새로 연다(AFTER_SIGN_OUT_PATH).
+ * 이 기기 푸시 알림도 로그아웃처럼 정리한다(withdrawWithDevicePush, NOTI-09).
  * 고객 [회원 탈퇴](정찬형)와 같은 순서다. PC 기준
  */
 export function WithdrawOwner({ hasCustomerAccount }: { hasCustomerAccount: boolean }) {
@@ -61,7 +63,7 @@ export function WithdrawOwner({ hasCustomerAccount }: { hasCustomerAccount: bool
     setWithdrawError(null);
     startWithdraw(async () => {
       try {
-        const outcome = afterWithdraw(await withdrawOwner());
+        const outcome = afterWithdraw(await withdrawWithDevicePush('owner', withdrawOwner));
         if (outcome.kind === 'done') {
           setLeaving(true);
           // 지금 화면은 기록에서 빼서 뒤로 가기로 내 계정이 다시 보이지 않게 한다(useSignOut과 같다)
