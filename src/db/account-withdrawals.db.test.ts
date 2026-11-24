@@ -143,6 +143,12 @@ describeDb('회원 탈퇴 DB 구조 (실제 DB)', () => {
         accountHolder: '김원장',
       });
 
+      // 모르는 샵 상태는 막힌다(등록증이 있을 때 확인한다. 비운 뒤에는 등록증 제약이 먼저 걸린다)
+      expect(
+        await blockedMessage(tx, (t) =>
+          t.update(shops).set({ status: 'closed' }).where(eq(shops.id, shop.shopId)),
+        ),
+      ).toContain('shops_status_check');
       expect(
         await blockedMessage(tx, (t) =>
           t.update(owners).set({ phone: null }).where(eq(owners.id, ownerId)),
@@ -181,11 +187,6 @@ describeDb('회원 탈퇴 DB 구조 (실제 DB)', () => {
         .where(eq(payoutAccounts.shopId, shop.shopId));
       // 은행과 뒷자리는 정산 기록으로 남긴다
       expect(account).toMatchObject({ bankCode: '088', accountLast4: '6789' });
-      expect(
-        await blockedMessage(tx, (t) =>
-          t.update(shops).set({ status: 'closed' }).where(eq(shops.id, shop.shopId)),
-        ),
-      ).toContain('shops_status_check');
     });
   });
 
