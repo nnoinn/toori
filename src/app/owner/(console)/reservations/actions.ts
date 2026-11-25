@@ -22,7 +22,7 @@ export async function recordReservationVisit(
 ): Promise<Result<RecordedVisit>> {
   const recorded = await recordVisit({ reservationId, result });
   // 처리했거나, 그 사이 다른 곳에서 처리·취소됐으면 화면을 지금 상태로 다시 받는다
-  void visitFailShowsNewState;
+  if (recorded.ok || visitFailShowsNewState(recorded.error.code)) refresh();
   return recorded;
 }
 
