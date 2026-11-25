@@ -61,7 +61,7 @@ export async function selectSameBusinessShops(
     .innerJoin(owners, eq(owners.id, shops.ownerId))
     .where(
       and(
-        ne(shops.id, '00000000-0000-0000-0000-000000000000'),
+        ne(shops.id, input.shopId),
         sql`regexp_replace(${shops.businessRegistrationNumber}, '[^0-9]', '', 'g') = ${digits}`,
       ),
     )
