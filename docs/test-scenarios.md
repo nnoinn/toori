@@ -66,7 +66,7 @@ PR 검사가 자동으로 막는 것:
 | --- | --- | --- | --- | --- |
 | STATUS-01 | 상태 이름은 게시예정·게시중·예약됨·마감·취소·완료 6가지만 쓴다 | X-301 | ✅ | `src/features/slot-status/slot-status.test.ts` 6개 상태를 화면 이름으로 보여준다 |
 | STATUS-02 | 게시 시각 전 게시예정은 게시예정, 팔리지 않고 시작이 지난 게시중은 마감으로 계산한다. DB 조회와 화면 계산이 같은 답을 낸다 | S-401 | ✅ | `src/app/owner/(console)/dashboard/dashboard.test.ts` 시작이 지난 게시중은 마감<br>`src/features/slot-status/slot-status-sql.test.ts` 순수 함수와 같은 답을 내고 |
-| STATUS-03 | 노쇼는 매물 상태가 아니다. 방문·노쇼를 처리하면 매물은 완료가 되고, 노쇼 여부는 예약에 남긴다 | S-405 | ✅ | `src/server/visits/visit-store.db.test.ts` 매물은 완료로 한 번에 바꾼다 |
+| STATUS-03 | 노쇼는 매물 상태가 아니다. 방문·노쇼를 처리하면 매물은 완료가 되고, 노쇼 여부는 예약에 남긴다 | S-405 | ✅ | `src/server/visits/visit-store.db.test.ts` 매물은 완료로 한 번에 바꾼다<br>`tests/e2e/owner-visit.spec.ts` 매물은 완료가 되고 |
 | STATUS-04 | 결제 없이 홀딩이 끝난 시간대 칸(hold_released)은 원장님 대시보드, 운영자 매물 목록, 원장님 매물 수에서 뺀다. 다른 사유로 마감한 매물은 보인다 | #308 ④ | ✅ | `src/app/owner/(console)/dashboard/dashboard-store.db.test.ts` 결제 없이 홀딩이 끝나 마감된 매물(hold_released)은 빼고<br>`src/app/admin/reservations/queries.db.test.ts` 어느 상태로 걸러도 보이지 않고<br>`src/app/admin/users/queries.db.test.ts` 매물 수는 결제 없이 비운 시간대 칸 |
 
 ## 4. 고객에게 보이기
@@ -135,8 +135,8 @@ PR 검사가 자동으로 막는 것:
 
 | ID | 시나리오와 기대 | 근거 | 상태 | 테스트 |
 | --- | --- | --- | --- | --- |
-| VISIT-01 | 방문 완료·노쇼는 서비스 시작 시각부터 누를 수 있다(딱 시작 시각 포함) | S-405 | ✅ | `src/server/visits/rules.test.ts` 예약됨이고 시작 시각이 되면 처리할 수 있다(딱 시작 시각 포함) |
-| VISIT-02 | 처리한 뒤에는 원장님이 바꿀 수 없고, 방문 완료와 노쇼를 동시에 눌러도 하나만 처리된다 | S-405 | ✅ | `src/server/visits/rules.test.ts` 이용 완료이거나 방문 결과가 있으면 ALREADY_RECORDED<br>`src/server/visits/visit-concurrency.db.test.ts` 방문 완료와 노쇼를 동시에 눌러도 하나만 처리되고 |
+| VISIT-01 | 방문 완료·노쇼는 서비스 시작 시각부터 누를 수 있다(딱 시작 시각 포함) | S-405 | ✅ | `src/server/visits/rules.test.ts` 예약됨이고 시작 시각이 되면 처리할 수 있다(딱 시작 시각 포함)<br>`tests/e2e/owner-visit.spec.ts` 시작이 지난 예약을 예약 현황에서 열어 방문 완료로 처리하면 |
+| VISIT-02 | 처리한 뒤에는 원장님이 바꿀 수 없고, 방문 완료와 노쇼를 동시에 눌러도 하나만 처리된다 | S-405 | ✅ | `src/server/visits/rules.test.ts` 이용 완료이거나 방문 결과가 있으면 ALREADY_RECORDED<br>`src/server/visits/visit-concurrency.db.test.ts` 방문 완료와 노쇼를 동시에 눌러도 하나만 처리되고<br>`tests/e2e/owner-visit.spec.ts` 방문 완료로 처리하면 처리 필요에서 빠지고 |
 | VISIT-03 | 노쇼는 위약금 100%이고 결제 금액은 정산 대상이다(판매가 기준, 이용 완료와 같은 계산) | S-406 | ✅ | `src/server/settlements/calc-settlement.test.ts` 노쇼는 이용 완료와 같은 계산(판매가 기준, 위약금 100%) |
 | VISIT-04 | 노쇼로 처리되면 고객에게 알린다(잘못 처리됐으면 이의제기할 수 있게) | #130 | ✅ | `src/server/notifications/alerts.test.ts` 노쇼: 고객에게 그 예약 상세로 |
 
