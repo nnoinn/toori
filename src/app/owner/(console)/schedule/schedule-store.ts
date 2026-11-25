@@ -5,7 +5,7 @@
 
 import 'server-only';
 
-import { and, asc, eq, gte, lt, ne } from 'drizzle-orm';
+import { and, asc, eq, gte, lt } from 'drizzle-orm';
 
 import { getDb } from '@/db';
 import { customers, reservations, shops, slots } from '@/db/schema';
@@ -67,8 +67,6 @@ export async function selectScheduleSlots(
         gte(slots.startAt, from),
         lt(slots.startAt, to),
         ownerListedSlot(),
-        // 임시: E2E(#605)가 잡는지 일부러 예약 현황에서 게시예정 매물을 뺀다. 되돌린다
-        ne(slots.status, 'scheduled'),
       ),
     )
     .orderBy(asc(slots.startAt));
