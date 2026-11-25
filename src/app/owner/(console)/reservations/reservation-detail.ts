@@ -54,7 +54,7 @@ export function bookerName(name: string): string | null {
 
 /** 연락처를 다 보여줄지: 취소되지 않았고 방문·노쇼를 아직 처리하지 않은 예약만 */
 export function showsFullPhone(reservation: ReservationViewInput): boolean {
-  return reservation.status !== 'cancelled';
+  return reservation.status === 'confirmed' && reservation.visitResult === null;
 }
 
 /** 방문 완료·노쇼 버튼과 확인 창 문구(10/29 nnoinn, #130) */
