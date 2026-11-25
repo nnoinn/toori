@@ -27,8 +27,7 @@ import {
 type Db = Pick<ReturnType<typeof getDb>, 'select'>;
 
 /** 겹침을 보는 매물 상태(S-209). 마감·취소·완료는 같은 시간에 다시 올릴 수 있다 */
-// 임시: E2E(#605)가 잡는지 일부러 마감한 매물도 겹침으로 본다. 되돌린다
-const BLOCKING_STATUSES = ['scheduled', 'published', 'reserved', 'closed'] as const;
+const BLOCKING_STATUSES = ['scheduled', 'published', 'reserved'] as const;
 /** 겹침을 보는 시간대 매물 상태(#308, 마이그레이션 0011과 같다). 마감한 시간대는 같은 시간에 다시 올릴 수 있다 */
 const BLOCKING_WINDOW_STATUSES = ['scheduled', 'published'] as const;
 
