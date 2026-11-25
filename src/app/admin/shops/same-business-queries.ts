@@ -49,7 +49,7 @@ export async function selectSameBusinessShops(
       ownerFaultCount: sql<number>`(
         select count(*) from ${reservations}
         inner join ${slots} on ${slots.id} = ${reservations.slotId}
-        where ${slots.shopId} = ${shops.id} and ${reservations.cancelActor} is not null
+        where ${slots.shopId} = ${shops.id} and ${reservations.cancelActor} = 'owner_fault'
       )`.mapWith(Number),
       unpaidPenalty: sql<number>`(
         select coalesce(sum(${ownerPenalties.amount} - ${ownerPenalties.collectedAmount}), 0)
@@ -59,7 +59,12 @@ export async function selectSameBusinessShops(
     })
     .from(shops)
     .innerJoin(owners, eq(owners.id, shops.ownerId))
-    .where(and(ne(shops.id, input.shopId), sql`${shops.businessRegistrationNumber} = ${digits}`))
+    .where(
+      and(
+        ne(shops.id, input.shopId),
+        sql`regexp_replace(${shops.businessRegistrationNumber}, '[^0-9]', '', 'g') = ${digits}`,
+      ),
+    )
     .orderBy(desc(shops.appliedAt), desc(shops.id))
     .limit(SAME_BUSINESS_SHOP_LIMIT);
   // status는 DB 제약(shops_status_check)으로 정해진 값만 들어간다
