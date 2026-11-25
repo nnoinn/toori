@@ -32,7 +32,7 @@ export function VisitActions({
     <>
       {canRecord ? (
         <CardContent className="flex gap-2">
-          <Button type="button" size="lg" onClick={() => open('visited')}>
+          <Button type="button" size="lg" onClick={() => open('no_show')}>
             {VISIT_ACTIONS.visited.button}
           </Button>
           <Button type="button" size="lg" variant="destructive" onClick={() => open('no_show')}>
