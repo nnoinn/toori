@@ -2,7 +2,12 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { cancelPortOnePayment, finishedCancellation, getPortOnePayment } from './portone';
+import {
+  cancelPortOnePayment,
+  finishedCancellation,
+  getPortOnePayment,
+  portOneApiBase,
+} from './portone';
 
 const fetchMock = vi.fn();
 
@@ -393,5 +398,61 @@ describe('finishedCancellation', () => {
       amount: null,
       reasons: ['고객 예약 취소', '고객 예약 취소'],
     });
+  });
+});
+
+describe('포트원 API 주소 (#594, 브라우저 자동 테스트의 가짜 포트원 서버)', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  it('PORTONE_API_URL이 없으면 진짜 주소', () => {
+    expect(portOneApiBase()).toBe('https://api.portone.io');
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['http://127.0.0.1:4010', 'http://127.0.0.1:4010'],
+    ['http://localhost:4010/v2/x?y=1', 'http://localhost:4010'],
+    ['http://127.0.0.1:4010/', 'http://127.0.0.1:4010'],
+    ['http://[::1]:4010', 'http://[::1]:4010'],
+    ['https://localhost:8443', 'https://localhost:8443'],
+  ])('내 컴퓨터 주소(%s)면 그 주소 앞부분만 쓴다', (value, base) => {
+    vi.stubEnv('PORTONE_API_URL', value);
+    expect(portOneApiBase()).toBe(base);
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'https://evil.example',
+    'http://localhost.evil.com',
+    'http://127.0.0.1.nip.io',
+    'http://10.0.0.5:4010',
+    'ftp://localhost',
+    'not a url',
+  ])('다른 주소(%s)면 무시하고 진짜 주소로 보내고 경고를 남긴다', (value) => {
+    vi.stubEnv('PORTONE_API_URL', value);
+    expect(portOneApiBase()).toBe('https://api.portone.io');
+    expect(console.warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('운영 배포에서는 내 컴퓨터 주소여도 진짜 주소로 보낸다', () => {
+    vi.stubEnv('PORTONE_API_URL', 'http://127.0.0.1:4010');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    expect(portOneApiBase()).toBe('https://api.portone.io');
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    expect(portOneApiBase()).toBe('http://127.0.0.1:4010');
+  });
+
+  it('결제 조회와 취소가 모두 바꾼 주소로 간다', async () => {
+    vi.stubEnv('PORTONE_API_URL', 'http://127.0.0.1:4010');
+    respond(200, { status: 'READY' });
+    await getPortOnePayment('toori-1');
+    respond(200, { cancellation: { status: 'SUCCEEDED', id: 'c-1', totalAmount: 1000 } });
+    await cancelPortOnePayment('toori-1', '고객 예약 취소');
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      'http://127.0.0.1:4010/payments/toori-1?storeId=store-test',
+      'http://127.0.0.1:4010/payments/toori-1/cancel',
+    ]);
   });
 });

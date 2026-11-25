@@ -491,5 +491,6 @@
 | `PAYOUT_ACCOUNT_ENCRYPTION_KEY` | **서버 전용** | 원장님 정산 계좌번호 암호화(AES-256-GCM, 32바이트 base64). 개발용 값은 nnoinn이 만들었고(10/13), 출시 때 운영용을 따로 만든다. 값을 바꾸면 이미 암호화한 계좌를 못 읽으니 바꾸지 않는다 |
 | `ACCOUNT_IDENTITY_KEY` | **서버 전용** | 회원 탈퇴의 같은 사람 표시(#154): 로그인 이메일의 HMAC-SHA256(32바이트를 16진수 64자리로). 11/23 nnoinn이 만들어 단톡방으로 주고 Vercel Production·Preview에 넣었다. 비어 있으면 로컬·미리보기는 같은 사람 표시 없이 탈퇴하고(경고 로그), 운영 배포는 탈퇴를 막는다(11/24). 테스트는 vitest 설정의 가짜 값을 쓴다. 값을 바꾸면 예전 값과 이어지지 않으니 바꾸지 않는다 |
 | `SITE_LOCK_CODE` | **서버 전용** | 팀 접속 코드 잠금(#303). Vercel Production·Preview에만 넣고 로컬에는 넣지 않는다. 바꾸면 팀원 모두 코드를 다시 넣는다 |
+| `PORTONE_API_URL` | **서버 전용**, E2E 검사에서만 | 포트원 API 주소를 가짜 포트원 서버로 바꾼다(#594, 브라우저 자동 테스트 #592 2차). 내 컴퓨터 주소(`localhost`·`127.0.0.1`·`[::1]`)만 받고 그 밖의 주소나 운영 배포(`VERCEL_ENV=production`)에서는 무시하고 진짜 주소(`https://api.portone.io`)를 쓴다. `.env.local`·Vercel에는 넣지 않는다 |
 
 카카오·구글 로그인의 Client ID·Secret은 Supabase 대시보드에 들어 있어서 우리 코드에는 없다. 새 환경변수가 필요하면 `.env.example`에 이름을 추가하는 PR을 올리고, 값은 nnoinn에게 받는다.
