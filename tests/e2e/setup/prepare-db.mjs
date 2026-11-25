@@ -41,9 +41,17 @@ async function ensureSeedUsers(sql, supabase) {
 }
 
 export async function prepareE2eDb(supabase = readLocalSupabase()) {
+  // 마이그레이션 연결과 시드 연결을 따로 연다. drizzle(client)는 그 연결의 JSON·날짜 값 변환을 바꿔서
+  // 시드(scripts/seed.mjs의 sql.json, Date)가 같은 연결을 쓰면 값을 보내지 못한다
+  const migrator = postgres(supabase.dbUrl, { max: 1, onnotice: () => {} });
+  try {
+    await migrate(drizzle(migrator), { migrationsFolder: MIGRATIONS });
+  } finally {
+    await migrator.end();
+  }
+
   const client = postgres(supabase.dbUrl, { max: 1, onnotice: () => {} });
   try {
-    await migrate(drizzle(client), { migrationsFolder: MIGRATIONS });
     const userIds = await ensureSeedUsers(client, supabase);
     return await client.begin((tx) => seedDevData(tx, { now: new Date(), userIds }));
   } finally {
@@ -59,7 +67,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
       );
     })
     .catch((error) => {
-      console.error(error instanceof Error ? error.message : error);
+      // GitHub 검사에서 어느 줄에서 멈췄는지 보이게 위치(stack)까지 남긴다. 주소는 안전장치가 문구에 넣지 않는다
+      console.error(error instanceof Error ? (error.stack ?? error.message) : error);
       process.exitCode = 1;
     });
 }
