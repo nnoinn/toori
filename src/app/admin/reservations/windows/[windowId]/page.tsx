@@ -31,6 +31,10 @@ import {
   lookupHref,
   slotDetailHref,
   WINDOW_STATE_LABELS,
+  HOLDING_BADGE,
+  reservationBadge,
+  SLOT_STATUS_BADGES,
+  WINDOW_STATE_BADGES,
 } from '../../format';
 import { type AdminWindowDetail, selectAdminWindowDetail } from '../../window-queries';
 
@@ -72,7 +76,9 @@ async function Detail({ params }: { params: Params }) {
             <CardTitle className="text-lg">
               {formatKst(window.startAt)}~{formatEndTime(window.startAt, window.endAt)}
             </CardTitle>
-            <Badge variant="secondary">{WINDOW_STATE_LABELS[window.state]}</Badge>
+            <Badge variant={WINDOW_STATE_BADGES[window.state]}>
+              {WINDOW_STATE_LABELS[window.state]}
+            </Badge>
             {canForceCloseWindow(window.state) ? (
               <div className="ml-auto">
                 <SlotControlAction
@@ -172,8 +178,10 @@ function CellsCard({ cells, now }: { cells: AdminWindowDetail['cells']; now: Dat
                   <Link href={slotDetailHref(cell.slotId)} className="font-medium hover:underline">
                     {formatKstTime(cell.startAt)}~{formatKstTime(cell.endAt)} {cell.menuName}
                   </Link>
-                  <Badge variant="secondary">{SLOT_STATUS_LABELS[getSlotStatus(cell, now)]}</Badge>
-                  {isSlotOnHold(cell, now) ? <Badge>결제 중</Badge> : null}
+                  <Badge variant={SLOT_STATUS_BADGES[getSlotStatus(cell, now)]}>
+                    {SLOT_STATUS_LABELS[getSlotStatus(cell, now)]}
+                  </Badge>
+                  {isSlotOnHold(cell, now) ? <Badge variant={HOLDING_BADGE}>결제 중</Badge> : null}
                   {cell.closeReason ? (
                     <span className="text-muted-foreground">
                       {labelSlotCloseReason(cell.closeReason)}
@@ -191,7 +199,7 @@ function CellsCard({ cells, now }: { cells: AdminWindowDetail['cells']; now: Dat
                     >
                       예약 {formatReservationCode(reservation.code)}
                     </Link>
-                    <Badge variant="secondary">
+                    <Badge variant={reservationBadge(reservation.status, reservation.visitResult)}>
                       {labelReservation(reservation.status, reservation.visitResult)}
                     </Badge>
                   </p>

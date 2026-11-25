@@ -1,5 +1,9 @@
 // 매물·예약 조회 화면 표시 모양 (A-103, W18).
 
+import type { VariantProps } from 'class-variance-authority';
+
+import type { badgeVariants } from '@/components/ui/badge';
+import type { ReservationStatus, VisitResult } from '@/db/schema/payments';
 import { type SlotCloseReason, SLOT_STATUSES, type SlotStatus } from '@/db/schema/slots';
 import {
   getSlotStatus,
@@ -92,6 +96,50 @@ export const WINDOW_STATE_LABELS: Record<WindowState, string> = {
   full: '다 참',
   closed: '마감',
 };
+
+/** 상태 배지 색(공통 UI Badge의 variant) */
+export type StatusBadgeVariant = NonNullable<VariantProps<typeof badgeVariants>['variant']>;
+
+// 상태 배지 색(#587, 11/24 nnoinn 손 점검). [예약]·[매물]·[시간대 매물] 목록과 각 상세, 샵 상세 '매물 관리'가 같이 쓴다.
+// 같은 뜻이면 같은 색(원장님 화면 status-style.ts와 같은 원칙): 예약의 "예정" = 매물의 "예약됨" = 시간대의 "다 참"은 진한 초록,
+// 판매 중(게시중)은 밝은 초록, 판매 전(게시예정)은 테두리만, 끝난 것(이용 완료·마감·완료)은 회색, 취소·무효는 흐린 회색 테두리,
+// 노쇼는 빨강, 확인이 필요하거나 결제 중이면 주황. 색은 사진을 보고 nnoinn이 바꿀 수 있다
+
+/** 매물 상태 배지 색(getSlotStatus 결과) */
+export const SLOT_STATUS_BADGES: Record<SlotStatus, StatusBadgeVariant> = {
+  scheduled: 'outline',
+  published: 'secondary',
+  reserved: 'default',
+  closed: 'muted',
+  completed: 'muted',
+  cancelled: 'faded',
+};
+
+/** 시간대 매물 상태 배지 색(windowStatus 결과) */
+export const WINDOW_STATE_BADGES: Record<WindowState, StatusBadgeVariant> = {
+  scheduled: 'outline',
+  published: 'secondary',
+  full: 'default',
+  closed: 'muted',
+};
+
+/** 손님이 결제 중(10분 홀딩)인 매물에 같이 붙이는 "결제 중" 배지 색 */
+export const HOLDING_BADGE: StatusBadgeVariant = 'warning';
+/** 환불 금액 확인이 필요한 예약에 같이 붙이는 "확인 필요" 배지 색 */
+export const REVIEW_BADGE: StatusBadgeVariant = 'warning';
+/** 무효가 된 예약(A-108)에 같이 붙이는 "무효" 배지 색 */
+export const VOID_BADGE: StatusBadgeVariant = 'faded';
+
+/** 예약 상태 배지 색. 이름(labelReservation)과 같은 기준: 노쇼는 방문 결과로 본다 */
+export function reservationBadge(
+  status: ReservationStatus,
+  visitResult: VisitResult | null,
+): StatusBadgeVariant {
+  if (visitResult === 'no_show') return 'destructive';
+  if (status === 'cancelled') return 'faded';
+  if (status === 'completed') return 'muted';
+  return 'default';
+}
 
 /** 운영자가 강제 마감할 수 있는 시간대 매물(#373 ④): 마감하지 않았고 끝나지 않음. 막는 것은 서버가 다시 본다 */
 export function canForceCloseWindow(state: WindowState): boolean {

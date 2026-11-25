@@ -31,6 +31,8 @@ import {
   lookupHref,
   slotDetailHref,
   windowDetailHref,
+  HOLDING_BADGE,
+  SLOT_STATUS_BADGES,
 } from '../../reservations/format';
 import {
   CANCEL_STATS_ANCHOR,
@@ -366,8 +368,10 @@ function SlotControlPanel({
                 {slot.menuName}
               </Link>
               <span className="text-muted-foreground">{formatKst(slot.startAt)}</span>
-              <Badge variant="secondary">{SLOT_STATUS_LABELS[getSlotStatus(slot, now)]}</Badge>
-              {isSlotOnHold(slot, now) ? <Badge>결제 중</Badge> : null}
+              <Badge variant={SLOT_STATUS_BADGES[getSlotStatus(slot, now)]}>
+                {SLOT_STATUS_LABELS[getSlotStatus(slot, now)]}
+              </Badge>
+              {isSlotOnHold(slot, now) ? <Badge variant={HOLDING_BADGE}>결제 중</Badge> : null}
             </span>
             {/* 손님이 결제 중이면 강제 마감할 수 없다. 막는 것은 서버가 다시 본다 */}
             {canForceCloseSlot(slot, now) ? (

@@ -13,6 +13,10 @@ const badgeVariants = cva(
         destructive:
           'bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20',
         outline: 'border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground',
+        // 상태 배지(#587, 11/25): 끝난 것은 회색, 취소·무효는 흐린 회색 테두리, 처리·확인이 필요하거나 결제 중이면 주황
+        muted: 'bg-muted text-muted-foreground',
+        faded: 'border-border text-muted-foreground',
+        warning: 'bg-warning/25 text-warning-foreground',
         ghost: 'hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50',
         link: 'text-primary underline-offset-4 hover:underline',
       },

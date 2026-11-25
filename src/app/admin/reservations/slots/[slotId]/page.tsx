@@ -31,6 +31,9 @@ import {
   SLOT_ORIGIN_LABELS,
   slotDetailHref,
   slotOrigin,
+  HOLDING_BADGE,
+  reservationBadge,
+  SLOT_STATUS_BADGES,
 } from '../../format';
 import { selectSlotDetail, type SlotDetail } from '../../queries';
 
@@ -71,8 +74,8 @@ async function Detail({ params }: { params: Params }) {
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle className="text-lg">{slot.menuName}</CardTitle>
-            <Badge variant="secondary">{SLOT_STATUS_LABELS[status]}</Badge>
-            {onHold ? <Badge>결제 중</Badge> : null}
+            <Badge variant={SLOT_STATUS_BADGES[status]}>{SLOT_STATUS_LABELS[status]}</Badge>
+            {onHold ? <Badge variant={HOLDING_BADGE}>결제 중</Badge> : null}
             {canForceCloseSlot(slot, now) ? (
               <div className="ml-auto">
                 <SlotControlAction target={{ kind: 'close_slot', slotId: slot.slotId }} size="sm" />
@@ -164,7 +167,7 @@ function ReservationsCard({ reservations }: { reservations: SlotDetail['reservat
                 >
                   {formatReservationCode(reservation.code)}
                 </Link>
-                <Badge variant="secondary">
+                <Badge variant={reservationBadge(reservation.status, reservation.visitResult)}>
                   {labelReservation(reservation.status, reservation.visitResult)}
                 </Badge>
                 <span className="text-muted-foreground">
