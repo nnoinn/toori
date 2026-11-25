@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Fragment, Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -22,7 +22,7 @@ import {
   durationLabel,
   JOBS_PATH,
   staleLimitLabel,
-  summaryLabel,
+  summaryView,
   toCronJob,
 } from './format';
 import { selectCronRuns } from './queries';
@@ -215,8 +215,8 @@ function RunsTable({
                 <td className={cn(CELL, 'whitespace-nowrap')}>
                   {durationLabel(run.startedAt, run.finishedAt)}
                 </td>
-                <td className={cn(CELL, 'font-mono text-xs break-all')}>
-                  {summaryLabel(run.summary)}
+                <td className={CELL}>
+                  <SummaryCell job={job} summary={run.summary} />
                 </td>
                 <td className={cn(CELL, 'break-all')}>{run.error ?? '-'}</td>
               </tr>
@@ -225,6 +225,31 @@ function RunsTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** 처리 개수: 일마다 한 줄, 0인 값은 빼고, 작업 안의 실패 개수는 빨간색 */
+function SummaryCell({ job, summary }: { job: CronJob; summary: unknown }) {
+  const view = summaryView(job, summary);
+  if (view.kind === 'none') return '-';
+  if (view.kind === 'idle') return <span className="text-muted-foreground">처리할 것 없음</span>;
+  if (view.kind === 'raw') return <span className="font-mono text-xs break-all">{view.text}</span>;
+  return (
+    <ul className="flex flex-col gap-0.5">
+      {view.lines.map((line, lineIndex) => (
+        <li key={lineIndex}>
+          {line.title ? <span className="text-muted-foreground">{line.title}: </span> : null}
+          {line.parts.map((part, partIndex) => (
+            <Fragment key={partIndex}>
+              {partIndex > 0 ? ', ' : null}
+              <span className={part.failed ? 'font-medium text-destructive' : undefined}>
+                {part.text}
+              </span>
+            </Fragment>
+          ))}
+        </li>
+      ))}
+    </ul>
   );
 }
 

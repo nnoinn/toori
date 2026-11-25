@@ -4,6 +4,7 @@
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { recordCronRun } from '@/server/cron/run-log';
+import type { PaymentsSweepSummary } from '@/server/cron/summaries';
 import { isCronRequest } from '@/server/cron/auth';
 import { notifyKeptWindowSlotsReleased } from '@/server/notifications/alerts';
 import { sweepStaleOrders } from '@/server/payments';
@@ -19,19 +20,24 @@ export async function POST(request: Request) {
   }
   const db = getDb();
   const now = await getRequestNow();
-  // 실행 기록을 남긴다(#373 ⑥). 결과는 처리 개수만이다
-  const result = await recordCronRun(db, 'payments-sweep', now, async () => {
-    // 돈이 이미 움직였을 수 있는 취소를 먼저 본다
-    const cancels = await sweepStaleCancels(db, now);
-    const orders = await sweepStaleOrders(db, now);
-    // 결제 대기 주문의 결과가 정해진 뒤에 닫아야 해서 주문 정리 다음에 한다
-    const closed = await closeStaleWindowHolds(db, { now });
-    // 원장님이 마감할 때 결제 중이라 남긴 칸이 닫혔으면 알린다(그런 칸만 고른다, #308 ③-2)
-    notifyKeptWindowSlotsReleased(
-      db,
-      closed.map((slot) => slot.slotId),
-    );
-    return { orders, cancels, windowHolds: closed.length };
-  });
+  // 실행 기록을 남긴다(#373 ⑥). 결과는 처리 개수만이다. 값을 더하면 summaries.ts와 운영자 예약 작업 화면 이름표도 고친다
+  const result = await recordCronRun(
+    db,
+    'payments-sweep',
+    now,
+    async (): Promise<PaymentsSweepSummary> => {
+      // 돈이 이미 움직였을 수 있는 취소를 먼저 본다
+      const cancels = await sweepStaleCancels(db, now);
+      const orders = await sweepStaleOrders(db, now);
+      // 결제 대기 주문의 결과가 정해진 뒤에 닫아야 해서 주문 정리 다음에 한다
+      const closed = await closeStaleWindowHolds(db, { now });
+      // 원장님이 마감할 때 결제 중이라 남긴 칸이 닫혔으면 알린다(그런 칸만 고른다, #308 ③-2)
+      notifyKeptWindowSlotsReleased(
+        db,
+        closed.map((slot) => slot.slotId),
+      );
+      return { orders, cancels, windowHolds: closed.length };
+    },
+  );
   return Response.json(result);
 }

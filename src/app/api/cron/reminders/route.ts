@@ -4,6 +4,7 @@
 import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { recordCronRun } from '@/server/cron/run-log';
+import type { RemindersSummary } from '@/server/cron/summaries';
 import { isCronRequest } from '@/server/cron/auth';
 import { sendDueReminders } from '@/server/notifications';
 import { sweepAgreedCancelRequests } from '@/server/refunds';
@@ -17,8 +18,8 @@ export async function POST(request: Request) {
   }
   const db = getDb();
   const now = await getRequestNow();
-  // 실행 기록을 남긴다(#373 ⑥). 결과는 보낸 개수·정리한 개수만이다
-  const result = await recordCronRun(db, 'reminders', now, async () => {
+  // 실행 기록을 남긴다(#373 ⑥). 결과는 보낸 개수·정리한 개수만이다. 값을 더하면 summaries.ts와 운영자 예약 작업 화면 이름표도 고친다
+  const result = await recordCronRun(db, 'reminders', now, async (): Promise<RemindersSummary> => {
     const reminders = await sendDueReminders(db, now);
     const agreedCancels = await sweepAgreedCancelRequests(db, now);
     return { reminders, agreedCancels };
