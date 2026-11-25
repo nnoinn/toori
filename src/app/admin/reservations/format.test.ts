@@ -2,9 +2,12 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { badgeVariants } from '@/components/ui/badge';
+
 import {
   canForceCloseSlot,
   canForceCloseWindow,
+  HOLDING_BADGE,
   labelCancelActor,
   labelHoursBefore,
   labelOrderStatus,
@@ -13,6 +16,9 @@ import {
   labelRefundStatus,
   labelSlotCloseReason,
   lookupHref,
+  reservationBadge,
+  REVIEW_BADGE,
+  SLOT_STATUS_BADGES,
   SLOT_ORIGIN_LABELS,
   slotDetailHref,
   windowDetailHref,
@@ -22,7 +28,9 @@ import {
   toReservationSort,
   toSlotFilter,
   toWindowFilter,
+  VOID_BADGE,
   WINDOW_FILTER_LABELS,
+  WINDOW_STATE_BADGES,
   WINDOW_FILTERS,
   WINDOW_STATE_LABELS,
 } from './format';
@@ -164,5 +172,66 @@ describe('시간대 매물 탭 표시 모양(#567)', () => {
     expect(canForceCloseWindow('published')).toBe(true);
     expect(canForceCloseWindow('full')).toBe(true);
     expect(canForceCloseWindow('closed')).toBe(false);
+  });
+});
+
+describe('상태 배지 색 (#587, 11/24 nnoinn 손 점검)', () => {
+  it('예약: 예정 진한 초록, 이용 완료 회색, 노쇼 빨강, 취소 흐린 회색 테두리', () => {
+    expect(reservationBadge('confirmed', null)).toBe('default');
+    expect(reservationBadge('completed', 'visited')).toBe('muted');
+    expect(reservationBadge('completed', 'no_show')).toBe('destructive');
+    expect(reservationBadge('cancelled', null)).toBe('faded');
+  });
+
+  it('매물: 게시예정 테두리만, 게시중 연한 초록, 예약됨 진한 초록, 마감·완료 회색, 취소 흐린 회색 테두리', () => {
+    expect(SLOT_STATUS_BADGES).toEqual({
+      scheduled: 'outline',
+      published: 'soft',
+      reserved: 'default',
+      closed: 'muted',
+      completed: 'muted',
+      cancelled: 'faded',
+    });
+  });
+
+  it('시간대 매물: 게시예정 테두리만, 게시중 연한 초록, 다 참 진한 초록, 마감 회색', () => {
+    expect(WINDOW_STATE_BADGES).toEqual({
+      scheduled: 'outline',
+      published: 'soft',
+      full: 'default',
+      closed: 'muted',
+    });
+  });
+
+  it('같은 뜻이면 같은 색: 예약 예정 = 매물 예약됨 = 시간대 다 참, 예약 취소 = 매물 취소, 이용 완료 = 매물 완료', () => {
+    expect(reservationBadge('confirmed', null)).toBe(SLOT_STATUS_BADGES.reserved);
+    expect(SLOT_STATUS_BADGES.reserved).toBe(WINDOW_STATE_BADGES.full);
+    expect(reservationBadge('cancelled', null)).toBe(SLOT_STATUS_BADGES.cancelled);
+    expect(reservationBadge('completed', 'visited')).toBe(SLOT_STATUS_BADGES.completed);
+  });
+
+  it('결제 중·확인 필요는 주황, 무효는 흐린 회색 테두리. 결제 중은 예약됨(진한 초록)과 다르다', () => {
+    expect(HOLDING_BADGE).toBe('warning');
+    expect(REVIEW_BADGE).toBe('warning');
+    expect(VOID_BADGE).toBe('faded');
+    expect(HOLDING_BADGE).not.toBe(SLOT_STATUS_BADGES.reserved);
+  });
+
+  it('매물 상태끼리는 판매 중·예약됨·끝남·취소가 모두 다른 색이다(한눈에 구분)', () => {
+    const { published, reserved, closed, cancelled, scheduled } = SLOT_STATUS_BADGES;
+    expect(new Set([scheduled, published, reserved, closed, cancelled]).size).toBe(5);
+  });
+
+  it('공통 Badge에 더한 네 색은 연한 초록·회색·흐린 회색 테두리·연한 주황이고, 원래 색은 그대로다', () => {
+    expect(badgeVariants({ variant: 'soft' })).toContain('bg-primary/15 text-primary');
+    expect(badgeVariants({ variant: 'muted' })).toContain('bg-muted text-muted-foreground');
+    expect(badgeVariants({ variant: 'faded' })).toContain('border-border text-muted-foreground');
+    expect(badgeVariants({ variant: 'warning' })).toContain(
+      'bg-warning/25 text-warning-foreground',
+    );
+    expect(badgeVariants({ variant: 'secondary' })).toContain(
+      'bg-secondary text-secondary-foreground',
+    );
+    expect(badgeVariants()).toContain('bg-primary text-primary-foreground');
   });
 });

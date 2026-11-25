@@ -48,6 +48,11 @@ import {
   WINDOW_FILTERS,
   WINDOW_STATE_LABELS,
   windowDetailHref,
+  HOLDING_BADGE,
+  reservationBadge,
+  REVIEW_BADGE,
+  SLOT_STATUS_BADGES,
+  WINDOW_STATE_BADGES,
 } from './format';
 import { SlotControlAction } from '../shops/slot-control-actions';
 import { selectReservations, selectSlots } from './queries';
@@ -248,10 +253,10 @@ async function ReservationList({
                     <td className={CELL}>
                       {/* "이용 완료"와 "확인 필요"가 같이 붙으면 옆으로 넓어지지 않고 아래로 내린다 */}
                       <div className="flex flex-wrap items-center gap-1">
-                        <Badge variant="secondary">
+                        <Badge variant={reservationBadge(row.status, row.visitResult)}>
                           {labelReservation(row.status, row.visitResult)}
                         </Badge>
-                        {row.needsReview ? <Badge variant="destructive">확인 필요</Badge> : null}
+                        {row.needsReview ? <Badge variant={REVIEW_BADGE}>확인 필요</Badge> : null}
                       </div>
                     </td>
                     <td className={cn(CELL, 'text-right')}>
@@ -333,10 +338,12 @@ async function SlotList({ status, query }: { status: string | undefined; query: 
                     <td className={cn(CELL, 'whitespace-nowrap')}>{formatWon(row.salePrice)}</td>
                     <td className={CELL}>
                       <div className="flex items-center gap-1">
-                        <Badge variant="secondary">
+                        <Badge variant={SLOT_STATUS_BADGES[getSlotStatus(row, now)]}>
                           {SLOT_STATUS_LABELS[getSlotStatus(row, now)]}
                         </Badge>
-                        {isSlotOnHold(row, now) ? <Badge>결제 중</Badge> : null}
+                        {isSlotOnHold(row, now) ? (
+                          <Badge variant={HOLDING_BADGE}>결제 중</Badge>
+                        ) : null}
                       </div>
                     </td>
                     <td className={cn(CELL, 'text-right')}>
@@ -427,7 +434,9 @@ async function WindowList({ status, query }: { status: string | undefined; query
                       ) : null}
                     </td>
                     <td className={CELL}>
-                      <Badge variant="secondary">{WINDOW_STATE_LABELS[row.state]}</Badge>
+                      <Badge variant={WINDOW_STATE_BADGES[row.state]}>
+                        {WINDOW_STATE_LABELS[row.state]}
+                      </Badge>
                     </td>
                     <td className={cn(CELL, 'text-right')}>
                       <div className="flex items-center justify-end gap-2">

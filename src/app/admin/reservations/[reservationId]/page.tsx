@@ -29,6 +29,8 @@ import {
   labelRefundBand,
   labelRefundReason,
   labelRefundStatus,
+  reservationBadge,
+  VOID_BADGE,
 } from '../format';
 import { DISPUTE_TYPE_LABELS, labelDisputeStatus, toKstInputValue } from '../../disputes/format';
 import { labelReservation } from '../../lookup';
@@ -125,8 +127,10 @@ async function Detail({ params }: { params: Params }) {
         <CardHeader>
           <div className="flex items-center gap-2">
             <CardTitle className="text-lg">{formatReservationCode(detail.code)}</CardTitle>
-            <Badge variant="secondary">{labelReservation(detail.status, detail.visitResult)}</Badge>
-            {detail.voidedAt ? <Badge variant="outline">무효</Badge> : null}
+            <Badge variant={reservationBadge(detail.status, detail.visitResult)}>
+              {labelReservation(detail.status, detail.visitResult)}
+            </Badge>
+            {detail.voidedAt ? <Badge variant={VOID_BADGE}>무효</Badge> : null}
           </div>
         </CardHeader>
         <CardContent>
