@@ -8,6 +8,36 @@ import { z } from 'zod';
 
 const PORTONE_API = 'https://api.portone.io';
 const TIMEOUT_MS = 10_000;
+/** 바꾼 주소로 받는 내 컴퓨터 이름(브라우저 자동 테스트의 가짜 포트원 서버, #594) */
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * 포트원 API 주소(#594, #592 2차). 환경변수 PORTONE_API_URL로 바꿀 수 있지만 내 컴퓨터 주소(localhost·127.0.0.1·[::1], http·https)만
+ * 받고, 경로·쿼리는 버리고 주소 앞부분만 쓴다. 그 밖의 주소이거나 운영 배포(VERCEL_ENV=production)면 무시하고 진짜 주소를 쓴다.
+ * 배포 환경에 값이 잘못 들어가도 결제 확인·취소가 다른 서버로 가거나 모두 실패하지 않게 하려는 것이다. 값은 E2E 검사에서만 넣는다
+ */
+export function portOneApiBase(): string {
+  const value = process.env.PORTONE_API_URL;
+  if (!value) return PORTONE_API;
+  if (process.env.VERCEL_ENV === 'production') {
+    console.warn('[portone] 운영 배포에서는 PORTONE_API_URL을 쓰지 않고 진짜 주소로 보내요');
+    return PORTONE_API;
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    console.warn('[portone] PORTONE_API_URL이 주소 모양이 아니라 진짜 주소로 보내요');
+    return PORTONE_API;
+  }
+  const local =
+    (url.protocol === 'http:' || url.protocol === 'https:') && LOCAL_HOSTNAMES.has(url.hostname);
+  if (!local) {
+    console.warn('[portone] PORTONE_API_URL은 내 컴퓨터 주소만 받아서 진짜 주소로 보내요');
+    return PORTONE_API;
+  }
+  return url.origin;
+}
 
 const cancellationSchema = z.object({
   status: z.string(),
@@ -69,7 +99,7 @@ export async function getPortOnePayment(paymentId: string): Promise<PortOneLooku
   if (!keys) return { ok: false, reason: 'unavailable' };
   const { secret, storeId } = keys;
 
-  const url = `${PORTONE_API}/payments/${encodeURIComponent(paymentId)}?storeId=${encodeURIComponent(storeId)}`;
+  const url = `${portOneApiBase()}/payments/${encodeURIComponent(paymentId)}?storeId=${encodeURIComponent(storeId)}`;
   let response: Response;
   try {
     response = await fetch(url, {
@@ -166,7 +196,7 @@ export async function cancelPortOnePayment(
 
   let response: Response;
   try {
-    response = await fetch(`${PORTONE_API}/payments/${encodeURIComponent(paymentId)}/cancel`, {
+    response = await fetch(`${portOneApiBase()}/payments/${encodeURIComponent(paymentId)}/cancel`, {
       method: 'POST',
       headers: { Authorization: `PortOne ${secret}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ storeId, reason, ...partial }),
