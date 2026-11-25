@@ -6,9 +6,6 @@ name: E2E
 # (tests/e2e/setup/local-supabase.mjs). 처음에는 머지를 막는 필수 검사(check)에 넣지 않는다. 며칠 안정적으로 돌면 nnoinn이 정한다
 on:
   pull_request:
-  # 임시(PR 전 확인용): 내 컴퓨터에 Docker가 없어서 이 브랜치에 푸시할 때도 돌려 본다. PR을 올리기 전에 지운다
-  push:
-    branches: [chore/e2e-foundation]
 
 permissions:
   contents: read
