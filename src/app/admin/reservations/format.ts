@@ -102,13 +102,13 @@ export type StatusBadgeVariant = NonNullable<VariantProps<typeof badgeVariants>[
 
 // 상태 배지 색(#587, 11/24 nnoinn 손 점검). [예약]·[매물]·[시간대 매물] 목록과 각 상세, 샵 상세 '매물 관리'가 같이 쓴다.
 // 같은 뜻이면 같은 색(원장님 화면 status-style.ts와 같은 원칙): 예약의 "예정" = 매물의 "예약됨" = 시간대의 "다 참"은 진한 초록,
-// 판매 중(게시중)은 밝은 초록, 판매 전(게시예정)은 테두리만, 끝난 것(이용 완료·마감·완료)은 회색, 취소·무효는 흐린 회색 테두리,
+// 판매 중(게시중)은 연한 초록 바탕에 초록 글자(진한 초록과 한눈에 구분되게), 판매 전(게시예정)은 테두리만, 끝난 것(이용 완료·마감·완료)은 회색, 취소·무효는 흐린 회색 테두리,
 // 노쇼는 빨강, 확인이 필요하거나 결제 중이면 주황. 색은 사진을 보고 nnoinn이 바꿀 수 있다
 
 /** 매물 상태 배지 색(getSlotStatus 결과) */
 export const SLOT_STATUS_BADGES: Record<SlotStatus, StatusBadgeVariant> = {
   scheduled: 'outline',
-  published: 'secondary',
+  published: 'soft',
   reserved: 'default',
   closed: 'muted',
   completed: 'muted',
@@ -118,7 +118,7 @@ export const SLOT_STATUS_BADGES: Record<SlotStatus, StatusBadgeVariant> = {
 /** 시간대 매물 상태 배지 색(windowStatus 결과) */
 export const WINDOW_STATE_BADGES: Record<WindowState, StatusBadgeVariant> = {
   scheduled: 'outline',
-  published: 'secondary',
+  published: 'soft',
   full: 'default',
   closed: 'muted',
 };

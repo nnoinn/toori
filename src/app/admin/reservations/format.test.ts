@@ -183,10 +183,10 @@ describe('상태 배지 색 (#587, 11/24 nnoinn 손 점검)', () => {
     expect(reservationBadge('cancelled', null)).toBe('faded');
   });
 
-  it('매물: 게시예정 테두리만, 게시중 밝은 초록, 예약됨 진한 초록, 마감·완료 회색, 취소 흐린 회색 테두리', () => {
+  it('매물: 게시예정 테두리만, 게시중 연한 초록, 예약됨 진한 초록, 마감·완료 회색, 취소 흐린 회색 테두리', () => {
     expect(SLOT_STATUS_BADGES).toEqual({
       scheduled: 'outline',
-      published: 'secondary',
+      published: 'soft',
       reserved: 'default',
       closed: 'muted',
       completed: 'muted',
@@ -194,10 +194,10 @@ describe('상태 배지 색 (#587, 11/24 nnoinn 손 점검)', () => {
     });
   });
 
-  it('시간대 매물: 게시예정 테두리만, 게시중 밝은 초록, 다 참 진한 초록, 마감 회색', () => {
+  it('시간대 매물: 게시예정 테두리만, 게시중 연한 초록, 다 참 진한 초록, 마감 회색', () => {
     expect(WINDOW_STATE_BADGES).toEqual({
       scheduled: 'outline',
-      published: 'secondary',
+      published: 'soft',
       full: 'default',
       closed: 'muted',
     });
@@ -217,7 +217,13 @@ describe('상태 배지 색 (#587, 11/24 nnoinn 손 점검)', () => {
     expect(HOLDING_BADGE).not.toBe(SLOT_STATUS_BADGES.reserved);
   });
 
-  it('공통 Badge에 더한 세 색은 회색·흐린 회색 테두리·연한 주황이고, 원래 색은 그대로다', () => {
+  it('매물 상태끼리는 판매 중·예약됨·끝남·취소가 모두 다른 색이다(한눈에 구분)', () => {
+    const { published, reserved, closed, cancelled, scheduled } = SLOT_STATUS_BADGES;
+    expect(new Set([scheduled, published, reserved, closed, cancelled]).size).toBe(5);
+  });
+
+  it('공통 Badge에 더한 네 색은 연한 초록·회색·흐린 회색 테두리·연한 주황이고, 원래 색은 그대로다', () => {
+    expect(badgeVariants({ variant: 'soft' })).toContain('bg-primary/15 text-primary');
     expect(badgeVariants({ variant: 'muted' })).toContain('bg-muted text-muted-foreground');
     expect(badgeVariants({ variant: 'faded' })).toContain('border-border text-muted-foreground');
     expect(badgeVariants({ variant: 'warning' })).toContain(
