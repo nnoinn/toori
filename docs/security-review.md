@@ -120,7 +120,7 @@
 | 통계 `/owner/stats`: `stats-store` | `ensureOwnerPage` | 세션 샵 것만 | `src/app/owner/(console)/stats/stats-store.db.test.ts` 노쇼·취소·무효·다른 달·다른 샵은 뺀다 | ✅ |
 | 매장 설정 `/owner/settings/*`: 샵 정보(`selectShopProfile`)·메뉴·사진·사업자 정보·정산 계좌(`selectPayoutAccount`) 조회 | `ensureOwnerPage` | 세션 샵 것만(주소에 id가 없다). 정산 계좌는 은행·뒷자리·예금주만 읽는다 | `src/app/owner/(console)/settings/payout/payout-store.db.test.ts` 화면용 조회는 은행·뒷자리·예금주만 돌려준다 | ✅ |
 
-페이지가 같이 부르는 나머지 공통 서버 함수는 1장(강규민) 표에서 본다: 정산 내역·정산서(`getSettlementItems`·`getSettlementStatements`·`getSettlementStatement`·`previewSettlement`), 계정 이력(`getOwnerAccountHistory`), 알림함, 시간대 매물 등록·마감(`src/server/slot-windows/actions.ts`), 원장님 가입(`createOwnerAccount`), 탈퇴·되살리기(`getOwnerWithdrawalCheck`·`withdrawOwner`·`getRestorableAccount`·`restoreOwner`).
+페이지가 같이 부르는 나머지 공통 서버 함수는 1장(강규민) 표에서 본다: 정산 내역·정산서(`getSettlementItems`·`getSettlementStatements`·`getSettlementStatement`), 계정 이력(`getOwnerAccountHistory`), 알림함, 시간대 매물 등록·마감(`src/server/slot-windows/actions.ts`), 원장님 가입(`createOwnerAccount`), 탈퇴·되살리기(`getOwnerWithdrawalCheck`·`withdrawOwner`·`getRestorableAccount`·`restoreOwner`). 매물 등록 화면의 가격 미리보기 `previewSettlement`는 데이터를 읽지 않는 계산 함수라 점검 대상이 아니다.
 
 ## 4. 개인정보가 보이는 곳 — 현동훈
 
