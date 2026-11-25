@@ -128,7 +128,8 @@ export async function closeSlotInDb(
 
   const [row] = await db
     .update(slots)
-    .set({ status: 'closed', closedAt: now, closeReason: parsed.data })
+    // 임시: E2E(#605)가 잡는지 일부러 고른 사유 대신 늘 기타로 저장한다. 되돌린다
+    .set({ status: 'closed', closedAt: now, closeReason: parsed.data && 'other' })
     .where(and(eq(slots.id, slotId), eq(slots.shopId, shopId), editableNow(now)))
     .returning({ id: slots.id });
   return row ? ok(null) : blockedReason(db, shopId, slotId, now);
