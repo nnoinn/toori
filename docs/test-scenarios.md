@@ -7,7 +7,7 @@
 - **ID**: 영역-번호. PR·Issue에서 이 ID로 부른다
 - **시나리오와 기대**: 기대 결과는 규칙 문서(CLAUDE.md 핵심 비즈니스 규칙, `docs/settlement-examples.md`, 기능 명세 ID)의 숫자와 문장 그대로 쓴다
 - **상태**: ✅ 자동 테스트가 지킨다 / ⏳ 자동 테스트 예정(기능이 아직 없거나, 서버 흐름 테스트 ②·브라우저 테스트 ③에서 만든다) / 🖐 손 점검(체크리스트)으로만 본다
-- **테스트**: `파일` 뒤에 테스트 이름 일부를 적는다. `tests/scripts/test-scenarios.test.ts`가 PR 검사마다 그 파일과 이름이 정말 있는지 확인한다. 테스트 이름을 바꾸거나 지우면 PR 검사가 실패하니 이 표도 같이 고친다
+- **테스트**: `파일` 뒤에 테스트 이름 일부를 적는다. 브라우저 자동 테스트(E2E, `tests/e2e/*.spec.ts`, GitHub 검사 "E2E")도 같이 적는다. `tests/scripts/test-scenarios.test.ts`가 PR 검사마다 그 파일과 이름이 정말 있는지 확인한다. 테스트 이름을 바꾸거나 지우면 PR 검사가 실패하니 이 표도 같이 고친다
 
 ## 테스트가 틀리지 않게 (11/12)
 
@@ -84,15 +84,15 @@ PR 검사가 자동으로 막는 것:
 
 | ID | 시나리오와 기대 | 근거 | 상태 | 테스트 |
 | --- | --- | --- | --- | --- |
-| HOLD-01 | [예약하기]를 누르면 서버 시각으로 10분 홀딩하고, 만료 시각과 서버 시각을 화면에 준다 | C-404·X-304 | ✅ | `tests/docs/rule-docs.test.ts` 홀딩·게시·리마인드 시각<br>`src/server/payments/checkout.test.ts` 트랜잭션 안에서 서버 시각으로 홀딩하고 |
+| HOLD-01 | [예약하기]를 누르면 서버 시각으로 10분 홀딩하고, 만료 시각과 서버 시각을 화면에 준다 | C-404·X-304 | ✅ | `tests/docs/rule-docs.test.ts` 홀딩·게시·리마인드 시각<br>`src/server/payments/checkout.test.ts` 트랜잭션 안에서 서버 시각으로 홀딩하고<br>`tests/e2e/hold.spec.ts` [예약하기]를 누르면 10분 홀딩하고 |
 | HOLD-02 | 두 고객이 같은 매물을 동시에 누르면 한 명만 홀딩된다 | X-304 | ✅ | `src/server/payments/hold-concurrency.db.test.ts` 두 고객이 같은 매물을 동시에 누르면 한 명만 홀딩된다 |
 | HOLD-03 | 한 고객은 동시에 매물 1개만 홀딩한다 | C-404 | ✅ | `src/server/payments/hold-concurrency.db.test.ts` 한 고객이 두 매물을 동시에 누르면 하나만 홀딩된다<br>`src/server/payments/checkout.test.ts` ALREADY_HOLDING에는 지금 홀딩 중인 매물 id가 붙는다 |
 | HOLD-04 | 홀딩은 만료 시각과 같거나 지나면 풀린다. 내 홀딩이 아니거나 끝났으면 결제할 수 없다 | C-404 | ✅ | `src/features/slot-status/slot-status.test.ts` 만료 시각과 같거나 지나면 홀딩이 풀린다<br>`src/server/payments/checkout.test.ts` 내 홀딩이 끝났으면 HOLD_EXPIRED |
-| HOLD-05 | 환불 규정 필수 동의 없이는 결제할 수 없고(서버도 막는다), 주문에 동의 문구 버전과 시각을 남긴다 | C-402 | ✅ | `src/server/payments/checkout.test.ts` 필수 동의가 빠지면 CONSENT_REQUIRED<br>`src/server/payments/order-store.db.test.ts` 결제 대기 주문에 금액과 동의 2개의 버전·시각을 남긴다<br>`src/app/(customer)/(focus)/checkout/[slotId]/checkout-texts.test.ts` 필수 동의 2개가 문서 문구와 같다 |
+| HOLD-05 | 환불 규정 필수 동의 없이는 결제할 수 없고(서버도 막는다), 주문에 동의 문구 버전과 시각을 남긴다 | C-402 | ✅ | `src/server/payments/checkout.test.ts` 필수 동의가 빠지면 CONSENT_REQUIRED<br>`src/server/payments/order-store.db.test.ts` 결제 대기 주문에 금액과 동의 2개의 버전·시각을 남긴다<br>`src/app/(customer)/(focus)/checkout/[slotId]/checkout-texts.test.ts` 필수 동의 2개가 문서 문구와 같다<br>`tests/e2e/hold.spec.ts` 환불 규정에 동의하기 전에는 결제할 수 없고 |
 | HOLD-06 | 같은 주문을 동시에 두 번 확인해도 예약은 하나다 | W11 | ✅ | `src/server/payments/confirm-concurrency.db.test.ts` 같은 주문을 동시에 두 번 확인해도 예약은 하나 |
 | HOLD-07 | 원장님 모드로는 예약·결제할 수 없다 | X-101 | ✅ | `src/server/auth/require.test.ts` 원장님 모드면 WRONG_MODE |
 | HOLD-08 | 예약이 확정되면 고객과 원장님에게 각자의 문구로 알린다 | #131 | ✅ | `src/server/notifications/alerts.test.ts` 고객과 원장님에게 각자의 문구와 주소로 보낸다 |
-| HOLD-09 | 지금 내 홀딩(결제 중 막대)은 만료 전인 내 홀딩 하나만 보여 준다. 남의 홀딩, 끝난 홀딩, 예약된 매물은 보이지 않고, 로그인 안 함·원장님 모드·고객 계정 없음은 오류 없이 "없음"이다 | C-404·#363 | ✅ | `src/server/payments/hold-store.db.test.ts` 지금 내 홀딩: 살아 있는 내 홀딩만<br>`src/server/payments/checkout.test.ts` 로그인 안 함·원장님 모드·고객 계정 없음도 오류가 아니라 null |
+| HOLD-09 | 지금 내 홀딩(결제 중 막대)은 만료 전인 내 홀딩 하나만 보여 준다. 남의 홀딩, 끝난 홀딩, 예약된 매물은 보이지 않고, 로그인 안 함·원장님 모드·고객 계정 없음은 오류 없이 "없음"이다 | C-404·#363 | ✅ | `src/server/payments/hold-store.db.test.ts` 지금 내 홀딩: 살아 있는 내 홀딩만<br>`src/server/payments/checkout.test.ts` 로그인 안 함·원장님 모드·고객 계정 없음도 오류가 아니라 null<br>`tests/e2e/hold.spec.ts` 결제 중 칩의 [그만두기]로 풀면 다시 예약할 수 있다 |
 
 ## 6. 고객 취소·환불
 
@@ -206,7 +206,7 @@ PR 검사가 자동으로 막는 것:
 | AUTH-05 | 운영자가 개인정보가 보이는 화면을 볼 때마다 열람 기록을 남기고, 기록을 못 남기면 화면이 개인정보를 보여 주지 않는다 | #269 | ✅ | `src/server/admin/access-log.test.ts` 기록을 넣지 못하면 오류를 던진다 |
 | AUTH-06 | 팀 접속 코드가 켜져 있으면 코드를 넣기 전에는 모든 화면이 잠금 화면으로 간다. 코드를 바꾸면 전에 받은 입장은 통하지 않는다 | #303 | ✅ | `src/lib/site-lock.test.ts` 입장하지 않았으면 화면 요청을 잠금 화면으로 보내고<br>`src/proxy.test.ts` 코드를 바꾸면 전에 받은 쿠키로는 들어오지 못한다 |
 | AUTH-07 | 카카오·구글 간편 로그인으로 실제로 들어가고 나온다(외부 로그인 화면이라 로봇이 누르지 않는다) | C-101 | 🖐 | |
-| AUTH-08 | 로그아웃하면 고객·원장님 모두 첫 화면(/, 로그인과 로그인 없이 둘러보기)이 새로 열리고, 뒤로 가기로 로그인한 화면이 다시 보이지 않는다. 로그아웃은 `src/components/ui/use-sign-out.ts`가 지금 화면을 기록에서 빼고(location.replace) 첫 화면으로 보낸다. 뒤로 가기는 브라우저에서 손으로 본다 | 11/12 점검 9-1 | 🖐 | |
+| AUTH-08 | 로그아웃하면 고객·원장님 모두 첫 화면(/, 로그인과 로그인 없이 둘러보기)이 새로 열리고, 뒤로 가기로 로그인한 화면이 다시 보이지 않는다. 로그아웃은 `src/components/ui/use-sign-out.ts`가 지금 화면을 기록에서 빼고(location.replace) 첫 화면으로 보낸다. 뒤로 가기까지 브라우저 자동 테스트(E2E, #592)가 본다 | 11/12 점검 9-1 | ✅ | `tests/e2e/logout.spec.ts` 고객 로그아웃: 첫 화면이 열리고, 뒤로 가기로 내 정보가 다시 보이지 않는다<br>`tests/e2e/logout.spec.ts` 원장님 로그아웃: 첫 화면이 열리고, 뒤로 가기로 원장님 화면이 다시 보이지 않는다 |
 | AUTH-09 | 운영자 화면은 운영자 입구(/admin/login)에서 운영자로 로그인해야 열린다. 고객·원장님으로 로그인해 있어도 열리지 않고, 운영자 권한이 없으면 운영자 로그인을 거절한다. 운영자 함수도 운영자 모드에서만 통과한다(AUTH-03의 "관리자"가 이렇게 바뀐다) | #372, 11/13 nnoinn | ✅ | `src/server/auth/proxy-rules.test.ts` 운영자 모드면 통과하고<br>`src/app/api/auth/callback/route.test.ts` 운영자 입구로 들어왔는데 관리자가 아니면 바로 로그아웃시키고<br>`src/server/auth/session.test.ts` 운영자 모드로는 바꿀 수 없고 |
 | AUTH-10 | 운영자가 데이터를 바꾸면 같은 트랜잭션에서 처리 기록(누가·언제·무엇을·사유)이 남고, 처리 기록을 남기지 못하면 바꾼 것도 남지 않는다. 처리 기록과 열람 기록은 앱에서 고치거나 지울 수 없다 | #372·#373 | ✅ | `src/server/admin/action-store.db.test.ts` 게시 멈춤·다시 열기: 처리 기록을 남기지 못하면<br>`src/server/admin/action-store.db.test.ts` 매물·시간대 강제 마감: 처리 기록을 남기지 못하면<br>`src/server/admin/action-store.db.test.ts` 노쇼 되돌리기: 처리 기록을 남기지 못하면<br>`src/server/settlements/hold-store.db.test.ts` 거래 보류를 걸면 사유·운영자·시각과 settlement.hold 기록을 남기고<br>`src/server/refunds/void-store.db.test.ts` 진행 중 무효 환불과 처리 기록(메모 = 원장님 요청)을 남기고<br>`src/server/visits/admin-visit-store.db.test.ts` 노쇼를 방문으로 바꾸고, 같은 트랜잭션에서 visit.override 기록<br>`src/db/admin-profiles.db.test.ts` 작업 기록은 넣기만 되고 고치기·지우기·비우기는 트리거가 막는다<br>`src/db/admin-access-logs.db.test.ts` 넣기만 되고 고치기·지우기·비우기는 트리거가 막는다 |
 | AUTH-11 | 운영자 회원 상세(고객)와 입점 심사(샵 상세)의 연락처는 목록처럼 가려서 보여 주고(휴대폰 010-****-5678, 이메일 ab****@gmail.com), [번호 보기]를 누를 때만 서버에서 전체를 받아 와 가려 있던 같은 자리에 진하게(브랜드 색) 보여 주고, 화면을 떠나면 다시 가린다(11/22 nnoinn). 받아 올 때마다 운영자 열람 기록(contact_reveal)을 남기고, 운영자가 아니거나 대상이 없으면 주지도 기록하지도 않는다. 상세 화면 코드에는 전체 번호·이메일을 싣지 않는다 | 11/12 점검 8-2, 11/13 nnoinn, #360 4번 | ✅ | `src/app/admin/users/contact-actions.test.ts` 운영자에게 고객 이메일·휴대폰 전체를 주고 열람 기록(contact_reveal)을 남긴다<br>`src/app/admin/users/contact-actions.test.ts` 운영자가 아니거나 없는 고객이면 주지 않고 기록도 남기지 않는다<br>`src/app/admin/users/contact-actions.test.ts` 원장님을 대상으로 열람 기록을 남긴다<br>`src/lib/email.test.ts` 앞부분은 두 글자만 남기고 도메인은 그대로 둔다 |
@@ -236,7 +236,7 @@ PR 검사가 자동으로 막는 것:
 
 ## 16. 한 바퀴 흐름 (서버 흐름 ②·브라우저 ③에서 자동으로)
 
-여러 기능이 이어지는 흐름이다. 지금은 손 점검 체크리스트로 보고, 서버 흐름 테스트(②, 실제 서버 함수를 테스트 DB에서 차례로)와 브라우저 테스트(③, 결제사는 가짜)로 옮긴다. 서버 흐름 테스트는 `tests/flows/`에 있고, 바깥 서비스(로그인·포트원·웹 푸시)와 시각만 `tests/flows/fakes.ts`의 가짜로 바꾼다(11/13~).
+여러 기능이 이어지는 흐름이다. 지금은 손 점검 체크리스트로 보고, 서버 흐름 테스트(②, 실제 서버 함수를 테스트 DB에서 차례로)와 브라우저 테스트(③, 결제사는 가짜)로 옮긴다. 서버 흐름 테스트는 `tests/flows/`에 있고, 바깥 서비스(로그인·포트원·웹 푸시)와 시각만 `tests/flows/fakes.ts`의 가짜로 바꾼다(11/13~). 브라우저 테스트는 `tests/e2e/`에 있고 로컬 Supabase에서 돈다(11/25~, #592). 1차는 결제 전까지(둘러보기·홀딩·로그아웃)이고, FLOW-01의 결제부터는 2차(가짜 결제사)에서 더한다.
 
 | ID | 시나리오와 기대 | 근거 | 상태 | 테스트 |
 | --- | --- | --- | --- | --- |

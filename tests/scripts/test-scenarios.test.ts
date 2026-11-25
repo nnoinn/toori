@@ -80,7 +80,8 @@ describe('회귀 테스트 시나리오 목록 (docs/test-scenarios.md)', () => 
     const sources = new Map<string, string[]>();
     for (const scenario of scenarios) {
       for (const ref of scenario.refs) {
-        if (!/\.test\.tsx?$/.test(ref.path)) {
+        // 브라우저 자동 테스트(E2E, #592)는 tests/e2e/*.spec.ts다
+        if (!/\.(test|spec)\.tsx?$/.test(ref.path)) {
           missing.push(`${scenario.id}: 테스트 파일이 아니에요: ${ref.path}`);
           continue;
         }

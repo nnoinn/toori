@@ -1,0 +1,57 @@
+name: E2E
+
+# 브라우저 자동 테스트(회귀 테스트 ③, #592). 로봇이 실제 브라우저로 고객 흐름(둘러보기·홀딩·로그아웃)을 눌러 본다.
+# 이 검사 안에서만 켜는 로컬 Supabase에 src/db/migrations와 시드를 넣고, 운영과 같은 빌드(next build → next start)로 돈다.
+# 공용 개발 DB와 진짜 키는 쓰지 않는다. 레포가 공개라 GitHub secret도 쓰지 않고, 필요한 값은 E2E 전용 가짜 값이다
+# (tests/e2e/setup/local-supabase.mjs). 처음에는 머지를 막는 필수 검사(check)에 넣지 않는다. 며칠 안정적으로 돌면 nnoinn이 정한다
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+# 새로 푸시하면 앞의 검사를 멈추고 새 커밋만 검사한다
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: e2e
+    # ci.yml과 같은 이유로 버전을 고정한다
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          # tests/e2e/setup/local-supabase.mjs의 SUPABASE_CLI_VERSION과 같게 둔다
+          version: 2.122.1
+      - name: 로컬 Supabase 켜기
+        # 설정은 supabase/config.toml(E2E에 필요 없는 Studio·Storage·Realtime 등은 끈다)
+        run: supabase start
+      - name: 로컬 Supabase 값과 E2E 가짜 값 넘기기
+        # 빌드·실행·테스트 단계가 같은 값을 쓴다(값은 이 검사 안의 로컬 Supabase 것이라 공개돼도 상관없다)
+        run: node tests/e2e/setup/github-env.mjs >> "$GITHUB_ENV"
+      - name: 마이그레이션·시드
+        run: node tests/e2e/setup/prepare-db.mjs
+      - name: 빌드
+        run: npm run build
+      - name: 브라우저 설치
+        run: npx playwright install --with-deps chromium
+      - name: E2E
+        run: npx playwright test
+      - name: 실패 기록 올리기(사진·trace)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
