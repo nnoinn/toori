@@ -1,13 +1,11 @@
 // 매물 상세(J7)와 시간대 상세(#308)가 같이 쓰는 부분: 맨 위 사진·뒤로가기, 샵 정보(원장님 프로필, C-302~C-304), 접힌 환불 규정(C-305).
 // 두 화면 모두 PC(md 이상)에서 왼쪽 사진·샵 정보, 오른쪽 상자의 두 칸 배치라서 칸 위치 클래스도 여기에 둔다.
 
-import { cn } from 'cn';
 import { ChevronDown, ExternalLink, MapPin, Navigation, Phone } from 'lucide-react';
 
 import { BackButton } from '@/components/ui/back-button';
 import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { PhotoFrame } from '@/components/ui/photo-frame';
 import { ShopLocationMap } from '@/features/map/shop-location-map';
 import { CUSTOMER_HOME } from '@/server/auth/paths';
 import { NO_SHOW_PENALTY_RATE, OWNER_FAULT_COUPON_AMOUNT, REFUND_BANDS } from '@/server/policy';
@@ -21,19 +19,14 @@ import {
 } from './detail-format';
 import { kakaoDirectionsLink, kakaoMapLink } from '@/lib/kakao-map';
 import { FavoriteButton } from './favorite-button';
-import { SlotPhotos } from './slot-photos';
+import { PhotoGallery } from './photo-gallery';
 import type { SlotDetail } from './types';
 
 /** 상세 화면의 샵(원장님 프로필). 시간대 상세(SlotWindowShop)도 같은 모양이다 */
 export type DetailShop = SlotDetail['shop'];
 
-/** PC 사진 묶음의 칸 수: 큰 사진 1장 + 작은 사진 4장(11/18 정찬형, 회의 피드백 5번 A안) */
-export const GALLERY_SLOTS = 5;
-
 /**
- * 맨 위: 사진 묶음과 뒤로가기. 사진이 아직 없는 샵도 사진이 들어갈 칸을 미리 보여 준다(11/15 회의).
- * 폰은 사진을 옆으로 밀어 넘기고, 사진이 없으면 같은 크기의 빈 칸 하나다.
- * PC는 큰 사진 1장과 작은 사진 4장 칸이고, 모자라면 빈 칸, 5장보다 많으면 마지막 칸에 "+N"
+ * 맨 위: 사진 묶음과 뒤로가기. 사진 칸·크게 보기는 photo-gallery.tsx(폰은 옆으로 밀어 넘기고, PC는 큰 사진 1장과 작은 사진 4장)
  */
 export function DetailTop({
   imageUrls,
@@ -45,7 +38,6 @@ export function DetailTop({
   /** 다른 상세로 옮겨도 첫 장부터 보이게 상세마다 새로 시작한다(매물 id·시간대 id) */
   photosKey: string;
 }) {
-  const extra = imageUrls.length - GALLERY_SLOTS;
   return (
     <div className="relative md:col-start-1 md:row-start-1">
       {/* 폰만(아래 메뉴만 있고 위쪽 메뉴가 없어서). PC는 위쪽 메뉴와 브라우저 뒤로 가기를 쓴다(#533, 11/22 nnoinn).
@@ -54,35 +46,7 @@ export function DetailTop({
         fallbackHref={CUSTOMER_HOME}
         className="absolute top-2 left-2 z-10 size-10 bg-background/80 md:hidden"
       />
-      <div className="md:hidden">
-        {imageUrls.length > 0 ? (
-          <SlotPhotos key={photosKey} urls={imageUrls} shopName={shopName} />
-        ) : (
-          <PhotoFrame alt={`${shopName} 사진`} sizes="100vw" className="aspect-[4/3] w-full" />
-        )}
-      </div>
-      <ul
-        aria-label={`${shopName} 사진`}
-        className="hidden h-[360px] grid-cols-4 grid-rows-2 gap-2 overflow-hidden rounded-2xl md:grid"
-      >
-        {Array.from({ length: GALLERY_SLOTS }, (_, i) => (
-          <li key={i} className={cn('relative', i === 0 && 'col-span-2 row-span-2')}>
-            <PhotoFrame
-              src={imageUrls[i]}
-              alt={`${shopName} 사진 ${i + 1}`}
-              sizes={i === 0 ? '480px' : '240px'}
-              priority={i === 0}
-              // 회색 바탕 위에서 빈 칸이 보이게 흰 칸으로 둔다
-              className="size-full bg-card"
-            />
-            {i === GALLERY_SLOTS - 1 && extra > 0 ? (
-              <span className="absolute inset-0 flex items-center justify-center bg-foreground/50 text-lg font-semibold text-background">
-                +{extra}
-              </span>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+      <PhotoGallery key={photosKey} urls={imageUrls} shopName={shopName} />
     </div>
   );
 }

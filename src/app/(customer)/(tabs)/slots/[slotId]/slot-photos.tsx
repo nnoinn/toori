@@ -13,8 +13,18 @@ const ARROW_CLASS = 'absolute top-1/2 hidden -translate-y-1/2 bg-background/80 m
 /**
  * 매물 상세의 사진 줄(C-303). 폰은 옆으로 밀어 넘기고, PC는 마우스로 밀 수 없어서 좌우 화살표로 넘긴다.
  * 2장 이상이면 지금 몇 번째인지 보여 준다. 위치 기준(relative)은 감싸는 쪽에 있다.
+ * 사진을 누르면 onOpen으로 그 번호를 알려 크게 보기를 연다(photo-gallery.tsx)
  */
-export function SlotPhotos({ urls, shopName }: { urls: string[]; shopName: string }) {
+export function SlotPhotos({
+  urls,
+  shopName,
+  onOpen,
+}: {
+  urls: string[];
+  shopName: string;
+  /** 사진을 눌렀을 때(번호는 0부터) */
+  onOpen: (index: number) => void;
+}) {
   const listRef = useRef<HTMLUListElement>(null);
   const [index, setIndex] = useState(0);
   const last = urls.length - 1;
@@ -46,6 +56,12 @@ export function SlotPhotos({ urls, shopName }: { urls: string[]; shopName: strin
               sizes="(max-width: 768px) 100vw, 60vw"
               className="object-cover"
               preload={i === 0}
+            />
+            <button
+              type="button"
+              className="absolute inset-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
+              aria-label={`사진 ${i + 1} 크게 보기`}
+              onClick={() => onOpen(i)}
             />
           </li>
         ))}
