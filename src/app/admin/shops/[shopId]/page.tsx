@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { BackButton } from '@/components/ui/back-button';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { SelectableRow, SelectableRows } from '@/components/ui/selectable-rows';
+import { DetailLink, SelectableRow, SelectableRows } from '@/components/ui/selectable-rows';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDb } from '@/db';
 import {
@@ -17,6 +17,7 @@ import {
   SLOT_STATUS_LABELS,
 } from '@/features/slot-status/slot-status';
 import { formatBusinessNumber } from '@/lib/business-number';
+import { formatWon } from '@/lib/format';
 import { getRequestNow } from '@/lib/request-time';
 import { formatEndTime, formatKst, kstDateKey } from '@/lib/time';
 import { maskPhone } from '@/lib/phone';
@@ -51,6 +52,7 @@ import { revealShopOwnerContact } from '../../users/contact-actions';
 import { ContactReveal, RevealButton, RevealedValue } from '../../users/contact-reveal';
 import { labelPgSellerStatus, labelReviewAction, ntsCheckText } from '../format';
 import { selectShopForReview, type ShopReviewDetail } from '../queries';
+import { type SameBusinessShop, selectSameBusinessShops } from '../same-business-queries';
 import { SlotControlAction } from '../slot-control-actions';
 import { selectShopSlotControl, type ShopSlotControl } from '../slot-control-queries';
 import { StatusBadge } from '../status-badge';
@@ -106,14 +108,23 @@ async function ReviewDetail({
   // 비공개 버킷이라 5분 동안만 열리는 주소를 화면을 열 때마다 새로 받는다(#116)
   const doc = await getBusinessDocUrl(shopId);
   const approved = detail.status === 'approved';
+  // 예약을 받았던 샵(승인됨·탈퇴함)만 취소 기록이 있다. 탈퇴한 샵도 보여 줘야 같은 사업자의 다시 신청을 심사할 때 볼 수 있다(#154)
+  const showCancelStats = approved || detail.status === 'withdrawn';
   const now = await getRequestNow();
   // 입점 승인된 샵만 매물을 올리므로 그때만 매물 관리 칸을 보여 준다(#373 ④)
   const control = approved ? await selectShopSlotControl(db, shopId, now) : null;
-  // 입점 승인된 샵만 예약을 받으므로 그때만 취소 기록을 본다. 기간이 잘못됐으면 기록 대신 안내를 보인다(#486)
+  // 승인됐거나 탈퇴한 샵만 취소 기록을 본다. 기간이 잘못됐으면 기록 대신 안내를 보인다(#486)
   const cancelPeriod = readCancelStatsSearch(await searchParams);
   const cancelRange = toCancelStatsRange(cancelPeriod);
   const cancelStats =
-    approved && cancelRange ? await selectShopCancelStats(db, shopId, now, cancelRange) : null;
+    showCancelStats && cancelRange
+      ? await selectShopCancelStats(db, shopId, now, cancelRange)
+      : null;
+  // 같은 사업자등록번호의 다른 샵(#154 재가입과 악용 막기). 탈퇴하고 다시 신청한 원장님의 예전 취소 기록을 확인한다
+  const sameBusiness = await selectSameBusinessShops(db, {
+    shopId,
+    businessRegistrationNumber: detail.business.businessRegistrationNumber,
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -139,6 +150,12 @@ async function ReviewDetail({
           ) : null}
         </CardContent>
       </Card>
+
+      {sameBusiness.length > 0 ? (
+        <Section title={`같은 사업자등록번호의 다른 샵 ${sameBusiness.length}곳`}>
+          <SameBusinessShops shops={sameBusiness} />
+        </Section>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Section title="사업자 정보">
@@ -243,7 +260,7 @@ async function ReviewDetail({
         </Section>
       ) : null}
 
-      {approved ? (
+      {showCancelStats ? (
         <Section
           id={CANCEL_STATS_ANCHOR}
           title={cancelRange ? `취소 기록 · ${labelCancelStatsPeriod(cancelPeriod)}` : '취소 기록'}
@@ -380,6 +397,65 @@ function SlotControlPanel({
           </SelectableRow>
         ))}
       </SlotArea>
+    </div>
+  );
+}
+
+/**
+ * 같은 사업자등록번호의 다른 샵(#154). 줄을 두 번 누르거나 Enter·[상세]로 그 샵 상세(취소 기록)가 열린다(완료의 기준 7번).
+ * 원장님 사정 취소 건수와 못 걷은 패널티는 전체 기간이다
+ */
+function SameBusinessShops({ shops }: { shops: SameBusinessShop[] }) {
+  return (
+    <div className="flex flex-col gap-2 text-sm">
+      <p className="text-muted-foreground">
+        탈퇴하고 다시 신청한 원장님일 수 있어요. 예전 샵의 원장님 사정 취소 기록을 확인해 주세요.
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[40rem]">
+          <thead className="text-left text-muted-foreground">
+            <tr className="border-b">
+              <th className="px-2 py-2 font-medium">샵</th>
+              <th className="px-2 py-2 font-medium">상태</th>
+              <th className="px-2 py-2 font-medium">원장님</th>
+              <th className="px-2 py-2 font-medium">신청</th>
+              <th className="px-2 py-2 font-medium">원장님 사정 취소</th>
+              <th className="px-2 py-2 font-medium">못 걷은 패널티</th>
+              <th className="px-2 py-2 font-medium">
+                <span className="sr-only">관리</span>
+              </th>
+            </tr>
+          </thead>
+          <SelectableRows>
+            {shops.map((shop) => {
+              const href = `/admin/shops/${shop.shopId}`;
+              return (
+                <SelectableRow key={shop.shopId} id={shop.shopId} href={href}>
+                  <td className="px-2 py-2 font-medium">
+                    <Link href={href} className="hover:underline">
+                      {shop.name}
+                    </Link>
+                  </td>
+                  <td className="px-2 py-2">
+                    <StatusBadge status={shop.status} />
+                  </td>
+                  <td className="px-2 py-2 whitespace-nowrap">
+                    {shop.ownerWithdrawnAt ? `탈퇴 ${formatKst(shop.ownerWithdrawnAt)}` : '-'}
+                  </td>
+                  <td className="px-2 py-2 whitespace-nowrap">{formatKst(shop.appliedAt)}</td>
+                  <td className="px-2 py-2">{shop.ownerFaultCount}건</td>
+                  <td className="px-2 py-2 whitespace-nowrap">
+                    {shop.unpaidPenalty > 0 ? formatWon(shop.unpaidPenalty) : '-'}
+                  </td>
+                  <td className="px-2 py-2 text-right">
+                    <DetailLink href={href} label={`${shop.name} 샵 상세`} />
+                  </td>
+                </SelectableRow>
+              );
+            })}
+          </SelectableRows>
+        </table>
+      </div>
     </div>
   );
 }
