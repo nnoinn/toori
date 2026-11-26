@@ -11,10 +11,14 @@ test('고객 로그아웃: 첫 화면이 열리고, 뒤로 가기로 내 정보�
 }) => {
   await signInAs(context, 'customer-c', baseURL!);
   await page.goto('/home');
-  // 로그인한 고객의 PC 위쪽 메뉴에는 알림 종(누르면 최근 알림 상자)이 있다
-  const bell = page.getByRole('banner').getByRole('button', { name: /^알림/ });
+  // 로그인한 고객에게만 알림 종(누르면 최근 알림 상자)이 있다. PC는 위쪽 메뉴, 폰은 홈 위 오른쪽(#371)
+  const bell = page.getByRole('button', { name: /^알림/ });
   await expect(bell).toBeVisible();
-  await page.getByRole('link', { name: '내 정보' }).click();
+  // 고객 메뉴: PC는 위쪽, 폰은 아래
+  await page
+    .getByRole('navigation', { name: '고객 메뉴' })
+    .getByRole('link', { name: '내 정보' })
+    .click();
   await expect(page).toHaveURL(/\/me$/);
 
   await page.getByRole('button', { name: '로그아웃', exact: true }).click();
@@ -35,7 +39,9 @@ test('원장님 로그아웃: 첫 화면이 열리고, 뒤로 가기로 원장�
   page,
   context,
   baseURL,
+  isMobile,
 }) => {
+  test.skip(isMobile, '원장님 화면의 폰 배치는 출시 뒤(사이클 9단계)라 PC에서만 본다');
   await signInAs(context, 'owner-a', baseURL!);
   await page.goto('/owner');
   await page.goto('/owner/account');
