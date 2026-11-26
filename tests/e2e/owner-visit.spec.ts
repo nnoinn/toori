@@ -13,6 +13,12 @@ const OWNER_EMAIL = 'owner-a@seed.test';
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;
 const KST_MS = 9 * 60 * 60 * 1000;
 
+// 원장님 화면의 폰 배치는 출시 뒤(사이클 9단계)라 PC에서만 본다(#592 3차 폰 크기 실행에서 건너뛴다)
+test.skip(
+  ({ isMobile }) => isMobile,
+  '원장님 화면의 폰 배치는 출시 뒤(사이클 9단계)라 PC에서만 본다',
+);
+
 type PendingReservation = {
   id: string;
   code: string;
