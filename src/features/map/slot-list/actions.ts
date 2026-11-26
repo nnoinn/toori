@@ -15,6 +15,7 @@ import { parseFilters } from '../filters';
 import { resolveListArea } from '../list-area';
 import { getCustomerLocation, latLngSchema } from '../location';
 import { REGION_PARAM, withLinkedRegion } from '../region-link';
+import { parseSearchKeyword, SEARCH_PARAM } from '../search';
 import type { MapBounds, MapShop } from '../types';
 import { decodeCursor } from './cursor';
 import { countListItems, selectMapShops, selectSlotPage, type HomeSlotQuery } from './queries';
@@ -121,7 +122,8 @@ const NO_LIST_AREA = '동네를 정하지 못했어요. 동네를 골라 주세�
 
 /**
  * 지도 없는 매물 목록 한 쪽(20개, #215). 범위는 화면에서 받지 않고 서버가 위치 쿠키로 정한다:
- * 고른 동네면 그 시·군·구, 내 위치면 내 위치가 속한 시·군·구(11/3 결정). 첫 쪽에는 범위 안 매물 수도 준다
+ * 고른 동네면 그 시·군·구, 내 위치면 내 위치가 속한 시·군·구(11/3 결정). 첫 쪽에는 범위 안 매물 수도 준다.
+ * 검색(C-210)은 이 목록에서만 한다. 주소창 ?q= 를 다듬어(search.ts) 같은 범위·필터 안에서 거른다
  */
 export async function loadRegionSlots(
   input: unknown,
@@ -139,6 +141,7 @@ export async function loadRegionSlots(
     const query = {
       sigunguCode: area.sigunguCode,
       filters: parseFilters(params),
+      keyword: parseSearchKeyword(params[SEARCH_PARAM]),
       customerId,
       now,
     };

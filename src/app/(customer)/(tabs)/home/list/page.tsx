@@ -10,11 +10,13 @@ import { LocationIntro } from '@/features/map/location-intro';
 import { LocationSwitcher } from '@/features/map/location-switcher';
 import { QuickFilters } from '@/features/map/quick-filters';
 import { REGION_PARAM, withLinkedRegion } from '@/features/map/region-link';
+import { parseSearchKeyword, SEARCH_PARAM } from '@/features/map/search';
 import { parseSort } from '@/features/map/slot-list/sort';
 import { getRequestNow } from '@/lib/request-time';
 import { getOptionalConsents } from '@/server/auth/customer-account';
 import { getInterestAreas } from '@/server/notifications/interest-areas';
 
+import { SearchBox } from '../search-box';
 import { AreaAlert, type AreaAlertState } from './area-alert';
 import { RegionListView } from './region-list-view';
 
@@ -27,6 +29,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 // 위치·동네가 없으면 지도처럼 먼저 위치 안내·동네 선택(C-102)을 보여준다. 필터·정렬은 주소창 값(J5)이다.
 // 동네 링크 /home/list?region=41273 으로 들어오면 그 동네를 보여준다(region-link.ts).
 // 매물이 없으면 그 동네를 관심 동네로 등록하는 새 매물 알림 권유를 같이 보여준다(C-208)
+// 검색(C-210): 홈 검색 칸에서 ?q= 로 들어온다. 맨 윗줄에도 같은 검색 칸을 두어 필터·정렬을 지킨 채 검색어를 바꾼다
 export default function ListPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <main className="flex flex-1 flex-col gap-3 py-3 md:mx-auto md:w-full md:max-w-5xl md:px-6 md:py-6">
@@ -59,6 +62,16 @@ async function ListContent({ searchParams }: { searchParams: SearchParams }) {
   ]);
   const isRegion = location.kind === 'region';
   const filters = parseFilters(params);
+  const keyword = parseSearchKeyword(params[SEARCH_PARAM]);
+  // 검색어가 바뀌면 칸을 새로 그려 지금 검색어를 넣는다(떠났다 와도 남는 화면, Activity)
+  const searchBox = (className: string) => (
+    <SearchBox
+      key={keyword?.text ?? ''}
+      inList
+      defaultValue={keyword?.text}
+      className={className}
+    />
+  );
   const alertState: AreaAlertState | null =
     area && interest.ok && consents.ok
       ? {
@@ -69,11 +82,14 @@ async function ListContent({ searchParams }: { searchParams: SearchParams }) {
 
   return (
     <>
-      <div className="flex items-center px-2 md:px-0">
+      {/* 폰은 검색 칸을 맨 위 한 줄에 둔다(폰 단계에서 다듬는다) */}
+      <div className="px-4 md:hidden">{searchBox('')}</div>
+      <div className="flex items-center px-2 md:gap-2 md:px-0">
         <LocationSwitcher
           label={isRegion ? location.region.name : '내 위치'}
           selectedCode={isRegion ? location.region.code : null}
         />
+        {searchBox('hidden md:block md:max-w-md')}
         <FilterSheet filters={filters} />
       </div>
       <QuickFilters filters={filters} />
@@ -85,6 +101,7 @@ async function ListContent({ searchParams }: { searchParams: SearchParams }) {
             key={area.sigunguCode}
             areaCode={area.sigunguCode}
             areaLabel={area.fromMyLocation ? `내 위치 · ${area.label}` : area.label}
+            keyword={keyword?.text ?? null}
             sort={parseSort(params.sort)}
             serverNow={now.toISOString()}
             emptyAction={
