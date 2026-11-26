@@ -1,4 +1,5 @@
-import { Clock } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronRight, Clock } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { Countdown } from '@/components/ui/countdown';
@@ -10,13 +11,16 @@ import { formatKst } from '@/lib/time';
 
 import { formatDuration } from '@/lib/format';
 import {
+  DetailSection,
   DetailTop,
   RefundPolicyDetails,
   ShopHoursList,
   ShopLinkButtons,
   ShopLocationBlock,
   ShopPhoneLink,
+  ShopProfileLink,
 } from './detail-parts';
+import { shopProfilePath } from '../../shops/[shopId]/shop-format';
 import { type DetailTab, DetailTabs } from './detail-tabs';
 import { FavoriteButton } from './favorite-button';
 import { ReserveButton } from './reserve-button';
@@ -66,8 +70,15 @@ export function SlotDetailView({
       <DetailTop imageUrls={slot.imageUrls} shopName={shop.name} photosKey={slot.slotId} />
 
       <div className="flex items-start justify-between gap-3 px-4 max-md:flex-wrap md:col-start-1 md:row-start-2 md:px-0">
+        {/* 샵 이름을 누르면 샵 프로필(C-309) */}
         <h1 className="flex min-w-0 items-baseline gap-2 max-md:flex-1">
-          <span className="truncate text-xl font-bold">{shop.name}</span>
+          <Link
+            href={shopProfilePath(shop.shopId)}
+            className="flex min-w-0 items-center gap-0.5 hover:underline"
+          >
+            <span className="truncate text-xl font-bold">{shop.name}</span>
+            <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+          </Link>
           <span className="shrink-0 text-sm text-muted-foreground">{slot.shopCategory}</span>
         </h1>
         <FavoriteButton
@@ -149,6 +160,7 @@ export function SlotDetailView({
           <ShopHoursList businessHours={shop.businessHours} />
           <ShopPhoneLink phone={shop.phone} />
           <ShopLinkButtons shop={shop} />
+          <ShopProfileLink shopId={shop.shopId} />
         </DetailSection>
 
         <DetailSection id="location" title="위치">
@@ -174,30 +186,5 @@ export function SlotDetailView({
         <ReserveButton slotId={slot.slotId} availability={slot.availability} />
       </div>
     </article>
-  );
-}
-
-/** 탭 하나가 가리키는 칸(회색 배경 위 흰 카드). 탭을 눌러 내려왔을 때 탭 줄에 가리지 않게 위 여백을 둔다 */
-function DetailSection({
-  id,
-  title,
-  children,
-}: {
-  id: string;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card
-      id={id}
-      role="region"
-      aria-labelledby={`${id}-title`}
-      className="mx-4 scroll-mt-14 gap-3 px-4 text-base md:mx-0 md:scroll-mt-32 md:p-5"
-    >
-      <h2 id={`${id}-title`} className="font-semibold">
-        {title}
-      </h2>
-      {children}
-    </Card>
   );
 }

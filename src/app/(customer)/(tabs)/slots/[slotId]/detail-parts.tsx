@@ -1,8 +1,9 @@
 // 매물 상세(J7)와 시간대 상세(#308)가 같이 쓰는 부분: 맨 위 사진·뒤로가기, 샵 정보(원장님 프로필, C-302~C-304), 접힌 환불 규정(C-305).
 // 두 화면 모두 PC(md 이상)에서 왼쪽 사진·샵 정보, 오른쪽 상자의 두 칸 배치라서 칸 위치 클래스도 여기에 둔다.
 
+import Link from 'next/link';
 import { cn } from 'cn';
-import { ChevronDown, ExternalLink, MapPin, Navigation, Phone } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, MapPin, Navigation, Phone } from 'lucide-react';
 
 import { BackButton } from '@/components/ui/back-button';
 import { buttonVariants } from '@/components/ui/button';
@@ -20,6 +21,7 @@ import {
   telHref,
 } from './detail-format';
 import { kakaoDirectionsLink, kakaoMapLink } from '@/lib/kakao-map';
+import { shopProfilePath } from '../../shops/[shopId]/shop-format';
 import { FavoriteButton } from './favorite-button';
 import { SlotPhotos } from './slot-photos';
 import type { SlotDetail } from './types';
@@ -201,7 +203,7 @@ export function ShopLinkButtons({ shop }: { shop: DetailShop }) {
   );
 }
 
-/** 샵 정보(원장님 프로필): 이름·찜, 주소·작은 지도·길찾기, 전화, 영업시간, 소개, 외부 링크. 시간대 상세가 쓴다 */
+/** 샵 정보(원장님 프로필): 이름·찜, 주소·작은 지도·길찾기, 전화, 영업시간, 소개, 외부 링크, [샵 프로필 보기]. 시간대 상세가 쓴다 */
 export function ShopInfoSection({
   shop,
   favorite,
@@ -240,6 +242,48 @@ export function ShopInfoSection({
         <p className="text-sm whitespace-pre-line text-muted-foreground">{shop.description}</p>
       ) : null}
       <ShopLinkButtons shop={shop} />
+      <ShopProfileLink shopId={shop.shopId} />
+    </Card>
+  );
+}
+
+/** [샵 프로필 보기](C-309). 매물 상세의 샵 정보 칸과 시간대 상세의 샵 정보 끝에 둔다 */
+export function ShopProfileLink({ shopId }: { shopId: string }) {
+  return (
+    <Link
+      href={shopProfilePath(shopId)}
+      className={buttonVariants({ variant: 'outline', className: 'w-full gap-1 max-md:h-10' })}
+    >
+      샵 프로필 보기
+      <ChevronRight className="size-4" aria-hidden />
+    </Link>
+  );
+}
+
+/**
+ * 탭 하나가 가리키는 칸(회색 배경 위 흰 카드). 탭을 눌러 내려왔을 때 탭 줄에 가리지 않게 위 여백을 둔다.
+ * 매물 상세와 샵 프로필(C-309)이 같이 쓴다
+ */
+export function DetailSection({
+  id,
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card
+      id={id}
+      role="region"
+      aria-labelledby={`${id}-title`}
+      className="mx-4 scroll-mt-14 gap-3 px-4 text-base md:mx-0 md:scroll-mt-32 md:p-5"
+    >
+      <h2 id={`${id}-title`} className="font-semibold">
+        {title}
+      </h2>
+      {children}
     </Card>
   );
 }
