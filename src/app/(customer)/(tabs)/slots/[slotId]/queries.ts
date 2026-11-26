@@ -18,7 +18,7 @@ import { customerVisibleShop } from '@/server/shops/visibility';
 
 import type { SlotAvailability, SlotDetail } from './types';
 
-type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
+export type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 
 export type SlotDetailQuery = {
   slotId: string;
@@ -83,11 +83,7 @@ export async function selectSlotDetail(
   const status = getSlotStatus({ ...row, status: row.status as SlotStatus }, query.now);
   if (status === 'scheduled') return null;
 
-  const images = await db
-    .select({ storagePath: shopImages.storagePath })
-    .from(shopImages)
-    .where(eq(shopImages.shopId, row.shopId))
-    .orderBy(...imageOrder);
+  const imageUrls = await selectShopImageUrls(db, row.shopId);
 
   return {
     slotId: row.slotId,
@@ -118,10 +114,20 @@ export async function selectSlotDetail(
       instagramUrl: row.instagramUrl,
       naverPlaceUrl: row.naverPlaceUrl,
     },
-    imageUrls: images
-      .map((image) => shopImageUrl(image.storagePath))
-      .filter((url): url is string => url !== null),
+    imageUrls,
   };
+}
+
+/** 샵 사진의 공개 주소: 대표 사진 먼저, 그다음 스타일 사진(원장님이 정한 순서). 샵 프로필(C-309)도 쓴다 */
+export async function selectShopImageUrls(db: DbReader, shopId: string): Promise<string[]> {
+  const images = await db
+    .select({ storagePath: shopImages.storagePath })
+    .from(shopImages)
+    .where(eq(shopImages.shopId, shopId))
+    .orderBy(...imageOrder);
+  return images
+    .map((image) => shopImageUrl(image.storagePath))
+    .filter((url): url is string => url !== null);
 }
 
 function availabilityOf(
