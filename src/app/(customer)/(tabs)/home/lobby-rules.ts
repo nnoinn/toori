@@ -1,14 +1,8 @@
-// 고객 홈(로비, /home)의 바로가기 칸과 매물 칸 규칙 (11/15 회의 6번·1번, 11/20 정찬형 A안).
+// 고객 홈(로비, /home)의 바로가기 칸과 매물 칸 규칙 (11/15 회의 6번·1번, 11/20 정찬형 A안, 바로가기 6칸은 C-213).
 // 바로가기의 필터·정렬은 매물 목록 주소창 값(filters.ts·sort.ts)으로 만들어서, 목록이 같은 값으로 읽는다.
 // 업종·할인율은 정책값에서 가져온다(화면에 숫자를 직접 쓰지 않는다)
 
-import {
-  applyFiltersToSearch,
-  EMPTY_FILTERS,
-  QUICK_MIN_DISCOUNT,
-  selectCategory,
-  selectMinDiscount,
-} from '@/features/map/filters';
+import { applyFiltersToSearch, EMPTY_FILTERS, selectCategory } from '@/features/map/filters';
 import { type ListItem, listItemKey } from '@/features/map/slot-list/types';
 import { applySortToSearch, type SlotSort } from '@/features/map/slot-list/sort';
 import { SHOP_CATEGORIES, type ShopCategory } from '@/server/policy';
@@ -32,30 +26,23 @@ export function sortedListHref(sort: SlotSort): string {
   return listHref(applySortToSearch(new URLSearchParams(), sort));
 }
 
-/** 빠른 고르기 칩과 같은 "N% 이상" 매물 목록 */
-export const DISCOUNT_LIST_HREF = listHref(
-  applyFiltersToSearch(new URLSearchParams(), selectMinDiscount(EMPTY_FILTERS, QUICK_MIN_DISCOUNT)),
-);
-
-export type LobbyTileKey =
-  'list' | 'map' | 'favorites' | 'reservations' | ShopCategory | 'discount' | 'imminent';
+export type LobbyTileKey = 'list' | 'map' | 'favorites' | 'reservations' | ShopCategory;
 
 /**
- * 바로가기 칸 8개(당근 웹처럼, 4칸 2줄). 앞 4칸은 화면, 뒤 4칸은 필터·정렬을 건 매물 목록이다.
- * "곧 시작"은 임박순이다(매물 목록에 날짜 필터가 없어서 "오늘 매물" 대신, 11/20 정찬형)
+ * 바로가기 칸 6개(3칸 2줄, C-213 11/26). 윗줄은 화면 3개, 아랫줄은 업종 2개(그 업종만 고른 매물 목록)와 내 예약이다.
+ * 예전 8칸에서 "N% 이상"·"곧 시작"을 빼고 내 예약만 오른쪽 아래로 옮겼다. 할인·임박은 아래 매물 칸의 [더 보기]로 간다.
+ * 찜한 샵은 '관심'으로 이름을 바꿀 때(C-211) 같이 바꾼다
  */
 export const LOBBY_TILES: readonly { key: LobbyTileKey; label: string; href: string }[] = [
   { key: 'list', label: '매물 목록', href: LIST_PATH },
   { key: 'map', label: '지도', href: '/home/map' },
   { key: 'favorites', label: '찜한 샵', href: '/home/favorites' },
-  { key: 'reservations', label: '내 예약', href: '/reservations' },
   ...SHOP_CATEGORIES.map((category) => ({
     key: category.key,
     label: category.label,
     href: categoryListHref(category.key),
   })),
-  { key: 'discount', label: `${QUICK_MIN_DISCOUNT}% 이상`, href: DISCOUNT_LIST_HREF },
-  { key: 'imminent', label: '곧 시작', href: sortedListHref('imminent') },
+  { key: 'reservations', label: '내 예약', href: '/reservations' },
 ];
 
 /** 매물 칸에 보여 줄 줄 수. 폰은 두 칸 모두 PHONE_ROW_COUNT줄까지 */
