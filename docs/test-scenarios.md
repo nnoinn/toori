@@ -220,6 +220,7 @@ PR 검사가 자동으로 막는 것:
 | AUTH-19 | 탈퇴할 때 같은 사람 표시(로그인 이메일의 HMAC)를 남긴다. 키가 없으면 운영 배포는 탈퇴를 막고(아무것도 바꾸지 않음), 로컬·미리보기는 표시 없이 탈퇴한다 | #154 본문 4장, 11/24 | ✅ | `src/server/accounts/identity.test.ts` 앞뒤 공백과 대소문자가 달라도 같은 이메일이면 같은 값이다<br>`src/server/accounts/withdrawal.test.ts` 같은 사람 표시 키가 없으면 운영 배포는 NOT_READY |
 | AUTH-20 | 탈퇴하고 30일 안에는 같은 로그인으로 그 계정 종류에 새로 가입하지 못하고(WITHDRAWN_RESTORABLE) 되살리기만 할 수 있다. 되살리면 고객은 이력 그대로, 원장님은 샵이 탈퇴 전 상태로 돌아오고, 일괄 마감한 매물·없어진 쿠폰·철회한 동의는 돌아오지 않는다. 딱 30일이 되는 시각부터는 되살리지 못하고 새로 가입할 수 있다 | #154 본문 3장 | ✅ | `src/server/auth/customer-account.test.ts` 되살리기 기간 안에 탈퇴한 고객 계정이 있으면<br>`src/server/auth/owner-account.test.ts` 되살리기 기간 안에 탈퇴한 원장님 계정이 있으면<br>`src/server/accounts/withdrawal-restore-store.db.test.ts` 되살리기 기간(30일) 안의 끝나지 않은 탈퇴 기록이 있을 때만 새 가입을 막는다<br>`src/server/accounts/withdrawal-restore-store.db.test.ts` 원장님: 샵을 탈퇴 전 상태(승인 대기)로 돌리고<br>`src/server/accounts/withdrawal.test.ts` 30일이 지났으면 RESTORE_EXPIRED |
 | AUTH-21 | 탈퇴하고 30일이 지나고 되살리지 않은 계정은 매일 오후 1시 작업이 개인정보를 지운다: 고객 이름·닉네임("탈퇴한 회원")·휴대폰, 원장님 이름("탈퇴한 회원")·휴대폰, 사업자등록증·샵 사진(파일까지), 계좌번호·예금주, 샵 소개·메뉴 설명. 상호·대표자명·사업자등록번호·주소, 은행·뒷자리, 거래 기록, 같은 사람 표시는 남긴다. 계정이 모두 탈퇴했고 끝나지 않은 탈퇴 기록이 없는 사람은 로그인 정보를 지운 뒤 이메일을 비운다(지우지 못하면 다음 날 다시) | #154 본문 4장, 11/23·11/24 | ✅ | `src/server/accounts/withdrawal-erase-store.db.test.ts` 되살리지도 지우지도 않았고 30일이 지난 탈퇴 기록만<br>`src/server/accounts/withdrawal-erase-store.db.test.ts` 원장님: 이름·휴대폰, 등록증, 샵 소개, 계좌번호·예금주<br>`src/server/accounts/withdrawal-erase-store.db.test.ts` 로그인 정보는 계정이 모두 탈퇴했고<br>`src/server/accounts/withdrawal-erase.test.ts` 로그인 정보를 지운 뒤에만 이메일을 비운다<br>`src/app/api/cron/slot-digest/route.test.ts` 마지막에 같은 서버 시각으로 탈퇴 30일 뒤 개인정보를 지운다 |
+| AUTH-22 | 로그인하지 않고 둘러보다가 매물 상세에서 [예약하기]를 누르면 고객 로그인 화면으로 가고, 로그인하면 보던 매물 상세로 돌아온다 | C-102·C-301, 11/25 nnoinn(#592) | ✅ | `tests/e2e/browse.spec.ts` 로그인 없이 둘러보다가 [예약하기]를 누르면 고객 로그인 화면으로 가고<br>`src/lib/safe-next.test.ts` 우리 사이트 안 주소는 그대로 통과한다 |
 
 ## 15. 시간대 매물 (#308, 진행 중)
 
@@ -236,11 +237,11 @@ PR 검사가 자동으로 막는 것:
 
 ## 16. 한 바퀴 흐름 (서버 흐름 ②·브라우저 ③에서 자동으로)
 
-여러 기능이 이어지는 흐름이다. 지금은 손 점검 체크리스트로 보고, 서버 흐름 테스트(②, 실제 서버 함수를 테스트 DB에서 차례로)와 브라우저 테스트(③, 결제사는 가짜)로 옮긴다. 서버 흐름 테스트는 `tests/flows/`에 있고, 바깥 서비스(로그인·포트원·웹 푸시)와 시각만 `tests/flows/fakes.ts`의 가짜로 바꾼다(11/13~). 브라우저 테스트는 `tests/e2e/`에 있고 로컬 Supabase에서 돈다(11/25~, #592). 1차는 결제 전까지(둘러보기·홀딩·로그아웃)이고, FLOW-01의 결제부터는 2차(가짜 결제사)에서 더한다.
+여러 기능이 이어지는 흐름이다. 지금은 손 점검 체크리스트로 보고, 서버 흐름 테스트(②, 실제 서버 함수를 테스트 DB에서 차례로)와 브라우저 테스트(③, 결제사는 가짜)로 옮긴다. 서버 흐름 테스트는 `tests/flows/`에 있고, 바깥 서비스(로그인·포트원·웹 푸시)와 시각만 `tests/flows/fakes.ts`의 가짜로 바꾼다(11/13~). 브라우저 테스트는 `tests/e2e/`에 있고 로컬 Supabase에서 PC·폰 크기로 돈다(11/25~, #592). 결제는 가짜 결제사로 본다(2차): 브라우저 결제창은 테스트가 가짜로 바꾸고(`tests/e2e/support/portone.ts`), 서버의 결제 조회·취소는 가짜 포트원 서버(`tests/e2e/setup/fake-portone.mjs`, `PORTONE_API_URL`)로 간다. 진짜 결제창은 FLOW-06 손 점검으로 본다.
 
 | ID | 시나리오와 기대 | 근거 | 상태 | 테스트 |
 | --- | --- | --- | --- | --- |
-| FLOW-01 | 손님: 목록 → 상세 → [예약하기] 10분 홀딩 → 결제 → 예약 확정 알림(손님·원장님) → 내 예약 → 30시간 전 취소 → 70% 환불, 원장님에게 재등록 안내 | C-404·X-202 | ✅ | `tests/flows/customer-booking.db.test.ts` 목록 → 상세 → 10분 홀딩 → 결제 |
+| FLOW-01 | 손님: 목록 → 상세 → [예약하기] 10분 홀딩 → 결제 → 예약 확정 알림(손님·원장님) → 내 예약 → 30시간 전 취소 → 70% 환불, 원장님에게 재등록 안내 | C-404·X-202 | ✅ | `tests/flows/customer-booking.db.test.ts` 목록 → 상세 → 10분 홀딩 → 결제<br>`tests/e2e/payment.spec.ts` 결제하면 예약이 확정되고 내 예약에 보이며, 24시간 넘게 남았을 때 취소하면 결제액의 70%를 돌려받는다 |
 | FLOW-02 | 원장님: 가입·입점 신청 → 운영자 승인 → 매물 등록(게시예정·게시중) → 대시보드 → 예약 → 시작 뒤 방문·노쇼 처리 → 매물 완료 | S-101·A-101·S-405 | ✅ | `tests/flows/owner-flow.db.test.ts` 가입·입점 신청 → 운영자 승인 → 매물 등록(게시예정·게시중) |
 | FLOW-03 | 합의 후 취소: 원장님 요청 → 손님 알림 → 동의 → 결제액 50% 환불·예약 취소, 거절과 24시간 만료는 예약 그대로 | X-208 | ✅ | `tests/flows/agreed-cancel.db.test.ts` 원장님 요청 → 손님 알림 → 동의<br>`tests/flows/agreed-cancel.db.test.ts` 손님이 거절하면 예약은 그대로이고 |
 | FLOW-04 | 홀딩 경쟁: 두 손님이 같은 매물을 누르면 한 명만 홀딩되고, 다른 손님에게는 "결제 중"이 보이며, 10분이 지나면 다른 손님이 홀딩할 수 있다. 한 사람은 동시에 하나만 홀딩한다 | X-304·C-404 | ✅ | `tests/flows/hold-race.db.test.ts` 두 손님이 같은 매물을 누르면 한 명만 홀딩되고<br>`tests/flows/hold-race.db.test.ts` 10분이 지나면 다른 손님이 홀딩해<br>`tests/flows/hold-race.db.test.ts` 한 손님은 동시에 매물 하나만 홀딩한다 |

@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
+import { FAKE_PORTONE } from './tests/e2e/setup/fake-portone.mjs';
 import { e2eAppEnv, readLocalSupabase } from './tests/e2e/setup/local-supabase.mjs';
 
 // 브라우저 자동 테스트(E2E, 회귀 테스트 ③, #592). 로봇이 실제 브라우저로 고객 흐름을 눌러 본다.
@@ -39,21 +40,42 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  // PC 화면(1280×800)부터 한다. 폰 크기(375×812)는 3차(#592)
+  // 같은 흐름을 PC(1280×800)와 고객 폰(375×812, 터치, #592 3차)에서 돌린다.
+  // 원장님 화면의 폰 배치는 출시 뒤(사이클 9단계)라 원장님 흐름은 PC에서만 본다(테스트 안에서 건너뛴다)
   projects: [
     {
       name: 'pc',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } },
     },
+    {
+      name: 'phone',
+      use: {
+        browserName: 'chromium',
+        userAgent: devices['Pixel 7'].userAgent,
+        viewport: { width: 375, height: 812 },
+        deviceScaleFactor: 2,
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
   ],
-  webServer: {
-    // GitHub 검사는 앞 단계에서 같은 값으로 빌드해 두고 켜기만 한다. 내 컴퓨터는 E2E 값으로 다시 빌드한다
-    // (그냥 빌드하면 .env.local의 공용 개발 DB 주소가 화면 코드에 들어간다)
-    command: CI ? 'npm run start' : 'npm run build && npm run start',
-    url: BASE_URL,
-    // 이미 켜진 서버(npm run dev, 공용 개발 DB)에 붙지 않는다. 3000번이 쓰이고 있으면 끄고 다시 돌린다
-    reuseExistingServer: false,
-    timeout: 300_000,
-    env: e2eAppEnv(supabase),
-  },
+  webServer: [
+    {
+      // 가짜 포트원 서버(#592 2차). 앱 서버의 결제 조회·취소(PORTONE_API_URL)가 여기로 온다
+      command: 'node tests/e2e/setup/fake-portone-server.mjs',
+      url: `${FAKE_PORTONE.url}/health`,
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+    {
+      // GitHub 검사는 앞 단계에서 같은 값으로 빌드해 두고 켜기만 한다. 내 컴퓨터는 E2E 값으로 다시 빌드한다
+      // (그냥 빌드하면 .env.local의 공용 개발 DB 주소가 화면 코드에 들어간다)
+      command: CI ? 'npm run start' : 'npm run build && npm run start',
+      url: BASE_URL,
+      // 이미 켜진 서버(npm run dev, 공용 개발 DB)에 붙지 않는다. 3000번이 쓰이고 있으면 끄고 다시 돌린다
+      reuseExistingServer: false,
+      timeout: 300_000,
+      env: e2eAppEnv(supabase),
+    },
+  ],
 });
