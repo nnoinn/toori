@@ -7,7 +7,9 @@ import { NO_SHOW_PENALTY_RATE, OWNER_FAULT_COUPON_AMOUNT, REFUND_BANDS } from '@
 
 import {
   formatBusinessHours,
+  movedPhotoIndex,
   photoIndexAt,
+  photoStepForKey,
   refundPolicyLines,
   refundPolicyNotes,
   safeExternalUrl,
@@ -33,6 +35,26 @@ describe('사진 번호', () => {
   it('칸 폭을 못 재거나 사진이 없으면 첫 장', () => {
     expect(photoIndexAt(300, 0, 3)).toBe(0);
     expect(photoIndexAt(300, 600, 0)).toBe(0);
+  });
+});
+
+describe('사진 크게 보기 넘기기', () => {
+  it('←는 이전, →는 다음, 다른 키는 넘기지 않는다', () => {
+    expect(photoStepForKey('ArrowLeft')).toBe(-1);
+    expect(photoStepForKey('ArrowRight')).toBe(1);
+    expect(photoStepForKey('Enter')).toBeNull();
+    expect(photoStepForKey('ArrowUp')).toBeNull();
+  });
+
+  it('한 장씩 옮기고 첫 장·마지막 장을 넘지 않는다(돌아서 처음으로 가지 않는다)', () => {
+    expect(movedPhotoIndex(0, 1, 3)).toBe(1);
+    expect(movedPhotoIndex(2, -1, 3)).toBe(1);
+    expect(movedPhotoIndex(0, -1, 3)).toBe(0);
+    expect(movedPhotoIndex(2, 1, 3)).toBe(2);
+  });
+
+  it('사진이 없으면 첫 장', () => {
+    expect(movedPhotoIndex(0, 1, 0)).toBe(0);
   });
 });
 

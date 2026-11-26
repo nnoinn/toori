@@ -67,6 +67,19 @@ export function photoIndexAt(scrollLeft: number, slideWidth: number, count: numb
   return Math.min(count - 1, Math.max(0, Math.round(scrollLeft / slideWidth)));
 }
 
+/** 사진 크게 보기에서 누른 키로 옮길 칸: ←는 이전(-1), →는 다음(+1), 그 밖의 키는 null */
+export function photoStepForKey(key: string): -1 | 1 | null {
+  if (key === 'ArrowLeft') return -1;
+  if (key === 'ArrowRight') return 1;
+  return null;
+}
+
+/** 사진 크게 보기에서 옮긴 뒤 번호(0부터). 첫 장·마지막 장을 넘지 않는다(돌아서 처음으로 가지 않는다) */
+export function movedPhotoIndex(index: number, step: number, count: number): number {
+  if (count <= 0) return 0;
+  return Math.min(count - 1, Math.max(0, index + step));
+}
+
 /** 전화 걸기 링크용 숫자만. 예: "031-123-4567" → "tel:0311234567" */
 export function telHref(phone: string): string | null {
   const digits = phone.replace(/[^\d+]/g, '');
