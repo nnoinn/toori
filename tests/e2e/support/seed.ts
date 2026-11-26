@@ -114,6 +114,14 @@ export function reservableSeedSlotIds(): Promise<string[]> {
   return seedSlotIds({ minHoursLeft: 7, withNewCustomerOnly: false });
 }
 
+/**
+ * 예약할 수 있고, 취소하면 70% 환불 구간(24시간 이상 남음, X-202)인 시드 매물(#592 2차).
+ * 결제·취소하는 동안 24시간 아래로 내려가지 않게 25시간보다 많이 남은 것만 고른다
+ */
+export function refundableSeedSlotIds(): Promise<string[]> {
+  return seedSlotIds({ minHoursLeft: 25, withNewCustomerOnly: false });
+}
+
 /** 이 매물을 지금 홀딩한 시드 고객(없거나 끝났으면 null) */
 export async function holderOf(slotId: string): Promise<string | null> {
   return withDb(async (sql) => {

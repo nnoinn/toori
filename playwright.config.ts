@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
+import { FAKE_PORTONE } from './tests/e2e/setup/fake-portone.mjs';
 import { e2eAppEnv, readLocalSupabase } from './tests/e2e/setup/local-supabase.mjs';
 
 // 브라우저 자동 테스트(E2E, 회귀 테스트 ③, #592). 로봇이 실제 브라우저로 고객 흐름을 눌러 본다.
@@ -58,14 +59,23 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    // GitHub 검사는 앞 단계에서 같은 값으로 빌드해 두고 켜기만 한다. 내 컴퓨터는 E2E 값으로 다시 빌드한다
-    // (그냥 빌드하면 .env.local의 공용 개발 DB 주소가 화면 코드에 들어간다)
-    command: CI ? 'npm run start' : 'npm run build && npm run start',
-    url: BASE_URL,
-    // 이미 켜진 서버(npm run dev, 공용 개발 DB)에 붙지 않는다. 3000번이 쓰이고 있으면 끄고 다시 돌린다
-    reuseExistingServer: false,
-    timeout: 300_000,
-    env: e2eAppEnv(supabase),
-  },
+  webServer: [
+    {
+      // 가짜 포트원 서버(#592 2차). 앱 서버의 결제 조회·취소(PORTONE_API_URL)가 여기로 온다
+      command: 'node tests/e2e/setup/fake-portone-server.mjs',
+      url: `${FAKE_PORTONE.url}/health`,
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+    {
+      // GitHub 검사는 앞 단계에서 같은 값으로 빌드해 두고 켜기만 한다. 내 컴퓨터는 E2E 값으로 다시 빌드한다
+      // (그냥 빌드하면 .env.local의 공용 개발 DB 주소가 화면 코드에 들어간다)
+      command: CI ? 'npm run start' : 'npm run build && npm run start',
+      url: BASE_URL,
+      // 이미 켜진 서버(npm run dev, 공용 개발 DB)에 붙지 않는다. 3000번이 쓰이고 있으면 끄고 다시 돌린다
+      reuseExistingServer: false,
+      timeout: 300_000,
+      env: e2eAppEnv(supabase),
+    },
+  ],
 });

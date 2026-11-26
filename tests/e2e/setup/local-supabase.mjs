@@ -5,6 +5,8 @@
 
 import { execFileSync } from 'node:child_process';
 
+import { FAKE_PORTONE } from './fake-portone.mjs';
+
 /** GitHub 검사(supabase/setup-cli)와 내 컴퓨터(npx)가 같은 버전의 Supabase CLI를 쓴다 */
 export const SUPABASE_CLI_VERSION = '2.122.1';
 
@@ -105,15 +107,24 @@ const FAKE_SECRETS = {
 };
 
 /**
+ * 결제는 가짜 포트원 서버로 간다(#592 2차, fake-portone.mjs). 결제 조회·취소 주소(PORTONE_API_URL)는 내 컴퓨터 주소이고,
+ * 상점 아이디·채널 키·API 시크릿도 E2E 전용 가짜 값이다. 브라우저 결제창은 테스트가 가짜로 바꾼다(support/portone.ts)
+ */
+const FAKE_PORTONE_ENV = {
+  PORTONE_API_URL: FAKE_PORTONE.url,
+  NEXT_PUBLIC_PORTONE_STORE_ID: FAKE_PORTONE.storeId,
+  NEXT_PUBLIC_PORTONE_CHANNEL_KEY: FAKE_PORTONE.channelKey,
+  PORTONE_API_SECRET: FAKE_PORTONE.secret,
+};
+
+/**
  * 빈 값으로 덮는 환경변수. 내 컴퓨터의 .env.local(공용 개발 DB·외부 서비스 키, 로컬 스위치)이 E2E 앱 서버에 섞이지 않게 한다.
  * Next.js는 이미 있는 환경변수를 .env 파일로 덮지 않는다(빈 값도 있는 것으로 본다)
  */
 const BLANK_KEYS = [
   'NEXT_PUBLIC_KAKAO_MAP_JS_KEY',
   'KAKAO_REST_API_KEY',
-  'NEXT_PUBLIC_PORTONE_STORE_ID',
-  'NEXT_PUBLIC_PORTONE_CHANNEL_KEY',
-  'PORTONE_API_SECRET',
+  // 웹훅(W13)은 가짜 포트원이 보내지 않는다. 결제 확인은 결과 화면이 조회로 한다
   'PORTONE_WEBHOOK_SECRET',
   'NEXT_PUBLIC_VAPID_PUBLIC_KEY',
   'VAPID_PRIVATE_KEY',
@@ -136,6 +147,7 @@ export function e2eAppEnv(supabase) {
     SUPABASE_SECRET_KEY: supabase.serviceRoleKey,
     DATABASE_URL: supabase.dbUrl,
     ...FAKE_SECRETS,
+    ...FAKE_PORTONE_ENV,
     ...Object.fromEntries(BLANK_KEYS.map((key) => [key, ''])),
   };
 }

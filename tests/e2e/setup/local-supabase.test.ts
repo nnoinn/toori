@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { FAKE_PORTONE } from './fake-portone.mjs';
 import { e2eAppEnv, isLocalUrl, parseStatusEnv, readLocalSupabase } from './local-supabase.mjs';
 
 // E2E 안전장치(#592): 브라우저 자동 테스트는 로컬 Supabase(127.0.0.1)에서만 돌고, 공용 개발 DB 주소면 바로 멈춘다.
@@ -105,7 +106,7 @@ describe('E2E 앱 서버 환경변수', () => {
 
   it('외부 서비스 키·팀 접속 코드·로컬 스위치는 빈 값으로 덮는다', () => {
     for (const key of [
-      'PORTONE_API_SECRET',
+      'PORTONE_WEBHOOK_SECRET',
       'KAKAO_REST_API_KEY',
       'VAPID_PRIVATE_KEY',
       'SITE_LOCK_CODE',
@@ -115,6 +116,16 @@ describe('E2E 앱 서버 환경변수', () => {
     ]) {
       expect(env[key as keyof typeof env], key).toBe('');
     }
+  });
+
+  it('결제는 내 컴퓨터의 가짜 포트원 서버로 가고, 포트원 키는 E2E 가짜 값이다(#592 2차)', () => {
+    expect(env).toMatchObject({
+      PORTONE_API_URL: 'http://127.0.0.1:4010',
+      NEXT_PUBLIC_PORTONE_STORE_ID: FAKE_PORTONE.storeId,
+      NEXT_PUBLIC_PORTONE_CHANNEL_KEY: FAKE_PORTONE.channelKey,
+      PORTONE_API_SECRET: FAKE_PORTONE.secret,
+    });
+    expect(isLocalUrl(env.PORTONE_API_URL)).toBe(true);
   });
 
   it('같은 사람 표시 키는 E2E 전용 가짜 값(16진수 64자리)', () => {
