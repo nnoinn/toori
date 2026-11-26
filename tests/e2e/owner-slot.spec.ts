@@ -18,20 +18,30 @@ const MONDAY = 1;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const KST_MS = 9 * 60 * 60 * 1000;
 
+// 원장님 화면의 폰 배치는 출시 뒤(사이클 9단계)라 PC에서만 본다(#592 3차 폰 크기 실행에서 건너뛴다)
+test.skip(
+  ({ isMobile }) => isMobile,
+  '원장님 화면의 폰 배치는 출시 뒤(사이클 9단계)라 PC에서만 본다',
+);
+
 /** 테스트를 시작한 시각. 이 뒤에 원장님 A가 올린 매물을 끝나면 지운다 */
-let startedAt: Date;
+let startedAt: Date | null = null;
 
 test.beforeEach(() => {
   startedAt = new Date();
 });
 
 // 테스트가 올린 매물은 로컬 E2E DB에서 지운다(화면에는 지우기가 없다, S-206). 실패해서 다시 돌 때(GitHub 검사는 한 번 더 돈다)
-// 같은 시각에 매물이 남아 겹침에 막히거나 마감 목록에 같은 줄이 둘 생기지 않게 한다. 예약·결제가 없는 매물이라 다른 표가 가리키지 않는다
+// 같은 시각에 매물이 남아 겹침에 막히거나 마감 목록에 같은 줄이 둘 생기지 않게 한다. 예약·결제가 없는 매물이라 다른 표가 가리키지 않는다.
+// 폰에서 건너뛰면 위 beforeEach는 돌지 않고 이 afterEach만 돌아서, 시작 시각이 없으면 지우지 않는다
 test.afterEach(async () => {
+  if (!startedAt) return;
+  const since = startedAt;
+  startedAt = null;
   await withDb(async (sql) => {
     await sql`
       delete from slots
-      where shop_id = (${ownerShopId(sql)}) and created_at >= ${startedAt} and window_id is null`;
+      where shop_id = (${ownerShopId(sql)}) and created_at >= ${since} and window_id is null`;
   });
 });
 
