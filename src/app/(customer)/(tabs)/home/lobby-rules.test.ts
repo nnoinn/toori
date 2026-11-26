@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { EMPTY_FILTERS, parseFilters, QUICK_MIN_DISCOUNT } from '@/features/map/filters';
+import { EMPTY_FILTERS, parseFilters } from '@/features/map/filters';
 import { parseSort } from '@/features/map/slot-list/sort';
 import type { ListItem } from '@/features/map/slot-list/types';
 
 import { favoriteSummaryText, LIST_PATH, LOBBY_TILES, withoutShown } from './lobby-rules';
 
-// 고객 홈(로비) 바로가기와 찜한 샵 상자 문구 (11/15 회의 6번, 11/20 정찬형 A안)
+// 고객 홈(로비) 바로가기와 찜한 샵 상자 문구 (11/15 회의 6번, 11/20 정찬형 A안, 바로가기 6칸은 C-213)
 
 /** 바로가기 주소를 매물 목록이 읽는 대로 읽는다 */
 function readListHref(href: string) {
@@ -22,17 +22,21 @@ function tile(key: string) {
 }
 
 describe('바로가기 칸', () => {
-  it('8칸이고(4칸 2줄) 순서는 화면 4개 → 업종 2개 → 할인율 → 곧 시작', () => {
+  it('6칸이고(3칸 2줄) 윗줄은 매물 목록·지도·찜한 샵, 아랫줄은 미용실·네일·속눈썹·내 예약 (C-213)', () => {
     expect(LOBBY_TILES.map((t) => t.label)).toEqual([
       '매물 목록',
       '지도',
       '찜한 샵',
-      '내 예약',
       '미용실',
       '네일·속눈썹',
-      `${QUICK_MIN_DISCOUNT}% 이상`,
-      '곧 시작',
+      '내 예약',
     ]);
+  });
+
+  it('할인율("N% 이상")·"곧 시작" 바로가기는 없다(아래 매물 칸의 [더 보기]로 간다, C-213)', () => {
+    const keys: string[] = LOBBY_TILES.map((t) => t.key);
+    expect(keys).not.toContain('discount');
+    expect(keys).not.toContain('imminent');
   });
 
   it('화면 바로가기는 그 화면 주소로 간다', () => {
@@ -52,22 +56,6 @@ describe('바로가기 칸', () => {
       path: LIST_PATH,
       filters: { ...EMPTY_FILTERS, category: 'nail_lash' },
       sort: 'near',
-    });
-  });
-
-  it('할인율 바로가기는 빠른 고르기 칩과 같은 "N% 이상"이다', () => {
-    expect(readListHref(tile('discount').href)).toEqual({
-      path: LIST_PATH,
-      filters: { ...EMPTY_FILTERS, minDiscount: QUICK_MIN_DISCOUNT },
-      sort: 'near',
-    });
-  });
-
-  it('"곧 시작"은 필터 없이 임박순이다', () => {
-    expect(readListHref(tile('imminent').href)).toEqual({
-      path: LIST_PATH,
-      filters: EMPTY_FILTERS,
-      sort: 'imminent',
     });
   });
 });

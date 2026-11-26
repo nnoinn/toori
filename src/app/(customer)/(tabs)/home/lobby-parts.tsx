@@ -2,13 +2,11 @@ import Link from 'next/link';
 import {
   CalendarCheck,
   ChevronRight,
-  Clock,
   Heart,
   List,
   type LucideIcon,
   Map as MapIcon,
   MapPin,
-  Percent,
   Scissors,
   Sparkles,
 } from 'lucide-react';
@@ -34,8 +32,6 @@ const TILE_ICONS: Record<LobbyTileKey, LucideIcon> = {
   reservations: CalendarCheck,
   hair: Scissors,
   nail_lash: Sparkles,
-  discount: Percent,
-  imminent: Clock,
 };
 
 /** 동네 줄: 지금 동네(누르면 동네 고르기)와 지금 예약할 수 있는 할인 매물 수 */
@@ -68,13 +64,13 @@ export function LobbyAreaBar({
 }
 
 /**
- * 바로가기 칸 8개(4칸 2줄, 당근 웹처럼). PC는 흰 칸에 아이콘과 이름, 폰은 흰 아이콘 칸 아래 이름(앱 아이콘처럼).
+ * 바로가기 칸 6개(3칸 2줄, C-213). PC는 흰 칸에 아이콘과 이름, 폰은 흰 아이콘 칸 아래 이름(앱 아이콘처럼).
  * 폰에서 누르는 곳은 아이콘과 이름을 합친 칸 전체라 40px보다 크다
  */
 export function LobbyTiles() {
   return (
     <nav aria-label="바로가기">
-      <ul className="grid grid-cols-4 gap-x-2 gap-y-3 md:gap-2.5">
+      <ul className="grid grid-cols-3 gap-x-2 gap-y-3 md:gap-2.5">
         {LOBBY_TILES.map(({ key, label, href }) => {
           const Icon = TILE_ICONS[key];
           return (
