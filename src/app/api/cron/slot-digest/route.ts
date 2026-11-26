@@ -7,6 +7,7 @@ import { getDb } from '@/db';
 import { getRequestNow } from '@/lib/request-time';
 import { eraseWithdrawnAccounts } from '@/server/accounts/withdrawal-erase';
 import { recordCronRun } from '@/server/cron/run-log';
+import type { SlotDigestRunSummary } from '@/server/cron/summaries';
 import { isCronRequest } from '@/server/cron/auth';
 import { sendConsentRechecks, sendSlotDigest } from '@/server/notifications';
 import { cleanUpBusinessDocs } from '@/server/storage/business-doc-cleanup';
@@ -20,15 +21,21 @@ export async function POST(request: Request) {
   }
   const db = getDb();
   const now = await getRequestNow();
-  // 실행 기록을 남긴다(#373 ⑥). 결과는 보낸 개수, 지운 등록증 수, 보낸 동의 확인 수, 개인정보를 지운 탈퇴 계정 수다
-  const result = await recordCronRun(db, 'slot-digest', now, async () => ({
-    digest: await sendSlotDigest(db, now),
-    // 알림을 보낸 뒤에 한다. 실패해도 던지지 않고 결과에 남긴다
-    businessDocs: await cleanUpBusinessDocs(db, now),
-    // 동의를 읽다 실패하면 던져서 실행 기록에 실패로 남는다(앞의 두 일은 이미 끝났고, 탈퇴 지우기는 다음 날 한다)
-    consentRecheck: await sendConsentRechecks(db, now),
-    // 맨 뒤에 둔다. 탈퇴 기록을 읽다 실패하면 던져서 실행 기록에 실패로 남지만, 앞의 일들은 이미 끝났다
-    withdrawalErase: await eraseWithdrawnAccounts(db, now),
-  }));
+  // 실행 기록을 남긴다(#373 ⑥). 결과는 보낸 개수, 지운 등록증 수, 보낸 동의 확인 수, 개인정보를 지운 탈퇴 계정 수다.
+  // 값을 더하면 summaries.ts와 운영자 예약 작업 화면 이름표도 고친다
+  const result = await recordCronRun(
+    db,
+    'slot-digest',
+    now,
+    async (): Promise<SlotDigestRunSummary> => ({
+      digest: await sendSlotDigest(db, now),
+      // 알림을 보낸 뒤에 한다. 실패해도 던지지 않고 결과에 남긴다
+      businessDocs: await cleanUpBusinessDocs(db, now),
+      // 동의를 읽다 실패하면 던져서 실행 기록에 실패로 남는다(앞의 두 일은 이미 끝났고, 탈퇴 지우기는 다음 날 한다)
+      consentRecheck: await sendConsentRechecks(db, now),
+      // 맨 뒤에 둔다. 탈퇴 기록을 읽다 실패하면 던져서 실행 기록에 실패로 남지만, 앞의 일들은 이미 끝났다
+      withdrawalErase: await eraseWithdrawnAccounts(db, now),
+    }),
+  );
   return Response.json(result);
 }
