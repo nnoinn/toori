@@ -5,6 +5,9 @@
 // 매물 수정(O10, S-206)도 이 화면을 쓴다(edit). 지금 값을 채워서 열고(서버 확인이 되면 ③부터, #23 B2),
 // 고치는 매물 자신은 겹침으로 보지 않는다.
 // 새로 올릴 때는 맨 위 "지난 매물로 빠르게 올리기"(S-207 매물 복제)를 누르면 ①③ 값을 채우고 ② 시간부터 연다.
+// 주간 권유 알림으로 열면(S-411) 그 위 "이번 주 권하는 매물"의 첫 권유를 ①②③ 다 채운 채로 ③부터 연다.
+// 다른 권유를 누르면 그 값으로 바꾸고 서버가 ①②를 확인한 뒤 ③을 연다. 권유 목록은 화면을 열 때 받은 것을 그대로 쓴다
+// (올린 뒤 서버가 다시 계산하면 방금 올린 날의 남은 권유가 빠지므로). 올린 권유는 "올렸어요"로 잠근다.
 // 이 파일은 고른 값과 단계 이동·확인·저장을 맡고, 단계 버튼과 ①②③ 카드는 slot-form-steps.tsx,
 // 저장 완료 카드는 slot-saved-card.tsx가 그린다.
 
@@ -13,6 +16,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import type { BusinessHours } from '@/db/schema/shops';
 import { SLOT_STATUS_LABELS } from '@/features/slot-status/slot-status';
+import type { SuggestedSlot } from '@/features/weekly-suggest/weekly-suggest';
 import { formatKst, kstDateKey } from '@/lib/time';
 import type { DiscountRate } from '@/server/policy';
 import { previewSettlement } from '@/server/settlements';
@@ -33,6 +37,7 @@ import {
 import { SlotPresetPicker } from './slot-preset-picker';
 import type { SlotPreset } from './slot-presets';
 import { SavedCard, type SavedSummary } from './slot-saved-card';
+import { postedSuggestion, type SuggestionChip, toSuggestionChips } from './slot-suggestions';
 import {
   groupByKstDate,
   publishPlan,
@@ -40,6 +45,7 @@ import {
   startCandidates,
   type StartWindow,
 } from './slot-time';
+import { WeeklySuggestPicker } from './weekly-suggest-picker';
 
 export type SlotMenuOption = {
   id: string;
@@ -76,6 +82,11 @@ type SlotFormProps = {
   edit?: SlotEditTarget;
   /** 지난 매물 구성(S-207). 새로 올릴 때만 쓴다 */
   presets?: readonly SlotPreset[];
+  /**
+   * 주간 권유 알림으로 열었으면 이번 주 권하는 매물(S-411, 날짜·시각 순서). 권할 것이 없으면 빈 목록이고,
+   * 알림으로 열지 않았으면 넘기지 않는다. 새로 올릴 때만 쓴다
+   */
+  suggested?: readonly SuggestedSlot[];
 };
 
 /**
@@ -95,6 +106,7 @@ function SlotFormBody({
   busy,
   edit,
   presets = [],
+  suggested,
   onSaved,
 }: SlotFormProps & {
   /** 저장을 마쳤으면 true, 완료 카드에서 하나 더 올리기 시작하면 false */
@@ -108,13 +120,30 @@ function SlotFormBody({
   const startWindow = edit?.startWindow ?? 'advance';
   const days = useMemo(() => groupByKstDate(startCandidates(now, startWindow)), [now, startWindow]);
 
-  const [step, setStep] = useState<StepNumber>(edit?.openStep ?? 1);
-  const [menuId, setMenuId] = useState<string | null>(edit?.menuId ?? null);
+  // 주간 권유 버튼(S-411). 화면을 열 때 받은 권유를 그대로 쓴다: 올린 뒤 서버가 화면 값을 새로 보내도
+  // (refresh) 다시 계산한 권유로 바꾸지 않는다. 알림으로 열지 않았으면 null
+  const [chips] = useState<SuggestionChip[] | null>(() =>
+    edit || !suggested
+      ? null
+      : toSuggestionChips(
+          suggested,
+          menus.map((item) => item.id),
+          new Date(nowIso),
+        ),
+  );
+  // 처음에 채울 권유: 첫 권유를 ①②③ 다 채워 ③부터 연다(화면을 열 때 서버가 막히지 않는 시각만 골랐다)
+  const first = chips?.[0];
+  // 이 화면에서 올린 권유의 시작 시각
+  const [posted, setPosted] = useState<ReadonlySet<string>>(() => new Set());
+
+  const [step, setStep] = useState<StepNumber>(edit?.openStep ?? (first ? 3 : 1));
+  const [menuId, setMenuId] = useState<string | null>(edit?.menuId ?? first?.menuId ?? null);
   // 달력에서 고른 날짜. 새로 올릴 때는 비워 두고 원장님이 고르면 그 아래에 시작 시각을 보여준다.
-  // 수정이면 매물 날짜(지금 고를 수 있는 날짜일 때)
+  // 수정이면 매물 날짜(지금 고를 수 있는 날짜일 때), 권유를 채우면 권유 날짜
   const [dateKey, setDateKey] = useState(
     () =>
       (edit && days.find((item) => item.dateKey === kstDateKey(new Date(edit.startAt))))?.dateKey ??
+      first?.date ??
       '',
   );
   // 메뉴를 다시 골라야 하면 소요 시간이 달라지므로 시각도 다시 고른다. 지금 고를 수 없는 시각(범위 밖)이어도 다시 고른다
@@ -122,10 +151,14 @@ function SlotFormBody({
     edit?.menuId &&
     days.some((item) => item.starts.some((candidate) => candidate.toISOString() === edit.startAt))
       ? edit.startAt
-      : null,
+      : (first?.startIso ?? null),
   );
-  const [discountRate, setDiscountRate] = useState<DiscountRate | null>(edit?.discountRate ?? null);
-  const [newCustomerOnly, setNewCustomerOnly] = useState(edit?.newCustomerOnly ?? false);
+  const [discountRate, setDiscountRate] = useState<DiscountRate | null>(
+    edit?.discountRate ?? first?.discountRate ?? null,
+  );
+  const [newCustomerOnly, setNewCustomerOnly] = useState(
+    edit?.newCustomerOnly ?? first?.newCustomerOnly ?? false,
+  );
   // 저장한 매물(완료 카드에 보여준다)
   const [saved, setSaved] = useState<SavedSummary | null>(null);
   const [message, setMessage] = useState<string | null>(edit?.problem ?? null);
@@ -166,9 +199,13 @@ function SlotFormBody({
    */
   function next() {
     if (!menu || !start) return;
+    confirmTime({ menuId: menu.id, startAt: start.toISOString() });
+  }
+
+  /** 메뉴·시각을 서버가 확인하면 ③을 연다. 막히면 ② 시간에 이유를 보여준다 */
+  function confirmTime(draft: { menuId: string; startAt: string }) {
     setMessage(null);
     startTransition(async () => {
-      const draft = { menuId: menu.id, startAt: start.toISOString() };
       const result = edit
         ? await checkSlotEdit(shopId, edit.slotId, draft)
         : await checkSlotDraft(shopId, draft);
@@ -208,8 +245,32 @@ function SlotFormBody({
         newCustomerOnly,
         publishAt: result.data.publishAt ? new Date(result.data.publishAt) : null,
       });
+      // 권유를 올렸으면 그 권유 버튼을 "올렸어요"로 잠근다
+      const postedChip = chips
+        ? postedSuggestion(chips, { menuId: menu.id, startIso: start.toISOString() })
+        : null;
+      if (postedChip) setPosted((current) => new Set(current).add(postedChip.startIso));
       onSaved(true);
     });
+  }
+
+  /**
+   * 주간 권유를 고른다(S-411). ①②③ 값을 다 채우고, 서버가 메뉴·시각을 확인하면 ③ 할인율·확인을 연다
+   * (화면을 연 뒤에 그 시간에 매물을 올렸거나 시간이 지났으면 ② 시간에 이유를 보여준다).
+   * 등록 완료 카드에서 누르면 하나 더 올리기처럼 완료 카드를 닫는다
+   */
+  function chooseSuggestion(chip: SuggestionChip) {
+    if (saved) {
+      onSaved(false);
+      setSaved(null);
+    }
+    setMenuId(chip.menuId);
+    setDateKey(chip.date);
+    setStartIso(chip.startIso);
+    setDiscountRate(chip.discountRate);
+    setNewCustomerOnly(chip.newCustomerOnly);
+    setStep(2);
+    confirmTime({ menuId: chip.menuId, startAt: chip.startIso });
   }
 
   /**
@@ -238,12 +299,29 @@ function SlotFormBody({
 
   const saveLabel = edit ? '저장' : '등록';
   const publishNote = start ? publishNoteOf(start, now, startWindow, saveLabel) : null;
+  const suggestionPicker = chips ? (
+    <WeeklySuggestPicker
+      chips={chips}
+      menus={menus}
+      chosen={{ menuId, startIso, discountRate, newCustomerOnly }}
+      posted={posted}
+      disabled={pending}
+      onChoose={chooseSuggestion}
+    />
+  ) : null;
   if (saved) {
-    return <SavedCard saved={saved} edited={edit !== undefined} onAgain={startOver} />;
+    // 권유로 열었으면 완료 카드 위에 권유를 남겨 남은 권유를 바로 올리게 한다
+    return (
+      <div className="flex flex-col gap-4">
+        {suggestionPicker}
+        <SavedCard saved={saved} edited={edit !== undefined} onAgain={startOver} />
+      </div>
+    );
   }
 
   return (
     <div className="flex flex-col gap-4">
+      {suggestionPicker}
       {!edit && presets.length > 0 ? (
         <SlotPresetPicker
           presets={presets}
