@@ -178,7 +178,7 @@ describe('이름표와 대상', () => {
     expect(targetHref('customer', 'c-1')).toBe('/admin/users/customers/c-1');
     expect(targetHref('settlement', 'st-1')).toBe('/admin/settlements/st-1');
     expect(targetHref('slot', 'sl-1')).toBe('/admin/reservations/slots/sl-1');
-    expect(targetHref('slot_window', 'w-1')).toBeNull();
+    expect(targetHref('slot_window', 'w-1')).toBe('/admin/reservations/windows/w-1');
     expect(targetHref('owner', 'o-1')).toBeNull();
     expect(targetHref('list', null)).toBeNull();
     // 대상 id가 없으면(지운 대상) 화면이 있는 종류여도 주소가 없다
