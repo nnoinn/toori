@@ -75,7 +75,7 @@ export async function applyCustomerWithdrawal(
 
   await tx.delete(interestAreas).where(eq(interestAreas.customerId, customerId));
   await tx.delete(favorites).where(eq(favorites.customerId, customerId));
-  await tx.delete(slotInterests).where(eq(slotInterests.customerId, customerId));
+  await tx.delete(slotInterests);
   await tx
     .delete(pushSubscriptions)
     .where(
