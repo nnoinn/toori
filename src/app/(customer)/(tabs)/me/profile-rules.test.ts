@@ -7,6 +7,7 @@ import {
   consentResultMessage,
   NICKNAME_MAX_LENGTH,
   profileSchema,
+  savedAmountNote,
 } from './profile-rules';
 
 describe('연락처 형식 (공통 normalizePhone의 휴대폰만)', () => {
@@ -89,5 +90,17 @@ describe('광고성 정보 수신 처리 결과 (동의 문구 6-1)', () => {
       `${SITE_NAME} · 2026년 10월 29일에 관심 동네·찜한 샵 새 매물 알림 수신 동의 처리가 끝났어요.`,
     );
     expect(consentResultMessage('marketing', false, at)).toContain('거부 처리가 끝났어요.');
+  });
+});
+
+describe('아낀 금액 설명 (C-108)', () => {
+  it('방문을 마친 예약이 있으면 몇 건을 더했는지와 쿠폰 포함을 알린다', () => {
+    expect(savedAmountNote(3)).toBe(
+      '방문을 마친 예약 3건에서 정가보다 덜 낸 금액을 더했어요(쿠폰 포함).',
+    );
+  });
+
+  it('아직 없으면 방문을 마치면 쌓인다고 알린다', () => {
+    expect(savedAmountNote(0)).toBe('예약하고 방문을 마치면 정가보다 덜 낸 금액이 여기에 쌓여요.');
   });
 });

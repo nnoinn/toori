@@ -16,6 +16,8 @@ import { selectMyNoShows } from './no-show-history';
 import { NoShowRecord } from './no-show-record';
 import { NotificationSettings } from './notification-settings';
 import { ProfileForm } from './profile-form';
+import { selectSavedAmount } from './saved-amount';
+import { SavedAmountCard } from './saved-amount-card';
 
 export const metadata: Metadata = { title: '내 정보' };
 
@@ -31,7 +33,7 @@ export default function MyInfoPage() {
 
 async function MyInfoContent() {
   const { customerId } = await ensureCustomerPage('/me');
-  const [account, [customer], noShows, consents, interest, coupons] = await Promise.all([
+  const [account, [customer], noShows, consents, interest, coupons, saved] = await Promise.all([
     getCurrentAccount(),
     getDb()
       .select({ name: customers.name, nickname: customers.nickname, phone: customers.phone })
@@ -42,6 +44,7 @@ async function MyInfoContent() {
     getOptionalConsents(),
     getInterestAreas(),
     getMyCoupons(),
+    selectSavedAmount(getDb(), customerId),
   ]);
 
   return (
@@ -50,6 +53,9 @@ async function MyInfoContent() {
         <h1 className="text-2xl font-bold">내 정보</h1>
         {account?.email ? <p className="text-sm text-muted-foreground">{account.email}</p> : null}
       </div>
+
+      {/* 맨 위에 투리로 아낀 금액(C-108) */}
+      <SavedAmountCard saved={saved} />
 
       <ProfileForm
         name={customer?.name ?? ''}
