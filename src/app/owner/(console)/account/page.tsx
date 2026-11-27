@@ -9,10 +9,15 @@ import { OwnerSignOutButton } from '@/components/ui/owner-nav';
 import { LoadingCards } from '@/components/ui/state';
 import { PushSwitch } from '@/features/push/push-switch';
 import { OWNER_IOS_INSTALL_STEPS, OWNER_PUSH_DESCRIPTION } from '@/features/push/push-texts';
+import { getDb } from '@/db';
 import { KAKAO_CHANNEL_URL, SITE_NAME } from '@/lib/site';
 import { ensureOwnerPage, getCurrentAccount } from '@/server/auth';
+import { readShopReviewStatus } from '@/server/shops/review-store';
 
 import { OwnerPage } from '../owner-page';
+import { checklistFor, isChecklistDone } from '../tutorial/checklist';
+import { TutorialResetCard } from '../tutorial/tutorial-reset-card';
+import { selectTutorialProgress } from '../tutorial/tutorial-store';
 import { WithdrawOwner } from './withdraw-owner';
 
 export const metadata: Metadata = { title: '내 계정' };
@@ -22,6 +27,7 @@ const PAGE_PATH = '/owner/account';
 // 원장님 내 계정 (#307, O12 원장님 알림 받기 S-404). 고객 화면의 '내 정보'처럼 계정과 설정을 한곳에서 다룬다.
 // 로그인 계정, 계정 이력(#374, 메뉴에 두지 않고 여기서 들어간다), 이 기기 푸시 알림(기기에 소리·배너로 뜨는 알림,
 // #371 11/13 이름), 고객센터(카카오톡 채널), 로그아웃, 원장님 탈퇴(#154, 로그아웃 옆에 눈에 덜 띄게. 고객 내 정보와 같은 자리).
+// 사용 안내(S-412): 건너뛰었거나 이미 본 대시보드 체크 목록·화면별 말풍선을 다시 켠다.
 // 계정 바꾸기 버튼은 두지 않는다(11/10 nnoinn): 같은 메일이어도 고객·원장님 계정은 별개라서,
 // 다른 계정으로 가려면 로그아웃한 뒤 로그인 화면에서 고른다. PC 기준
 export default function OwnerAccountPage() {
@@ -40,8 +46,14 @@ export default function OwnerAccountPage() {
 
 /** 로그인 확인은 <Suspense> 안에서 한다(기술 가이드 2장). 원장님 가입 전이면 /owner/join 으로 보낸다 */
 async function AccountContent() {
-  await ensureOwnerPage(PAGE_PATH);
-  const account = await getCurrentAccount();
+  const auth = await ensureOwnerPage(PAGE_PATH);
+  const db = getDb();
+  const [account, review, progress] = await Promise.all([
+    getCurrentAccount(),
+    readShopReviewStatus(db, auth.shopId),
+    selectTutorialProgress(db, auth.shopId),
+  ]);
+  const checklistDone = isChecklistDone(checklistFor(review, progress));
 
   return (
     <div className="flex flex-col gap-4">
@@ -74,6 +86,8 @@ async function AccountContent() {
           </Button>
         </CardContent>
       </Card>
+
+      <TutorialResetCard shopId={auth.shopId} checklistDone={checklistDone} />
 
       <Card>
         <CardHeader>

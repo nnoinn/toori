@@ -173,7 +173,14 @@ function WindowFormBody({
 
   return (
     <div className="flex flex-col gap-4">
-      <StepNav labels={WINDOW_STEPS} step={step} done={stepDone} pending={pending} onGoTo={goTo} />
+      <StepNav
+        labels={WINDOW_STEPS}
+        step={step}
+        done={stepDone}
+        pending={pending}
+        onGoTo={goTo}
+        tourTarget="window-steps"
+      />
 
       {step === 1 ? (
         <TimeCard
@@ -301,7 +308,7 @@ function TimeCard({
   const noOpenCell = cells.every((cell) => cell.lock !== null);
 
   return (
-    <Card>
+    <Card data-tour="window-time">
       <CardHeader>
         <CardTitle>① 언제 올릴까요?</CardTitle>
         <p className="text-sm text-muted-foreground">

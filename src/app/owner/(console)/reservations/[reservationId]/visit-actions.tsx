@@ -31,7 +31,7 @@ export function VisitActions({
   return (
     <>
       {canRecord ? (
-        <CardContent className="flex gap-2">
+        <CardContent className="flex gap-2" data-tour="reservation-visit">
           <Button type="button" size="lg" onClick={() => open('visited')}>
             {VISIT_ACTIONS.visited.button}
           </Button>

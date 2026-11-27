@@ -253,7 +253,13 @@ function SlotFormBody({
           onChoose={choosePreset}
         />
       ) : null}
-      <StepNav step={step} done={stepDone} pending={pending} onGoTo={goTo} />
+      <StepNav
+        step={step}
+        done={stepDone}
+        pending={pending}
+        onGoTo={goTo}
+        tourTarget={edit ? undefined : 'slot-steps'}
+      />
 
       {step === 1 ? <MenuStep menus={menus} menuId={menuId} onChoose={chooseMenu} /> : null}
 
