@@ -15,6 +15,7 @@ import { getOptionalConsents } from '@/server/auth/customer-account';
 
 import { isFavoriteShop } from '../../home/favorites/store';
 import { otherShopItems } from './detail-format';
+import { slotShareText, slotShareTitle } from './share-rules';
 import { selectSlotDetail } from './queries';
 import { SlotDetailView } from './slot-detail-view';
 
@@ -45,12 +46,16 @@ const loadSlot = cache(async (slotId: string) => {
   return slot ? { slot, customerId, now } : null;
 });
 
-/** 탭 제목: "여성 커트 · 샘플 헤어 중앙역점 | 투리" */
+/**
+ * 탭 제목: "여성 커트 · 샘플 헤어 중앙역점 | 투리".
+ * 링크 미리보기(C-310)의 제목·설명도 같은 값이다. 미리보기 그림은 같은 폴더의 opengraph-image.tsx가 붙인다
+ */
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const loaded = await loadSlot((await params).slotId);
-  return {
-    title: loaded ? `${loaded.slot.menu.name} · ${loaded.slot.shop.name}` : '매물을 찾을 수 없어요',
-  };
+  if (!loaded) return { title: '매물을 찾을 수 없어요' };
+  const title = slotShareTitle(loaded.slot);
+  const description = slotShareText(loaded.slot);
+  return { title, description, openGraph: { title, description, type: 'website' } };
 }
 
 async function DetailContent({ params }: { params: Params }) {
