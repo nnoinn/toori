@@ -15,6 +15,7 @@ import { MyCoupons } from './my-coupons';
 import { selectMyNoShows } from './no-show-history';
 import { NoShowRecord } from './no-show-record';
 import { NotificationSettings } from './notification-settings';
+import { OnboardingReplay } from './onboarding-replay';
 import { ProfileForm } from './profile-form';
 
 export const metadata: Metadata = { title: '내 정보' };
@@ -66,6 +67,8 @@ async function MyInfoContent() {
         marketingAgreed={consents.ok ? consents.data.marketing.agreed : false}
         interestCodes={interest.ok ? interest.data.sigunguCodes : null}
       />
+
+      <OnboardingReplay />
 
       <AccountActions hasOwnerAccount={Boolean(account?.ownerId)} />
     </section>
