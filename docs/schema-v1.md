@@ -79,6 +79,7 @@ erDiagram
 | nickname | text | 투리 안에서만 쓰는 이름(내 정보, 운영자 회원 목록 둘째 칸) |
 | phone | text, null 가능 | 예약 확인·노쇼 연락용. 인증 없이 형식만 검사. 고객 계정을 만들 때 받는다(11/2, #183). 그 전에 만든 계정은 비어 있을 수 있어 예약 전에 꼭 입력. 휴대폰만, 하이픈 넣은 모양(`010-1234-5678`, `normalizePhone(…, 'mobile')`) |
 | last_interest_push_at | timestamptz, null | 관심 지역 알림을 마지막으로 보낸 시각. 하루 1번(13시) 묶음 발송에서 "그 뒤에 새로 올라온 매물"을 고르는 기준 |
+| onboarding_seen_at | timestamptz, null | 첫 로그인 안내(C-107, #616, 0024)를 끝까지 넘기거나 닫은 시각. 비어 있으면 로그인한 뒤 안내를 보여 준다. 기기가 아니라 계정에 남겨서 다른 기기로 로그인해도 다시 뜨지 않는다. 내 정보에서 다시 볼 때는 바꾸지 않는다. 0024 전에 있던 계정은 비어 있어 다음 로그인 때 한 번 본다 |
 | withdrawn_at | timestamptz, null | 탈퇴 시각(C-106, #154). 되살리기·30일 뒤 지우기 기록은 `account_withdrawals` |
 | created_at | timestamptz | |
 
@@ -656,7 +657,9 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 
 `(customer_id, sigungu_code)` unique. 고객의 현재 위치와 고른 동네는 DB에 저장하지 않는다(브라우저 쿠키, #19 D9).
 
-### favorites — 찜 (C-209, P1)
+### favorites — 관심 샵 (C-209, C-211)
+
+화면 이름은 3단계에서 '찜'이 '관심'으로 바뀌었고(C-211), 표 이름은 그대로 둔다(#616).
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
@@ -665,7 +668,24 @@ S-201의 두 번째 등록 방식이다. 원장님이 세로 시간표에서 켠
 | shop_id | uuid → shops | |
 | created_at | timestamptz | |
 
-`(customer_id, shop_id)` unique. 테이블만 먼저 만든다.
+`(customer_id, shop_id)` unique. 고객이 탈퇴하면 지운다(#154).
+
+### slot_interests — 관심 매물 (C-211, #616, 0024)
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| id | uuid PK | |
+| customer_id | uuid → customers | 관심 표시한 고객 계정 |
+| slot_id | uuid → slots, null | 한 시술 매물 |
+| window_id | uuid → slot_windows, null | 시간대 매물 |
+| created_at | timestamptz | 관심 표시한 때(관심 화면 목록 순서) |
+
+- `slot_id`와 `window_id` 중 하나만 채운다(check `slot_interests_target_check`). 매물 목록에 한 시술 매물 카드와 시간대 카드가 따로 있어서다.
+- `(customer_id, slot_id)`, `(customer_id, window_id)` 각각 unique. 빈 값끼리는 같지 않아서 서로를 막지 않는다.
+- 관심을 끄면 줄을 지운다. 매물이 예약·마감돼도 줄은 그대로 두고, 화면이 '마감된 매물' 칸으로 옮긴다. 따로 지우는 예약 작업은 없다.
+- 시간대 안에서 손님이 홀딩해 만든 매물(`slots.window_id` 있음)은 카드가 없어서 저장 함수가 막는다(그 시간대에 관심 표시한다).
+- 고객이 탈퇴하면 지운다(#154, 관심 동네·관심 샵과 같다).
+- 인덱스 `slot_interests_customer_created_at_idx`(customer_id, created_at): 관심 화면 목록.
 
 ---
 
