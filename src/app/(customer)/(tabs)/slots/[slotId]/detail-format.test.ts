@@ -11,11 +11,32 @@ import {
   refundPolicyLines,
   refundPolicyNotes,
   safeExternalUrl,
+  slotPhotoRows,
   telHref,
   OTHER_SLOT_COUNT,
   otherShopItems,
 } from './detail-format';
 import type { ListItem } from '@/features/map/slot-list/types';
+
+describe('매물 상세 사진(C-309 ②)', () => {
+  const photo = (path: string, menuId: string | null) => ({ storagePath: path, menuId });
+  const rows = [
+    photo('main', null),
+    photo('cut-1', 'cut'),
+    photo('perm-1', 'perm'),
+    photo('cut-2', 'cut'),
+  ];
+
+  it('그 매물 메뉴의 시술 사진만, 받은 순서 그대로', () => {
+    expect(slotPhotoRows(rows, 'cut').map((row) => row.storagePath)).toEqual(['cut-1', 'cut-2']);
+  });
+
+  it('그 메뉴에 묶인 사진이 없으면 샵 사진 전체', () => {
+    expect(slotPhotoRows(rows, 'color')).toEqual(rows);
+    expect(slotPhotoRows(rows, null)).toEqual(rows);
+    expect(slotPhotoRows([], 'cut')).toEqual([]);
+  });
+});
 
 describe('사진 번호', () => {
   it('스크롤 위치에서 가장 가까운 사진', () => {

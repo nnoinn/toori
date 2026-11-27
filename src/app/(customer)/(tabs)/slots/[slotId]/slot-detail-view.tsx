@@ -1,4 +1,5 @@
-import { Clock } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronRight, Clock } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { Countdown } from '@/components/ui/countdown';
@@ -10,13 +11,15 @@ import { formatKst } from '@/lib/time';
 
 import { formatDuration } from '@/lib/format';
 import {
+  DetailSection,
   DetailTop,
   RefundPolicyDetails,
-  ShopHoursList,
   ShopLinkButtons,
   ShopLocationBlock,
   ShopPhoneLink,
+  ShopProfileLink,
 } from './detail-parts';
+import { shopProfilePath } from '../../shops/[shopId]/shop-format';
 import { type DetailTab, DetailTabs } from './detail-tabs';
 import { FavoriteButton } from './favorite-button';
 import { ReserveButton } from './reserve-button';
@@ -45,6 +48,8 @@ const TABS: DetailTab[] = [
 /**
  * 매물 상세 (J7, C-301~C-305, C-308). 11/18 회의 피드백 5번 A안(지도 앱 장소 상세처럼):
  * 위에 사진 묶음 → 샵 이름 → 탭(시술 정보·샵 정보·위치·이 샵의 다른 매물)과 칸. 오른쪽(PC)은 가격·예약하기 상자.
+ * C-309 ②: 사진은 그 매물 메뉴의 시술 사진만(없으면 샵 사진 전체), 샵 정보 칸은 전화·외부 링크·[샵 프로필 보기]만 두고
+ * 샵 소개·영업시간은 샵 프로필(/shops/[shopId])에서 본다.
  * 폰: 사진 → 샵 이름 → 가격·예약 상자 → 탭과 칸(회색 배경 위 흰 카드, #359 2번), 아래 고정 예약 바.
  * PC(md 이상): 가운데 최대 1024px 두 칸. 오른쪽 상자는 스크롤해도 따라온다.
  * 예약하기는 10분 홀딩을 걸고 예약 확인 화면으로 간다(reserve-button.tsx). 사진 묶음·샵 정보 조각·환불 규정은 시간대 상세(#308)와 같이 쓴다
@@ -66,8 +71,15 @@ export function SlotDetailView({
       <DetailTop imageUrls={slot.imageUrls} shopName={shop.name} photosKey={slot.slotId} />
 
       <div className="flex items-start justify-between gap-3 px-4 max-md:flex-wrap md:col-start-1 md:row-start-2 md:px-0">
+        {/* 샵 이름을 누르면 샵 프로필(C-309) */}
         <h1 className="flex min-w-0 items-baseline gap-2 max-md:flex-1">
-          <span className="truncate text-xl font-bold">{shop.name}</span>
+          <Link
+            href={shopProfilePath(shop.shopId)}
+            className="flex min-w-0 items-center gap-0.5 hover:underline"
+          >
+            <span className="truncate text-xl font-bold">{shop.name}</span>
+            <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+          </Link>
           <span className="shrink-0 text-sm text-muted-foreground">{slot.shopCategory}</span>
         </h1>
         <FavoriteButton
@@ -141,14 +153,9 @@ export function SlotDetailView({
         </DetailSection>
 
         <DetailSection id="shop-info" title="샵 정보">
-          {shop.description ? (
-            <p className="text-sm whitespace-pre-line">{shop.description}</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">샵 소개가 아직 없어요.</p>
-          )}
-          <ShopHoursList businessHours={shop.businessHours} />
           <ShopPhoneLink phone={shop.phone} />
           <ShopLinkButtons shop={shop} />
+          <ShopProfileLink shopId={shop.shopId} />
         </DetailSection>
 
         <DetailSection id="location" title="위치">
@@ -174,30 +181,5 @@ export function SlotDetailView({
         <ReserveButton slotId={slot.slotId} availability={slot.availability} />
       </div>
     </article>
-  );
-}
-
-/** 탭 하나가 가리키는 칸(회색 배경 위 흰 카드). 탭을 눌러 내려왔을 때 탭 줄에 가리지 않게 위 여백을 둔다 */
-function DetailSection({
-  id,
-  title,
-  children,
-}: {
-  id: string;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card
-      id={id}
-      role="region"
-      aria-labelledby={`${id}-title`}
-      className="mx-4 scroll-mt-14 gap-3 px-4 text-base md:mx-0 md:scroll-mt-32 md:p-5"
-    >
-      <h2 id={`${id}-title`} className="font-semibold">
-        {title}
-      </h2>
-      {children}
-    </Card>
   );
 }

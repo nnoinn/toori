@@ -16,9 +16,10 @@ import { newCustomerOnlyVisible } from '@/server/customers';
 import { categoryLabel, serviceTypeLabel } from '@/server/policy';
 import { customerVisibleShop } from '@/server/shops/visibility';
 
+import { slotPhotoRows } from './detail-format';
 import type { SlotAvailability, SlotDetail } from './types';
 
-type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
+export type DbReader = Pick<ReturnType<typeof getDb>, 'select'>;
 
 export type SlotDetailQuery = {
   slotId: string;
@@ -49,6 +50,7 @@ export async function selectSlotDetail(
       newCustomerOnly: slots.newCustomerOnly,
       holdCustomerId: slots.holdCustomerId,
       holdExpiresAt: slots.holdExpiresAt,
+      menuId: slots.menuId,
       menuName: slots.menuName,
       serviceType: slots.serviceType,
       menuDescription: slots.menuDescription,
@@ -83,11 +85,8 @@ export async function selectSlotDetail(
   const status = getSlotStatus({ ...row, status: row.status as SlotStatus }, query.now);
   if (status === 'scheduled') return null;
 
-  const images = await db
-    .select({ storagePath: shopImages.storagePath })
-    .from(shopImages)
-    .where(eq(shopImages.shopId, row.shopId))
-    .orderBy(...imageOrder);
+  // 그 매물 메뉴의 시술 사진만, 없으면 샵 사진 전체(C-309 ②)
+  const imageUrls = toImageUrls(slotPhotoRows(await selectShopImages(db, row.shopId), row.menuId));
 
   return {
     slotId: row.slotId,
@@ -118,10 +117,28 @@ export async function selectSlotDetail(
       instagramUrl: row.instagramUrl,
       naverPlaceUrl: row.naverPlaceUrl,
     },
-    imageUrls: images
-      .map((image) => shopImageUrl(image.storagePath))
-      .filter((url): url is string => url !== null),
+    imageUrls,
   };
+}
+
+/** 샵 사진 줄(저장 경로와 묶인 메뉴): 대표 사진 먼저, 그다음 스타일 사진(원장님이 정한 순서) */
+async function selectShopImages(db: DbReader, shopId: string) {
+  return db
+    .select({ storagePath: shopImages.storagePath, menuId: shopImages.menuId })
+    .from(shopImages)
+    .where(eq(shopImages.shopId, shopId))
+    .orderBy(...imageOrder);
+}
+
+function toImageUrls(images: readonly { storagePath: string }[]): string[] {
+  return images
+    .map((image) => shopImageUrl(image.storagePath))
+    .filter((url): url is string => url !== null);
+}
+
+/** 샵 사진 전체의 공개 주소(대표 먼저). 샵 프로필(C-309)이 쓴다 */
+export async function selectShopImageUrls(db: DbReader, shopId: string): Promise<string[]> {
+  return toImageUrls(await selectShopImages(db, shopId));
 }
 
 function availabilityOf(
