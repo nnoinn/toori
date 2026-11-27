@@ -93,6 +93,7 @@
 | `selectRegion`·`saveMyLocation` (`src/features/map/location-actions.ts`) | 누구나 | 이 브라우저 쿠키만 바꾸고 계정 데이터는 읽지 않는다. 내 위치는 위치 이용 기록을 남긴다(위치정보법) | `src/features/map/location-actions.test.ts` 위치 이용 기록을 1번 남기고<br>`src/features/map/location-actions.test.ts` 목록에 없는 동네는 거절한다 | ✅ |
 | `selectFavoriteSlots` (`src/features/map/slot-list/queries.ts`)·`countFavoriteShops`·`isFavoriteShop` (`(tabs)/home/favorites/store.ts`), 찜한 샵 매물·로비·매물 상세 하트 | `ensureCustomerPage`·`getCurrentAccount`(페이지) | 세션 고객의 찜만 | `src/features/map/slot-list/queries.db.test.ts` 찜한 샵 매물: 내가 찜한 샵의 보이는 매물만<br>`src/app/(customer)/(tabs)/home/favorites/store.db.test.ts` 본인 찜만 바뀐다 | ✅ |
 | `selectMyNoShows` (`(tabs)/me/no-show-history.ts`, 내 정보) | `ensureCustomerPage`(페이지) | 세션 고객 | `src/app/(customer)/(tabs)/me/no-show-history.db.test.ts` 본인 노쇼만 세고 | ✅ |
+| `loadRecentItems` (`(tabs)/recent/actions.ts`, 최근 본 매물 C-212) | 누구나(로그인 없이 둘러보기) | 이 기기에 남긴 매물 id(20개까지)만 받고 읽기만 한다. 매물 상세와 같은 조건(승인 샵·게시 뒤, 고객으로 들어왔으면 세션 고객 기준 신규 고객 전용)으로 다시 걸러 볼 수 없는 매물은 주지 않는다. 시간대는 `getSlotWindow`(1장)를 그대로 쓴다 | `src/app/(customer)/(tabs)/recent/queries.db.test.ts` 신규 고객 전용은 그 샵 이력이 있는 고객에게 빠진다<br>`src/app/(customer)/(tabs)/recent/queries.db.test.ts` 게시중은 그대로, 예약됨·마감은 흐리게 | ✅ |
 
 페이지가 같이 부르는 나머지 공통 서버 함수는 1장(강규민) 표에서 본다: 쿠폰함·예약 확인의 `getMyCoupons`, 시간대 상세 `/windows/[id]`의 `getSlotWindow`, 알림함, 관심 동네·선택 동의(`getInterestAreas`·`getOptionalConsents`).
 
