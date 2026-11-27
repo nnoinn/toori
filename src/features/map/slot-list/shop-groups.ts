@@ -1,11 +1,14 @@
 // 매물을 샵별로 묶어 보여주기. 화면 없이 테스트한다.
 // - 거리순 목록(11/18 정찬형): 거리순은 같은 샵 줄이 붙어 오므로(merge.ts·queries.ts) 붙어 있는 같은 샵 줄을 한 묶음으로 만든다
-// - 찜한 샵(11/15 회의 3번): 지금 매물이 있는 찜한 샵마다 한 묶음. 매물이 없는 샵은 보여주지 않는다(11/18 정찬형)
+// - 관심 샵(예전 이름 찜한 샵, 11/15 회의 3번·C-211): 지금 매물이 있는 관심 샵마다 한 묶음. 매물이 없는 샵은 보여주지 않는다(11/18 정찬형)
 
 import type { ListItem } from './types';
 
 /** 접힌 묶음에서 먼저 보여주는 매물 수. 더 있으면 [매물 N개 더 보기] */
 export const GROUP_PREVIEW_COUNT = 3;
+
+/** 관심 샵 화면은 샵마다 매물을 2개까지 먼저 보여준다(C-211, docs/stage3-spec.md) */
+export const INTEREST_GROUP_PREVIEW_COUNT = 2;
 
 /** 묶음 머리 줄에 보여줄 샵 정보 */
 export type ShopHeader = {
@@ -75,16 +78,17 @@ export function groupSummaryText(group: ShopGroup): string {
   return `매물 ${group.items.length}개 · 최대 ${groupMaxDiscount(group)}%`;
 }
 
-/** 접혔을 때 보여줄 줄과 숨긴 수 */
+/** 접혔을 때 보여줄 줄과 숨긴 수. 먼저 보여주는 수는 화면마다 다르다(거리순 목록 3개, 관심 샵 2개) */
 export function groupPreview(
   group: ShopGroup,
   expanded: boolean,
+  previewCount: number = GROUP_PREVIEW_COUNT,
 ): { visible: ListItem[]; hiddenCount: number } {
-  if (expanded || group.items.length <= GROUP_PREVIEW_COUNT) {
+  if (expanded || group.items.length <= previewCount) {
     return { visible: group.items, hiddenCount: 0 };
   }
   return {
-    visible: group.items.slice(0, GROUP_PREVIEW_COUNT),
-    hiddenCount: group.items.length - GROUP_PREVIEW_COUNT,
+    visible: group.items.slice(0, previewCount),
+    hiddenCount: group.items.length - previewCount,
   };
 }

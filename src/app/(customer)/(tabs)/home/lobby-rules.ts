@@ -47,7 +47,8 @@ export type LobbyTileKey =
 export const LOBBY_TILES: readonly { key: LobbyTileKey; label: string; href: string }[] = [
   { key: 'list', label: '매물 목록', href: LIST_PATH },
   { key: 'map', label: '지도', href: '/home/map' },
-  { key: 'favorites', label: '찜한 샵', href: '/home/favorites' },
+  // C-211: '찜한 샵'을 '관심'으로(관심 샵·관심 매물을 모아 보는 곳)
+  { key: 'favorites', label: '관심', href: '/home/favorites' },
   { key: 'reservations', label: '내 예약', href: '/reservations' },
   ...SHOP_CATEGORIES.map((category) => ({
     key: category.key,
@@ -75,10 +76,10 @@ export function withoutShown(
   return items.filter((item) => !shownKeys.has(listItemKey(item))).slice(0, count);
 }
 
-/** 찜한 샵 상자 문구. 지금 예약할 수 있는 매물이 있는 찜한 샵 수와 매물 수(시간대는 1개로 센다) */
+/** 관심 샵 상자 문구(C-211). 지금 예약할 수 있는 매물이 있는 관심 샵 수와 매물 수(시간대는 1개로 센다) */
 export function favoriteSummaryText(shopCount: number, items: readonly ListItem[]): string {
-  if (shopCount === 0) return '아직 찜한 샵이 없어요';
+  if (shopCount === 0) return '아직 관심 샵이 없어요';
   const withItems = new Set(items.map((item) => item.shopId)).size;
-  if (withItems === 0) return `찜한 샵 ${shopCount}곳에 지금 올라온 매물이 없어요`;
-  return `찜한 샵 ${withItems}곳에 지금 매물 ${items.length}개`;
+  if (withItems === 0) return `관심 샵 ${shopCount}곳에 지금 올라온 매물이 없어요`;
+  return `관심 샵 ${withItems}곳에 지금 매물 ${items.length}개`;
 }

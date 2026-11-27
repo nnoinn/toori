@@ -164,20 +164,20 @@ export function LobbyMapBox() {
   );
 }
 
-/** 오른쪽 찜한 샵 상자(PC). summary가 null이면 로그인하지 않았다(누르면 로그인 뒤 찜한 샵 매물로 간다) */
+/** 오른쪽 관심 샵 상자(PC, C-211). summary가 null이면 로그인하지 않았다(누르면 로그인 뒤 관심 샵 화면으로 간다) */
 export function LobbyFavoritesBox({ summary }: { summary: string | null }) {
   return (
     <div className={BOX}>
-      <p className={BOX_TITLE}>찜한 샵</p>
+      <p className={BOX_TITLE}>관심 샵</p>
       <p className="flex items-center gap-2 font-medium">
         <Heart className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-        {summary ?? '로그인하면 찜한 샵의 매물을 모아 볼 수 있어요'}
+        {summary ?? '로그인하면 관심 샵의 매물을 모아 볼 수 있어요'}
       </p>
       <Link
         href="/home/favorites"
         className={buttonVariants({ variant: 'outline', className: 'w-full' })}
       >
-        찜한 샵 매물 보기
+        관심 샵 매물 보기
       </Link>
     </div>
   );

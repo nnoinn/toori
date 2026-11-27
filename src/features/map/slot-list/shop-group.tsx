@@ -20,16 +20,19 @@ import { windowMenuText } from './window-card';
 import { windowRangeText } from './window-range';
 
 /**
- * 샵 묶음 목록(거리순 목록, 찜한 샵). 흰 판(frameClassName) 안에 묶음을 쌓고, 펼친 샵을 기억한다
+ * 샵 묶음 목록(거리순 목록, 관심 샵). 흰 판(frameClassName) 안에 묶음을 쌓고, 펼친 샵을 기억한다
  */
 export function ShopGroupList({
   groups,
   serverNow,
   frameClassName,
+  previewCount,
 }: {
   groups: ShopGroup[];
   serverNow: string;
   frameClassName: string;
+  /** 샵마다 먼저 보여줄 매물 수. 없으면 3개(GROUP_PREVIEW_COUNT). 관심 샵은 2개(C-211) */
+  previewCount?: number;
 }) {
   // 펼친 샵 묶음(샵 id)
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
@@ -53,6 +56,7 @@ export function ShopGroupList({
               serverNow={serverNow}
               expanded={expanded.has(group.shop.shopId)}
               onToggle={() => toggle(group.shop.shopId)}
+              previewCount={previewCount}
             />
           </li>
         ))}
@@ -62,23 +66,25 @@ export function ShopGroupList({
 }
 
 /**
- * 샵 묶음 하나(거리순 목록 11/18 정찬형, 찜한 샵 11/15 회의 3번). 머리 줄(샵 사진·이름·업종·거리, 매물 수·최대 할인율) 아래에
- * 그 샵 매물을 짧은 줄로 놓는다. 3개가 넘으면 접어 두고 [매물 N개 더 보기]로 편다
+ * 샵 묶음 하나(거리순 목록 11/18 정찬형, 관심 샵 11/15 회의 3번·C-211). 머리 줄(샵 사진·이름·업종·거리, 매물 수·최대 할인율) 아래에
+ * 그 샵 매물을 짧은 줄로 놓는다. previewCount(기본 3개)가 넘으면 접어 두고 [매물 N개 더 보기]로 편다
  */
 export function ShopGroupBlock({
   group,
   serverNow,
   expanded,
   onToggle,
+  previewCount,
 }: {
   group: ShopGroup;
   serverNow: string;
   expanded: boolean;
   onToggle: () => void;
+  previewCount?: number;
 }) {
   const { shop } = group;
   const distance = formatDistance(shop.distanceMeters);
-  const { visible, hiddenCount } = groupPreview(group, expanded);
+  const { visible, hiddenCount } = groupPreview(group, expanded, previewCount);
   const foldable = group.items.length > visible.length || expanded;
 
   return (
