@@ -125,7 +125,7 @@ function withdrawnResult(now: Date): WithdrawnAccount {
 /**
  * 고객 탈퇴(확인 창 두 번 뒤). 한 트랜잭션에서 고객 계정 줄을 잠그고 막는 이유를 다시 센다.
  * 있으면 WITHDRAWAL_BLOCKED(error.blockers에 이유 모두). 없으면 결제 중이면 홀딩을 풀고, 안 쓴 쿠폰을 없애고,
- * 관심 동네·찜·웹 푸시 구독을 지우고, 광고성 동의 철회를 남기고, 같은 사람 표시를 채운 뒤 로그아웃한다.
+ * 관심 동네·관심 샵·관심 매물·웹 푸시 구독을 지우고, 광고성 동의 철회를 남기고, 같은 사람 표시를 채운 뒤 로그아웃한다.
  * 운영 배포에서 같은 사람 표시 키가 없으면 NOT_READY(아무것도 바꾸지 않는다)
  */
 export async function withdrawCustomer(): Promise<WithdrawalResult<WithdrawnAccount>> {
@@ -285,7 +285,7 @@ async function restore(
 }
 
 /**
- * 고객 [계정 되살리기]. 탈퇴한 고객 계정을 되살린다(이력 그대로). 없어진 쿠폰, 철회한 광고성 동의, 지운 관심 동네·찜·푸시 구독은
+ * 고객 [계정 되살리기]. 탈퇴한 고객 계정을 되살린다(이력 그대로). 없어진 쿠폰, 철회한 광고성 동의, 지운 관심 동네·관심 샵·관심 매물·푸시 구독은
  * 돌아오지 않는다(#154 3장). 탈퇴한 계정이 없으면 NOT_WITHDRAWN, 되살리기 기간이 지났으면 RESTORE_EXPIRED
  */
 export async function restoreCustomer(): Promise<WithdrawalResult<RestoredAccount>> {

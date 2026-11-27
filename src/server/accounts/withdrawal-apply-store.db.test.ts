@@ -2,7 +2,7 @@
 // 함수를 부르는 차례(잠그기 → 막는 이유 다시 세기 → 처리 → 로그아웃)는 withdrawal.test.ts가 본다.
 // 시각은 2026-11-01 한국 시간이다(tests/db/fixtures.ts testSlot과 같은 날)
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import { afterAll, expect, it } from 'vitest';
 
 import {
@@ -15,6 +15,7 @@ import {
   profiles,
   pushSubscriptions,
   shops,
+  slotInterests,
   slots,
   slotWindows,
   termsAgreements,
@@ -106,7 +107,7 @@ function pushOf(userId: string, accountType: 'customer' | 'owner') {
 describeDb('회원 탈퇴 처리 저장 (실제 DB)', () => {
   afterAll(closeTestDb);
 
-  it('고객: 홀딩을 풀고, 기한이 남은 안 쓴 쿠폰만 없애고, 관심 동네·찜·고객 푸시 구독을 지우고, 광고성 동의만 철회로 남긴다', async () => {
+  it('고객: 홀딩을 풀고, 기한이 남은 안 쓴 쿠폰만 없애고, 관심 동네·관심 샵·관심 매물·고객 푸시 구독을 지우고, 광고성 동의만 철회로 남긴다', async () => {
     await withRollback(async (tx) => {
       const shop = await createTestShop(tx, { status: 'approved' });
       const customer = await createTestCustomer(tx);
@@ -141,6 +142,14 @@ describeDb('회원 탈퇴 처리 저장 (실제 DB)', () => {
         .returning({ id: coupons.id });
       await tx.insert(interestAreas).values({ customerId, sigunguCode: '41273' });
       await tx.insert(favorites).values({ customerId, shopId: shop.shopId });
+      // 관심 매물(C-211)은 한 시술 매물과 시간대 모두 지우고, 다른 고객의 관심은 그대로다
+      const windowId = await addWindow(tx, shop);
+      const other = await createTestCustomer(tx);
+      await tx.insert(slotInterests).values([
+        { customerId, slotId: heldSlot },
+        { customerId, windowId },
+        { customerId: other.customerId, slotId: heldSlot },
+      ]);
       await tx
         .insert(pushSubscriptions)
         .values([pushOf(userId, 'customer'), pushOf(userId, 'owner')]);
@@ -186,6 +195,12 @@ describeDb('회원 탈퇴 처리 저장 (실제 DB)', () => {
       expect(await tx.select().from(favorites).where(eq(favorites.customerId, customerId))).toEqual(
         [],
       );
+      expect(
+        await tx
+          .select({ customerId: slotInterests.customerId })
+          .from(slotInterests)
+          .where(or(eq(slotInterests.slotId, heldSlot), eq(slotInterests.windowId, windowId))),
+      ).toEqual([{ customerId: other.customerId }]);
       expect(
         (
           await tx

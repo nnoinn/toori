@@ -135,6 +135,8 @@ async function clearSeedData(sql, userIds) {
   await sql`delete from reservations where id in (${seedReservations()})`;
   await sql`delete from orders where id in (${seedOrders()})`;
   await sql`delete from favorites where customer_id in (${seedCustomers()}) or shop_id in (${seedShops()})`;
+  // 관심 매물(C-211, #616): 시드 고객의 관심과, 시드 샵 매물·시간대를 가리키는 관심을 매물·시간대보다 먼저 지운다
+  await sql`delete from slot_interests where customer_id in (${seedCustomers()}) or slot_id in (select id from slots where shop_id in (${seedShops()}) or created_by in ${sql(userIds)}) or window_id in (select id from slot_windows where shop_id in (${seedShops()}))`;
   await sql`delete from interest_areas where customer_id in (${seedCustomers()})`;
   await sql`delete from notifications where user_id in ${sql(userIds)}`;
   await sql`delete from push_subscriptions where user_id in ${sql(userIds)}`;
