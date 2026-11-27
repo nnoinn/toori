@@ -61,6 +61,18 @@ export function safeExternalUrl(raw: string | null | undefined): string | null {
   }
 }
 
+/**
+ * 매물 상세 사진(C-309 ②): 그 매물 메뉴의 시술 사진만. 원장님이 그 메뉴에 사진을 하나도 묶지 않았으면 샵 사진 전체.
+ * 받은 순서(대표 먼저, 그다음 원장님이 정한 순서)를 그대로 둔다. 샵 소개·영업시간과 함께 샵 전체 사진은 샵 프로필에서 본다
+ */
+export function slotPhotoRows<T extends { menuId: string | null }>(
+  rows: readonly T[],
+  menuId: string | null,
+): T[] {
+  const own = menuId === null ? [] : rows.filter((row) => row.menuId === menuId);
+  return own.length > 0 ? own : [...rows];
+}
+
 /** 사진 줄의 스크롤 위치로 지금 보이는 사진 번호(0부터)를 구한다. 칸 폭을 못 재면 첫 장 */
 export function photoIndexAt(scrollLeft: number, slideWidth: number, count: number): number {
   if (slideWidth <= 0 || count <= 0) return 0;

@@ -14,7 +14,6 @@ import {
   DetailSection,
   DetailTop,
   RefundPolicyDetails,
-  ShopHoursList,
   ShopLinkButtons,
   ShopLocationBlock,
   ShopPhoneLink,
@@ -49,6 +48,8 @@ const TABS: DetailTab[] = [
 /**
  * 매물 상세 (J7, C-301~C-305, C-308). 11/18 회의 피드백 5번 A안(지도 앱 장소 상세처럼):
  * 위에 사진 묶음 → 샵 이름 → 탭(시술 정보·샵 정보·위치·이 샵의 다른 매물)과 칸. 오른쪽(PC)은 가격·예약하기 상자.
+ * C-309 ②: 사진은 그 매물 메뉴의 시술 사진만(없으면 샵 사진 전체), 샵 정보 칸은 전화·외부 링크·[샵 프로필 보기]만 두고
+ * 샵 소개·영업시간은 샵 프로필(/shops/[shopId])에서 본다.
  * 폰: 사진 → 샵 이름 → 가격·예약 상자 → 탭과 칸(회색 배경 위 흰 카드, #359 2번), 아래 고정 예약 바.
  * PC(md 이상): 가운데 최대 1024px 두 칸. 오른쪽 상자는 스크롤해도 따라온다.
  * 예약하기는 10분 홀딩을 걸고 예약 확인 화면으로 간다(reserve-button.tsx). 사진 묶음·샵 정보 조각·환불 규정은 시간대 상세(#308)와 같이 쓴다
@@ -152,12 +153,6 @@ export function SlotDetailView({
         </DetailSection>
 
         <DetailSection id="shop-info" title="샵 정보">
-          {shop.description ? (
-            <p className="text-sm whitespace-pre-line">{shop.description}</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">샵 소개가 아직 없어요.</p>
-          )}
-          <ShopHoursList businessHours={shop.businessHours} />
           <ShopPhoneLink phone={shop.phone} />
           <ShopLinkButtons shop={shop} />
           <ShopProfileLink shopId={shop.shopId} />

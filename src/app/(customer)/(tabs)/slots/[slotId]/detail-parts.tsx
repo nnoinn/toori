@@ -203,7 +203,7 @@ export function ShopLinkButtons({ shop }: { shop: DetailShop }) {
   );
 }
 
-/** 샵 정보(원장님 프로필): 이름·찜, 주소·작은 지도·길찾기, 전화, 영업시간, 소개, 외부 링크, [샵 프로필 보기]. 시간대 상세가 쓴다 */
+/** 샵 정보(원장님 프로필): 이름·찜, 주소·작은 지도·길찾기, 전화, 외부 링크, [샵 프로필 보기]. 시간대 상세가 쓴다 */
 export function ShopInfoSection({
   shop,
   favorite,
@@ -237,26 +237,31 @@ export function ShopInfoSection({
       </div>
       <ShopLocationBlock shop={shop} />
       <ShopPhoneLink phone={shop.phone} />
-      <ShopHoursList businessHours={shop.businessHours} />
-      {shop.description ? (
-        <p className="text-sm whitespace-pre-line text-muted-foreground">{shop.description}</p>
-      ) : null}
+      {/* 샵 소개·영업시간은 샵 프로필에서 본다(C-309 ②, 매물 상세와 같게) */}
       <ShopLinkButtons shop={shop} />
       <ShopProfileLink shopId={shop.shopId} />
     </Card>
   );
 }
 
-/** [샵 프로필 보기](C-309). 매물 상세의 샵 정보 칸과 시간대 상세의 샵 정보 끝에 둔다 */
+/**
+ * [샵 프로필 보기](C-309). 매물 상세의 샵 정보 칸과 시간대 상세의 샵 정보 끝에 둔다.
+ * 상세에서 뺀 샵 소개·영업시간(C-309 ②)을 어디서 보는지 버튼 위에 한 줄로 알린다
+ */
 export function ShopProfileLink({ shopId }: { shopId: string }) {
   return (
-    <Link
-      href={shopProfilePath(shopId)}
-      className={buttonVariants({ variant: 'outline', className: 'w-full gap-1 max-md:h-10' })}
-    >
-      샵 프로필 보기
-      <ChevronRight className="size-4" aria-hidden />
-    </Link>
+    <>
+      <p className="text-xs text-muted-foreground">
+        샵 소개·영업시간·메뉴는 샵 프로필에서 볼 수 있어요.
+      </p>
+      <Link
+        href={shopProfilePath(shopId)}
+        className={buttonVariants({ variant: 'outline', className: 'w-full gap-1 max-md:h-10' })}
+      >
+        샵 프로필 보기
+        <ChevronRight className="size-4" aria-hidden />
+      </Link>
+    </>
   );
 }
 

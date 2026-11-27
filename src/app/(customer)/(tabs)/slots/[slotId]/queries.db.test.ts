@@ -3,7 +3,7 @@
 
 import { afterAll, expect, it } from 'vitest';
 
-import { shopImages, slots } from '@/db/schema';
+import { menus, shopImages, slots } from '@/db/schema';
 
 import {
   createTestCustomer,
@@ -76,6 +76,58 @@ describeDb('매물 상세 조회', () => {
         ]);
       } else {
         expect(result?.imageUrls).toEqual([]);
+      }
+    });
+  });
+
+  it('사진은 그 매물 메뉴의 시술 사진만, 그 메뉴에 사진이 없으면 샵 사진 전체(C-309 ②)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved' });
+      const [perm] = await tx
+        .insert(menus)
+        .values({
+          shopId: shop.shopId,
+          serviceType: 'perm',
+          name: '펌',
+          listPrice: 80000,
+          durationMinutes: 120,
+          sortOrder: 1,
+        })
+        .returning();
+      // 커트 매물(테스트 샵의 첫 메뉴)과 펌 매물
+      const cut = await insertSlot(tx, shop, '10:00', '11:00');
+      const permSlot = await insertSlot(tx, shop, '12:00', '14:00', {
+        menuId: perm.id,
+        serviceType: 'perm',
+        menuName: '펌',
+      });
+      await tx.insert(shopImages).values([
+        { shopId: shop.shopId, kind: 'main', storagePath: 'shop/main.jpg', sortOrder: 0 },
+        {
+          shopId: shop.shopId,
+          kind: 'style',
+          storagePath: 'shop/cut-2.jpg',
+          sortOrder: 2,
+          menuId: shop.menuId,
+        },
+        {
+          shopId: shop.shopId,
+          kind: 'style',
+          storagePath: 'shop/cut-1.jpg',
+          sortOrder: 1,
+          menuId: shop.menuId,
+        },
+      ]);
+
+      const names = async (slotId: string) =>
+        (await detail(tx, slotId))?.imageUrls.map((url) => url.split('/').at(-1));
+      // Supabase 주소가 없는 테스트 환경이면 이미지 주소도 없다
+      if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
+        expect(await names(cut.id)).toEqual(['cut-1.jpg', 'cut-2.jpg']);
+        // 펌에는 묶인 사진이 없어서 샵 사진 전체(대표 먼저)
+        expect(await names(permSlot.id)).toEqual(['main.jpg', 'cut-1.jpg', 'cut-2.jpg']);
+      } else {
+        expect(await names(cut.id)).toEqual([]);
       }
     });
   });
