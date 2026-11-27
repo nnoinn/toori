@@ -3,7 +3,7 @@
 
 import 'server-only';
 
-import { and, eq, isNotNull, isNull, or } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 import { getDb } from '@/db';
 import { menus, slots, slotWindows } from '@/db/schema';
@@ -21,7 +21,7 @@ export async function selectTutorialProgress(
     db
       .select({ id: menus.id })
       .from(menus)
-      .where(and(eq(menus.shopId, shopId), or(isNull(menus.hiddenAt), isNotNull(menus.hiddenAt))))
+      .where(and(eq(menus.shopId, shopId), isNull(menus.hiddenAt)))
       .limit(1),
     db.select({ id: slots.id }).from(slots).where(eq(slots.shopId, shopId)).limit(1),
     db
@@ -30,8 +30,5 @@ export async function selectTutorialProgress(
       .where(eq(slotWindows.shopId, shopId))
       .limit(1),
   ]);
-  return {
-    hasMenu: menu.length > 0,
-    hasListed: slot.length > 0 || (window.length > 0 && slot.length > 0),
-  };
+  return { hasMenu: menu.length > 0, hasListed: slot.length > 0 || window.length > 0 };
 }
