@@ -64,15 +64,18 @@ export function StepNav<N extends number = StepNumber>({
   done,
   pending,
   onGoTo,
+  tourTarget,
 }: {
   labels?: readonly string[];
   step: N;
   done: Record<N, boolean>;
   pending: boolean;
   onGoTo: (target: N) => void;
+  /** 튜토리얼 말풍선(S-412)이 붙는 칸 이름(`data-tour`) */
+  tourTarget?: string;
 }) {
   return (
-    <ol className="flex gap-2" aria-label="등록 단계">
+    <ol className="flex gap-2 rounded-lg" aria-label="등록 단계" data-tour={tourTarget}>
       {labels.map((label, index) => {
         const number = (index + 1) as N;
         const isDone = done[number];

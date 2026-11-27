@@ -14,6 +14,14 @@ function PopoverTrigger({ ...props }: React.ComponentProps<typeof PopoverPrimiti
   return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />;
 }
 
+/**
+ * 버튼이 아닌 곳 옆에 창을 붙일 때 쓴다. `virtualRef`로 화면의 다른 요소를 가리킬 수 있다.
+ * 예: 원장님 튜토리얼 말풍선(S-412)이 설명하는 칸 옆에 뜬다
+ */
+function PopoverAnchor({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Anchor>) {
+  return <PopoverPrimitive.Anchor data-slot="popover-anchor" {...props} />;
+}
+
 function PopoverContent({
   className,
   align = 'start',
@@ -36,4 +44,4 @@ function PopoverContent({
   );
 }
 
-export { Popover, PopoverContent, PopoverTrigger };
+export { Popover, PopoverAnchor, PopoverContent, PopoverTrigger };

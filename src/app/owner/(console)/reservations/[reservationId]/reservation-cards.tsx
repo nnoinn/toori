@@ -121,7 +121,7 @@ export function BookerCard({ reservation }: { reservation: OwnerReservation }) {
   const name = bookerName(reservation.customerName);
   const phone = reservation.customerPhone;
   return (
-    <Card>
+    <Card data-tour="reservation-booker">
       <CardHeader>
         <CardTitle>예약자</CardTitle>
       </CardHeader>

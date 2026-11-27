@@ -116,6 +116,7 @@ async function SlotCreateContent() {
 
   return (
     <SlotCreateTabs
+      shopId={auth.shopId}
       single={
         <SlotForm
           shopId={auth.shopId}

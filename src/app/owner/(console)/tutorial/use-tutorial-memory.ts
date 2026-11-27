@@ -1,17 +1,19 @@
 'use client';
 
 // 원장님 튜토리얼(S-412) 브라우저 기록(tutorial-memory.ts)을 화면에서 읽고 바꾼다.
-// 대시보드 체크 목록과 내 계정의 [다시 보기]가 같은 기록을 본다. 같은 탭에서 바꾸면 이 파일의 알림으로,
+// 대시보드 체크 목록, 화면별 말풍선, 내 계정의 [다시 보기]가 같은 기록을 본다. 같은 탭에서 바꾸면 이 파일의 알림으로,
 // 다른 탭에서 바꾸면 브라우저의 storage 알림으로 다시 그린다.
 // 저장소가 막혀 있으면(사생활 보호 모드 등) 이 탭에서만 기억한다.
 
 import { useSyncExternalStore } from 'react';
 
+import type { TourKey } from './tours';
 import {
   parseTutorialMemory,
   serializeTutorialMemory,
   type TutorialMemory,
   tutorialMemoryKey,
+  withTourSeen,
 } from './tutorial-memory';
 
 const CHANGE_EVENT = 'toori:owner-tutorial-change';
@@ -67,6 +69,13 @@ export function hideChecklist(shopId: string) {
   const key = tutorialMemoryKey(shopId);
   const memory = parseTutorialMemory(readRaw(key));
   writeRaw(key, serializeTutorialMemory({ ...memory, checklistHidden: true }));
+}
+
+/** 그 화면 말풍선을 끝까지 봤거나 건너뛰었다. 다음에는 띄우지 않는다 */
+export function markTourSeen(shopId: string, tour: TourKey) {
+  const key = tutorialMemoryKey(shopId);
+  const memory = parseTutorialMemory(readRaw(key));
+  writeRaw(key, serializeTutorialMemory(withTourSeen(memory, tour)));
 }
 
 /** 내 계정 [다시 보기]: 이 샵의 튜토리얼 기록을 지워 처음처럼 보이게 한다 */

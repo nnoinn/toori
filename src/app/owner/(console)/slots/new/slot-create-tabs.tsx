@@ -3,9 +3,12 @@
 // 매물 등록 방식 고르기 (#308, S-201). "한 시술 매물"(서비스 하나를 정한 시각에, 지금 방식)과
 // "시간대 매물"(빈 시간대를 통째로, 고객이 서비스와 시작 시각을 고름) 중 하나를 탭으로 고른다.
 // 처음에는 지금 방식 탭이 열려 있다(11/11 정민석). 탭을 오가도 고르던 값이 남도록 두 화면을 다 두고 하나만 보여준다.
+// 탭마다 처음 열면 튜토리얼 말풍선(S-412)이 뜬다.
 
 import { useId, useState } from 'react';
 import { cn } from 'cn';
+
+import { TutorialTour } from '../../tutorial/tutorial-tour';
 
 const METHODS = [
   { key: 'single', title: '한 시술 매물', description: '서비스 하나를 정한 시각에 올려요' },
@@ -19,9 +22,12 @@ const METHODS = [
 type Method = (typeof METHODS)[number]['key'];
 
 export function SlotCreateTabs({
+  shopId,
   single,
   windowForm,
 }: {
+  /** 튜토리얼 말풍선을 본 기록을 샵마다 둔다 */
+  shopId: string;
   /** 한 시술 매물 등록(SlotForm) */
   single: React.ReactNode;
   /** 시간대 매물 등록(WindowForm) */
@@ -42,7 +48,12 @@ export function SlotCreateTabs({
 
   return (
     <div className="flex flex-col gap-4">
-      <div role="tablist" aria-label="등록 방식" className="grid grid-cols-2 gap-2">
+      <div
+        role="tablist"
+        aria-label="등록 방식"
+        data-tour="slot-methods"
+        className="grid grid-cols-2 gap-2 rounded-xl"
+      >
         {METHODS.map((item) => {
           const current = method === item.key;
           return (
@@ -78,6 +89,8 @@ export function SlotCreateTabs({
           {panels[item.key]}
         </div>
       ))}
+      <TutorialTour shopId={shopId} tour="slot_single" active={method === 'single'} />
+      <TutorialTour shopId={shopId} tour="slot_window" active={method === 'window'} />
     </div>
   );
 }

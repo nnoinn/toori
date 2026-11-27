@@ -25,7 +25,11 @@ export function SlotPresetPicker({
   onChoose: (preset: SlotPreset) => void;
 }) {
   return (
-    <section aria-labelledby="slot-presets-title" className="flex flex-col gap-2">
+    <section
+      aria-labelledby="slot-presets-title"
+      data-tour="slot-presets"
+      className="flex flex-col gap-2 rounded-lg"
+    >
       <div className="flex flex-col gap-0.5">
         <h2 id="slot-presets-title" className="text-sm font-semibold">
           지난 매물로 빠르게 올리기

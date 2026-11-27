@@ -17,6 +17,7 @@ import { canRecordVisit } from '@/server/visits/rules';
 
 import { OwnerPage } from '../../owner-page';
 import { RESERVATION_VIEW_STYLE } from '../../status-style';
+import { TutorialTour } from '../../tutorial/tutorial-tour';
 import { RESERVATION_VIEW_LABELS, reservationView, visitSummary } from '../reservation-detail';
 import { selectOwnerReservation } from '../reservation-detail-store';
 import { ReservationCancelCard } from './cancel-card';
@@ -67,7 +68,7 @@ async function ReservationContent({ params }: { params: Params }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card>
+      <Card data-tour="reservation-header">
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div className="flex flex-col gap-1">
             <p className="text-sm text-muted-foreground">예약번호</p>
@@ -111,6 +112,9 @@ async function ReservationContent({ params }: { params: Params }) {
       </div>
 
       <HistoryCard reservation={reservation} />
+
+      {/* 처음 들어오면 예약번호·방문 처리·취소·예약자 칸을 말풍선으로 안내한다(S-412) */}
+      <TutorialTour shopId={auth.shopId} tour="reservation_detail" />
 
       <div>
         <Button asChild variant="outline">
