@@ -7,11 +7,12 @@ CREATE TABLE "slot_interests" (
 	"window_id" uuid,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "slot_interests_customer_slot_unique" UNIQUE("customer_id","slot_id"),
-	CONSTRAINT "slot_interests_target_check" CHECK (not ("slot_interests"."slot_id" is null and "slot_interests"."window_id" is null))
+	CONSTRAINT "slot_interests_customer_window_unique" UNIQUE("customer_id","window_id"),
+	CONSTRAINT "slot_interests_target_check" CHECK (("slot_interests"."slot_id" is null) <> ("slot_interests"."window_id" is null))
 );
 --> statement-breakpoint
 ALTER TABLE "slot_interests" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
-ALTER TABLE "customers" ADD COLUMN "onboarding_seen_at" timestamp with time zone DEFAULT now();--> statement-breakpoint
+ALTER TABLE "customers" ADD COLUMN "onboarding_seen_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "slot_interests" ADD CONSTRAINT "slot_interests_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "slot_interests" ADD CONSTRAINT "slot_interests_slot_id_slots_id_fk" FOREIGN KEY ("slot_id") REFERENCES "public"."slots"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "slot_interests" ADD CONSTRAINT "slot_interests_window_id_slot_windows_id_fk" FOREIGN KEY ("window_id") REFERENCES "public"."slot_windows"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
