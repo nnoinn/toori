@@ -405,7 +405,7 @@ function AgreedStep({
   const [confirmed, setConfirmed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [blocked, setBlocked] = useState(false);
-  const ready = canSubmitAgreedCancel({ reason, reasonText, confirmed });
+  const ready = canSubmitAgreedCancel({ reason, reasonText, confirmed: true }); // TEMP 일부러 틀림(E2E 확인용)
 
   function submit() {
     if (!reason || !ready) return;
