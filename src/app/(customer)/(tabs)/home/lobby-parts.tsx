@@ -18,6 +18,7 @@ import { LocationSwitcher } from '@/features/map/location-switcher';
 import { ListItemRow } from '@/features/map/slot-list/slot-list';
 import { type ListItem, listItemKey } from '@/features/map/slot-list/types';
 
+import { interestTabHref } from './favorites/interest-tabs';
 import { LOBBY_TILES, type LobbyTileKey, PHONE_ROW_COUNT } from './lobby-rules';
 
 // 고객 홈(로비) 조각 (11/15 회의 6번, 11/20 정찬형 A안). 흰 카드는 모두 같은 모양(둥근 모서리·테두리)이다.
@@ -174,7 +175,7 @@ export function LobbyFavoritesBox({ summary }: { summary: string | null }) {
         {summary ?? '로그인하면 관심 샵의 매물을 모아 볼 수 있어요'}
       </p>
       <Link
-        href="/home/favorites"
+        href={interestTabHref('shops')}
         className={buttonVariants({ variant: 'outline', className: 'w-full' })}
       >
         관심 샵 매물 보기

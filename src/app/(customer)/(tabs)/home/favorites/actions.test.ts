@@ -4,7 +4,8 @@ import { refresh } from 'next/cache';
 import { fail, ok } from '@/lib/result';
 import { requireCustomer } from '@/server/auth';
 
-import { setFavorite } from './actions';
+import { setFavorite, setSlotInterest } from './actions';
+import { addSlotInterest, removeSlotInterest } from './slot-interest-store';
 import { addFavorite, removeFavorite } from './store';
 
 // 로그인 확인·DB 저장·화면 새로 그리기는 흉내 낸다. 여기서는 "본인 고객 계정의 찜만 바꾸고, 입력·실패를 어떻게 돌려주는지"를 본다.
@@ -13,17 +14,23 @@ vi.mock('next/cache', () => ({ refresh: vi.fn() }));
 vi.mock('@/db', () => ({ getDb: vi.fn(() => 'db') }));
 vi.mock('@/server/auth', () => ({ requireCustomer: vi.fn() }));
 vi.mock('./store', () => ({ addFavorite: vi.fn(), removeFavorite: vi.fn() }));
+vi.mock('./slot-interest-store', () => ({ addSlotInterest: vi.fn(), removeSlotInterest: vi.fn() }));
 
 const SHOP_ID = '6f2c1d8e-3b4a-4c5d-9e7f-0a1b2c3d4e5f';
 const authMock = vi.mocked(requireCustomer);
 const addMock = vi.mocked(addFavorite);
 const removeMock = vi.mocked(removeFavorite);
+const SLOT_ID = '7a3d2e9f-4c5b-4d6e-8f9a-1b2c3d4e5f60';
+const addInterestMock = vi.mocked(addSlotInterest);
+const removeInterestMock = vi.mocked(removeSlotInterest);
 
 beforeEach(() => {
   vi.clearAllMocks();
   authMock.mockResolvedValue(ok({ userId: 'user-1', customerId: 'customer-1' }));
   addMock.mockResolvedValue(true);
   removeMock.mockResolvedValue(undefined);
+  addInterestMock.mockResolvedValue(true);
+  removeInterestMock.mockResolvedValue(undefined);
 });
 
 describe('setFavorite', () => {
@@ -77,6 +84,46 @@ describe('setFavorite', () => {
     const result = await setFavorite({ shopId: SHOP_ID, favorite: true });
     expect(!result.ok && result.error.code).toBe('SAVE_FAILED');
     expect(log).toHaveBeenCalledWith('[setFavorite] 저장 실패:', 'TypeError');
+    expect(refresh).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+});
+
+describe('setSlotInterest (관심 매물, C-211)', () => {
+  it('켜면 내 고객 계정으로 저장하고, 끄면 지우고, 화면을 다시 그린다', async () => {
+    expect(await setSlotInterest({ slotId: SLOT_ID, interested: true })).toEqual(
+      ok({ interested: true }),
+    );
+    expect(addInterestMock).toHaveBeenCalledWith('db', 'customer-1', SLOT_ID);
+    expect(await setSlotInterest({ slotId: SLOT_ID, interested: false })).toEqual(
+      ok({ interested: false }),
+    );
+    expect(removeInterestMock).toHaveBeenCalledWith('db', 'customer-1', SLOT_ID);
+    expect(refresh).toHaveBeenCalledTimes(2);
+  });
+
+  it('고객으로 로그인하지 않았거나 입력이 이상하면 저장하지 않는다', async () => {
+    authMock.mockResolvedValueOnce(fail('WRONG_MODE', '고객으로 들어와 주세요'));
+    const wrongMode = await setSlotInterest({ slotId: SLOT_ID, interested: true });
+    expect(!wrongMode.ok && wrongMode.error.code).toBe('WRONG_MODE');
+    for (const input of [{ slotId: 'nope', interested: true }, { slotId: SLOT_ID }, null]) {
+      const result = await setSlotInterest(input);
+      expect(!result.ok && result.error.code).toBe('INVALID_INPUT');
+    }
+    expect(addInterestMock).not.toHaveBeenCalled();
+    expect(removeInterestMock).not.toHaveBeenCalled();
+  });
+
+  it('관심 표시할 수 없는 매물이면 SLOT_NOT_FOUND, 저장이 실패하면 SAVE_FAILED', async () => {
+    addInterestMock.mockResolvedValueOnce(false);
+    const missing = await setSlotInterest({ slotId: SLOT_ID, interested: true });
+    expect(!missing.ok && missing.error.code).toBe('SLOT_NOT_FOUND');
+
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    addInterestMock.mockRejectedValueOnce(new TypeError('boom'));
+    const failed = await setSlotInterest({ slotId: SLOT_ID, interested: true });
+    expect(!failed.ok && failed.error.code).toBe('SAVE_FAILED');
+    expect(log).toHaveBeenCalledWith('[setSlotInterest] 저장 실패:', 'TypeError');
     expect(refresh).not.toHaveBeenCalled();
     log.mockRestore();
   });

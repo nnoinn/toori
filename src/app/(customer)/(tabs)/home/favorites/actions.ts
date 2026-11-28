@@ -10,6 +10,7 @@ import { getDb } from '@/db';
 import { fail, ok, type Result } from '@/lib/result';
 import { requireCustomer } from '@/server/auth';
 
+import { addSlotInterest, removeSlotInterest } from './slot-interest-store';
 import { addFavorite, removeFavorite } from './store';
 
 const favoriteInputSchema = z.object({ shopId: z.uuid(), favorite: z.boolean() });
@@ -35,4 +36,32 @@ export async function setFavorite(input: unknown): Promise<Result<{ favorite: bo
   // 상세의 하트와 관심 샵 화면이 새 값으로 다시 그려지게 한다
   refresh();
   return ok({ favorite });
+}
+
+const slotInterestInputSchema = z.object({ slotId: z.uuid(), interested: z.boolean() });
+
+/**
+ * 관심 매물(C-211) 켜고 끄기. 매물 상세의 [관심 매물]에서 부른다. 여러 번 눌러도 결과는 같다.
+ * 본인 고객 계정의 관심만 바꾼다(X-102). 관심 표시할 수 없는 매물(승인 안 된 샵, 게시 전 등)이면 SLOT_NOT_FOUND
+ */
+export async function setSlotInterest(input: unknown): Promise<Result<{ interested: boolean }>> {
+  const auth = await requireCustomer();
+  if (!auth.ok) return auth;
+  const parsed = slotInterestInputSchema.safeParse(input);
+  if (!parsed.success) return fail('INVALID_INPUT', '관심 매물로 둘 매물을 찾지 못했어요');
+  const { slotId, interested } = parsed.data;
+  try {
+    if (interested) {
+      const added = await addSlotInterest(getDb(), auth.data.customerId, slotId);
+      if (!added) return fail('SLOT_NOT_FOUND', '지금은 관심 매물로 둘 수 없는 매물이에요');
+    } else {
+      await removeSlotInterest(getDb(), auth.data.customerId, slotId);
+    }
+  } catch (error) {
+    console.error('[setSlotInterest] 저장 실패:', error instanceof Error ? error.name : 'unknown');
+    return fail('SAVE_FAILED', '관심 매물을 저장하지 못했어요. 잠시 후 다시 시도해 주세요');
+  }
+  // 상세의 하트와 관심 화면이 새 값으로 다시 그려지게 한다
+  refresh();
+  return ok({ interested });
 }

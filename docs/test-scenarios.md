@@ -79,6 +79,7 @@ PR 검사가 자동으로 막는 것:
 | SHOW-04 | 매물 상세에는 접힌 "환불 규정" 한 줄만 두고, 규정 문구는 결제 동의 문구와 글자까지 같다 | C-305·C-402 | ✅ | `src/app/(customer)/(tabs)/slots/[slotId]/detail-format.test.ts` 결제 동의 문구(consent-texts.md 3장)와 글자까지 같다 |
 | SHOW-05 | 샵 영업시간은 일~토 순서로 보여 준다(고객 매물 상세, 원장님 매장 설정의 표와 요일별 칸) | 11/15 nnoinn, #431, #437 | ✅ | `src/app/(customer)/(tabs)/slots/[slotId]/detail-format.test.ts` 캘린더처럼 일요일부터 토요일까지 7줄<br>`src/app/owner/(console)/settings/shop/shop-profile.test.ts` 저장된 영업시간을 일~토 7줄로 바꾸고 |
 | SHOW-06 | 신규 고객 판별의 이력은 같은 사람의 고객 계정 모두에서 본다: 같은 로그인의 탈퇴한 고객 계정, 로그인 정보까지 지운 뒤 같은 이메일로 다시 가입한 계정(같은 사람 표시). 같은 사람 표시가 비어 있으면 잇지 않는다. 첫 로그인 때 같은 사람 표시를 채운다 | #154 본문 4장 | ✅ | `src/server/customers/new-customer.test.ts` 같은 로그인의 탈퇴한 고객 계정 이력도 이력으로 본다<br>`src/server/customers/new-customer.test.ts` 로그인 정보까지 지운 뒤 같은 이메일로 다시 가입한 계정은<br>`src/server/customers/new-customer.test.ts` 같은 사람 표시가 둘 다 비어 있으면 같은 사람으로 보지 않는다<br>`src/server/auth/current-account.test.ts` ensureProfile은 처음 만들 때 같은 사람 표시 |
+| SHOW-13 | 관심 매물은 관심 화면 [매물 보기](기본 탭)에 최근 표시한 순으로 보이고, 마감된 매물(예약됨·마감·취소·완료, 시작 지남)은 흐리게 아래 '마감된 매물' 칸으로 옮긴다. 볼 수 없게 된 매물(승인 안 된 샵, 그 샵 이력이 있는 고객의 신규 고객 전용)은 뺀다 | C-211 | ✅ | `src/app/(customer)/(tabs)/home/favorites/slot-interest-store.db.test.ts` 목록: 최근 표시한 순, 마감된 매물은 아래 칸<br>`tests/e2e/interest-slot.spec.ts` 매물 상세의 [관심 매물]을 누르면 |
 
 ## 5. 홀딩·결제
 

@@ -13,6 +13,7 @@ import { getRequestNow } from '@/lib/request-time';
 import { getCurrentAccount } from '@/server/auth';
 import { getOptionalConsents } from '@/server/auth/customer-account';
 
+import { isSlotInterested } from '../../home/favorites/slot-interest-store';
 import { isFavoriteShop } from '../../home/favorites/store';
 import { otherShopItems } from './detail-format';
 import { selectSlotDetail } from './queries';
@@ -58,10 +59,14 @@ async function DetailContent({ params }: { params: Params }) {
   if (!loaded) notFound();
   const { slot, customerId, now } = loaded;
   const db = getDb();
-  const [[favorite, consents], others] = await Promise.all([
+  const [[favorite, consents, slotInterested], others] = await Promise.all([
     customerId
-      ? Promise.all([isFavoriteShop(db, customerId, slot.shop.shopId), getOptionalConsents()])
-      : Promise.resolve([false, null] as const),
+      ? Promise.all([
+          isFavoriteShop(db, customerId, slot.shop.shopId),
+          getOptionalConsents(),
+          isSlotInterested(db, customerId, slot.slotId),
+        ])
+      : Promise.resolve([false, null, false] as const),
     // 이 샵의 다른 매물: 매물 목록과 같은 조건(게시중·신규 고객 전용·시간대 포함)으로 그 샵 것만 임박순
     selectSlotPage(db, {
       sigunguCode: slot.sigunguCode,
@@ -81,6 +86,7 @@ async function DetailContent({ params }: { params: Params }) {
       serverNow={now.toISOString()}
       favorite={favorite}
       interestAlertAgreed={consents?.ok ? consents.data.interest_alert.agreed : false}
+      slotInterested={slotInterested}
       otherItems={otherItems}
     />
   );

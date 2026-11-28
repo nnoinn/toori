@@ -47,9 +47,9 @@ test('매물 상세의 [관심 샵]을 누르면 관심 샵 화면에 그 샵이
   await expect(button).toHaveAttribute('aria-pressed', 'true');
   await expect(button).toBeEnabled();
 
-  await page.goto('/home/favorites');
+  await page.goto('/home/favorites?tab=shops');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('관심');
   const list = page.getByRole('region', { name: '관심 샵' });
-  await expect(list.getByRole('heading', { level: 1 })).toHaveText('관심 샵');
   await expect(list.getByRole('region', { name: shopName })).toBeVisible();
 
   await page.goto(`/slots/${slotId}`);
@@ -58,6 +58,6 @@ test('매물 상세의 [관심 샵]을 누르면 관심 샵 화면에 그 샵이
   await expect(button).toHaveAttribute('aria-pressed', 'false');
   await expect(button).toBeEnabled();
 
-  await page.goto('/home/favorites');
+  await page.goto('/home/favorites?tab=shops');
   await expect(page.getByText('아직 관심 샵이 없어요')).toBeVisible();
 });
