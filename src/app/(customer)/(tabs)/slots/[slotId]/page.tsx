@@ -14,6 +14,7 @@ import { getCurrentAccount } from '@/server/auth';
 import { getOptionalConsents } from '@/server/auth/customer-account';
 
 import { isFavoriteShop } from '../../home/favorites/store';
+import { RecentRecorder } from '../../recent/recent-recorder';
 import { otherShopItems } from './detail-format';
 import { selectSlotDetail } from './queries';
 import { SlotDetailView } from './slot-detail-view';
@@ -76,13 +77,17 @@ async function DetailContent({ params }: { params: Params }) {
   ]);
   const otherItems = otherShopItems(others.items, slot.slotId);
   return (
-    <SlotDetailView
-      slot={slot}
-      serverNow={now.toISOString()}
-      favorite={favorite}
-      interestAlertAgreed={consents?.ok ? consents.data.interest_alert.agreed : false}
-      otherItems={otherItems}
-    />
+    <>
+      {/* 이 기기의 최근 본 매물에 남긴다(C-212) */}
+      <RecentRecorder kind="slot" id={slot.slotId} />
+      <SlotDetailView
+        slot={slot}
+        serverNow={now.toISOString()}
+        favorite={favorite}
+        interestAlertAgreed={consents?.ok ? consents.data.interest_alert.agreed : false}
+        otherItems={otherItems}
+      />
+    </>
   );
 }
 

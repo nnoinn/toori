@@ -13,6 +13,7 @@ import { getSlotWindow } from '@/server/slot-windows';
 
 import { isFavoriteShop } from '../../home/favorites/store';
 import { WindowDetailView } from './window-detail-view';
+import { RecentRecorder } from '../../recent/recent-recorder';
 
 type Params = Promise<{ windowId: string }>;
 
@@ -59,11 +60,15 @@ async function DetailContent({ params }: { params: Params }) {
       ])
     : [false, null];
   return (
-    <WindowDetailView
-      window={window}
-      favorite={favorite}
-      interestAlertAgreed={consents?.ok ? consents.data.interest_alert.agreed : false}
-    />
+    <>
+      {/* 이 기기의 최근 본 매물에 남긴다(C-212) */}
+      <RecentRecorder kind="window" id={window.windowId} />
+      <WindowDetailView
+        window={window}
+        favorite={favorite}
+        interestAlertAgreed={consents?.ok ? consents.data.interest_alert.agreed : false}
+      />
+    </>
   );
 }
 
