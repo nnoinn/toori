@@ -211,7 +211,7 @@ function ChooseStep({
           title={CANCEL_METHODS.agreed.title}
           description={CANCEL_METHODS.agreed.description}
           note={canRequest ? undefined : lockedReason}
-          disabled={pending} // TEMP 일부러 틀림(E2E 확인용)
+          disabled={!canRequest || pending}
           onClick={onAgreed}
         />
       </div>
@@ -451,7 +451,8 @@ function AgreedStep({
         ))}
       </GuideSection>
       <GuideSection title="이렇게 처리돼요" highlight>
-        {agreedCancelOutcomes(baseAmount).map((line) => (
+        {agreedCancelOutcomes(baseAmount * 2).map( // TEMP 일부러 틀림(E2E 확인용)
+        (line) => (
           <li key={line}>{line}</li>
         ))}
       </GuideSection>
