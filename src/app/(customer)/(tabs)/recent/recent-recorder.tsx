@@ -11,7 +11,7 @@ import type { RecentEntry } from './recent-rules';
  */
 export function RecentRecorder({ kind, id }: RecentEntry) {
   useEffect(() => {
-    rememberRecentEntry({ kind, id });
+    if (kind === 'window') rememberRecentEntry({ kind, id });
   }, [kind, id]);
   return null;
 }

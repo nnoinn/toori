@@ -17,7 +17,7 @@ type ShareSlot = Pick<
 
 /** 매물 상세 주소(공유 링크). 로그인 없이 열린다(둘러보기와 같다) */
 export function slotSharePath(slotId: string): string {
-  return `/slots/${slotId}`;
+  return `/slot/${slotId}`;
 }
 
 /** 공유 제목: "여성 커트 · 샘플 헤어 중앙역점"(탭 제목과 같다) */

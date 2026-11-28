@@ -55,14 +55,14 @@ async function MyInfoContent() {
         {account?.email ? <p className="text-sm text-muted-foreground">{account.email}</p> : null}
       </div>
 
-      {/* 맨 위에 투리로 아낀 금액(C-108) */}
-      <SavedAmountCard saved={saved} />
 
       <ProfileForm
         name={customer?.name ?? ''}
         nickname={customer?.nickname ?? ''}
         phone={customer?.phone ?? ''}
       />
+
+      <SavedAmountCard saved={saved} />
 
       <NoShowRecord history={noShows} />
 

@@ -14,7 +14,7 @@ import { listHref } from './lobby-rules';
 export function searchListHref(text: string, current: URLSearchParams | null): string {
   const next = new URLSearchParams(current ?? undefined);
   const keyword = parseSearchKeyword(text);
-  if (keyword) next.set(SEARCH_PARAM, keyword.text);
+  if (keyword) next.set('query', keyword.text);
   else next.delete(SEARCH_PARAM);
   return listHref(next);
 }

@@ -54,7 +54,7 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
   {
     key: 'refund',
     icon: 'refund',
-    title: '결제 직후에도 무료 취소가 되지 않아요',
+    title: '취소 규정을 확인하세요',
     lines: refundNotes.before,
     bullets: refundPolicyLines(REFUND_BANDS, NO_SHOW_PENALTY_RATE),
   },

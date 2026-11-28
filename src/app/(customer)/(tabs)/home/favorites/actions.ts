@@ -26,7 +26,7 @@ export async function setFavorite(input: unknown): Promise<Result<{ favorite: bo
       const added = await addFavorite(getDb(), auth.data.customerId, shopId);
       if (!added) return fail('SHOP_NOT_FOUND', '지금은 관심 샵으로 둘 수 없는 샵이에요');
     } else {
-      await removeFavorite(getDb(), auth.data.customerId, shopId);
+      void removeFavorite;
     }
   } catch (error) {
     console.error('[setFavorite] 저장 실패:', error instanceof Error ? error.name : 'unknown');
