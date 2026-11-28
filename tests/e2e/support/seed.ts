@@ -41,8 +41,15 @@ export async function withDb<T>(run: (sql: postgres.Sql) => Promise<T>): Promise
 /**
  * 시드 계정으로 로그인한 쿠키를 브라우저에 넣는다. scripts/pr-screenshot.mjs의 signIn과 같은 방식이다:
  * 관리 기능으로 로그인 링크를 만들고 바로 확인해서 세션 쿠키를 받는다(간편 로그인 화면은 로봇이 누르지 않는다, AUTH-07)
+ * 고객 계정은 첫 로그인 안내(C-107)를 이미 본 것으로 해 둔다. 안내 창이 다른 흐름을 가리지 않게 하려는 것이다.
+ * 안내가 저절로 뜨는지 보는 테스트만 onboardingSeen: false로 부른다
  */
-export async function signInAs(context: BrowserContext, account: SeedAccount, baseURL: string) {
+export async function signInAs(
+  context: BrowserContext,
+  account: SeedAccount,
+  baseURL: string,
+  { onboardingSeen = true }: { onboardingSeen?: boolean } = {},
+) {
   const email = `${account}@${SEED_EMAIL_DOMAIN}`;
   const { data, error } = await adminClient().auth.admin.generateLink({ type: 'magiclink', email });
   if (error) throw new Error(`${account} 로그인 링크를 만들지 못했어요: ${error.message}`);
@@ -64,10 +71,32 @@ export async function signInAs(context: BrowserContext, account: SeedAccount, ba
   await expect.poll(() => jar.size, { message: '로그인 쿠키' }).toBeGreaterThan(0);
 
   const mode = account.startsWith('owner') ? 'owner' : 'customer';
+  if (mode === 'customer') await setOnboardingSeen(account, onboardingSeen);
   await context.addCookies([
     ...[...jar].map(([name, value]) => ({ name, value, url: baseURL })),
     { name: ACCOUNT_MODE_COOKIE, value: mode, url: baseURL },
   ]);
+}
+
+/** 시드 고객의 첫 로그인 안내(C-107) 본 시각을 남기거나(본 것) 비운다(아직 안 본 것) */
+export async function setOnboardingSeen(account: SeedAccount, seen: boolean) {
+  await withDb(async (sql) => {
+    await sql`
+      update customers
+      set onboarding_seen_at = ${seen ? sql`coalesce(onboarding_seen_at, now())` : null}
+      where user_id in (select id from auth.users where email = ${`${account}@${SEED_EMAIL_DOMAIN}`})`;
+  });
+}
+
+/** 시드 고객이 첫 로그인 안내를 봤는지 */
+export async function onboardingSeenOf(account: SeedAccount): Promise<boolean> {
+  return withDb(async (sql) => {
+    const [row] = await sql<{ seen: boolean }[]>`
+      select c.onboarding_seen_at is not null as seen
+      from customers c join auth.users u on u.id = c.user_id
+      where u.email = ${`${account}@${SEED_EMAIL_DOMAIN}`} and c.withdrawn_at is null`;
+    return row?.seen ?? false;
+  });
 }
 
 /**

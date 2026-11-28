@@ -1,6 +1,9 @@
+import { Suspense } from 'react';
+
 import { AccountNotificationBell } from '@/components/ui/account-notification-bell';
 import { CustomerBottomNav, CustomerTopNav } from '@/components/ui/customer-nav';
 
+import { OnboardingGate } from '../onboarding-gate';
 import { HoldChip, HoldPill, HoldProvider } from './hold-bar';
 import {
   CUSTOMER_NOTIFICATION_ACCOUNT,
@@ -14,6 +17,7 @@ import {
 // 화면 높이를 직접 정하는 홈과 폰에서 위에 붙는 칸(매물 상세 탭)도 이 값을 쓴다
 // 알림 종(#371): PC는 위쪽 메뉴 오른쪽 끝. 폰은 아래 메뉴에 두지 않고 홈 화면(/home) 위 오른쪽에만 둔다(11/15 nnoinn).
 // 종은 원장님 화면과 같은 공통 UI(AccountNotificationBell)다
+// 첫 로그인 안내(C-107): 고객 계정으로 처음 들어오면 메뉴가 있는 화면에서 안내 창을 한 번 연다. 로그인 쿠키를 읽어서 <Suspense> 안에 둔다
 export default function CustomerTabsLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <HoldProvider>
@@ -31,6 +35,9 @@ export default function CustomerTabsLayout({ children }: Readonly<{ children: Re
       <div className="flex flex-1 flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] has-[[data-hold-pill]]:pt-14 has-[[data-hold-pill]]:[--hold-top:3.5rem] md:pb-0 md:has-[[data-hold-pill]]:pt-0 md:has-[[data-hold-pill]]:[--hold-top:0px]">
         {children}
         <HoldPill />
+        <Suspense fallback={null}>
+          <OnboardingGate />
+        </Suspense>
       </div>
       <CustomerBottomNav />
     </HoldProvider>

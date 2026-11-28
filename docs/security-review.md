@@ -93,6 +93,7 @@
 | `selectRegion`·`saveMyLocation` (`src/features/map/location-actions.ts`) | 누구나 | 이 브라우저 쿠키만 바꾸고 계정 데이터는 읽지 않는다. 내 위치는 위치 이용 기록을 남긴다(위치정보법) | `src/features/map/location-actions.test.ts` 위치 이용 기록을 1번 남기고<br>`src/features/map/location-actions.test.ts` 목록에 없는 동네는 거절한다 | ✅ |
 | `selectFavoriteSlots` (`src/features/map/slot-list/queries.ts`)·`countFavoriteShops`·`isFavoriteShop` (`(tabs)/home/favorites/store.ts`), 찜한 샵 매물·로비·매물 상세 하트 | `ensureCustomerPage`·`getCurrentAccount`(페이지) | 세션 고객의 찜만 | `src/features/map/slot-list/queries.db.test.ts` 찜한 샵 매물: 내가 찜한 샵의 보이는 매물만<br>`src/app/(customer)/(tabs)/home/favorites/store.db.test.ts` 본인 찜만 바뀐다 | ✅ |
 | `selectMyNoShows` (`(tabs)/me/no-show-history.ts`, 내 정보) | `ensureCustomerPage`(페이지) | 세션 고객 | `src/app/(customer)/(tabs)/me/no-show-history.db.test.ts` 본인 노쇼만 세고 | ✅ |
+| `finishOnboarding` (`src/app/(customer)/onboarding-actions.ts`)·`selectOnboardingSeen` (`onboarding-store.ts`, 첫 로그인 안내 C-107) | `requireCustomer`, 읽기는 `getCurrentAccount`(고객 모드의 고객 계정) | 세션 고객 계정의 안내 본 시각만. 입력을 받지 않고, 이미 남겼으면 처음 시각을 그대로 둔다 | `src/app/(customer)/onboarding-store.db.test.ts` 새 고객 계정은 아직 안 봤고, 남기면 본 것이 되고, 다른 고객은 그대로다 | ✅ |
 
 페이지가 같이 부르는 나머지 공통 서버 함수는 1장(강규민) 표에서 본다: 쿠폰함·예약 확인의 `getMyCoupons`, 시간대 상세 `/windows/[id]`의 `getSlotWindow`, 알림함, 관심 동네·선택 동의(`getInterestAreas`·`getOptionalConsents`).
 

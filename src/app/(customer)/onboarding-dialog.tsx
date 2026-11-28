@@ -29,8 +29,8 @@ const ICONS: Record<OnboardingIcon, LucideIcon> = {
 
 /**
  * 첫 로그인 안내 창(C-107). 4장을 [다음]으로 넘기고 마지막 장의 [시작하기]나 닫기(×)로 닫는다.
- * 지금은 내 정보의 [안내 다시 보기]에서 연다. 고객 계정으로 처음 로그인했을 때 저절로 여는 것은
- * 안내 본 시각(onboarding_seen_at, #623)이 생기면 더하고, 그때 onClosed로 본 시각을 남긴다.
+ * 고객 계정으로 처음 들어오면 저절로 열리고(onboarding-gate.tsx·onboarding-auto.tsx, 닫으면 본 시각을 남긴다),
+ * 내 정보의 [안내 다시 보기]로 다시 연다(본 시각은 바꾸지 않는다).
  * 열 때마다 첫 장부터 보여 준다(부르는 쪽이 열 때 key를 바꾸지 않아도 되게 닫히면 첫 장으로 돌린다)
  */
 export function OnboardingDialog({

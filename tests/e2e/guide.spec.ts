@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-import { signInAs } from './support/seed';
+import { onboardingSeenOf, setOnboardingSeen, signInAs } from './support/seed';
 
-// 첫 로그인 안내(C-107 화면). 지금은 내 정보의 [안내 다시 보기]에서 연다(처음 로그인했을 때 저절로 뜨는 것은 #623 뒤).
-// 4장을 [다음]으로 넘기고 마지막 장의 [시작하기]로 닫는다. 다시 열면 첫 장부터다
+// 첫 로그인 안내(C-107). 고객 계정으로 처음 들어오면 한 번 저절로 열리고, 닫으면 계정에 본 시각을 남겨 다시 열리지 않는다.
+// 내 정보의 [안내 다시 보기]로 다시 볼 수 있다. 4장을 [다음]으로 넘기고 마지막 장의 [시작하기]로 닫는다. 다시 열면 첫 장부터다
+// 다른 테스트는 signInAs가 안내를 본 것으로 해 둔다
 test('내 정보의 [안내 다시 보기]로 안내 4장을 넘겨 보고, 닫았다 다시 열면 첫 장부터다', async ({
   page,
   context,
@@ -34,4 +35,27 @@ test('내 정보의 [안내 다시 보기]로 안내 4장을 넘겨 보고, 닫�
 
   await replay.click();
   await expect(page.getByRole('dialog').getByText('1 / 4')).toBeVisible();
+});
+
+test('고객 계정으로 처음 들어오면 안내가 저절로 열리고, 닫으면 다음부터는 열리지 않는다', async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  await signInAs(context, 'customer-c', baseURL!, { onboardingSeen: false });
+  try {
+    await page.goto('/home');
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('1 / 4')).toBeVisible();
+    await dialog.getByRole('button', { name: '닫기' }).click();
+    await expect(dialog).toBeHidden();
+    // 계정에 본 시각이 남는다(다른 기기에서도 다시 뜨지 않는다)
+    await expect.poll(() => onboardingSeenOf('customer-c')).toBe(true);
+
+    await page.goto('/reservations');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  } finally {
+    await setOnboardingSeen('customer-c', true);
+  }
 });
