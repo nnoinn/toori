@@ -20,9 +20,13 @@ export const INTEREST_AREA_NOTE =
 /** 관심 동네를 골랐는데 관심 동네·찜한 샵 알림 동의가 없을 때(D15). 이 자리에서 동의를 받는다 */
 export const INTEREST_NEEDS_CONSENT = `${OPTIONAL_CONSENT_NAMES.interest_alert}은 광고성 정보라서 수신에 동의해야 받을 수 있어요.`;
 
-/** 찜을 눌렀는데 관심 동네·찜한 샵 알림 동의가 없을 때 (#270 3번) */
+/** 관심 샵(예전 이름 찜)을 눌렀는데 관심 동네·찜한 샵 알림 동의가 없을 때 (#270 3번) */
 export const FAVORITE_NEEDS_CONSENT = '새 매물 알림도 받으려면 동의가 필요해요';
 
+/**
+ * 관심 샵 버튼 옆 동의 권유의 설명. 바로 옆 버튼 이름에 맞춰 '관심 샵'이라 쓴다(C-211, 뜻은 같다).
+ * 동의 이름(OPTIONAL_CONSENT_NAMES)과 가입 동의 문구·동의 문구 문서 7장의 '찜한 샵'은 서버 이름과 같이 바꾼다
+ */
 export const FAVORITE_ALERT_NOTE =
-  `찜한 샵과 관심 동네의 새 할인 매물을 하루 한 번 ${formatHourLabel(INTEREST_DIGEST_HOUR)}에 알려 드려요(광고성 정보). ` +
+  `관심 샵과 관심 동네의 새 할인 매물을 하루 한 번 ${formatHourLabel(INTEREST_DIGEST_HOUR)}에 알려 드려요(광고성 정보). ` +
   `${formatHourLabel(PUSH_QUIET_HOURS.start)}부터 ${formatHourLabel(PUSH_QUIET_HOURS.end)}까지는 보내지 않아요.`;
