@@ -79,7 +79,7 @@ PR 검사가 자동으로 막는 것:
 | SHOW-04 | 매물 상세에는 접힌 "환불 규정" 한 줄만 두고, 규정 문구는 결제 동의 문구와 글자까지 같다 | C-305·C-402 | ✅ | `src/app/(customer)/(tabs)/slots/[slotId]/detail-format.test.ts` 결제 동의 문구(consent-texts.md 3장)와 글자까지 같다 |
 | SHOW-05 | 샵 영업시간은 일~토 순서로 보여 준다(고객 매물 상세, 원장님 매장 설정의 표와 요일별 칸) | 11/15 nnoinn, #431, #437 | ✅ | `src/app/(customer)/(tabs)/slots/[slotId]/detail-format.test.ts` 캘린더처럼 일요일부터 토요일까지 7줄<br>`src/app/owner/(console)/settings/shop/shop-profile.test.ts` 저장된 영업시간을 일~토 7줄로 바꾸고 |
 | SHOW-06 | 신규 고객 판별의 이력은 같은 사람의 고객 계정 모두에서 본다: 같은 로그인의 탈퇴한 고객 계정, 로그인 정보까지 지운 뒤 같은 이메일로 다시 가입한 계정(같은 사람 표시). 같은 사람 표시가 비어 있으면 잇지 않는다. 첫 로그인 때 같은 사람 표시를 채운다 | #154 본문 4장 | ✅ | `src/server/customers/new-customer.test.ts` 같은 로그인의 탈퇴한 고객 계정 이력도 이력으로 본다<br>`src/server/customers/new-customer.test.ts` 로그인 정보까지 지운 뒤 같은 이메일로 다시 가입한 계정은<br>`src/server/customers/new-customer.test.ts` 같은 사람 표시가 둘 다 비어 있으면 같은 사람으로 보지 않는다<br>`src/server/auth/current-account.test.ts` ensureProfile은 처음 만들 때 같은 사람 표시 |
-| SHOW-10 | 내 정보의 "투리로 아낀 금액"은 방문 완료 예약의 (정가 − 실제 결제액) 합이다. 쿠폰으로 덜 낸 금액은 넣고, 노쇼·취소·예정·무효 예약은 뺀다 | C-108 | ✅ | `src/app/(customer)/(tabs)/me/saved-amount.db.test.ts` 방문 완료 예약의 (정가 − 실제 결제액)을 더하고<br>`src/app/(customer)/(tabs)/me/saved-amount.db.test.ts` 노쇼·취소·예정·무효 예약과 다른 손님의 예약은 더하지 않는다 |
+| SHOW-10 | 내 정보의 "투리로 아낀 금액"은 방문 완료 예약의 (정가 − 실제 결제액) 합이다. 쿠폰으로 덜 낸 금액은 넣고, 노쇼·취소·예정·무효 예약은 뺀다 | C-108 | ✅ | `src/app/(customer)/(tabs)/me/saved-amount.db.test.ts` 방문 완료 예약의 (정가 − 실제 결제액)을 더하고<br>`src/app/(customer)/(tabs)/me/saved-amount.db.test.ts` 노쇼·취소·예정·무효 예약과 다른 손님의 예약은 더하지 않는다<br>`tests/e2e/saved-amount.spec.ts` 내 정보 맨 위에 아낀 금액 |
 
 ## 5. 홀딩·결제
 
