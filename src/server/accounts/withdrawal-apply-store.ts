@@ -16,6 +16,7 @@ import {
   profiles,
   pushSubscriptions,
   shops,
+  slotInterests,
   slots,
   slotWindows,
   termsAgreements,
@@ -47,7 +48,7 @@ export async function lockActiveCustomer(
 
 /**
  * 고객 탈퇴(#154 본문 2장): 결제 중이면 홀딩을 풀고, 기한이 남은 안 쓴 쿠폰을 없애고(확인 창의 "쿠폰 N장"과 같은 기준),
- * 관심 동네·찜·고객 푸시 구독을 지우고, 켜져 있는 광고성 동의를 철회로 남기고, 계정을 탈퇴로 바꾸고 탈퇴 기록을 남긴다.
+ * 관심 동네·관심 샵·관심 매물·고객 푸시 구독을 지우고, 켜져 있는 광고성 동의를 철회로 남기고, 계정을 탈퇴로 바꾸고 탈퇴 기록을 남긴다.
  * lockActiveCustomer로 잠근 뒤, 막는 이유가 없을 때만 부른다
  */
 export async function applyCustomerWithdrawal(
@@ -74,6 +75,7 @@ export async function applyCustomerWithdrawal(
 
   await tx.delete(interestAreas).where(eq(interestAreas.customerId, customerId));
   await tx.delete(favorites).where(eq(favorites.customerId, customerId));
+  await tx.delete(slotInterests).where(eq(slotInterests.customerId, customerId));
   await tx
     .delete(pushSubscriptions)
     .where(
