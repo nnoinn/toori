@@ -216,6 +216,8 @@ async function deleteSlots(sql, slotIds) {
     )
     select id from chain`;
   await deleteBookings(sql, () => sql`select id from orders where slot_id in (${withRelisted()})`);
+  // 팀원이 시나리오 매물에 남긴 관심(C-211, #616)도 같이 지운다(남아 있으면 매물을 지우지 못한다)
+  await sql`delete from slot_interests where slot_id in (${withRelisted()})`;
   // 원래 매물과 재등록한 매물을 한 번에 지워야 서로 가리키는 제약에 걸리지 않는다
   await sql`delete from slots where id in (${withRelisted()})`;
 }

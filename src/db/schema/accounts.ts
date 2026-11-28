@@ -69,6 +69,9 @@ export const customers = pgTable(
     phone: text(),
     // 관심 지역 알림을 마지막으로 보낸 시각(하루 1번 13시 묶음 발송 기준)
     lastInterestPushAt: timestamptz(),
+    // 첫 로그인 안내(C-107, #616)를 끝까지 넘기거나 닫은 시각. 비어 있으면 로그인한 뒤 안내를 보여 준다.
+    // 기기가 아니라 계정에 남겨서 다른 기기로 로그인해도 다시 뜨지 않는다. 내 정보에서 다시 볼 때는 바꾸지 않는다
+    onboardingSeenAt: timestamptz(),
     // 탈퇴한 시각(#154). 자세한 기록(되살리기·30일 뒤 지우기)은 account_withdrawals
     withdrawnAt: timestamptz(),
     createdAt: createdAt(),
