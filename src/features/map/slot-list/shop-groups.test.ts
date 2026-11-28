@@ -6,6 +6,7 @@ import {
   groupByShopInOrder,
   groupPreview,
   groupSummaryText,
+  INTEREST_GROUP_PREVIEW_COUNT,
 } from './shop-groups';
 import type { ListItem } from './types';
 
@@ -81,10 +82,26 @@ describe('샵별 묶기', () => {
     expect(folded.hiddenCount).toBe(2);
     expect(groupPreview(five, true)).toEqual({ visible: five.items, hiddenCount: 0 });
   });
+
+  it(`관심 샵은 샵마다 ${INTEREST_GROUP_PREVIEW_COUNT}개까지 보여주고, 넘으면 [더 보기]로 숨긴 수(C-211)`, () => {
+    const [two] = groupByShop([slot('1', 'a'), slot('2', 'a')]);
+    expect(groupPreview(two, false, INTEREST_GROUP_PREVIEW_COUNT)).toEqual({
+      visible: two.items,
+      hiddenCount: 0,
+    });
+    const [three] = groupByShop([slot('1', 'a'), slot('2', 'a'), slot('3', 'a')]);
+    const folded = groupPreview(three, false, INTEREST_GROUP_PREVIEW_COUNT);
+    expect(ids(folded.visible)).toEqual(['1', '2']);
+    expect(folded.hiddenCount).toBe(1);
+    expect(groupPreview(three, true, INTEREST_GROUP_PREVIEW_COUNT)).toEqual({
+      visible: three.items,
+      hiddenCount: 0,
+    });
+  });
 });
 
-// 찜한 샵(11/15 회의 3번): 매물이 있는 찜한 샵마다 한 묶음(매물 없는 샵은 숨김, 11/18)
-describe('찜한 샵 묶기', () => {
+// 관심 샵(예전 이름 찜한 샵, 11/15 회의 3번·C-211): 매물이 있는 관심 샵마다 한 묶음(매물 없는 샵은 숨김, 11/18)
+describe('관심 샵 묶기', () => {
   it('시작이 가까운 순으로 받은 매물을 샵마다 모으고, 샵은 가장 빠른 매물 순', () => {
     // 매물은 시작이 가까운 순: c, a, c(시간대), a, b
     const groups = groupByShopInOrder([

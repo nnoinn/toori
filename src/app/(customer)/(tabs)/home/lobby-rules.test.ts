@@ -6,7 +6,7 @@ import type { ListItem } from '@/features/map/slot-list/types';
 
 import { favoriteSummaryText, LIST_PATH, LOBBY_TILES, withoutShown } from './lobby-rules';
 
-// 고객 홈(로비) 바로가기와 찜한 샵 상자 문구 (11/15 회의 6번, 11/20 정찬형 A안)
+// 고객 홈(로비) 바로가기와 관심 샵 상자 문구 (11/15 회의 6번, 11/20 정찬형 A안, C-211)
 
 /** 바로가기 주소를 매물 목록이 읽는 대로 읽는다 */
 function readListHref(href: string) {
@@ -26,7 +26,7 @@ describe('바로가기 칸', () => {
     expect(LOBBY_TILES.map((t) => t.label)).toEqual([
       '매물 목록',
       '지도',
-      '찜한 샵',
+      '관심',
       '내 예약',
       '미용실',
       '네일·속눈썹',
@@ -72,20 +72,20 @@ describe('바로가기 칸', () => {
   });
 });
 
-describe('찜한 샵 상자 문구', () => {
+describe('관심 샵 상자 문구 (C-211)', () => {
   const item = (shopId: string, id: string) => ({ kind: 'slot', shopId, slotId: id }) as ListItem;
 
-  it('찜한 샵이 없으면 없다고 한다', () => {
-    expect(favoriteSummaryText(0, [])).toBe('아직 찜한 샵이 없어요');
+  it('관심 샵이 없으면 없다고 한다', () => {
+    expect(favoriteSummaryText(0, [])).toBe('아직 관심 샵이 없어요');
   });
 
-  it('찜한 샵은 있는데 지금 매물이 없으면 찜한 샵 수와 함께 없다고 한다', () => {
-    expect(favoriteSummaryText(3, [])).toBe('찜한 샵 3곳에 지금 올라온 매물이 없어요');
+  it('관심 샵은 있는데 지금 매물이 없으면 관심 샵 수와 함께 없다고 한다', () => {
+    expect(favoriteSummaryText(3, [])).toBe('관심 샵 3곳에 지금 올라온 매물이 없어요');
   });
 
-  it('매물이 있으면 매물이 있는 샵 수(찜한 샵 수가 아니라)와 매물 수', () => {
+  it('매물이 있으면 매물이 있는 샵 수(관심 샵 수가 아니라)와 매물 수', () => {
     const items = [item('a', '1'), item('a', '2'), item('b', '3')];
-    expect(favoriteSummaryText(5, items)).toBe('찜한 샵 2곳에 지금 매물 3개');
+    expect(favoriteSummaryText(5, items)).toBe('관심 샵 2곳에 지금 매물 3개');
   });
 });
 

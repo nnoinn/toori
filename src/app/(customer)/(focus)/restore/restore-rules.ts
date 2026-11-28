@@ -37,7 +37,7 @@ export function restoreDescription(restoreDays: number): string {
 /** 되살리면 돌아오는 것과 돌아오지 않는 것(#154 3장, #579) */
 export const RESTORE_NOTES = [
   '예약·결제 기록은 그대로 돌아와요',
-  '없어진 쿠폰, 관심 동네·찜한 샵·푸시 알림·광고성 알림 동의는 돌아오지 않아요',
+  '없어진 쿠폰, 관심 동네·관심 샵·푸시 알림·광고성 알림 동의는 돌아오지 않아요',
 ] as const;
 
 /** 탈퇴한 날과 되살릴 수 있는 기한. 예: "11/21(토) 14:00" */
