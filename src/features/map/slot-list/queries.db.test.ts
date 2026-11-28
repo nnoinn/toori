@@ -3,7 +3,7 @@
 
 import { afterAll, expect, it } from 'vitest';
 
-import { favorites, slots, slotWindows } from '@/db/schema';
+import { favorites, slots, slotWindowMenus, slotWindows } from '@/db/schema';
 
 import {
   createTestCustomer,
@@ -15,6 +15,7 @@ import {
 } from '../../../../tests/db/fixtures';
 import { closeTestDb, describeDb, type TestTx, withRollback } from '../../../../tests/db/test-db';
 import { EMPTY_FILTERS, type HomeFilters } from '../filters';
+import { parseSearchKeyword } from '../search';
 import type { MapBounds } from '../types';
 import { decodeCursor, SLOT_PAGE_SIZE } from './cursor';
 import {
@@ -261,6 +262,141 @@ describeDb('홈 목록·지도 조회', () => {
         await filtered({ prices: ['under_30k', '30k_50k'], times: ['afternoon', 'evening'] }),
       ).toEqual([afternoon.id, evening.id].sort());
       expect(await filtered({ times: ['morning'], category: 'hair' })).toEqual([morning.id]);
+    });
+  });
+
+  it('검색(C-210): 고른 동네 안에서 샵 이름·메뉴 이름·서비스 종류 이름으로 찾고, 단어는 모두 맞아야 하며 매물 수도 같은 조건', async () => {
+    await withRollback(async (tx) => {
+      const handae = await createTestShop(tx, { status: 'approved', name: '테스트 한대앞 헤어' });
+      const other = await createTestShop(tx, { status: 'approved', name: '테스트 다른 샵' });
+      const sangnok = await createTestShop(tx, {
+        status: 'approved',
+        name: '테스트 한대앞 상록',
+        sigunguCode: '41271',
+        sigungu: '안산시 상록구',
+      });
+      const pending = await createTestShop(tx, { status: 'pending', name: '테스트 한대앞 대기' });
+
+      // 메뉴 이름 '커트'(testSlot 기본), 서비스 종류 커트
+      const cut = await insertSlot(tx, handae, '10:00', '11:00');
+      const magic = await insertSlot(tx, other, '12:00', '13:00', {
+        serviceType: 'perm',
+        menuName: '볼륨 매직',
+      });
+      const percent = await insertSlot(tx, other, '14:00', '15:00', { menuName: '50% 특가 커트' });
+      // 마감 매물, 다른 동네 샵, 승인 대기 샵은 이름이 맞아도 빠진다
+      await insertSlot(tx, handae, '16:00', '17:00', {
+        status: 'closed',
+        serviceType: 'perm',
+        menuName: '볼륨 매직',
+      });
+      await insertSlot(tx, sangnok, '10:00', '11:00');
+      await insertSlot(tx, pending, '10:00', '11:00');
+
+      const search = async (text: string) => {
+        const query = {
+          sigunguCode: '41273',
+          filters: EMPTY_FILTERS,
+          keyword: parseSearchKeyword(text),
+          customerId: null,
+          now: NOW,
+        };
+        const result = await selectSlotPage(tx, {
+          ...query,
+          origin: TEST_LOCATION,
+          sort: 'imminent',
+          cursor: null,
+          shopId: null,
+        });
+        return { ids: ids(result.items), total: await countListItems(tx, query) };
+      };
+
+      // 샵 이름
+      expect(await search('한대앞')).toEqual({ ids: [cut.id], total: 1 });
+      // 메뉴 이름
+      expect(await search('매직')).toEqual({ ids: [magic.id], total: 1 });
+      // 서비스 종류 이름(메뉴 이름에 '펌'이 없어도)
+      expect(await search('펌')).toEqual({ ids: [magic.id], total: 1 });
+      // 단어는 모두 맞아야 한다(샵 이름 + 서비스 종류)
+      expect((await search('다른 펌')).ids).toEqual([magic.id]);
+      expect((await search('한대앞 펌')).ids).toEqual([]);
+      // 메뉴 이름과 서비스 종류 '커트'
+      expect((await search('커트')).ids).toEqual([cut.id, percent.id]);
+      // % _ 는 글자 그대로 찾는다(모든 매물에 맞지 않는다)
+      expect((await search('%')).ids).toEqual([percent.id]);
+      expect((await search('_')).ids).toEqual([]);
+      // 검색어가 없으면 거르지 않는다
+      expect((await search('  ')).total).toBe(3);
+    });
+  });
+
+  it('검색(C-210): 신규 고객 전용은 검색에서도 그 샵 이력이 있는 고객에게 빠지고, 필터와 같이 쓴다', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved', name: '테스트 한대앞 헤어' });
+      const visited = await createTestCustomer(tx);
+      await createTestReservation(tx, shop, visited.customerId, '08:00', '09:00', 'completed');
+      const onlyNew = await insertSlot(tx, shop, '10:00', '11:00', { newCustomerOnly: true });
+      const normal = await insertSlot(tx, shop, '12:00', '13:00', {
+        listPrice: 40000,
+        discountRate: 50,
+        salePrice: 20000,
+      });
+
+      const keyword = parseSearchKeyword('한대앞');
+      const found = (extra: Partial<HomeSlotQuery>) =>
+        page(tx, { sort: 'imminent', keyword, ...extra }).then((result) => ids(result.items));
+
+      expect(await found({ customerId: visited.customerId })).toEqual([normal.id]);
+      expect(await found({})).toEqual([onlyNew.id, normal.id]);
+      expect(await found({ filters: { ...EMPTY_FILTERS, minDiscount: 50 } })).toEqual([normal.id]);
+    });
+  });
+
+  it('검색(C-210): 시간대 카드는 지금은 샵 이름으로만 찾는다(시간대 안 서비스 이름은 listSlotWindows가 받으면 바꾼다)', async () => {
+    await withRollback(async (tx) => {
+      const shop = await createTestShop(tx, { status: 'approved', name: '테스트 시간대 헤어' });
+      const [window] = await tx
+        .insert(slotWindows)
+        .values({
+          shopId: shop.shopId,
+          startAt: new Date('2026-11-01T13:00:00+09:00'),
+          endAt: new Date('2026-11-01T18:00:00+09:00'),
+          publishAt: new Date('2026-10-30T13:00:00+09:00'),
+          status: 'published',
+          createdBy: shop.createdBy,
+        })
+        .returning();
+      await tx.insert(slotWindowMenus).values({
+        windowId: window.id,
+        menuId: shop.menuId,
+        serviceType: 'cut',
+        menuName: '커트',
+        listPrice: 20000,
+        durationMinutes: 60,
+        discountRate: 10,
+        salePrice: 18000,
+      });
+
+      const search = async (text: string) => {
+        const query = {
+          sigunguCode: '41273',
+          filters: EMPTY_FILTERS,
+          keyword: parseSearchKeyword(text),
+          customerId: null,
+          now: NOW,
+        };
+        const result = await selectSlotPage(tx, {
+          ...query,
+          origin: TEST_LOCATION,
+          sort: 'imminent',
+          cursor: null,
+          shopId: null,
+        });
+        return { ids: ids(result.items), total: await countListItems(tx, query) };
+      };
+
+      expect(await search('시간대')).toEqual({ ids: [window.id], total: 1 });
+      expect(await search('다른샵')).toEqual({ ids: [], total: 0 });
     });
   });
 

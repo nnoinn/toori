@@ -79,6 +79,7 @@ PR 검사가 자동으로 막는 것:
 | SHOW-04 | 매물 상세에는 접힌 "환불 규정" 한 줄만 두고, 규정 문구는 결제 동의 문구와 글자까지 같다 | C-305·C-402 | ✅ | `src/app/(customer)/(tabs)/slots/[slotId]/detail-format.test.ts` 결제 동의 문구(consent-texts.md 3장)와 글자까지 같다 |
 | SHOW-05 | 샵 영업시간은 일~토 순서로 보여 준다(고객 매물 상세, 원장님 매장 설정의 표와 요일별 칸) | 11/15 nnoinn, #431, #437 | ✅ | `src/app/(customer)/(tabs)/slots/[slotId]/detail-format.test.ts` 캘린더처럼 일요일부터 토요일까지 7줄<br>`src/app/owner/(console)/settings/shop/shop-profile.test.ts` 저장된 영업시간을 일~토 7줄로 바꾸고 |
 | SHOW-06 | 신규 고객 판별의 이력은 같은 사람의 고객 계정 모두에서 본다: 같은 로그인의 탈퇴한 고객 계정, 로그인 정보까지 지운 뒤 같은 이메일로 다시 가입한 계정(같은 사람 표시). 같은 사람 표시가 비어 있으면 잇지 않는다. 첫 로그인 때 같은 사람 표시를 채운다 | #154 본문 4장 | ✅ | `src/server/customers/new-customer.test.ts` 같은 로그인의 탈퇴한 고객 계정 이력도 이력으로 본다<br>`src/server/customers/new-customer.test.ts` 로그인 정보까지 지운 뒤 같은 이메일로 다시 가입한 계정은<br>`src/server/customers/new-customer.test.ts` 같은 사람 표시가 둘 다 비어 있으면 같은 사람으로 보지 않는다<br>`src/server/auth/current-account.test.ts` ensureProfile은 처음 만들 때 같은 사람 표시 |
+| SHOW-09 | 검색은 지금 고른 동네 안에서 샵 이름·메뉴 이름·서비스 종류 이름으로 찾고, 띄어 쓴 단어는 모두 맞아야 한다. 결과도 목록과 같은 조건(승인 샵·게시중·신규 고객 전용 서버 판별)이고 필터와 같이 쓴다. `%`·`_`도 글자 그대로 찾는다. 시간대 카드는 지금 샵 이름으로만 찾는다 | C-210 | ✅ | `src/features/map/slot-list/queries.db.test.ts` 검색(C-210): 고른 동네 안에서 샵 이름·메뉴 이름·서비스 종류 이름으로 찾고<br>`src/features/map/slot-list/queries.db.test.ts` 검색(C-210): 신규 고객 전용은 검색에서도<br>`src/features/map/slot-list/queries.db.test.ts` 검색(C-210): 시간대 카드는 지금은 샵 이름으로만 찾는다<br>`src/features/map/search.test.ts` 단어마다 샵 이름·메뉴 이름·서비스 종류 중 한 곳에 있으면 맞고<br>`tests/e2e/search.spec.ts` 홈 검색 칸에서 샵 이름으로 찾으면 |
 
 ## 5. 홀딩·결제
 

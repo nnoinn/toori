@@ -32,6 +32,7 @@ import {
   LobbyTiles,
 } from './lobby-parts';
 import { favoriteSummaryText, LOBBY_ROW_COUNT, sortedListHref, withoutShown } from './lobby-rules';
+import { SearchBox } from './search-box';
 import {
   CUSTOMER_NOTIFICATION_ACCOUNT,
   NOTIFICATIONS_PATH,
@@ -40,7 +41,7 @@ import {
 export const metadata: Metadata = { title: '홈' };
 
 // 고객 홈 = 로비 (#215 2장, 11/15 회의 6번·1번, 11/20 정찬형 A안). 주소: /home. 당근 웹처럼:
-// 동네 줄 → 바로가기 8칸 → 왼쪽 매물 칸(곧 시작하는 매물 5개·많이 할인하는 매물 3개), 오른쪽(PC) 지도·관심 동네·찜한 샵 상자.
+// 동네 줄(PC는 가운데 검색 칸, 폰은 줄 아래 검색 칸, C-210) → 바로가기 8칸 → 왼쪽 매물 칸(곧 시작하는 매물 5개·많이 할인하는 매물 3개), 오른쪽(PC) 지도·관심 동네·찜한 샵 상자.
 // 폰은 위쪽 줄에 로고와 알림 종(종은 이 화면에만, #371), 관심 동네 상자는 바로가기 아래(회의 1번), 매물 칸은 3줄씩.
 // 범위는 매물 목록과 같다(고른 동네, 내 위치면 그 시·군·구). 동네를 아직 안 골랐으면 위치 안내·동네 고르기를 보여준다.
 // 로그인하지 않아도 볼 수 있다(#215 댓글). 찜한 샵 매물만 들어갈 때 로그인 화면을 거친다
@@ -148,7 +149,10 @@ async function LobbyContent() {
         label={isRegion ? area.label : '내 위치'}
         selectedCode={isRegion ? location.region.code : null}
         total={total}
+        search={<SearchBox filled />}
       />
+      {/* 폰은 동네 줄이 좁아서 검색 칸을 그 아래 한 줄에 둔다(폰 단계에서 다듬는다) */}
+      <SearchBox className="md:hidden" />
       <LobbyTiles />
       <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_300px] md:items-start md:gap-6">
         <div className="flex flex-col gap-4">
