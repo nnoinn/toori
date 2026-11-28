@@ -20,6 +20,8 @@ import {
 import { type DetailTab, DetailTabs } from './detail-tabs';
 import { FavoriteButton } from './favorite-button';
 import { ReserveButton } from './reserve-button';
+import { ShareButton } from './share-button';
+import { slotShareText, slotShareTitle } from './share-rules';
 import type { SlotDetail } from './types';
 
 type SlotDetailViewProps = {
@@ -79,8 +81,18 @@ export function SlotDetailView({
       </div>
 
       <Card className="mx-4 gap-3 px-4 text-base md:sticky md:top-22 md:col-start-2 md:row-span-3 md:row-start-1 md:mx-0 md:p-5">
-        <p className="text-sm text-muted-foreground">{shop.name}</p>
-        <h2 className="text-xl font-bold">{menu.name}</h2>
+        {/* 오른쪽 위 [공유](C-310): 링크를 붙이면 할인율·시간·샵 이름 미리보기 그림이 뜬다 */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 flex-col gap-1">
+            <p className="text-sm text-muted-foreground">{shop.name}</p>
+            <h2 className="text-xl font-bold">{menu.name}</h2>
+          </div>
+          <ShareButton
+            slotId={slot.slotId}
+            title={slotShareTitle(slot)}
+            text={slotShareText(slot)}
+          />
+        </div>
         <SlotBadges kinds={slot.badges} />
         <Price
           listPrice={slot.listPrice}
