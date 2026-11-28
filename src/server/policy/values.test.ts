@@ -49,6 +49,7 @@ import {
   UPLOAD_ALLOWED_TYPES,
   UPLOAD_MAX_BYTES,
 } from './upload';
+import { WEEKLY_SUGGEST_LOOKBACK_WEEKS, WEEKLY_SUGGEST_MAX_ITEMS } from './weekly-suggest';
 import { WITHDRAWAL_RESTORE_DAYS } from './withdrawal';
 
 describe('시간 (#48 1장)', () => {
@@ -191,5 +192,12 @@ describe('정산 계좌 은행 (S-107)', () => {
 describe('회원 탈퇴 (#154)', () => {
   it('탈퇴한 계정은 30일 안에 되살릴 수 있다(10/29 nnoinn 결정)', () => {
     expect(WITHDRAWAL_RESTORE_DAYS).toBe(30);
+  });
+});
+
+describe('주간 매물 등록 권유 (S-411)', () => {
+  it('지난 4주 판매를 보고 최대 3개 권한다(명세 🟡, #626)', () => {
+    expect(WEEKLY_SUGGEST_LOOKBACK_WEEKS).toBe(4);
+    expect(WEEKLY_SUGGEST_MAX_ITEMS).toBe(3);
   });
 });
