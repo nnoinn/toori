@@ -38,25 +38,33 @@ const TILE_ICONS: Record<LobbyTileKey, LucideIcon> = {
   imminent: Clock,
 };
 
-/** 동네 줄: 지금 동네(누르면 동네 고르기)와 지금 예약할 수 있는 할인 매물 수 */
+/** 동네 줄: 지금 동네(누르면 동네 고르기), PC는 가운데 검색 칸(C-210), 지금 예약할 수 있는 할인 매물 수 */
 export function LobbyAreaBar({
   label,
   selectedCode,
   total,
+  search,
 }: {
   label: string;
   selectedCode: string | null;
   /** 동네 안 매물 수(시간대는 1개로). 동네를 찾지 못했으면 null */
   total: number | null;
+  /** 가운데 검색 칸(PC만). 폰은 바가 좁아서 홈이 바 아래에 따로 둔다 */
+  search?: React.ReactNode;
 }) {
   return (
     <div
       className={`${CARD} flex items-center justify-between gap-2 py-1 pr-4 pl-3 md:rounded-full`}
     >
-      <div className="flex min-w-0 items-center">
+      <div className="flex min-w-0 shrink-0 items-center">
         <MapPin className="size-5 shrink-0 text-muted-foreground" aria-hidden />
         <LocationSwitcher label={label} selectedCode={selectedCode} />
       </div>
+      {search ? (
+        <div className="hidden min-w-0 flex-1 justify-center md:flex">
+          <div className="w-full max-w-md">{search}</div>
+        </div>
+      ) : null}
       {total === null ? null : (
         <p className="shrink-0 text-sm text-muted-foreground">
           <span className="max-md:hidden">지금 예약할 수 있는 </span>할인{' '}

@@ -8,7 +8,21 @@
 
 import 'server-only';
 
-import { and, asc, count, desc, eq, gt, gte, inArray, lt, or, type SQL, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  gte,
+  ilike,
+  inArray,
+  lt,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm';
 
 import { getDb } from '@/db';
 import { favorites, shopImages, shops, slots } from '@/db/schema';
@@ -20,6 +34,12 @@ import { customerVisibleShop } from '@/server/shops/visibility';
 import { listSlotWindows, notWindowSlot, type SlotWindowCard } from '@/server/slot-windows';
 
 import { EMPTY_FILTERS, type HomeFilters } from '../filters';
+import {
+  containsPattern,
+  matchesSearchKeyword,
+  type SearchKeyword,
+  serviceTypesMatching,
+} from '../search';
 import type { LatLng, MapBounds, MapShop } from '../types';
 import { slotBadges, windowBadges } from './badges';
 import { encodeCursor, SLOT_PAGE_SIZE, type SlotCursor } from './cursor';
@@ -50,6 +70,8 @@ export type HomeSlotQuery = {
   customerId: string | null;
   /** 서버 시각. 상태·배지를 같은 시각으로 정한다 */
   now: Date;
+  /** 검색어(C-210, 매물 목록 ?q=). 없으면 거르지 않는다 */
+  keyword?: SearchKeyword | null;
 };
 
 const float = (value: number) => sql`${value}::float8`;
@@ -102,6 +124,25 @@ function filterConditions(filters: HomeFilters): (SQL | undefined)[] {
   ];
 }
 
+/**
+ * 검색어(C-210) → 조건. 단어마다 샵 이름·메뉴 이름·서비스 종류 이름 중 한 곳에 들어 있어야 한다(search.ts와 같은 규칙).
+ * 디자이너 이름(S-110)은 DB가 바뀐 뒤 더한다
+ */
+function keywordCondition(keyword: SearchKeyword | null | undefined): SQL | undefined {
+  if (!keyword) return undefined;
+  return and(
+    ...keyword.words.map((word) => {
+      const pattern = containsPattern(word);
+      const types = serviceTypesMatching(word);
+      return or(
+        ilike(shops.name, pattern),
+        ilike(slots.menuName, pattern),
+        types.length > 0 ? inArray(slots.serviceType, types) : undefined,
+      );
+    }),
+  );
+}
+
 /** 범위(지도 영역 또는 시·군·구)와 필터·로그인·시각 */
 export type VisibleSlotQuery = Omit<HomeSlotQuery, 'bounds'> & SlotArea;
 
@@ -114,19 +155,27 @@ function visibleSlotConditions(query: VisibleSlotQuery): SQL {
     notWindowSlot(),
     areaCondition(query),
     ...filterConditions(query.filters),
+    keywordCondition(query.keyword),
   )!;
 }
 
-/** 범위 안 시간대 카드(#308). 매물과 같은 범위·필터·로그인·시각으로 부른다 */
-function visibleWindows(db: DbReader, query: VisibleSlotQuery): Promise<SlotWindowCard[]> {
-  const { filters, customerId, now } = query;
+/**
+ * 범위 안 시간대 카드(#308). 매물과 같은 범위·필터·로그인·시각으로 부른다.
+ * 검색어(C-210)가 있으면 지금은 샵 이름으로만 거른다. 시간대 안 서비스 이름으로 찾는 것은 listSlotWindows(강규민)가
+ * 검색어를 받으면 바꾼다(연결 Issue)
+ */
+async function visibleWindows(db: DbReader, query: VisibleSlotQuery): Promise<SlotWindowCard[]> {
+  const { filters, customerId, now, keyword } = query;
   const area: SlotArea =
     'bounds' in query
       ? { bounds: query.bounds }
       : 'sigunguCode' in query
         ? { sigunguCode: query.sigunguCode }
         : { favoritesOf: query.favoritesOf };
-  return listSlotWindows(db, { ...area, filters, customerId, now });
+  const cards = await listSlotWindows(db, { ...area, filters, customerId, now });
+  return keyword
+    ? cards.filter((card) => matchesSearchKeyword(keyword, { shopName: card.shopName }))
+    : cards;
 }
 
 /** 시간대가 있는 샵의 시·군·구와 기준점에서의 거리(매물과 같은 계산). 기준점이 없으면 거리는 null */

@@ -15,7 +15,8 @@ import { SHOP_CATEGORIES, type ShopCategory } from '@/server/policy';
 
 export const LIST_PATH = '/home/list';
 
-function listHref(search: URLSearchParams): string {
+/** 매물 목록 주소. 주소창 값이 없으면 /home/list */
+export function listHref(search: URLSearchParams): string {
   const query = search.toString();
   return query ? `${LIST_PATH}?${query}` : LIST_PATH;
 }
