@@ -78,3 +78,13 @@ export function consentResultMessage(
 ): string {
   return `${SITE_NAME} · ${formatKstDate(processedAt)}에 ${OPTIONAL_CONSENT_NAMES[type]} 수신 ${agreed ? '동의' : '거부'} 처리가 끝났어요.`;
 }
+
+/**
+ * 아낀 금액 아래 설명(C-108). 몇 건을 더했는지와 무엇을 더했는지(정가 − 실제 결제액, 쿠폰 포함) 알린다.
+ * 노쇼·취소된 예약은 더하지 않는다(saved-amount.ts)
+ */
+export function savedAmountNote(visits: number): string {
+  return visits > 0
+    ? `방문을 마친 예약 ${visits}건에서 정가보다 덜 낸 금액을 더했어요(쿠폰 포함).`
+    : '예약하고 방문을 마치면 정가보다 덜 낸 금액이 여기에 쌓여요.';
+}
