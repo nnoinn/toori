@@ -230,4 +230,18 @@ describe('시간표 모양: 덩어리·막대 (11/22, 둥근 카드와 막대)',
       { kind: 'selected', from: 0, cells: 2, label: null },
     ]);
   });
+
+  it('막대: 뒤 덩어리의 잠긴 막대도 그 덩어리 첫 칸부터 세고, 덩어리 마지막 한 칸도 막대가 된다', () => {
+    // 금요일 하루 전체(두 줄): 12:00~13:00과 23:30~24:00에 이미 올린 매물, 23:00 한 칸을 켰다
+    const busy = [
+      { start: kst('2026-11-13T12:00:00'), end: kst('2026-11-13T13:00:00') },
+      { start: kst('2026-11-13T23:30:00'), end: kst('2026-11-14T00:00:00') },
+    ];
+    const day = dayCells('2026-11-13', hours, now, busy);
+    expect(segmentBars(day, new Set([46]), { first: 24, last: 47 }, '2026-11-13')).toEqual([
+      { kind: 'locked', from: 0, cells: 2, label: '이미 올린 매물' },
+      { kind: 'selected', from: 22, cells: 1, label: '23:00~23:30' },
+      { kind: 'locked', from: 23, cells: 1, label: '이미 올린 매물' },
+    ]);
+  });
 });
