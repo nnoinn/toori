@@ -134,7 +134,8 @@ test('예정 예약에 손님과 합의 후 취소를 요청하면 손님 동의
   await expect(agreedMethod).toContainText(
     '손님 답을 기다리는 요청이 있어요. 손님이 거절하거나 24시간이 지나면 다시 요청할 수 있어요',
   );
-  await chooser.getByRole('button', { name: '닫기', exact: true }).click();
+  // 창 오른쪽 위 X도 이름이 "닫기"다(공통 창, 내용 뒤에 붙는다). 먼저 나오는 창 아래 [닫기]를 누른다
+  await chooser.getByRole('button', { name: '닫기', exact: true }).first().click();
   await expect(chooser).toBeHidden();
 
   // 5. DB: 요청은 하나이고 답을 기다린다. 예약·매물은 그대로(손님이 동의해야 취소된다)
