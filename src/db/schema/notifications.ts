@@ -1,10 +1,12 @@
-// 알림·관심 테이블 (docs/schema-v1.md 7장, X-505-1, S-404, S-400, C-601, C-602, C-209).
+// 알림·관심 테이블 (docs/schema-v1.md 7장, X-505-1, S-404, S-400, C-601, C-602, C-209, C-211).
 // 고객의 현재 위치와 고른 동네는 DB에 저장하지 않는다(브라우저 쿠키, #19 D9).
 
+import { sql } from 'drizzle-orm';
 import { check, index, jsonb, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
 
 import { ACCOUNT_TYPES, customers, profiles } from './accounts';
 import { shops } from './shops';
+import { slots, slotWindows } from './slots';
 import { createdAt, inValues, timestamptz } from './types';
 
 /** 알림 채널. 앱 단계에서 app_push를 더한다 */
@@ -89,7 +91,7 @@ export const interestAreas = pgTable(
   (t) => [unique('interest_areas_customer_sigungu_unique').on(t.customerId, t.sigunguCode)],
 ).enableRLS();
 
-/** 찜 (C-209, P1). 테이블만 먼저 만든다 */
+/** 관심 샵 (C-209, C-211). 화면 이름은 '찜'에서 '관심'으로 바뀌었고(3단계 C-211), 표 이름은 그대로 둔다(#616) */
 export const favorites = pgTable(
   'favorites',
   {
@@ -103,4 +105,30 @@ export const favorites = pgTable(
     createdAt: createdAt(),
   },
   (t) => [unique('favorites_customer_shop_unique').on(t.customerId, t.shopId)],
+).enableRLS();
+
+/**
+ * 관심 매물 (C-211, #616, 11/27). 한 시술 매물(slot_id)이나 시간대 매물(window_id) 중 하나에 관심 표시한다(목록 카드가 따로 있어서).
+ * 끄면 줄을 지운다(관심 샵과 같다). 매물이 예약·마감돼도 줄은 그대로 두고 화면이 '마감된 매물' 칸으로 옮긴다.
+ * 시간대 안에서 손님이 홀딩해 만든 매물(slots.window_id 있음)은 카드가 없어서 저장 함수가 막는다. 고객이 탈퇴하면 지운다
+ */
+export const slotInterests = pgTable(
+  'slot_interests',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    customerId: uuid()
+      .notNull()
+      .references(() => customers.id),
+    slotId: uuid().references(() => slots.id),
+    windowId: uuid().references(() => slotWindows.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check('slot_interests_target_check', sql`(${t.slotId} is null) <> (${t.windowId} is null)`),
+    // 빈 값끼리는 같지 않아서, 매물 관심과 시간대 관심이 서로를 막지 않는다
+    unique('slot_interests_customer_slot_unique').on(t.customerId, t.slotId),
+    unique('slot_interests_customer_window_unique').on(t.customerId, t.windowId),
+    // 관심 화면 목록(고객마다 최근 순)
+    index('slot_interests_customer_created_at_idx').on(t.customerId, t.createdAt),
+  ],
 ).enableRLS();
