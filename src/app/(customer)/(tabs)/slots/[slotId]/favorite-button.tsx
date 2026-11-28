@@ -13,10 +13,11 @@ import { AreaDevicePush } from '../../home/list/area-device-push';
 import { ConsentResult, useOptionalConsent } from '../../me/consent-switch';
 import { FAVORITE_ALERT_NOTE, FAVORITE_NEEDS_CONSENT } from '../../me/interest-area-rules';
 
-const SAVE_FAILED_MESSAGE = '찜을 저장하지 못했어요. 잠시 후 다시 시도해 주세요';
+const SAVE_FAILED_MESSAGE = '관심 샵을 저장하지 못했어요. 잠시 후 다시 시도해 주세요';
 
 /**
- * 샵 찜 버튼 (#215 2장, C-209). 누르면 바로 하트를 바꿔 보여주고 서버에 저장한다. 실패하면 원래대로 돌아오고 안내를 띄운다.
+ * 관심 샵 버튼 (#215 2장, C-209, C-211에서 '찜'을 '관심 샵'으로. 관심 매물 버튼과 헷갈리지 않게 '관심 샵'이라 쓴다).
+ * 아래 설명의 '찜'은 관심 샵을 말한다. 누르면 바로 하트를 바꿔 보여주고 서버에 저장한다. 실패하면 원래대로 돌아오고 안내를 띄운다.
  * 로그인 안 함·원장님 모드면 로그인 화면으로, 고객 계정이 없으면 약관 동의로 보내고 이 화면(매물·시간대 상세)으로 돌아온다(예약하기와 같게).
  * 찜을 눌렀는데 관심 동네·찜한 샵 알림 동의가 없으면 그 순간에만 동의를 권하고, 동의하면 이 기기 푸시 알림 켜기를 보여준다(#270 3번).
  * 찜 저장은 동의와 상관없이 된다
@@ -93,7 +94,8 @@ export function FavoriteButton({
         onClick={toggle}
         className="gap-1 max-md:h-10 max-md:px-3"
       >
-        <Heart className={cn('size-4', shown && 'fill-primary text-primary')} aria-hidden />찜
+        <Heart className={cn('size-4', shown && 'fill-primary text-primary')} aria-hidden />
+        관심 샵
       </Button>
       {error ? (
         <p role="alert" className="text-sm text-destructive max-md:order-last max-md:w-full">

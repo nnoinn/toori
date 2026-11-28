@@ -46,7 +46,7 @@ export function withdrawalNotices(
     lines.push(`쿠폰 ${check.unusedCouponCount}장이 없어져요. 계정을 되살려도 돌아오지 않아요`);
   }
   if (check.holding) lines.push('결제 중인 매물은 결제를 그만둬요');
-  lines.push('관심 동네·찜한 샵·푸시 알림·광고성 알림 동의가 지워져요');
+  lines.push('관심 동네·관심 샵·푸시 알림·광고성 알림 동의가 지워져요');
   lines.push(
     `${check.restoreDays}일 안에 같은 로그인으로 들어오면 계정을 되살릴 수 있어요. 그동안은 새로 가입할 수 없어요`,
   );

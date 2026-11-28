@@ -185,7 +185,7 @@ async function LobbyContent() {
           )}
         </div>
         <aside
-          aria-label="지도·관심 동네·찜한 샵"
+          aria-label="지도·관심 동네·관심 샵"
           className="hidden md:sticky md:top-20 md:flex md:flex-col md:gap-3"
         >
           <LobbyMapBox />

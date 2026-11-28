@@ -20,6 +20,7 @@ import {
 import { type DetailTab, DetailTabs } from './detail-tabs';
 import { FavoriteButton } from './favorite-button';
 import { ReserveButton } from './reserve-button';
+import { SlotInterestButton } from './slot-interest-button';
 import type { SlotDetail } from './types';
 
 type SlotDetailViewProps = {
@@ -30,6 +31,8 @@ type SlotDetailViewProps = {
   favorite: boolean;
   /** 관심 동네·찜한 샵 새 매물 알림에 동의했는지(찜 버튼의 동의 권유) */
   interestAlertAgreed: boolean;
+  /** 이 매물을 관심 매물로 두었는지(C-211). 고객으로 로그인하지 않았으면 false */
+  slotInterested: boolean;
   /** 이 샵의 다른 매물(지금 매물은 빼고, 시작이 가까운 순) */
   otherItems: ListItem[];
 };
@@ -54,6 +57,7 @@ export function SlotDetailView({
   serverNow,
   favorite,
   interestAlertAgreed,
+  slotInterested,
   otherItems,
 }: SlotDetailViewProps) {
   const { menu, shop } = slot;
@@ -79,8 +83,14 @@ export function SlotDetailView({
       </div>
 
       <Card className="mx-4 gap-3 px-4 text-base md:sticky md:top-22 md:col-start-2 md:row-span-3 md:row-start-1 md:mx-0 md:p-5">
-        <p className="text-sm text-muted-foreground">{shop.name}</p>
-        <h2 className="text-xl font-bold">{menu.name}</h2>
+        {/* 오른쪽 위 [관심 매물](C-211): 관심 화면 [매물 보기]에 모은다 */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 flex-col gap-1">
+            <p className="text-sm text-muted-foreground">{shop.name}</p>
+            <h2 className="text-xl font-bold">{menu.name}</h2>
+          </div>
+          <SlotInterestButton slotId={slot.slotId} interested={slotInterested} />
+        </div>
         <SlotBadges kinds={slot.badges} />
         <Price
           listPrice={slot.listPrice}
