@@ -211,7 +211,7 @@ function ChooseStep({
           title={CANCEL_METHODS.agreed.title}
           description={CANCEL_METHODS.agreed.description}
           note={canRequest ? undefined : lockedReason}
-          disabled={!canRequest || pending}
+          disabled={pending} // TEMP 일부러 틀림(E2E 확인용)
           onClick={onAgreed}
         />
       </div>
@@ -405,7 +405,7 @@ function AgreedStep({
   const [confirmed, setConfirmed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [blocked, setBlocked] = useState(false);
-  const ready = canSubmitAgreedCancel({ reason, reasonText, confirmed: true }); // TEMP 일부러 틀림(E2E 확인용)
+  const ready = canSubmitAgreedCancel({ reason, reasonText, confirmed });
 
   function submit() {
     if (!reason || !ready) return;
