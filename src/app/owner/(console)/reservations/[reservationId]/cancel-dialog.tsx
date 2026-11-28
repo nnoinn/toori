@@ -451,8 +451,7 @@ function AgreedStep({
         ))}
       </GuideSection>
       <GuideSection title="이렇게 처리돼요" highlight>
-        {agreedCancelOutcomes(baseAmount * 2).map( // TEMP 일부러 틀림(E2E 확인용)
-        (line) => (
+        {agreedCancelOutcomes(baseAmount).map((line) => (
           <li key={line}>{line}</li>
         ))}
       </GuideSection>
